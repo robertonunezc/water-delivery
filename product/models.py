@@ -37,7 +37,7 @@ class Product(models.Model):
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
     min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity')
     max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity')
-
+    note = models.TextField(blank=True, null=True)
     def __str__(self):
         return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
 
@@ -52,7 +52,8 @@ class ProductClientPrice(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client")
     price = models.FloatField(default=0.0)
-
+    note = models.TextField(blank=True, null=True)
+    until_date = models.DateField(null=True, blank=True) # Date until which this price is valid, null means no expiration
     def __str__(self):
         return "{} {} - ${}".format(self.product, self.client, self.price)
 
