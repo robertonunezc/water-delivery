@@ -37,7 +37,7 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active', 'created_at', 'updated_at')
 	search_fields = ('name',)
 	list_filter = ('active',)
-	inlines = [IndividualClientInline, CorporateClientInline, BranchInline, ContactInline, AddressInline, BillingDataInline]
+	inlines = [IndividualClientInline, BranchInline, ContactInline, AddressInline, BillingDataInline]
 	readonly_fields = ('created_at', 'updated_at')
 
 
@@ -49,16 +49,19 @@ class IndividualClientAdmin(admin.ModelAdmin):
 
 @admin.register(models.CorporateClient)
 class CorporateClientAdmin(admin.ModelAdmin):
-	list_display = ('company_name', 'client', 'tax_id', 'created_at', 'updated_at')
-	search_fields = ('company_name', 'client__name', 'tax_id')
-	inlines = [BranchInline, BillingDataInline, ContactInline]
+	# CorporateClient does not have a direct FK to Client in models; show company_name and tax_id
+	list_display = ('company_name', 'tax_id', 'created_at', 'updated_at')
+	search_fields = ('company_name', 'tax_id')
+	# Only BranchInline is valid here because Branch has a FK to CorporateClient.
+	inlines = [BranchInline]
 	readonly_fields = ('created_at', 'updated_at')
 
 
 @admin.register(models.Branch)
 class BranchAdmin(admin.ModelAdmin):
-	list_display = ('branch_name', 'client', 'corporate_client', 'created_at', 'updated_at')
-	search_fields = ('branch_name', 'client__name', 'corporate_client__company_name')
+	# Branch model defines no field `branch_name` in models.py; use `pk` or __str__ instead.
+	list_display = ('pk', 'client', 'corporate_client', 'created_at', 'updated_at')
+	search_fields = ('client__name', 'corporate_client__company_name')
 	readonly_fields = ('created_at', 'updated_at')
 
 
@@ -76,5 +79,10 @@ class AddressAdmin(admin.ModelAdmin):
 
 @admin.register(models.BillingData)
 class BillingDataAdmin(admin.ModelAdmin):
-	list_display = ('business_name', 'client', 'tax_id')
-	search_fields = ('business_name', 'client__name', 'tax_id')
+	# show related client name via a callable
+	list_display = ('rfc', 'razon_social', 'client_name')
+	search_fields = ('razon_social', 'rfc',)
+
+	def client_name(self, obj):
+		return obj.client.name if obj.client else ''
+	client_name.short_description = 'client'

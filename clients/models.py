@@ -17,10 +17,8 @@ class IndividualClient(TimeStampedModel):
 
 
 class CorporateClient(TimeStampedModel):
-    client = models.OneToOneField('Client', related_name='corporate_client', on_delete=models.CASCADE)
     company_name = models.CharField(max_length=255)
     tax_id = models.CharField(max_length=50, unique=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.company_name} ({self.client.name})"
