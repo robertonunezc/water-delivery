@@ -29,7 +29,7 @@ class Product(models.Model):
         ]
 
     name = models.CharField(max_length=200)
-    presentation = models.CharField(max_length=200)
+    presentation = models.CharField(max_length=200, help_text="Garrafon, Botella, Caja")
     unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0)
     image = models.FileField(null=True, blank=True, upload_to='product_images/')
     order = models.IntegerField(default=0)
@@ -53,7 +53,7 @@ class ProductClientPrice(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client")
     price = models.FloatField(default=0.0)
     note = models.TextField(blank=True, null=True)
-    until_date = models.DateField(null=True, blank=True) # Date until which this price is valid, null means no expiration
+    until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido")
     def __str__(self):
         return "{} {} - ${}".format(self.product, self.client, self.price)
 
