@@ -25,5 +25,7 @@ urlpatterns = [
     # path('reports/', include('report.urls')),
     # path('routes/', include('routes.urls')),
     path('', include('core.urls')),
+    path('accounts/login/', admin.site.login, name='login'),
+    path('accounts/logout/', admin.site.logout, name='logout'),
 
 ]
