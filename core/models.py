@@ -13,7 +13,7 @@ class User(models.Model):
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
         """By default, exclude soft-deleted records"""
-        return super().get_queryset().filter(is_deleted=False)
+        return super().get_queryset().filter(deleted_at=None)
 
 class AllObjectsManager(models.Manager):
     """Manager to get all records including soft-deleted"""
@@ -33,6 +33,5 @@ class TimeStampedModel(models.Model):
         abstract = True
 
     def delete(self, using=None, keep_parents=False):
-        self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()

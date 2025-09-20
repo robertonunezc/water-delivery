@@ -1,35 +1,20 @@
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
-
+#Client types
+CLIENT_TYPE_CHOICES = [
+    ('individual', 'Individual'),
+    ('corporate', 'Corporate'),
+    ('branch', 'Branch'),
+]
 class Client(TimeStampedModel):
     name = models.CharField(max_length=100)
     active = models.BooleanField(default=True)
+    note = models.TextField(blank=True, null=True)
+    type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='individual')
+    corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True)
     def __str__(self):
         return self.name
-
-class IndividualClient(TimeStampedModel):
-    client = models.OneToOneField('Client', related_name='individual_client', on_delete=models.CASCADE)
-    # individual-specific fields
-
-    def __str__(self):
-        return f"Individual: {self.client.name}"
-
-
-class CorporateClient(TimeStampedModel):
-    company_name = models.CharField(max_length=255)
-    tax_id = models.CharField(max_length=50, unique=True)
-
-    def __str__(self):
-        return f"{self.company_name} ({self.client.name})"
-
-
-class Branch(TimeStampedModel):
-    client = models.OneToOneField('Client', related_name='branch', on_delete=models.CASCADE)
-    corporate_client = models.ForeignKey('CorporateClient', related_name='branches', on_delete=models.CASCADE)
-
-    def __str__(self):
-        return f"{self.branch_name} ({self.client.name})"
 
 
 class Contact(TimeStampedModel):
