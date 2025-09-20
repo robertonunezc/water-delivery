@@ -7,6 +7,14 @@ CLIENT_TYPE_CHOICES = [
     ('corporate', 'Corporate'),
     ('branch', 'Branch'),
 ]
+PAYMENT_METHOD_CHOICES = [
+    ('cash', 'Efectivo'),
+    ('credit_card', 'Tarjeta de Crédito'),
+    ('bank_transfer', 'Transferencia Bancaria'),
+    ('balance', 'Saldo'),
+    ('credit', 'Crédito'),
+    ('other', 'Otro'),
+]
 class Client(TimeStampedModel):
     name = models.CharField(max_length=100)
     active = models.BooleanField(default=True)
@@ -31,11 +39,12 @@ class Contact(TimeStampedModel):
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.CASCADE)
     street = models.CharField(max_length=255)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
-    zip_code = models.CharField(max_length=20)
-    country = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, default='Queretaro')
+    state = models.CharField(max_length=100, default='Queretaro')
+    zip_code = models.CharField(max_length=20, default='76000')
+    country = models.CharField(max_length=100, default='Mexico')
     active = models.BooleanField(default=True)
+    note = models.TextField(blank=True, null=True)
     type = models.CharField(max_length=50, choices=[('billing', 'Billing'), ('shipping', 'Shipping'), ('other', 'Other')], default='other')
 
     def __str__(self):
@@ -47,7 +56,7 @@ class BillingData(TimeStampedModel):
     rfc = models.CharField(max_length=255)
     razon_social = models.TextField()
     uso_cfdi = models.CharField(max_length=255)
-    metodo_pago = models.CharField(max_length=255)
+    metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other')
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
     def __str__(self):
         return f"Billing data for {self.client.name}"

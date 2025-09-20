@@ -117,3 +117,4 @@ media/
 staticfiles/
 static/
 .DS_Store
+*/__init__.py
