@@ -33,7 +33,7 @@ class Contact(TimeStampedModel):
     position = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
-        return f"{self.name} ({self.client.name})"
+        return f"{self.name} ({self.phone})"
 
 
 class Address(TimeStampedModel):

@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+
+{% block content %}
+  <div class="container mt-4">
+    <h1>Clients</h1>
+
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Nombre</th>
+          <th>Direccion</th>
+          <th>Telefono</th>
+          <th>Tipo</th>
+          <th>Notas</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for client in clients %}
+          <tr>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ client.name }}</td>
+            <td>{{ client.addresses.all|join:", " }}</td>
+            <td>{{ client.contacts.all|join:", " }}</td>
+            <td>{{ client.get_type_display }}</td>
+            <td>{{ client.note|default_if_none:"" }}</td>
+            <td>
+              <a href="#" class="btn btn-sm btn-primary">Detalles</a>
+              <a href="#" class="btn btn-sm btn-secondary">Facturar</a>
+              <a href="#" class="btn btn-sm btn-success">Pedido</a>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6">No se encontraron clientes.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+{% endblock %}
