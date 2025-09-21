@@ -4,7 +4,6 @@ from . import views
 app_name = 'orders'
 
 urlpatterns = [
-    path('client/<int:client_pk>/new/', views.new_order, name='client_new'),
-    # detail view should exist elsewhere; using new_order as placeholder for now
-    path('<int:pk>/', views.new_order, name='detail'),
+    path('update/<int:order_pk>', views.update_order, name='order_update'),
+    path('<int:client_pk>/', views.create_order, name='create_order'),
 ]

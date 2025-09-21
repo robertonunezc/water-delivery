@@ -24,20 +24,23 @@
           <tr>
             <th>Product</th>
             <th>Presentation</th>
-            <th>Unit</th>
-            <th>Available</th>
-            <th>Quantity</th>
+            <th>Precio</th>
+            <th>Cantidad</th>
+            <th> Accion </th>
           </tr>
         </thead>
         <tbody>
           {% for product in products %}
             <tr>
-              <td>{{ product.name }}</td>
-              <td>{{ product.presentation }}</td>
-              <td>{{ product.get_unit_of_measure_display }}</td>
-              <td>{{ product.quantity }}</td>
+              <td>{{ product.product.name }}</td>
+              <td>{{ product.product.get_presentation_display }}</td>
+              <td>{{ product.product.get_price_display }}</td>
               <td>
                 <input type="number" name="qty_{{ product.id }}" min="0" value="0" class="form-control" style="width:100px;" />
+              </td>
+              <td>
+                <button type="button" class="btn btn-sm btn-success">Agregar</button>
+                <button type="button" class="btn btn-sm btn-danger">Quitar</button>
               </td>
             </tr>
           {% endfor %}

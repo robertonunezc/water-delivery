@@ -43,17 +43,25 @@ class Product(models.Model):
 
     def get_full_name(self):
         return self.__str__()
+    
+    def get_price_display(self):
+        return self.prices.first().price if self.prices.exists() else "N/A"
+
+    def get_presentation_display(self):
+        return "{} {}".format(self.presentation, self.get_unit_of_measure_display())
 
 class ProductClientPrice(models.Model):
-    class Meta:
+    class Meta: 
         verbose_name_plural = 'Product prices'
         unique_together = ('product', 'client',)
 
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="product", related_name='prices')
+    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client", related_name='product_prices')
     price = models.FloatField(default=0.0)
     note = models.TextField(blank=True, null=True)
     until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido")
     def __str__(self):
         return "{} {} - ${}".format(self.product, self.client, self.price)
+    def get_price_display(self):
+        return "${:,.2f}".format(self.price) if hasattr(self, 'price') else "N/A"
 

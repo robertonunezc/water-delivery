@@ -28,7 +28,7 @@
             <td>
               <a href="#" class="btn btn-sm btn-primary">Detalles</a>
               <a href="#" class="btn btn-sm btn-secondary">Facturar</a>
-              <a href="#" class="btn btn-sm btn-success">Pedido</a>
+              <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-success">Pedido</a>
             </td>
           </tr>
         {% empty %}
