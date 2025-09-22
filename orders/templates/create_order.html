@@ -53,3 +53,38 @@
   </div>
 
 {% endblock %}
+{% block extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const addButtons = document.querySelectorAll('button.btn-success');
+      const removeButtons = document.querySelectorAll('button.btn-danger');
+
+      addButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const row = this.closest('tr');
+          const qtyInput = row.querySelector('input[type="number"]');
+          // Call API to update the order with the new quantity
+          qtyInput.value = parseInt(qtyInput.value) + 1;
+          fetch(`/api/orders/${orderId}/items/${productId}/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ quantity: qtyInput.value })
+          }).then(response => response.json()).then(data => {
+            console.log('Order updated:', data);
+          }).catch(error => { console.error('Error:', error); });
+        });
+      });
+
+      removeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+          const row = this.closest('tr');
+          const qtyInput = row.querySelector('input[type="number"]');
+          qtyInput.value = Math.max(0, parseInt(qtyInput.value) - 1);
+        });
+      });
+    });
+  </script>
+{% endblock %}
