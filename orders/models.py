@@ -1,11 +1,25 @@
 from django.db import models
+from enum import Enum
+
+from core.models import TimeStampedModel
+
+class OrderStatus(Enum):
+    PENDING = 'PENDING'
+    COMPLETED = 'COMPLETED'
+    CANCELLED = 'CANCELLED'
+
+ORDER_STATUS_CHOICES = (
+    (OrderStatus.PENDING.value, 'Pendiente'),
+    (OrderStatus.COMPLETED.value, 'Completado'),
+    (OrderStatus.CANCELLED.value, 'Cancelado'),
+)
 
 # Create your models here.
-class Order(models.Model):
+class Order(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
     order_date = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=50, default='pending')
+    status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default='PENDING')
     notes = models.TextField(blank=True, null=True)
     def __str__(self):
         return f"Order {self.id} for {self.client.name} - {self.status} ({self.total_amount})"
