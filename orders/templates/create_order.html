@@ -3,7 +3,8 @@
 {% block content %}
   <div class="container mt-4">
     <h1>New Order for {{ client.name }}</h1>
-
+    <div class="row mb-3">
+      <div class="col-9">
     <form method="post">
       {% csrf_token %}
 
@@ -39,8 +40,8 @@
                 <input type="number" name="qty_{{ product.id }}" min="0" value="0" class="form-control" style="width:100px;" />
               </td>
               <td>
-                <button type="button" class="btn btn-sm btn-success">Agregar</button>
-                <button type="button" class="btn btn-sm btn-danger">Quitar</button>
+                <button type="button" class="btn btn-sm btn-success" data-order="{{ order.pk }}" data-product="{{ product.id }}">Agregar</button>
+                <button type="button" class="btn btn-sm btn-danger" data-order="{{ order.pk }}" data-product="{{ product.id }}">Quitar</button>
               </td>
             </tr>
           {% endfor %}
@@ -50,11 +51,35 @@
       <button type="submit" class="btn btn-primary">Create Order</button>
       <a href="{% url 'clients:list' %}" class="btn btn-secondary">Back</a>
     </form>
+    </div>
+    <div class="col-3">
+      <h4>Order Summary</h4>
+      <ul class="list-group mb-3" id="order-summary-products">
+        {% for item in order.items.all %}
+          <li class="list-group-item d-flex justify-content-between align-items-center">
+            {{ item.product.name }} (x{{ item.quantity }})
+            <span class="badge bg-primary rounded-pill">{{ item.total_price|default:"0.00" }}</span>
+          </li>
+        {% empty %}
+          <li class="list-group-item">No items in the order.</li>
+        {% endfor %}
+      </ul>
+      <ul class="list-group">
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          Total Items
+          <span class="badge bg-primary rounded-pill">{{ order.items.count }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+          Total Amount
+          <span class="badge bg-primary rounded-pill">{{ order.total_amount|default:"0.00" }}</span>
+        </li>
+      </ul>
   </div>
 
 {% endblock %}
 {% block extra_js %}
   <script>
+    // add new product to order summary
     document.addEventListener('DOMContentLoaded', function() {
       const addButtons = document.querySelectorAll('button.btn-success');
       const removeButtons = document.querySelectorAll('button.btn-danger');
@@ -63,19 +88,21 @@
         button.addEventListener('click', function() {
           const row = this.closest('tr');
           const qtyInput = row.querySelector('input[type="number"]');
-
+          const orderId = this.getAttribute('data-order');
+          const productId = this.getAttribute('data-product');
           // Call API to update the order with the new quantity
-          fetch(`/api/orders/${orderId}/items/${productId}/`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({ quantity: qtyInput.value })
-          }).then(response => response.json()).then(data => {
-            console.log('Order updated:', data);
-          }).catch(error => { console.error('Error:', error); });
-        });
+          // build the URL using the known orders prefix
+          fetch(`/orders/${orderId}/update/`, {
+             method: 'POST',
+             headers: {
+               'Content-Type': 'application/json',
+               'X-CSRFToken': '{{ csrf_token }}'
+             },
+             body: JSON.stringify({ quantity: qtyInput.value, product_id: productId })
+           }).then(response => response.json()).then(data => {
+             console.log('Order updated:', data);
+           }).catch(error => { console.error('Error:', error); });
+         });
       });
 
       removeButtons.forEach(button => {
