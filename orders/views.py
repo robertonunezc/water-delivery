@@ -15,8 +15,8 @@ from orders import services
 def create_order(request, client_pk):
     client = get_object_or_404(Client, pk=client_pk)
     order = services.create_order(client)
-    products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
-    return render(request, 'create_order.html', {'client': client, 'order': order, 'products': products})
+    client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
+    return render(request, 'create_order.html', {'client': client, 'order': order, 'client_products': client_products})
 
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
