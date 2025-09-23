@@ -42,7 +42,7 @@ class Product(models.Model):
         return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
 
     def get_full_name(self):
-        return self.__str__()
+        return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
     
     def get_price_display(self):
         return self.prices.first().price if self.prices.exists() else "N/A"

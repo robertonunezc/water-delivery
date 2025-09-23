@@ -36,11 +36,11 @@ def update_order(request, order_pk):
             return HttpResponseBadRequest('Invalid quantity')
 
         product = get_object_or_404(Product, pk=product_id)
-        order_product = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
-
+        # Clients should only have one pending order per day
+        pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
         if quantity <= 0:
-            order_product.delete()
+            pending_client_order.delete()
         else:
-           order = services.update_order_product(order_product, quantity, product, order.client)
+           order = services.update_order(pending_client_order, quantity, product, order.client)
 
         return JsonResponse({'status': 'success', 'order_total': str(order.total_amount)})

@@ -57,18 +57,15 @@
       <ul class="list-group mb-3" id="order-summary-products">
         {% for item in order.items.all %}
           <li class="list-group-item d-flex justify-content-between align-items-center">
-            {{ item.product.name }} (x{{ item.quantity }})
-            <span class="badge bg-primary rounded-pill">{{ item.total_price|default:"0.00" }}</span>
+            {{ item.product.get_full_name }} (x{{ item.quantity }})
+            <span class="badge bg-primary rounded-pill">{{ item.get_total_price|default:"0.00" }}</span>
           </li>
         {% empty %}
           <li class="list-group-item">No items in the order.</li>
         {% endfor %}
       </ul>
       <ul class="list-group">
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          Total Items
-          <span class="badge bg-primary rounded-pill">{{ order.items.count }}</span>
-        </li>
+        
         <li class="list-group-item d-flex justify-content-between align-items-center">
           Total Amount
           <span class="badge bg-primary rounded-pill">{{ order.total_amount|default:"0.00" }}</span>
