@@ -26,7 +26,20 @@ class RouteClient(models.Model):
     client = models.ForeignKey('clients.Client', related_name='client_routes', on_delete=models.CASCADE)
     sequence = models.PositiveIntegerField()
     note = models.TextField(blank=True, null=True)
-
+    day_to_visit = models.CharField(max_length=50, choices=[
+        ('monday', 'Monday'),
+        ('tuesday', 'Tuesday'),
+        ('wednesday', 'Wednesday'),
+        ('thursday', 'Thursday'),
+        ('friday', 'Friday'),
+        ('saturday', 'Saturday'),
+        ('sunday', 'Sunday'),
+    ], default='monday')
+    frecuency = models.CharField(max_length=50, choices=[
+        ('weekly', 'Weekly'),
+        ('biweekly', 'Biweekly'),
+        ('monthly', 'Monthly'),
+    ], default='weekly')
     class Meta:
         unique_together = ('route', 'client')
         ordering = ['sequence']
