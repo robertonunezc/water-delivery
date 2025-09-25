@@ -1,10 +1,53 @@
 from django.shortcuts import render, get_object_or_404
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from .models import Client
 
 def list(request):
-    clients = Client.objects.all()
-    return render(request, 'list_clients.html', {'clients': clients})
+    # Get search query from request
+    search_query = request.GET.get('search', '').strip()
+    
+    # Start with all clients
+    clients_queryset = Client.objects.select_related().prefetch_related(
+        'contacts', 'addresses'
+    ).order_by('-created_at', 'name')
+    
+    # Apply search filter if query exists
+    if search_query:
+        clients_queryset = clients_queryset.filter(
+            Q(name__icontains=search_query) |
+            Q(note__icontains=search_query) |
+            Q(contacts__name__icontains=search_query) |
+            Q(contacts__phone__icontains=search_query) |
+            Q(contacts__email__icontains=search_query) |
+            Q(addresses__street__icontains=search_query) |
+            Q(addresses__city__icontains=search_query) |
+            Q(addresses__state__icontains=search_query) |
+            Q(billing_data__rfc__icontains=search_query) |
+            Q(billing_data__razon_social__icontains=search_query)
+        ).distinct()
+    
+    # Pagination
+    paginator = Paginator(clients_queryset, 10)  # Show 10 clients per page
+    page = request.GET.get('page')
+    
+    try:
+        clients = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        clients = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        clients = paginator.page(paginator.num_pages)
+    
+    context = {
+        'clients': clients,
+        'search_query': search_query,
+        'total_clients': paginator.count,
+        'has_search': bool(search_query),
+    }
+    
+    return render(request, 'list_clients.html', context)
 
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
