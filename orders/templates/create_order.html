@@ -3,160 +3,470 @@
 {% block extra_css %}
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    /* Tablet-specific optimizations */
+    @media (min-width: 768px) and (max-width: 1024px) {
+      .btn-sm {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.9rem;
+      }
+      
+      .table td, .table th {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
+      }
+      
+      .form-control {
+        padding: 0.5rem 0.75rem;
+        font-size: 1rem;
+      }
+      
+      .order-summary-fixed {
+        position: sticky;
+        top: 20px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
+      }
+      
+      .products-table-container {
+        max-height: 60vh;
+        overflow-y: auto;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+      }
+    }
+
+    /* Mobile/small tablet optimizations */
+    @media (max-width: 767px) {
+      .order-summary-mobile {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-top: 2px solid #dee2e6;
+        padding: 1rem;
+        z-index: 1000;
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+      
+      .main-content-mobile {
+        padding-bottom: 200px; /* Space for fixed summary */
+      }
+      
+      .btn-group-mobile .btn {
+        margin: 0.25rem;
+        padding: 0.5rem 1rem;
+      }
+    }
+
+    /* Touch-friendly improvements */
+    .btn-touch {
+      min-height: 44px;
+      min-width: 44px;
+      padding: 0.75rem 1rem;
+    }
+    
+    .quantity-input {
+      min-height: 44px;
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: bold;
+    }
+    
+    .table-hover tbody tr:hover {
+      background-color: rgba(0,123,255,.075);
+    }
+  </style>
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
-    <h1>New Order for {{ client.name }}</h1>
-    <div class="row mb-3">
-      <div class="col-7">
-    <form method="post">
-      {% csrf_token %}
+  <div class="container-fluid mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center">
+          <h1 class="mb-3 mb-md-0">
+            <i class="fas fa-shopping-cart me-2 text-primary"></i>
+            Nuevo Pedido para <span class="text-primary">{{ client.name }}</span>
+          </h1>
+          <div class="btn-group-mobile">
+            <a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-secondary btn-touch">
+              <i class="fas fa-user me-2"></i>Ver Cliente
+            </a>
+            <a href="{% url 'clients:list' %}" class="btn btn-secondary btn-touch">
+              <i class="fas fa-arrow-left me-2"></i>Volver
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
 
-      <div class="mb-3">
-        {{ form.client }}
-        {{ form.order_date }}
-        {{ form.status }}
-        {{ form.notes }}
-        {# total_amount will be computed server-side; hide it if present #}
-        {% if form.total_amount %}
-          <div style="display:none;">{{ form.total_amount }}</div>
-        {% endif %}
+    <div class="row">
+      <!-- Main Content Area -->
+      <div class="col-12 col-lg-7 col-xl-8 main-content-mobile">
+        <form method="post">
+          {% csrf_token %}
+
+          <!-- Hidden Form Fields -->
+          <div class="d-none">
+            {{ form.client }}
+            {{ form.order_date }}
+            {{ form.status }}
+            {{ form.notes }}
+            {% if form.total_amount %}
+              {{ form.total_amount }}
+            {% endif %}
+          </div>
+
+          <!-- Products Section -->
+          <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+              <h4 class="mb-0">
+                <i class="fas fa-boxes me-2"></i>Productos Disponibles
+              </h4>
+            </div>
+            <div class="card-body p-0">
+              <div class="products-table-container">
+                <div class="table-responsive">
+                  <table class="table table-hover mb-0">
+                    <thead class="table-light sticky-top">
+                      <tr>
+                        <th>Producto</th>
+                        <th class="d-none d-md-table-cell">Presentación</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for client_product in client_products %}
+                        <tr>
+                          <td>
+                            <div class="fw-bold">{{ client_product.product.name }}</div>
+                            <small class="text-muted d-md-none">{{ client_product.product.get_presentation_display }}</small>
+                          </td>
+                          <td class="d-none d-md-table-cell">{{ client_product.product.get_presentation_display }}</td>
+                          <td class="fw-bold text-success">${{ client_product.price }}</td>
+                          <td>
+                            <input type="number" 
+                                   name="qty_{{ client_product.product.id }}" 
+                                   min="0" 
+                                   value="0" 
+                                   class="form-control quantity-input" 
+                                   style="width:80px;" />
+                          </td>
+                          <td>
+                            <div class="btn-group" role="group">
+                              <button type="button" 
+                                      class="btn btn-success btn-sm btn-touch" 
+                                      data-order="{{ order.pk }}" 
+                                      data-product="{{ client_product.product.id }}"
+                                      title="Agregar producto">
+                                <i class="fas fa-plus"></i>
+                                <span class="d-none d-sm-inline ms-1">Agregar</span>
+                              </button>
+                              <button type="button" 
+                                      class="btn btn-danger btn-sm btn-touch" 
+                                      data-order="{{ order.pk }}" 
+                                      data-product="{{ client_product.product.id }}"
+                                      title="Quitar producto">
+                                <i class="fas fa-minus"></i>
+                                <span class="d-none d-sm-inline ms-1">Quitar</span>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
       </div>
 
-      <h4>Products</h4>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Presentation</th>
-            <th>Precio</th>
-            <th>Cantidad</th>
-            <th> Accion </th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for client_product in client_products %}
-            <tr>
-              <td>{{ client_product.product.name }}</td>
-              <td>{{ client_product.product.get_presentation_display }}</td>
-              <td>{{ client_product.price }}</td>
-              <td>
-                <input type="number" name="qty_{{ client_product.product.id }}" min="0" value="0" class="form-control" style="width:100px;" />
-              </td>
-              <td>
-                <button type="button" class="btn btn-sm btn-success" data-order="{{ order.pk }}" data-product="{{ client_product.product.id }}">Agregar</button>
-                <button type="button" class="btn btn-sm btn-danger" data-order="{{ order.pk }}" data-product="{{ client_product.product.id }}">Quitar</button>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <!-- Order Summary Sidebar -->
+      <div class="col-12 col-lg-5 col-xl-4 d-none d-lg-block">
+        <div class="order-summary-fixed">
+          <!-- Order Summary Card -->
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white">
+              <h4 class="mb-0">
+                <i class="fas fa-receipt me-2"></i>Resumen del Pedido
+              </h4>
+            </div>
+            <div class="card-body">
+              <ul class="list-group list-group-flush" id="order-summary-products">
+                {% for item in order.items.all %}
+                  <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0" 
+                      data-product-id="{{ item.product.id }}" 
+                      data-order-id="{{ order.pk }}">
+                    <div class="flex-grow-1">
+                      <div class="fw-bold">{{ item.product.get_full_name }}</div>
+                      <small class="text-muted">Cantidad: {{ item.quantity }}</small>
+                    </div>
+                    <div class="d-flex align-items-center">
+                      <span class="badge bg-primary rounded-pill me-2">${{ item.get_total_price|default:"0.00" }}</span>
+                      <button type="button" 
+                              class="btn btn-sm btn-outline-danger remove-item-btn btn-touch" 
+                              data-product-id="{{ item.product.id }}" 
+                              data-order-id="{{ order.pk }}" 
+                              title="Remover producto">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </li>
+                {% empty %}
+                  <li class="list-group-item border-0 px-0 text-muted text-center py-4">
+                    <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+                    No hay productos en el pedido
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
 
-      <a href="{% url 'clients:list' %}" class="btn btn-secondary">Back</a>
-    </form>
-    </div>
-    <div class="col-5">
-      <h4>Resumen Pedido</h4>
-      <ul class="list-group mb-3" id="order-summary-products">
-        {% for item in order.items.all %}
-          <li class="list-group-item d-flex justify-content-between align-items-center" data-product-id="{{ item.product.id }}" data-order-id="{{ order.pk }}">
-            <div class="flex-grow-1">
-              {{ item.product.get_full_name }} (x{{ item.quantity }})
+          <!-- Payment Method Card -->
+          <div class="card shadow-sm mb-4">
+            <div class="card-header bg-warning text-dark">
+              <h5 class="mb-0">
+                <i class="fas fa-credit-card me-2"></i>Método de Pago
+              </h5>
             </div>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-primary rounded-pill me-2">{{ item.get_total_price|default:"0.00" }}</span>
-              <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-product-id="{{ item.product.id }}" data-order-id="{{ order.pk }}" title="Remover producto">
-                <i class="fas fa-times"></i>
-              </button>
+            <div class="card-body">
+              <select class="form-select form-select-lg" id="payment-method-select" name="payment_type">
+                <option value="">Seleccionar método de pago</option>
+                {% for code, label in payment_types %}
+                  <option value="{{ code }}">{{ label }}</option>
+                {% empty %}
+                  <option disabled>No hay métodos de pago disponibles</option>
+                {% endfor %}
+              </select>
             </div>
-          </li>
-        {% empty %}
-          <li class="list-group-item">No items in the order.</li>
-        {% endfor %}
-      </ul>
-      <h4>Métodos de Pago</h4>
-      <select class="form-select mb-3" id="payment-method-select" name="payment_type">
-        <option value="">Seleccionar método de pago</option>
-        {% for code, label in payment_types %}
-          <option value="{{ code }}">{{ label }}</option>
-        {% empty %}
-          <option disabled>No hay métodos de pago disponibles</option>
-        {% endfor %}
-      </select>
-      <ul class="list-group">
+          </div>
+
+          <!-- Total Card -->
+          <div class="card shadow-sm mb-4">
+            <div class="card-body text-center">
+              <div class="row">
+                <div class="col-6">
+                  <h3 class="text-muted mb-0">Total</h3>
+                </div>
+                <div class="col-6">
+                  <h2 class="text-success mb-0">
+                    $<span class="badge bg-success fs-4 p-2">{{ order.total_amount|default:"0.00" }}</span>
+                  </h2>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Finish Order Button -->
+          <div class="d-grid">
+            <button type="button" 
+                    id="finish-order-btn" 
+                    class="btn btn-success btn-lg btn-touch" 
+                    data-order-id="{{ order.pk }}">
+              <i class="fas fa-check-circle me-2"></i>Terminar Pedido
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Order Summary (Fixed Bottom) -->
+      <div class="d-lg-none order-summary-mobile">
+        <div class="row mb-3">
+          <div class="col-6">
+            <select class="form-select" id="payment-method-select-mobile" name="payment_type">
+              <option value="">Método de pago</option>
+              {% for code, label in payment_types %}
+                <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-6 text-end">
+            <h4 class="text-success mb-0">
+              Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
+            </h4>
+          </div>
+        </div>
         
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-          Total 
-          <span class="badge bg-primary rounded-pill">{{ order.total_amount|default:"0.00" }}</span>
-        </li>
-      </ul>
-    <div class="mt-3">
-      <button type="button" id="finish-order-btn" class="btn btn-success" data-order-id="{{ order.pk }}">Terminar Pedido</button>
+        <div class="row">
+          <div class="col-6">
+            <button type="button" 
+                    class="btn btn-outline-info btn-lg w-100" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#orderSummaryModal">
+              <i class="fas fa-list me-2"></i>Ver Resumen
+            </button>
+          </div>
+          <div class="col-6">
+            <button type="button" 
+                    id="finish-order-btn-mobile" 
+                    class="btn btn-success btn-lg w-100" 
+                    data-order-id="{{ order.pk }}">
+              <i class="fas fa-check-circle me-2"></i>Terminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Order Summary Modal -->
+    <div class="modal fade" id="orderSummaryModal" tabindex="-1">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              <i class="fas fa-receipt me-2"></i>Resumen del Pedido
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <ul class="list-group" id="order-summary-products-mobile">
+              {% for item in order.items.all %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <div class="flex-grow-1">
+                    <div class="fw-bold">{{ item.product.get_full_name }}</div>
+                    <small class="text-muted">Cantidad: {{ item.quantity }}</small>
+                  </div>
+                  <div class="d-flex align-items-center">
+                    <span class="badge bg-primary rounded-pill me-2">${{ item.get_total_price|default:"0.00" }}</span>
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-danger remove-item-btn-mobile" 
+                            data-product-id="{{ item.product.id }}" 
+                            data-order-id="{{ order.pk }}">
+                      <i class="fas fa-times"></i>
+                    </button>
+                  </div>
+                </li>
+              {% empty %}
+                <li class="list-group-item text-muted text-center py-4">
+                  <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+                  No hay productos en el pedido
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-
 {% endblock %}
 {% block extra_js %}
   <script>
-    // Helper function to update order summary
+    // Helper function to update order summary (both desktop and mobile)
     function updateOrderSummary(productId, quantity, data) {
       const summaryList = document.getElementById('order-summary-products');
+      const summaryListMobile = document.getElementById('order-summary-products-mobile');
       const orderId = document.querySelector('[data-order]').getAttribute('data-order');
       
-      // Remove "No items" message if it exists
-      const emptyItem = summaryList.querySelector('li:only-child');
-      if (emptyItem && emptyItem.textContent.includes('No items')) {
-        emptyItem.remove();
+      // Function to update a specific summary list
+      function updateSummaryList(listElement, isMobile = false) {
+        if (!listElement) return;
+        
+        // Remove "No items" message if it exists
+        const emptyItem = listElement.querySelector('li:only-child');
+        if (emptyItem && emptyItem.textContent.includes('No hay productos')) {
+          emptyItem.remove();
+        }
+        
+        // Find existing item in summary
+        let existingItem = listElement.querySelector(`[data-product-id="${productId}"]`);
+        
+        if (parseInt(quantity) > 0) {
+          // Get product info from the table row
+          const productRow = document.querySelector(`[data-product="${productId}"]`).closest('tr');
+          const productName = productRow.querySelector('td:first-child .fw-bold, td:first-child').textContent.trim();
+          const productPresentationCell = productRow.querySelector('td:nth-child(2)');
+          const productPresentation = productPresentationCell ? 
+            productPresentationCell.textContent : 
+            productRow.querySelector('.text-muted').textContent;
+          const productPrice = productRow.querySelector('td:nth-child(3), td:nth-child(2)').textContent.replace('$', '');
+          
+          const fullProductName = `${productName} - ${productPresentation}`;
+          const itemTotal = (parseFloat(productPrice) * parseInt(quantity)).toFixed(2);
+          
+          if (existingItem) {
+            // Update existing item
+            const productNameDiv = existingItem.querySelector('.fw-bold, .flex-grow-1 > div:first-child');
+            const quantitySmall = existingItem.querySelector('small');
+            const badge = existingItem.querySelector('.badge');
+            
+            if (productNameDiv) productNameDiv.textContent = fullProductName;
+            if (quantitySmall) quantitySmall.textContent = `Cantidad: ${quantity}`;
+            if (badge) badge.textContent = `$${itemTotal}`;
+          } else {
+            // Add new item
+            const newItem = document.createElement('li');
+            if (isMobile) {
+              newItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+              newItem.setAttribute('data-product-id', productId);
+              newItem.setAttribute('data-order-id', orderId);
+              newItem.innerHTML = `
+                <div class="flex-grow-1">
+                  <div class="fw-bold">${fullProductName}</div>
+                  <small class="text-muted">Cantidad: ${quantity}</small>
+                </div>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-primary rounded-pill me-2">$${itemTotal}</span>
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn-mobile" 
+                          data-product-id="${productId}" data-order-id="${orderId}">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              `;
+            } else {
+              newItem.className = 'list-group-item d-flex justify-content-between align-items-center border-0 px-0';
+              newItem.setAttribute('data-product-id', productId);
+              newItem.setAttribute('data-order-id', orderId);
+              newItem.innerHTML = `
+                <div class="flex-grow-1">
+                  <div class="fw-bold">${fullProductName}</div>
+                  <small class="text-muted">Cantidad: ${quantity}</small>
+                </div>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-primary rounded-pill me-2">$${itemTotal}</span>
+                  <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn btn-touch" 
+                          data-product-id="${productId}" data-order-id="${orderId}" title="Remover producto">
+                    <i class="fas fa-times"></i>
+                  </button>
+                </div>
+              `;
+            }
+            listElement.appendChild(newItem);
+          }
+        } else if (existingItem) {
+          // Remove item from summary if quantity is 0
+          existingItem.remove();
+          
+          // Add "No items" message if list is now empty
+          if (listElement.children.length === 0) {
+            const emptyItem = document.createElement('li');
+            emptyItem.className = isMobile ? 
+              'list-group-item text-muted text-center py-4' : 
+              'list-group-item border-0 px-0 text-muted text-center py-4';
+            emptyItem.innerHTML = `
+              <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+              No hay productos en el pedido
+            `;
+            listElement.appendChild(emptyItem);
+          }
+        }
       }
       
-      // Find existing item in summary
-      let existingItem = summaryList.querySelector(`[data-product-id="${productId}"]`);
+      // Update both desktop and mobile summary lists
+      updateSummaryList(summaryList, false);
+      updateSummaryList(summaryListMobile, true);
       
-      if (parseInt(quantity) > 0) {
-        // Get product info from the table row
-        const productRow = document.querySelector(`[data-product="${productId}"]`).closest('tr');
-        const productName = productRow.querySelector('td:first-child').textContent;
-        const productPresentation = productRow.querySelector('td:nth-child(2)').textContent;
-        const productPrice = productRow.querySelector('td:nth-child(3)').textContent;
-        
-        const fullProductName = `${productName} - ${productPresentation}`;
-        const itemTotal = (parseFloat(productPrice) * parseInt(quantity)).toFixed(2);
-        
-        if (existingItem) {
-          // Update existing item
-          existingItem.querySelector('.flex-grow-1').textContent = `${fullProductName} (x${quantity})`;
-          existingItem.querySelector('.badge').textContent = itemTotal;
-        } else {
-          // Add new item
-          const newItem = document.createElement('li');
-          newItem.className = 'list-group-item d-flex justify-content-between align-items-center';
-          newItem.setAttribute('data-product-id', productId);
-          newItem.setAttribute('data-order-id', orderId);
-          newItem.innerHTML = `
-            <div class="flex-grow-1">
-              ${fullProductName} (x${quantity})
-            </div>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-primary rounded-pill me-2">${itemTotal}</span>
-              <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn" data-product-id="${productId}" data-order-id="${orderId}" title="Remover producto">
-                <i class="fas fa-times"></i>
-              </button>
-            </div>
-          `;
-          summaryList.appendChild(newItem);
-        }
-      } else if (existingItem) {
-        // Remove item from summary if quantity is 0
-        existingItem.remove();
-        
-        // Add "No items" message if list is now empty
-        if (summaryList.children.length === 0) {
-          const emptyItem = document.createElement('li');
-          emptyItem.className = 'list-group-item';
-          emptyItem.textContent = 'No items in the order.';
-          summaryList.appendChild(emptyItem);
-        }
+      // Update total in mobile view
+      const totalMobile = document.querySelector('.total-mobile');
+      if (totalMobile && data.order_total) {
+        totalMobile.textContent = data.order_total;
       }
     }
 
@@ -191,13 +501,13 @@
             `;
             
             // Insert the alert at the top of the content container
-            const contentContainer = document.querySelector('.container.mt-4');
+            const contentContainer = document.querySelector('.container-fluid.mt-4');
             const firstChild = contentContainer.firstElementChild;
             contentContainer.insertBefore(alertDiv, firstChild);
 
             // Update order total if provided
             if (data.order_total) {
-              const totalElement = document.querySelector('.badge.bg-primary.rounded-pill:last-child');
+              const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
               if (totalElement) {
                 totalElement.textContent = data.order_total;
               }
@@ -220,7 +530,7 @@
                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
              `;
              
-             const contentContainer = document.querySelector('.container.mt-4');
+             const contentContainer = document.querySelector('.container-fluid.mt-4');
              const firstChild = contentContainer.firstElementChild;
              contentContainer.insertBefore(errorDiv, firstChild);
 
@@ -258,13 +568,13 @@
             `;
             
             // Insert the alert at the top of the content container
-            const contentContainer = document.querySelector('.container.mt-4');
+            const contentContainer = document.querySelector('.container-fluid.mt-4');
             const firstChild = contentContainer.firstElementChild;
             contentContainer.insertBefore(alertDiv, firstChild);
 
             // Update order total if provided
             if (data.order_total) {
-              const totalElement = document.querySelector('.badge.bg-primary.rounded-pill:last-child');
+              const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
               if (totalElement) {
                 totalElement.textContent = data.order_total;
               }
@@ -287,7 +597,7 @@
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
             
-            const contentContainer = document.querySelector('.container.mt-4');
+            const contentContainer = document.querySelector('.container-fluid.mt-4');
             const firstChild = contentContainer.firstElementChild;
             contentContainer.insertBefore(errorDiv, firstChild);
 
@@ -298,10 +608,10 @@
         });
       });
 
-      // Handle remove buttons in order summary
+      // Handle remove buttons in order summary (both desktop and mobile)
       document.addEventListener('click', function(e) {
-        if (e.target.closest('.remove-item-btn')) {
-          const button = e.target.closest('.remove-item-btn');
+        if (e.target.closest('.remove-item-btn, .remove-item-btn-mobile')) {
+          const button = e.target.closest('.remove-item-btn, .remove-item-btn-mobile');
           const orderId = button.getAttribute('data-order-id');
           const productId = button.getAttribute('data-product-id');
           
@@ -318,26 +628,16 @@
             }).then(response => response.json()).then(data => {
               console.log('Item removed:', data);
               
-              // Remove the item from the order summary
-              const listItem = button.closest('li');
-              listItem.remove();
-              
               // Update order total if provided
               if (data.order_total) {
-                const totalElement = document.querySelector('.badge.bg-primary.rounded-pill:last-child');
-                if (totalElement) {
-                  totalElement.textContent = data.order_total;
-                }
+                const totalElement = document.querySelector('.badge.bg-success.fs-4');
+                const totalMobile = document.querySelector('.total-mobile');
+                if (totalElement) totalElement.textContent = data.order_total;
+                if (totalMobile) totalMobile.textContent = data.order_total;
               }
               
-              // Check if order summary is now empty
-              const summaryList = document.getElementById('order-summary-products');
-              if (summaryList.children.length === 0) {
-                const emptyItem = document.createElement('li');
-                emptyItem.className = 'list-group-item';
-                emptyItem.textContent = 'No items in the order.';
-                summaryList.appendChild(emptyItem);
-              }
+              // Update order summary using the helper function
+              updateOrderSummary(productId, 0, data);
               
               // Reset corresponding quantity input to 0
               const quantityInput = document.querySelector(`input[name="qty_${productId}"]`);
@@ -353,7 +653,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               `;
               
-              const contentContainer = document.querySelector('.container.mt-4');
+              const contentContainer = document.querySelector('.container-fluid.mt-4');
               const firstChild = contentContainer.firstElementChild;
               contentContainer.insertBefore(alertDiv, firstChild);
 
@@ -370,7 +670,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
               `;
               
-              const contentContainer = document.querySelector('.container.mt-4');
+              const contentContainer = document.querySelector('.container-fluid.mt-4');
               const firstChild = contentContainer.firstElementChild;
               contentContainer.insertBefore(errorDiv, firstChild);
 
@@ -382,11 +682,19 @@
         }
       });
 
-      // Handle "Terminar Pedido" button
-      document.getElementById('finish-order-btn').addEventListener('click', function() {
-        const orderId = this.getAttribute('data-order-id');
+      // Handle "Terminar Pedido" button (both desktop and mobile)
+      function handleFinishOrder(button) {
+        const orderId = button.getAttribute('data-order-id');
         const paymentMethodSelect = document.getElementById('payment-method-select');
-        const selectedPaymentMethod = paymentMethodSelect.value;
+        const paymentMethodSelectMobile = document.getElementById('payment-method-select-mobile');
+        
+        // Get selected payment method from either desktop or mobile select
+        let selectedPaymentMethod = '';
+        if (paymentMethodSelect && paymentMethodSelect.value) {
+          selectedPaymentMethod = paymentMethodSelect.value;
+        } else if (paymentMethodSelectMobile && paymentMethodSelectMobile.value) {
+          selectedPaymentMethod = paymentMethodSelectMobile.value;
+        }
         
         // Validate payment method selection
         if (!selectedPaymentMethod) {
@@ -398,28 +706,39 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           `;
           
-          const contentContainer = document.querySelector('.container.mt-4');
+          const contentContainer = document.querySelector('.container-fluid.mt-4');
           const firstChild = contentContainer.firstElementChild;
           contentContainer.insertBefore(errorDiv, firstChild);
           
-          // Highlight the payment select
-          paymentMethodSelect.classList.add('is-invalid');
+          // Highlight the payment selects
+          if (paymentMethodSelect) paymentMethodSelect.classList.add('is-invalid');
+          if (paymentMethodSelectMobile) paymentMethodSelectMobile.classList.add('is-invalid');
           
           setTimeout(() => {
             errorDiv.remove();
-            paymentMethodSelect.classList.remove('is-invalid');
+            if (paymentMethodSelect) paymentMethodSelect.classList.remove('is-invalid');
+            if (paymentMethodSelectMobile) paymentMethodSelectMobile.classList.remove('is-invalid');
           }, 5000);
           
           return;
         }
         
         // Get order total
-        const totalElement = document.querySelector('.badge.bg-primary.rounded-pill:last-child');
+        const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
         const orderTotal = totalElement ? totalElement.textContent : '0.00';
         
-        // Disable button to prevent double submission
-        this.disabled = true;
-        this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Procesando...';
+        // Disable buttons to prevent double submission
+        const finishButton = document.getElementById('finish-order-btn');
+        const finishButtonMobile = document.getElementById('finish-order-btn-mobile');
+        
+        if (finishButton) {
+          finishButton.disabled = true;
+          finishButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
+        }
+        if (finishButtonMobile) {
+          finishButtonMobile.disabled = true;
+          finishButtonMobile.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
+        }
         
         // Call payment creation endpoint
         fetch('/payments/create/', {
@@ -444,14 +763,21 @@
               <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
             
-            const contentContainer = document.querySelector('.container.mt-4');
+            const contentContainer = document.querySelector('.container-fluid.mt-4');
             const firstChild = contentContainer.firstElementChild;
             contentContainer.insertBefore(successDiv, firstChild);
             
             // Update button text
-            this.innerHTML = '✓ Pedido Completado';
-            this.classList.remove('btn-success');
-            this.classList.add('btn-secondary');
+            if (finishButton) {
+              finishButton.innerHTML = '✓ Pedido Completado';
+              finishButton.classList.remove('btn-success');
+              finishButton.classList.add('btn-secondary');
+            }
+            if (finishButtonMobile) {
+              finishButtonMobile.innerHTML = '✓ Completado';
+              finishButtonMobile.classList.remove('btn-success');
+              finishButtonMobile.classList.add('btn-secondary');
+            }
             
             // Disable all form interactions
             document.querySelectorAll('button:not(.btn-close), select, input').forEach(element => {
@@ -471,9 +797,15 @@
         }).catch(error => {
           console.error('Payment error:', error);
           
-          // Re-enable button
-          this.disabled = false;
-          this.innerHTML = 'Terminar Pedido';
+          // Re-enable buttons
+          if (finishButton) {
+            finishButton.disabled = false;
+            finishButton.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar Pedido';
+          }
+          if (finishButtonMobile) {
+            finishButtonMobile.disabled = false;
+            finishButtonMobile.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar';
+          }
           
           // Show error message
           const errorDiv = document.createElement('div');
@@ -483,7 +815,7 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
           `;
           
-          const contentContainer = document.querySelector('.container.mt-4');
+          const contentContainer = document.querySelector('.container-fluid.mt-4');
           const firstChild = contentContainer.firstElementChild;
           contentContainer.insertBefore(errorDiv, firstChild);
 
@@ -491,6 +823,26 @@
             errorDiv.remove();
           }, 8000);
         });
+      }
+
+      // Event listeners for finish order buttons
+      document.getElementById('finish-order-btn')?.addEventListener('click', function() {
+        handleFinishOrder(this);
+      });
+      
+      document.getElementById('finish-order-btn-mobile')?.addEventListener('click', function() {
+        handleFinishOrder(this);
+      });
+
+      // Sync payment method selections between desktop and mobile
+      document.getElementById('payment-method-select')?.addEventListener('change', function() {
+        const mobileSelect = document.getElementById('payment-method-select-mobile');
+        if (mobileSelect) mobileSelect.value = this.value;
+      });
+      
+      document.getElementById('payment-method-select-mobile')?.addEventListener('change', function() {
+        const desktopSelect = document.getElementById('payment-method-select');
+        if (desktopSelect) desktopSelect.value = this.value;
       });
     });
   </script>
