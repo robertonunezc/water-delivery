@@ -1,10 +1,17 @@
 from django.contrib import admin
-from .models import User
+from django.contrib.auth.models import User
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from .models import Employee
 
+class EmployeeInline(admin.StackedInline):
+    model = Employee
+    can_delete = False
+    verbose_name_plural = "employee"
 
-@admin.register(User)
-class UserAdmin(admin.ModelAdmin):
-    list_display = ('username', 'email', 'is_active')
-    search_fields = ('username', 'email')
+class UserAdmin(BaseUserAdmin):
+    inlines = [EmployeeInline]
 
-# Register your models here.
+# Unregister the original User admin
+admin.site.unregister(User)
+# Register the User admin with Employee inline
+admin.site.register(User, UserAdmin)
