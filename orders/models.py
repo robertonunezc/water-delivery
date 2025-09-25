@@ -16,7 +16,7 @@ ORDER_STATUS_CHOICES = (
 
 # Create your models here.
 class Order(TimeStampedModel):
-    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
+    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='orders')
     order_date = models.DateTimeField(auto_now_add=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default='PENDING')

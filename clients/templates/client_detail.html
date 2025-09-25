@@ -1,0 +1,272 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .stat-card {
+      transition: transform 0.2s;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    .section-header {
+      border-bottom: 2px solid #007bff;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <!-- Client Header -->
+  <div class="row mb-4">
+    <div class="col-md-8">
+      <div class="d-flex align-items-center mb-3">
+        <h1 class="me-3">{{ client.name }}</h1>
+        <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %} fs-6">
+          {% if client.active %}Activo{% else %}Inactivo{% endif %}
+        </span>
+        <span class="badge bg-info ms-2 fs-6">{{ client.get_type_display }}</span>
+      </div>
+      
+      {% if client.note %}
+        <div class="alert alert-info">
+          <strong>Nota:</strong> {{ client.note }}
+        </div>
+      {% endif %}
+      
+      <div class="mb-3">
+        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-success me-2">
+          <i class="fas fa-plus"></i> Nuevo Pedido
+        </a>
+        <a href="{% url 'clients:list' %}" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Volver a la Lista
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statistics Cards -->
+  <div class="row mb-4">
+    <div class="col-md-3">
+      <div class="card stat-card h-100 border-primary">
+        <div class="card-body text-center">
+          <i class="fas fa-shopping-cart fa-2x text-primary mb-2"></i>
+          <h5 class="card-title">{{ stats.total_orders }}</h5>
+          <p class="card-text text-muted">Total Pedidos</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card h-100 border-success">
+        <div class="card-body text-center">
+          <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
+          <h5 class="card-title">{{ stats.completed_orders }}</h5>
+          <p class="card-text text-muted">Completados</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card h-100 border-warning">
+        <div class="card-body text-center">
+          <i class="fas fa-clock fa-2x text-warning mb-2"></i>
+          <h5 class="card-title">{{ stats.pending_orders }}</h5>
+          <p class="card-text text-muted">Pendientes</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card h-100 border-info">
+        <div class="card-body text-center">
+          <i class="fas fa-dollar-sign fa-2x text-info mb-2"></i>
+          <h5 class="card-title">${{ stats.total_spent|floatformat:2 }}</h5>
+          <p class="card-text text-muted">Total Gastado</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <!-- Client Information Column -->
+    <div class="col-md-4">
+      <!-- Contact Information -->
+      <div class="card mb-4">
+        <div class="card-header section-header">
+          <h5 class="mb-0"><i class="fas fa-user me-2"></i>Información de Contacto</h5>
+        </div>
+        <div class="card-body">
+          {% if contacts %}
+            {% for contact in contacts %}
+              <div class="mb-3 border-bottom pb-2">
+                <h6>{{ contact.name }}</h6>
+                {% if contact.position %}
+                  <small class="text-muted d-block">{{ contact.position }}</small>
+                {% endif %}
+                {% if contact.phone %}
+                  <div><i class="fas fa-phone me-1"></i> {{ contact.phone }}</div>
+                {% endif %}
+                {% if contact.email %}
+                  <div><i class="fas fa-envelope me-1"></i> {{ contact.email }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted">No hay información de contacto disponible.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Addresses -->
+      <div class="card mb-4">
+        <div class="card-header section-header">
+          <h5 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>Direcciones</h5>
+        </div>
+        <div class="card-body">
+          {% if addresses %}
+            {% for address in addresses %}
+              <div class="mb-3 border-bottom pb-2">
+                <span class="badge bg-secondary mb-2">{{ address.get_type_display }}</span>
+                <div>{{ address.street }}</div>
+                <div>{{ address.city }}, {{ address.state }} {{ address.zip_code }}</div>
+                <div>{{ address.country }}</div>
+                {% if address.note %}
+                  <small class="text-muted">{{ address.note }}</small>
+                {% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted">No hay direcciones registradas.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Billing Data -->
+      {% if billing_data %}
+        <div class="card mb-4">
+          <div class="card-header section-header">
+            <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Datos Fiscales</h5>
+          </div>
+          <div class="card-body">
+            {% for billing in billing_data %}
+              <div class="mb-3">
+                <div><strong>RFC:</strong> {{ billing.rfc }}</div>
+                <div><strong>Razón Social:</strong> {{ billing.razon_social }}</div>
+                <div><strong>Uso CFDI:</strong> {{ billing.uso_cfdi }}</div>
+                <div><strong>Método de Pago:</strong> {{ billing.get_metodo_pago_display }}</div>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Orders and Payments Column -->
+    <div class="col-md-8">
+      <!-- Recent Orders -->
+      <div class="card mb-4">
+        <div class="card-header section-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Pedidos Recientes</h5>
+          <small class="text-muted">Mostrando los últimos 10</small>
+        </div>
+        <div class="card-body">
+          {% if orders %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th>Total</th>
+                    <th>Productos</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for order in orders %}
+                    <tr>
+                      <td><strong>#{{ order.id }}</strong></td>
+                      <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                      <td>
+                        <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                          {{ order.get_status_display }}
+                        </span>
+                      </td>
+                      <td>${{ order.total_amount|floatformat:2 }}</td>
+                      <td>
+                        <small>
+                          {% for item in order.items.all %}
+                            {{ item.product.name }} ({{ item.quantity }})<br>
+                          {% endfor %}
+                        </small>
+                      </td>
+                      <td>
+                        {% if order.status == 'pending' %}
+                          <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-edit"></i>
+                          </a>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted">No hay pedidos registrados para este cliente.</p>
+            <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-primary">
+              <i class="fas fa-plus"></i> Crear Primer Pedido
+            </a>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Recent Payments -->
+      <div class="card">
+        <div class="card-header section-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Pagos Recientes</h5>
+          <small class="text-muted">Mostrando los últimos 10</small>
+        </div>
+        <div class="card-body">
+          {% if payments %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Pedido</th>
+                    <th>Método</th>
+                    <th>Estado</th>
+                    <th>Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for payment in payments %}
+                    <tr>
+                      <td><strong>#{{ payment.id }}</strong></td>
+                      <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
+                      <td><a href="#" class="text-decoration-none">#{{ payment.order.id }}</a></td>
+                      <td>{{ payment.get_method_display }}</td>
+                      <td>
+                        <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% else %}danger{% endif %}">
+                          {{ payment.get_status_display }}
+                        </span>
+                      </td>
+                      <td class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted">No hay pagos registrados para este cliente.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

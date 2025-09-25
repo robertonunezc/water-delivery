@@ -6,7 +6,7 @@ from django.db import transaction
 import json
 
 from .models import Payment
-from orders.models import Order
+from orders.models import OrderStatus, Order
 
 @require_http_methods(["POST"])
 @transaction.atomic
@@ -38,9 +38,8 @@ def create_payment(request):
             order=order
         )
         
-        # Mark order as completed or paid (you might want to add a status field)
-        # order.status = OrderStatus.COMPLETED  # uncomment if you have this status
-        # order.save()
+        order.status = OrderStatus.COMPLETED 
+        order.save()
         
         return JsonResponse({
             'success': True,
