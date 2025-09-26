@@ -93,9 +93,10 @@ def today_route(request):
         'today_orders': today_orders,
         'regular_clients': regular_clients,
         'today': date.today(),
+        'is_today_view': True,
     }
     
-    return render(request, 'routes/today_route.html', context)
+    return render(request, 'routes/route_detail.html', context)
 
 
 @login_required
@@ -120,6 +121,7 @@ def route_detail(request, route_id):
         'route_clients': route_clients,
         'recent_orders': recent_orders,
         'today': date.today(),
+        'is_today_view': False,
     }
     
     return render(request, 'routes/route_detail.html', context)

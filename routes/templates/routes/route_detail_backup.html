@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Route Details - {{ route.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ route.name }}</h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info">{{ route.get_weekday_display }}</span>
+                        <span class="badge badge-primary">{{ route.transportation.license_plate }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Route Information -->
+                    <div class="row mb-3">
+                        <div class="col-md-8">
+                            <h5>Informacion Ruta</h5>
+                            <p><strong>Descripcion:</strong> {{ route.description|default:"No description" }} | 
+                               <strong>Dia:</strong> {{ route.get_weekday_display }} | 
+                               <strong>Transporte:</strong> {{ route.transportation.license_plate }} - {{ route.transportation.model }} | 
+                               <strong>Conductor:</strong> 
+                               {% if route.transportation.assigned_driver %}
+                                   {{ route.transportation.assigned_driver.user.get_full_name }}
+                               {% else %}
+                                   Not assigned
+                               {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info"><i class="fas fa-users"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Clientes Activos</span>
+                                    <span class="info-box-number">{{ route_clients.count }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Regular Clients -->
+                    <h5>Clientes</h5>
+                    {% if route_clients %}
+                        {% include 'includes/client_table.html' with items=route_clients table_context='route' show_id=False show_sequence=True show_frequency=True %}
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h6>No clients assigned</h6>
+                            <p>This route doesn't have any regular clients assigned yet.</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Recent Orders -->
+                    {% if recent_orders %}
+                        <h5 class="mt-4">Recent Orders (Last 7 days)</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Sequence</th>
+                                        <th>Client</th>
+                                        <th>Order</th>
+                                        <th>Status</th>
+                                        <th>Completed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_order in recent_orders %}
+                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
+                                            <td>{{ route_order.visit_date }}</td>
+                                            <td>{{ route_order.sequence }}</td>
+                                            <td>{{ route_order.client.name }}</td>
+                                            <td>
+                                                Order #{{ route_order.order.id }}<br>
+                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
+                                            </td>
+                                            <td>{{ route_order.order.get_status_display }}</td>
+                                            <td>
+                                                {% if route_order.is_completed %}
+                                                    <span class="badge badge-success">Yes</span>
+                                                    {% if route_order.completed_at %}
+                                                        <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge badge-warning">No</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'routes:list' %}" class="btn btn-secondary">Back to Routes</a>
+                    {% comment %} <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
+                       class="btn btn-primary">View Today's Orders</a> {% endcomment %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
