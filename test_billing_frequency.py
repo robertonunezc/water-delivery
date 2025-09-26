@@ -25,6 +25,9 @@ def test_billing_frequency_examples():
     # Clear any existing billing frequencies
     ClientBillingFrecuency.objects.filter(client=client).delete()
     
+    # Keep track of created objects for cleanup
+    created_objects = {'client': client if created else None}
+    
     print(f"Testing billing frequency for client: {client.name}")
     print("-" * 50)
     
@@ -90,6 +93,28 @@ def test_billing_frequency_examples():
     
     print("All tests completed successfully!")
     print("The new billing frequency structure is working correctly.")
+    
+    # Cleanup: Delete all test data
+    print("\nCleaning up test data...")
+    
+    # Delete all billing frequencies for the test client
+    deleted_bf_count = ClientBillingFrecuency.objects.filter(client=client).count()
+    ClientBillingFrecuency.objects.filter(client=client).delete()
+    print(f"   Deleted {deleted_bf_count} billing frequency records")
+    
+    # Delete the client if we created it during this test
+    if created_objects['client']:
+        client.delete()
+        print(f"   Deleted test client: {client.name}")
+    else:
+        print(f"   Kept existing client: {client.name} (was not created by this test)")
+    
+    print("Cleanup completed successfully!")
 
 if __name__ == "__main__":
-    test_billing_frequency_examples()
+    try:
+        test_billing_frequency_examples()
+    except Exception as e:
+        print(f"\nTest failed with error: {e}")
+        print("Cleanup may not have been performed properly.")
+        raise
