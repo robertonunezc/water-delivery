@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.db.models import Q, Count, Prefetch
 from django.utils import timezone
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from .models import Route, RouteClient, RouteClientOrder
 from core.models import Employee, Transport
 from clients.models import Client
@@ -112,13 +112,14 @@ def route_detail(request, route_id):
     # Get recent client orders for this route
     recent_orders = RouteClientOrder.objects.filter(
         route=route,
-        visit_date__gte=date.today() - timezone.timedelta(days=7)
+        visit_date__gte=date.today() - timedelta(days=7)
     ).select_related('client', 'order').order_by('-visit_date', 'sequence')
     
     context = {
         'route': route,
         'route_clients': route_clients,
         'recent_orders': recent_orders,
+        'today': date.today(),
     }
     
     return render(request, 'routes/route_detail.html', context)

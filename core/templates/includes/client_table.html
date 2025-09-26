@@ -1,0 +1,72 @@
+{% load static %}
+
+<!-- Reusable Client Table Component -->
+<div class="table-responsive">
+    <table class="table table-striped table-hover">
+        <thead class="table-dark">
+            <tr>
+                {% if show_id %}<th>#</th>{% endif %}
+                {% if show_sequence %}<th>Sequence</th>{% endif %}
+                <th>Nombre</th>
+                <th>Tipo</th>
+                <th>Contacto</th>
+                <th>Direcciones</th>
+                <th>Estado</th>
+                {% if show_frequency %}<th>Frecuencia</th>{% endif %}
+                <th>Notas</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+                {% if show_sequence %}
+                    <!-- Route context - item is route_client -->
+                    {% with client=item.client %}
+                        <tr>
+                            <td><strong>{{ item.sequence }}</strong></td>
+                            {% include 'includes/client_table_row.html' with client=client show_frequency=True frequency_display=item.get_frequency_display %}
+                            <td>{{ item.notes|default:"—"|truncatechars:30 }}</td>
+                            <td>
+                                <div class="btn-group" role="group">
+                                    {% if table_context == 'route' %}
+                                        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-outline-primary" title="Ver Cliente">
+                                            <i class="fas fa-eye"></i>
+                                        </a>
+                                        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-success" title="Nuevo Pedido">
+                                            <i class="fas fa-shopping-cart"></i>
+                                        </a>
+                                        <a href="#" class="btn btn-sm btn-outline-warning" title="Editar en Ruta">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                    {% endwith %}
+                {% else %}
+                    <!-- Client list context - item is client -->
+                    <tr>
+                        {% if show_id %}<td>{{ item.id }}</td>{% endif %}
+                        {% include 'includes/client_table_row.html' with client=item %}
+                        <td>{{ item.note|default_if_none:"-"|truncatechars:30 }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                {% if table_context == 'client_list' %}
+                                    <a href="{% url 'clients:detail' item.pk %}" class="btn btn-sm btn-outline-primary" title="Ver Detalles">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'orders:create_order' item.pk %}" class="btn btn-sm btn-outline-success" title="Nuevo Pedido">
+                                        <i class="fas fa-shopping-cart"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-sm btn-outline-secondary" title="Facturar">
+                                        <i class="fas fa-file-invoice"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                {% endif %}
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

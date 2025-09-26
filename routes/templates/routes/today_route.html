@@ -57,7 +57,7 @@
                                                 {% for address in route_order.client.addresses.all %}
                                                     {% if address.active %}
                                                         <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
-                                                        {% break %}
+                                                        {% if forloop.first %}{% endif %}
                                                     {% endif %}
                                                 {% endfor %}
                                             </td>
@@ -122,16 +122,17 @@
                                                 {% for address in route_client.client.addresses.all %}
                                                     {% if address.active %}
                                                         <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
-                                                        {% break %}
+                                                        {% if forloop.first %}{% endif %}
                                                     {% endif %}
                                                 {% endfor %}
                                             </td>
                                             <td>{{ route_client.get_frequency_display }}</td>
                                             <td>
                                                 {% for contact in route_client.client.contacts.all %}
-                                                    {{ contact.name }}<br>
-                                                    <small class="text-muted">{{ contact.phone }}</small>
-                                                    {% break %}
+                                                    {% if forloop.first %}
+                                                        {{ contact.name }}<br>
+                                                        <small class="text-muted">{{ contact.phone }}</small>
+                                                    {% endif %}
                                                 {% endfor %}
                                             </td>
                                             <td>

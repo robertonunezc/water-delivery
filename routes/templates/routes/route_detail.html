@@ -44,56 +44,7 @@
                     <!-- Regular Clients -->
                     <h5>Regular Clients</h5>
                     {% if route_clients %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Sequence</th>
-                                        <th>Client</th>
-                                        <th>Address</th>
-                                        <th>Contact</th>
-                                        <th>Frequency</th>
-                                        <th>Status</th>
-                                        <th>Notes</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for route_client in route_clients %}
-                                        <tr>
-                                            <td><strong>{{ route_client.sequence }}</strong></td>
-                                            <td>{{ route_client.client.name }}</td>
-                                            <td>
-                                                {% for address in route_client.client.addresses.all %}
-                                                    {% if address.active %}
-                                                        {{ address.street }}<br>
-                                                        <small class="text-muted">{{ address.city }}, {{ address.state }}</small>
-                                                        {% break %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                {% for contact in route_client.client.contacts.all %}
-                                                    {{ contact.name }}<br>
-                                                    <small class="text-muted">{{ contact.phone }}</small>
-                                                    {% break %}
-                                                {% empty %}
-                                                    <span class="text-muted">No contact info</span>
-                                                {% endfor %}
-                                            </td>
-                                            <td>{{ route_client.get_frequency_display }}</td>
-                                            <td>
-                                                {% if route_client.is_active %}
-                                                    <span class="badge badge-success">Active</span>
-                                                {% else %}
-                                                    <span class="badge badge-secondary">Inactive</span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ route_client.notes|default:"—"|truncatechars:30 }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                        {% include 'includes/client_table.html' with items=route_clients table_context='route' show_id=False show_sequence=True show_frequency=True %}
                     {% else %}
                         <div class="alert alert-info">
                             <h6>No clients assigned</h6>

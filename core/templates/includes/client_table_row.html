@@ -1,0 +1,48 @@
+<!-- Client Table Row Data - Reusable component for client information -->
+<td>
+    <a href="{% url 'clients:detail' client.pk %}" class="text-decoration-none fw-bold">
+        {% if has_search and search_query %}
+            {{ client.name|default:"Sin nombre" }}
+        {% else %}
+            {{ client.name }}
+        {% endif %}
+    </a>
+</td>
+<td>
+    <span class="badge bg-info">{{ client.get_type_display }}</span>
+</td>
+<td>
+    <small class="text-muted">
+        {% for contact in client.contacts.all %}
+            <div><i class="fas fa-phone me-1"></i>{{ contact.phone }}</div>
+            {% if contact.email %}
+                <div><i class="fas fa-envelope me-1"></i>{{ contact.email|truncatechars:20 }}</div>
+            {% endif %}
+        {% empty %}
+            <span class="text-muted">Sin contacto</span>
+        {% endfor %}
+    </small>
+</td>
+<td>
+    <small class="text-muted">
+        {% for address in client.addresses.all %}
+            {% if address.active %}
+                <div>{{ address.street|truncatechars:25 }}</div>
+                <div>{{ address.city }}, {{ address.state }}</div>
+                {% if forloop.first %}{% endif %}
+            {% endif %}
+        {% empty %}
+            <span class="text-muted">Sin direcciones</span>
+        {% endfor %}
+    </small>
+</td>
+<td>
+    <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %}">
+        {% if client.active %}Activo{% else %}Inactivo{% endif %}
+    </span>
+</td>
+{% if show_frequency %}
+<td>
+    <span class="badge bg-primary">{{ frequency_display|default:"—" }}</span>
+</td>
+{% endif %}
