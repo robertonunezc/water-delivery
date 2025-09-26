@@ -41,8 +41,3 @@
         {% if client.active %}Activo{% else %}Inactivo{% endif %}
     </span>
 </td>
-{% if show_frequency %}
-<td>
-    <span class="badge bg-primary">{{ frequency_display|default:"—" }}</span>
-</td>
-{% endif %}
