@@ -1,0 +1,461 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <!-- Font Awesome -->
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    .filter-section {
+      background: #f8f9fa;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .order-card {
+      transition: all 0.2s ease;
+      border-left: 4px solid transparent;
+      margin-bottom: 1rem;
+    }
+    
+    .order-card:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    
+    .order-card.status-PENDING {
+      border-left-color: #ffc107;
+    }
+    
+    .order-card.status-COMPLETED {
+      border-left-color: #198754;
+    }
+    
+    .order-card.status-CANCELLED {
+      border-left-color: #dc3545;
+    }
+    
+    .status-badge.PENDING {
+      background-color: #ffc107;
+      color: #000;
+    }
+    
+    .status-badge.COMPLETED {
+      background-color: #198754;
+    }
+    
+    .status-badge.CANCELLED {
+      background-color: #dc3545;
+    }
+    
+    .order-total {
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #198754;
+    }
+    
+    .order-id {
+      font-family: 'Courier New', monospace;
+      font-weight: bold;
+      color: #6c757d;
+    }
+    
+    .stats-card {
+      background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+      color: white;
+      border-radius: 0.5rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .product-item {
+      background: #f8f9fa;
+      border-radius: 0.25rem;
+      padding: 0.5rem;
+      margin: 0.25rem 0;
+    }
+    
+    @media (max-width: 768px) {
+      .filter-section {
+        padding: 1rem;
+      }
+      
+      .order-card .card-body {
+        padding: 1rem;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1><i class="fas fa-shopping-cart me-2"></i>Gestión de Pedidos</h1>
+        {% if has_filters %}
+          <p class="text-muted mb-0">
+            Mostrando resultados filtrados
+          </p>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{% url 'clients:list' %}" class="btn btn-primary">
+          <i class="fas fa-plus"></i> Nuevo Pedido
+        </a>
+      </div>
+    </div>
+
+    <!-- Statistics Card -->
+    {% if total_orders > 0 %}
+      <div class="stats-card">
+        <div class="row text-center">
+          <div class="col-md-3">
+            <h4>{{ total_orders }}</h4>
+            <p class="mb-0">Total Pedidos</p>
+          </div>
+          <div class="col-md-3">
+            <h4>{{ page_stats.count }}</h4>
+            <p class="mb-0">En esta página</p>
+          </div>
+          <div class="col-md-3">
+            <h4>${{ page_stats.total_amount|floatformat:2 }}</h4>
+            <p class="mb-0">Valor página</p>
+          </div>
+          <div class="col-md-3">
+            <h4>{{ today|date:"d/m/Y" }}</h4>
+            <p class="mb-0">Fecha actual</p>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <form method="get" id="filterForm">
+        <div class="row">
+          <div class="col-md-12 mb-3">
+            <h6 class="fw-bold mb-3"><i class="fas fa-filter me-2"></i>Filtros y Búsqueda</h6>
+          </div>
+        </div>
+        
+        <div class="row">
+          <!-- Search -->
+          <div class="col-md-4 mb-3">
+            <label for="search" class="form-label">Buscar</label>
+            <input type="search" 
+                   class="form-control" 
+                   id="search"
+                   name="search" 
+                   value="{{ filters.search }}" 
+                   placeholder="ID, cliente, producto, notas...">
+          </div>
+          
+          <!-- Status Filter -->
+          <div class="col-md-2 mb-3">
+            <label for="status" class="form-label">Estado</label>
+            <select class="form-select" id="status" name="status">
+              <option value="">Todos los estados</option>
+              {% for status_value, status_display in status_choices %}
+                <option value="{{ status_value }}" {% if filters.status == status_value %}selected{% endif %}>
+                  {{ status_display }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <!-- Client Filter -->
+          <div class="col-md-3 mb-3">
+            <label for="client" class="form-label">Cliente</label>
+            <select class="form-select" id="client" name="client">
+              <option value="">Todos los clientes</option>
+              {% for client in all_clients %}
+                <option value="{{ client.id }}" {% if filters.client == client.id|stringformat:"s" %}selected{% endif %}>
+                  {{ client.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <!-- Date From -->
+          <div class="col-md-1.5 mb-3">
+            <label for="date_from" class="form-label">Desde</label>
+            <input type="date" 
+                   class="form-control" 
+                   id="date_from"
+                   name="date_from" 
+                   value="{{ filters.date_from }}">
+          </div>
+          
+          <!-- Date To -->
+          <div class="col-md-1.5 mb-3">
+            <label for="date_to" class="form-label">Hasta</label>
+            <input type="date" 
+                   class="form-control" 
+                   id="date_to"
+                   name="date_to" 
+                   value="{{ filters.date_to }}">
+          </div>
+        </div>
+        
+        <!-- Filter Actions -->
+        <div class="row">
+          <div class="col-12">
+            <button type="submit" class="btn btn-primary me-2">
+              <i class="fas fa-search me-2"></i>Filtrar
+            </button>
+            <a href="{% url 'orders:list' %}" class="btn btn-outline-secondary">
+              <i class="fas fa-times me-2"></i>Limpiar Filtros
+            </a>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Orders List -->
+    {% if orders %}
+      <div class="row">
+        {% for order in orders %}
+          <div class="col-12">
+            <div class="card order-card status-{{ order.status }}">
+              <div class="card-body">
+                <div class="row align-items-start">
+                  <!-- Order Info -->
+                  <div class="col-md-3">
+                    <div class="d-flex align-items-center mb-2">
+                      <span class="order-id me-2">#{{ order.id }}</span>
+                      <span class="badge status-badge {{ order.status }} badge-sm">
+                        {{ order.get_status_display }}
+                      </span>
+                    </div>
+                    <h6 class="mb-1">
+                      <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none">
+                        {{ order.client.name }}
+                      </a>
+                    </h6>
+                    <small class="text-muted">
+                      <i class="fas fa-calendar-alt me-1"></i>
+                      {{ order.order_date|date:"d/m/Y H:i" }}
+                    </small>
+                  </div>
+                  
+                  <!-- Products -->
+                  <div class="col-md-4">
+                    <h6 class="text-muted mb-2">Productos:</h6>
+                    <div class="small">
+                      {% for item in order.items.all|slice:":3" %}
+                        <div class="product-item">
+                          <strong>{{ item.quantity }}x</strong> {{ item.product.name }}
+                          <span class="float-end">${{ item.get_total_price|floatformat:2 }}</span>
+                        </div>
+                      {% endfor %}
+                      {% if order.items.count > 3 %}
+                        <div class="text-muted small">
+                          + {{ order.items.count|add:"-3" }} producto{{ order.items.count|add:"-3"|pluralize }} más...
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                  
+                  <!-- Contact Info -->
+                  <div class="col-md-2">
+                    <div class="small text-muted">
+                      {% for contact in order.client.contacts.all|slice:":1" %}
+                        <div><i class="fas fa-phone me-1"></i>{{ contact.phone|default:"Sin teléfono" }}</div>
+                        {% if contact.email %}
+                          <div><i class="fas fa-envelope me-1"></i>{{ contact.email|truncatechars:15 }}</div>
+                        {% endif %}
+                      {% empty %}
+                        <span class="text-muted">Sin contacto</span>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  
+                  <!-- Total & Actions -->
+                  <div class="col-md-3 text-end">
+                    <div class="order-total mb-2">
+                      ${{ order.total_amount|floatformat:2 }}
+                    </div>
+                    <div class="btn-group" role="group">
+                      <a href="{% url 'clients:detail' order.client.pk %}" 
+                         class="btn btn-sm btn-outline-primary" 
+                         title="Ver Cliente">
+                        <i class="fas fa-user"></i>
+                      </a>
+                      {% if order.status == 'PENDING' %}
+                        <a href="{% url 'orders:create_order' order.client.pk %}" 
+                           class="btn btn-sm btn-warning" 
+                           title="Editar Pedido">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                      {% endif %}
+                      {% if user.is_staff %}
+                        <a href="{% url 'admin:orders_order_change' order.id %}" 
+                           class="btn btn-sm btn-outline-secondary" 
+                           title="Admin">
+                          <i class="fas fa-cog"></i>
+                        </a>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Order Notes -->
+                {% if order.notes %}
+                  <div class="row mt-3">
+                    <div class="col-12">
+                      <div class="alert alert-info py-2">
+                        <small>
+                          <strong>Notas:</strong> {{ order.notes }}
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Pagination -->
+      {% if orders.has_other_pages %}
+        <div class="row mt-4">
+          <div class="col-12">
+            <nav aria-label="Navegación de páginas de pedidos">
+              <ul class="pagination justify-content-center">
+                {% if orders.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page=1" aria-label="Primera página">
+                      <i class="fas fa-angle-double-left"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                  </li>
+                {% endif %}
+
+                <!-- Page numbers -->
+                {% for page_num in orders.paginator.page_range %}
+                  {% if page_num == orders.number %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                  {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% if orders.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
+                      <i class="fas fa-angle-double-right"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+            
+            <!-- Pagination Info -->
+            <div class="text-center text-muted mt-2">
+              <small>
+                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }} pedidos
+              </small>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <!-- Empty State -->
+      <div class="text-center py-5">
+        {% if has_filters %}
+          <i class="fas fa-search fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No se encontraron pedidos</h4>
+          <p class="text-muted">
+            No hay pedidos que coincidan con los filtros aplicados.
+          </p>
+          <div class="mt-3">
+            <a href="{% url 'orders:list' %}" class="btn btn-outline-primary me-2">
+              <i class="fas fa-times me-2"></i>Limpiar Filtros
+            </a>
+            <a href="{% url 'clients:list' %}" class="btn btn-primary">
+              <i class="fas fa-plus me-2"></i>Crear Nuevo Pedido
+            </a>
+          </div>
+        {% else %}
+          <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No hay pedidos registrados</h4>
+          <p class="text-muted">Comienza creando tu primer pedido seleccionando un cliente</p>
+          <a href="{% url 'clients:list' %}" class="btn btn-primary">
+            <i class="fas fa-plus"></i> Crear Primer Pedido
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    // Auto-submit form when filters change (optional)
+    document.addEventListener('DOMContentLoaded', function() {
+      const autoSubmitElements = document.querySelectorAll('#status, #client');
+      
+      autoSubmitElements.forEach(element => {
+        element.addEventListener('change', function() {
+          // Optional: Auto-submit on select change
+          // document.getElementById('filterForm').submit();
+        });
+      });
+      
+      // Set date inputs to today by default (optional)
+      const today = new Date().toISOString().split('T')[0];
+      const dateFromInput = document.getElementById('date_from');
+      const dateToInput = document.getElementById('date_to');
+      
+      // Uncomment to set default date range
+      /*
+      if (!dateFromInput.value) {
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        dateFromInput.value = weekAgo.toISOString().split('T')[0];
+      }
+      
+      if (!dateToInput.value) {
+        dateToInput.value = today;
+      }
+      */
+    });
+  </script>
+{% endblock %}
