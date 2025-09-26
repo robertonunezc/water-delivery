@@ -16,25 +16,25 @@
                 </div>
                 <div class="card-body">
                     <!-- Route Information -->
-                    <div class="row mb-4">
+                    <div class="row mb-3">
                         <div class="col-md-8">
-                            <h5>Route Information</h5>
-                            <p><strong>Description:</strong> {{ route.description|default:"No description" }}</p>
-                            <p><strong>Day:</strong> {{ route.get_weekday_display }}</p>
-                            <p><strong>Transportation:</strong> {{ route.transportation.license_plate }} - {{ route.transportation.model }}</p>
-                            <p><strong>Driver:</strong> 
-                                {% if route.transportation.assigned_driver %}
-                                    {{ route.transportation.assigned_driver.user.get_full_name }}
-                                {% else %}
-                                    Not assigned
-                                {% endif %}
+                            <h5>Informacion Ruta</h5>
+                            <p><strong>Descripcion:</strong> {{ route.description|default:"No description" }} | 
+                               <strong>Dia:</strong> {{ route.get_weekday_display }} | 
+                               <strong>Transporte:</strong> {{ route.transportation.license_plate }} - {{ route.transportation.model }} | 
+                               <strong>Conductor:</strong> 
+                               {% if route.transportation.assigned_driver %}
+                                   {{ route.transportation.assigned_driver.user.get_full_name }}
+                               {% else %}
+                                   Not assigned
+                               {% endif %}
                             </p>
                         </div>
                         <div class="col-md-4">
                             <div class="info-box">
                                 <span class="info-box-icon bg-info"><i class="fas fa-users"></i></span>
                                 <div class="info-box-content">
-                                    <span class="info-box-text">Active Clients</span>
+                                    <span class="info-box-text">Clientes Activos</span>
                                     <span class="info-box-number">{{ route_clients.count }}</span>
                                 </div>
                             </div>
@@ -42,7 +42,7 @@
                     </div>
 
                     <!-- Regular Clients -->
-                    <h5>Regular Clients</h5>
+                    <h5>Clientes</h5>
                     {% if route_clients %}
                         {% include 'includes/client_table.html' with items=route_clients table_context='route' show_id=False show_sequence=True show_frequency=True %}
                     {% else %}
@@ -97,8 +97,8 @@
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'routes:list' %}" class="btn btn-secondary">Back to Routes</a>
-                    <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
-                       class="btn btn-primary">View Today's Orders</a>
+                    {% comment %} <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
+                       class="btn btn-primary">View Today's Orders</a> {% endcomment %}
                 </div>
             </div>
         </div>
