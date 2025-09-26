@@ -1,7 +1,54 @@
 from django.shortcuts import render, get_object_or_404
 from django.db.models import Sum, Count, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from datetime import date, datetime, timedelta
+from calendar import monthrange
 from .models import Client
+
+
+def calculate_next_billing_date(billing_frequency):
+    """Calculate the next billing date based on frequency settings"""
+    if not billing_frequency or not billing_frequency.is_active:
+        return None
+    
+    today = date.today()
+    
+    # Get all possible billing dates from the model
+    candidates = billing_frequency.get_next_billing_candidates(today)
+    
+    if not candidates:
+        return None
+    
+    # Find the first date that is in the future
+    for candidate_date in candidates:
+        if candidate_date > today:
+            # Check if this date matches the frequency pattern
+            if _is_valid_billing_date(candidate_date, billing_frequency, today):
+                return candidate_date
+    
+    return None
+
+
+def _is_valid_billing_date(candidate_date, billing_frequency, reference_date):
+    """Check if a candidate date matches the billing frequency pattern"""
+    
+    # For monthly frequency, any candidate from the model is valid
+    if billing_frequency.frequency == 'monthly':
+        return True
+    
+    # For other frequencies, we need to calculate the interval
+    interval_months = {
+        'bimonthly': 2,
+        'quarterly': 3,
+        'semiannual': 6,
+        'annual': 12,
+    }.get(billing_frequency.frequency, 1)
+    
+    # Check if the candidate date falls on the correct interval
+    # This is a simplified check - in a real system you might want to store the last billing date
+    month_diff = (candidate_date.year - reference_date.year) * 12 + candidate_date.month - reference_date.month
+    return month_diff % interval_months == 0 or month_diff == 1  # Allow next month for monthly
+
 
 def list(request):
     # Get search query from request
@@ -69,6 +116,16 @@ def detail(request, pk):
     addresses = client.addresses.filter(active=True)
     billing_data = client.billing_data.all()
     
+    # Get billing frequency information
+    billing_frequencies = client.billing_frecuency.all()
+    billing_frequency_info = None
+    next_billing_date = None
+    
+    if billing_frequencies.exists():
+        billing_frequency = billing_frequencies.first()  # Assuming one billing frequency per client
+        billing_frequency_info = billing_frequency
+        next_billing_date = calculate_next_billing_date(billing_frequency)
+    
     context = {
         'client': client,
         'orders': orders[:10],  # Limit to recent 10 orders for performance
@@ -76,6 +133,8 @@ def detail(request, pk):
         'contacts': contacts,
         'addresses': addresses,
         'billing_data': billing_data,
+        'billing_frequency': billing_frequency_info,
+        'next_billing_date': next_billing_date,
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,

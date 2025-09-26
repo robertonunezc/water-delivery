@@ -160,6 +160,122 @@
           </div>
         </div>
       {% endif %}
+
+      <!-- Billing Frequency -->
+      {% if billing_frequency %}
+        <div class="card mb-4">
+          <div class="card-header section-header">
+            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Frecuencia de Facturación</h5>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <div class="row">
+                <div class="col-sm-6">
+                  <div><strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}</div>
+                  <div><strong>Tipo de Fecha:</strong> {{ billing_frequency.get_billing_date_display }}</div>
+                </div>
+                <div class="col-sm-6">
+                  <div><strong>Estado:</strong> 
+                    <span class="badge bg-{% if billing_frequency.is_active %}success{% else %}secondary{% endif %}">
+                      {% if billing_frequency.is_active %}Activo{% else %}Inactivo{% endif %}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- Specific configuration details -->
+              <div class="mt-3">
+                {% if billing_frequency.billing_date == 'specific_date' and billing_frequency.specific_day %}
+                  <div class="alert alert-light">
+                    <i class="fas fa-calendar-day me-2"></i>
+                    <strong>Día Específico:</strong> {{ billing_frequency.specific_day }} de cada mes
+                  </div>
+                {% elif billing_frequency.billing_date == 'weekday_occurrence' and billing_frequency.weekday is not None and billing_frequency.occurrence %}
+                  <div class="alert alert-light">
+                    <i class="fas fa-calendar-week me-2"></i>
+                    <strong>Día de la Semana:</strong> {{ billing_frequency.get_occurrence_display }} {{ billing_frequency.get_weekday_display }} de cada mes
+                  </div>
+                {% elif billing_frequency.billing_date == 'first_day' %}
+                  <div class="alert alert-light">
+                    <i class="fas fa-calendar-plus me-2"></i>
+                    <strong>Primer día</strong> de cada período
+                  </div>
+                {% elif billing_frequency.billing_date == 'last_day' %}
+                  <div class="alert alert-light">
+                    <i class="fas fa-calendar-minus me-2"></i>
+                    <strong>Último día</strong> de cada período
+                  </div>
+                {% endif %}
+              </div>
+              
+              {% if next_billing_date and billing_frequency.is_active %}
+                <div class="mt-3">
+                  <div class="alert alert-info d-flex align-items-center">
+                    <i class="fas fa-calendar-check me-2"></i>
+                    <div>
+                      <strong>Próxima Facturación:</strong><br>
+                      <span class="fs-5 text-primary">{{ next_billing_date|date:"d/m/Y" }}</span>
+                      <small class="text-muted d-block">
+                        {% now "Y-m-d" as today %}
+                        {% if next_billing_date|date:"Y-m-d" == today %}
+                          ¡Hoy es día de facturación!
+                        {% else %}
+                          En {{ next_billing_date|timeuntil }}
+                        {% endif %}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              {% elif not billing_frequency.is_active %}
+                <div class="mt-3">
+                  <div class="alert alert-warning">
+                    <i class="fas fa-pause-circle me-2"></i>
+                    La facturación automática está desactivada para este cliente.
+                  </div>
+                </div>
+              {% else %}
+                <div class="mt-3">
+                  <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    No se pudo calcular la próxima fecha de facturación.
+                  </div>
+                </div>
+              {% endif %}
+              
+              {% if billing_frequency.notes %}
+                <div class="mt-3">
+                  <div class="alert alert-secondary">
+                    <strong><i class="fas fa-sticky-note me-2"></i>Notas:</strong>
+                    <p class="mb-0 mt-2">{{ billing_frequency.notes }}</p>
+                  </div>
+                </div>
+              {% endif %}
+              
+              <div class="mt-2">
+                <small class="text-muted">
+                  <i class="fas fa-info-circle me-1"></i>
+                  {{ billing_frequency.get_billing_info }}
+                </small>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="card mb-4">
+          <div class="card-header section-header">
+            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Frecuencia de Facturación</h5>
+          </div>
+          <div class="card-body">
+            <div class="alert alert-light">
+              <i class="fas fa-info-circle me-2"></i>
+              No hay frecuencia de facturación configurada para este cliente.
+              <div class="mt-2">
+                <small class="text-muted">Configura la frecuencia de facturación desde la sección administrativa para automatizar la generación de facturas.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
     </div>
 
     <!-- Orders and Payments Column -->
