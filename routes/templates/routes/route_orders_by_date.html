@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Route Orders - {{ route.name }} - {{ visit_date }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ route.name }} - {{ visit_date|date:"l, F d, Y" }}</h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info">{{ route.get_weekday_display }}</span>
+                        <span class="badge badge-primary">{{ route.transportation.license_plate }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Date Navigation -->
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <form method="GET" class="form-inline">
+                                <div class="form-group">
+                                    <label for="date" class="mr-2">Select Date:</label>
+                                    <input type="date" name="date" id="date" class="form-control" 
+                                           value="{{ visit_date|date:'Y-m-d' }}">
+                                </div>
+                                <button type="submit" class="btn btn-primary ml-2">Go</button>
+                            </form>
+                        </div>
+                        <div class="col-md-6 text-right">
+                            <a href="{% url 'routes:detail' route.id %}" class="btn btn-secondary">
+                                Back to Route
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Orders for this date -->
+                    {% if route_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Sequence</th>
+                                        <th>Client</th>
+                                        <th>Order</th>
+                                        <th>Address</th>
+                                        <th>Status</th>
+                                        <th>Completed</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_order in route_orders %}
+                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
+                                            <td><strong>{{ route_order.sequence }}</strong></td>
+                                            <td>{{ route_order.client.name }}</td>
+                                            <td>
+                                                Order #{{ route_order.order.id }}<br>
+                                                <small class="text-muted">
+                                                    ${{ route_order.order.total_amount }}<br>
+                                                    {{ route_order.order.get_status_display }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                {% for address in route_order.client.addresses.all %}
+                                                    {% if address.active %}
+                                                        {{ address.street }}<br>
+                                                        <small class="text-muted">{{ address.city }}, {{ address.state }}</small>
+                                                        {% break %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>{{ route_order.order.get_status_display }}</td>
+                                            <td>
+                                                {% if route_order.is_completed %}
+                                                    <span class="badge badge-success">
+                                                        <i class="fas fa-check"></i> Completed
+                                                    </span>
+                                                    {% if route_order.completed_at %}
+                                                        <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge badge-warning">
+                                                        <i class="fas fa-clock"></i> Pending
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ route_order.notes|default:"—"|truncatechars:30 }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h5>No orders scheduled</h5>
+                            <p>There are no orders scheduled for {{ visit_date|date:"l, F d, Y" }} on this route.</p>
+                            <a href="{% url 'routes:detail' route.id %}" class="btn btn-primary">
+                                View Regular Clients
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-submit form when date changes
+    document.getElementById('date').addEventListener('change', function() {
+        this.form.submit();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block title %}No Transportation Assigned{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="card-title mb-0">No Transportation Assigned</h4>
+                </div>
+                <div class="card-body text-center">
+                    <i class="fas fa-truck fa-4x text-warning mb-3"></i>
+                    <h5>Hello {{ employee.user.get_full_name }},</h5>
+                    <p>You don't have any transportation assigned to you yet.</p>
+                    <p class="text-muted">Please contact your administrator to get a vehicle assigned so you can access your routes.</p>
+                    <a href="{% url 'core:home' %}" class="btn btn-primary">Go to Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,215 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Today's Route - {{ transportation.license_plate }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="card-title">
+                        <i class="fas fa-route"></i> Today's Route - {{ today|date:"l, F d, Y" }}
+                    </h3>
+                    <div class="card-tools">
+                        <span class="badge badge-light">{{ transportation.license_plate }}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Route Info -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <h5>{{ route.name }}</h5>
+                            <p class="text-muted">{{ route.description|default:"No description available" }}</p>
+                        </div>
+                        <div class="col-md-6 text-right">
+                            <h6>Transportation Details:</h6>
+                            <p>
+                                <strong>{{ transportation.license_plate }}</strong><br>
+                                {{ transportation.model }}<br>
+                                Capacity: {{ transportation.capacity_liters }}L
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Today's Scheduled Orders -->
+                    {% if today_orders %}
+                        <h5><i class="fas fa-clipboard-list"></i> Today's Scheduled Orders</h5>
+                        <div class="table-responsive mb-4">
+                            <table class="table table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Client</th>
+                                        <th>Order</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_order in today_orders %}
+                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
+                                            <td>{{ route_order.sequence }}</td>
+                                            <td>
+                                                <strong>{{ route_order.client.name }}</strong><br>
+                                                {% for address in route_order.client.addresses.all %}
+                                                    {% if address.active %}
+                                                        <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
+                                                        {% break %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                Order #{{ route_order.order.id }}<br>
+                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
+                                            </td>
+                                            <td>
+                                                {% if route_order.is_completed %}
+                                                    <span class="badge badge-success">
+                                                        <i class="fas fa-check"></i> Completed
+                                                    </span>
+                                                    {% if route_order.completed_at %}
+                                                        <br><small class="text-muted">{{ route_order.completed_at|time:"H:i" }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge badge-warning">
+                                                        <i class="fas fa-clock"></i> Pending
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ route_order.notes|default:"—" }}</td>
+                                            <td>
+                                                {% if not route_order.is_completed %}
+                                                    <button class="btn btn-sm btn-success complete-order-btn" 
+                                                            data-order-id="{{ route_order.id }}">
+                                                        <i class="fas fa-check"></i> Mark Complete
+                                                    </button>
+                                                {% else %}
+                                                    <span class="text-success">
+                                                        <i class="fas fa-check-circle"></i> Done
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+
+                    <!-- Regular Clients (for manual order creation) -->
+                    <h5><i class="fas fa-users"></i> Regular Clients on This Route</h5>
+                    {% if regular_clients %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Client</th>
+                                        <th>Frequency</th>
+                                        <th>Contact</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_client in regular_clients %}
+                                        <tr>
+                                            <td>{{ route_client.sequence }}</td>
+                                            <td>
+                                                <strong>{{ route_client.client.name }}</strong><br>
+                                                {% for address in route_client.client.addresses.all %}
+                                                    {% if address.active %}
+                                                        <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
+                                                        {% break %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>{{ route_client.get_frequency_display }}</td>
+                                            <td>
+                                                {% for contact in route_client.client.contacts.all %}
+                                                    {{ contact.name }}<br>
+                                                    <small class="text-muted">{{ contact.phone }}</small>
+                                                    {% break %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                <a href="/orders/create/{{ route_client.client.id }}/" 
+                                                   class="btn btn-sm btn-primary">
+                                                    <i class="fas fa-plus"></i> Create Order
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h6>No regular clients</h6>
+                            <p>This route doesn't have any regular clients assigned yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle complete order buttons
+    document.querySelectorAll('.complete-order-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            const button = this;
+            
+            if (confirm('Mark this order as completed?')) {
+                fetch(`{% url 'routes:mark_completed' 0 %}`.replace('0', orderId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update the UI
+                        const row = button.closest('tr');
+                        row.classList.add('table-success');
+                        
+                        const statusCell = row.querySelector('td:nth-child(4)');
+                        statusCell.innerHTML = `
+                            <span class="badge badge-success">
+                                <i class="fas fa-check"></i> Completed
+                            </span>
+                            <br><small class="text-muted">${new Date().toLocaleTimeString()}</small>
+                        `;
+                        
+                        button.outerHTML = `
+                            <span class="text-success">
+                                <i class="fas fa-check-circle"></i> Done
+                            </span>
+                        `;
+                        
+                        // Show success message
+                        alert('Order marked as completed successfully!');
+                    } else {
+                        alert('Error: ' + (data.error || 'Could not complete order'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An error occurred while completing the order.');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

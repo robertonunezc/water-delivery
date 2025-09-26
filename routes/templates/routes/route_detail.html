@@ -1,327 +1,156 @@
 {% extends 'base.html' %}
 
-{% block extra_css %}
-  <!-- Font Awesome -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <style>
-    .route-header {
-      background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
-      color: white;
-      border-radius: 0.5rem;
-      padding: 2rem;
-      margin-bottom: 2rem;
-    }
-    
-    .client-sequence {
-      background: #007bff;
-      color: white;
-      border-radius: 50%;
-      width: 30px;
-      height: 30px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.9rem;
-      font-weight: bold;
-      margin-right: 1rem;
-    }
-    
-    .client-card {
-      transition: all 0.2s ease;
-      border-left: 4px solid transparent;
-    }
-    
-    .client-card:hover {
-      border-left-color: #007bff;
-      transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    
-    .day-filter-nav {
-      background: #f8f9fa;
-      border-radius: 0.5rem;
-      padding: 1rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .day-tab {
-      border: none;
-      background: transparent;
-      padding: 0.5rem 1rem;
-      margin: 0 0.25rem;
-      border-radius: 0.375rem;
-      transition: all 0.2s;
-    }
-    
-    .day-tab.active {
-      background: #007bff;
-      color: white;
-    }
-    
-    .day-tab:hover:not(.active) {
-      background: #e9ecef;
-    }
-    
-    .route-stats {
-      background: white;
-      border-radius: 0.5rem;
-      padding: 1.5rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      margin-bottom: 1.5rem;
-    }
-  </style>
-{% endblock %}
+{% block title %}Route Details - {{ route.name }}{% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
-    <!-- Route Header -->
-    <div class="route-header">
-      <div class="row align-items-center">
-        <div class="col-md-8">
-          <h1 class="mb-2">
-            <i class="fas fa-route me-2"></i>{{ route.name }}
-          </h1>
-          {% if route.description %}
-            <p class="mb-0 opacity-75">{{ route.description }}</p>
-          {% endif %}
-        </div>
-        <div class="col-md-4 text-md-end">
-          <a href="{% url 'routes:list' %}" class="btn btn-light me-2">
-            <i class="fas fa-arrow-left"></i> Volver a Rutas
-          </a>
-          {% if user.is_staff %}
-            <a href="{% url 'admin:routes_route_change' route.id %}" class="btn btn-outline-light">
-              <i class="fas fa-edit"></i> Editar
-            </a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-
-    <!-- Route Stats -->
-    <div class="route-stats">
-      <div class="row text-center">
-        <div class="col-md-3">
-          <h4 class="text-primary">{{ route_clients.count }}</h4>
-          <p class="mb-0 text-muted">Cliente{{ route_clients.count|pluralize }} en ruta</p>
-        </div>
-        <div class="col-md-3">
-          <h4 class="text-success">{{ route.route_employees.count }}</h4>
-          <p class="mb-0 text-muted">Empleado{{ route.route_employees.count|pluralize }} asignado{{ route.route_employees.count|pluralize }}</p>
-        </div>
-        <div class="col-md-3">
-          <h4 class="text-info">{{ days_in_route.count }}</h4>
-          <p class="mb-0 text-muted">Día{{ days_in_route.count|pluralize }} de visita</p>
-        </div>
-        <div class="col-md-3">
-          <h4 class="text-warning">{{ route.created_at|date:"M Y" }}</h4>
-          <p class="mb-0 text-muted">Creada</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Day Filter Navigation -->
-    {% if days_in_route %}
-      <div class="day-filter-nav">
-        <div class="row align-items-center">
-          <div class="col-md-8">
-            <h6 class="mb-2 mb-md-0">Filtrar por día de visita:</h6>
-            <div class="btn-group" role="group">
-              <a href="{% url 'routes:detail' route.id %}" 
-                 class="day-tab {% if not day_filter %}active{% endif %}">
-                Todos los días
-              </a>
-              {% for day in days_in_route %}
-                <a href="{% url 'routes:detail' route.id %}?day={{ day }}" 
-                   class="day-tab {% if day_filter == day %}active{% endif %}">
-                  {{ day|capfirst }}
-                </a>
-              {% endfor %}
-            </div>
-          </div>
-          <div class="col-md-4 text-md-end">
-            <small class="text-muted">
-              {% if day_filter %}
-                Mostrando clientes para: <strong>{{ day_filter|capfirst }}</strong>
-              {% else %}
-                Mostrando todos los clientes
-              {% endif %}
-            </small>
-          </div>
-        </div>
-      </div>
-    {% endif %}
-
-    <!-- Clients List -->
-    {% if route_clients %}
-      <div class="row">
-        {% for route_client in route_clients %}
-          <div class="col-12 mb-3">
-            <div class="card client-card">
-              <div class="card-body">
-                <div class="row align-items-center">
-                  <!-- Sequence Number -->
-                  <div class="col-auto">
-                    <div class="client-sequence">{{ route_client.sequence }}</div>
-                  </div>
-                  
-                  <!-- Client Info -->
-                  <div class="col-md-4">
-                    <h6 class="mb-1">
-                      <a href="{% url 'clients:detail' route_client.client.pk %}" class="text-decoration-none">
-                        {{ route_client.client.name }}
-                      </a>
-                    </h6>
-                    <div class="small text-muted">
-                      <span class="badge bg-info me-1">{{ route_client.client.get_type_display }}</span>
-                      <span class="badge bg-{% if route_client.client.active %}success{% else %}secondary{% endif %}">
-                        {% if route_client.client.active %}Activo{% else %}Inactivo{% endif %}
-                      </span>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ route.name }}</h3>
+                    <div class="card-tools">
+                        <span class="badge badge-info">{{ route.get_weekday_display }}</span>
+                        <span class="badge badge-primary">{{ route.transportation.license_plate }}</span>
                     </div>
-                  </div>
-                  
-                  <!-- Contact Info -->
-                  <div class="col-md-3">
-                    <div class="small text-muted">
-                      {% for contact in route_client.client.contacts.all|slice:":1" %}
-                        <div><i class="fas fa-phone me-1"></i>{{ contact.phone|default:"Sin teléfono" }}</div>
-                        {% if contact.email %}
-                          <div><i class="fas fa-envelope me-1"></i>{{ contact.email|truncatechars:20 }}</div>
-                        {% endif %}
-                      {% empty %}
-                        <span class="text-muted">Sin contacto</span>
-                      {% endfor %}
-                    </div>
-                  </div>
-                  
-                  <!-- Schedule Info -->
-                  <div class="col-md-2">
-                    <div class="small">
-                      <div class="mb-1">
-                        <span class="badge bg-primary">{{ route_client.get_day_to_visit_display }}</span>
-                      </div>
-                      <div>
-                        <span class="badge bg-secondary">{{ route_client.get_frecuency_display }}</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Actions -->
-                  <div class="col-md-3 text-end">
-                    <div class="btn-group" role="group">
-                      <a href="{% url 'clients:detail' route_client.client.pk %}" 
-                         class="btn btn-sm btn-outline-primary" title="Ver Cliente">
-                        <i class="fas fa-eye"></i>
-                      </a>
-                      <a href="{% url 'orders:create_order' route_client.client.pk %}" 
-                         class="btn btn-sm btn-success" title="Crear Pedido">
-                        <i class="fas fa-shopping-cart"></i> Crear Pedido
-                      </a>
-                      {% if user.is_staff %}
-                        <a href="{% url 'admin:routes_routeclient_change' route_client.id %}" 
-                           class="btn btn-sm btn-outline-secondary" title="Editar Asignación">
-                          <i class="fas fa-edit"></i>
-                        </a>
-                      {% endif %}
-                    </div>
-                  </div>
                 </div>
-                
-                <!-- Client Note -->
-                {% if route_client.note %}
-                  <div class="row mt-2">
-                    <div class="col-12">
-                      <div class="alert alert-info py-2">
-                        <small>
-                          <strong>Nota de ruta:</strong> {{ route_client.note }}
-                        </small>
-                      </div>
+                <div class="card-body">
+                    <!-- Route Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <h5>Route Information</h5>
+                            <p><strong>Description:</strong> {{ route.description|default:"No description" }}</p>
+                            <p><strong>Day:</strong> {{ route.get_weekday_display }}</p>
+                            <p><strong>Transportation:</strong> {{ route.transportation.license_plate }} - {{ route.transportation.model }}</p>
+                            <p><strong>Driver:</strong> 
+                                {% if route.transportation.assigned_driver %}
+                                    {{ route.transportation.assigned_driver.user.get_full_name }}
+                                {% else %}
+                                    Not assigned
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="info-box">
+                                <span class="info-box-icon bg-info"><i class="fas fa-users"></i></span>
+                                <div class="info-box-content">
+                                    <span class="info-box-text">Active Clients</span>
+                                    <span class="info-box-number">{{ route_clients.count }}</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                  </div>
-                {% endif %}
-                
-                <!-- Address Preview -->
-                {% if route_client.client.addresses.all %}
-                  <div class="row mt-2">
-                    <div class="col-12">
-                      <small class="text-muted">
-                        <i class="fas fa-map-marker-alt me-1"></i>
-                        {% for address in route_client.client.addresses.all|slice:":1" %}
-                          {{ address.street }}, {{ address.city }}, {{ address.state }}
-                        {% endfor %}
-                      </small>
-                    </div>
-                  </div>
-                {% endif %}
-              </div>
+
+                    <!-- Regular Clients -->
+                    <h5>Regular Clients</h5>
+                    {% if route_clients %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Sequence</th>
+                                        <th>Client</th>
+                                        <th>Address</th>
+                                        <th>Contact</th>
+                                        <th>Frequency</th>
+                                        <th>Status</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_client in route_clients %}
+                                        <tr>
+                                            <td><strong>{{ route_client.sequence }}</strong></td>
+                                            <td>{{ route_client.client.name }}</td>
+                                            <td>
+                                                {% for address in route_client.client.addresses.all %}
+                                                    {% if address.active %}
+                                                        {{ address.street }}<br>
+                                                        <small class="text-muted">{{ address.city }}, {{ address.state }}</small>
+                                                        {% break %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </td>
+                                            <td>
+                                                {% for contact in route_client.client.contacts.all %}
+                                                    {{ contact.name }}<br>
+                                                    <small class="text-muted">{{ contact.phone }}</small>
+                                                    {% break %}
+                                                {% empty %}
+                                                    <span class="text-muted">No contact info</span>
+                                                {% endfor %}
+                                            </td>
+                                            <td>{{ route_client.get_frequency_display }}</td>
+                                            <td>
+                                                {% if route_client.is_active %}
+                                                    <span class="badge badge-success">Active</span>
+                                                {% else %}
+                                                    <span class="badge badge-secondary">Inactive</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ route_client.notes|default:"—"|truncatechars:30 }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h6>No clients assigned</h6>
+                            <p>This route doesn't have any regular clients assigned yet.</p>
+                        </div>
+                    {% endif %}
+
+                    <!-- Recent Orders -->
+                    {% if recent_orders %}
+                        <h5 class="mt-4">Recent Orders (Last 7 days)</h5>
+                        <div class="table-responsive">
+                            <table class="table table-bordered">
+                                <thead class="thead-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Sequence</th>
+                                        <th>Client</th>
+                                        <th>Order</th>
+                                        <th>Status</th>
+                                        <th>Completed</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_order in recent_orders %}
+                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
+                                            <td>{{ route_order.visit_date }}</td>
+                                            <td>{{ route_order.sequence }}</td>
+                                            <td>{{ route_order.client.name }}</td>
+                                            <td>
+                                                Order #{{ route_order.order.id }}<br>
+                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
+                                            </td>
+                                            <td>{{ route_order.order.get_status_display }}</td>
+                                            <td>
+                                                {% if route_order.is_completed %}
+                                                    <span class="badge badge-success">Yes</span>
+                                                    {% if route_order.completed_at %}
+                                                        <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="badge badge-warning">No</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'routes:list' %}" class="btn btn-secondary">Back to Routes</a>
+                    <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
+                       class="btn btn-primary">View Today's Orders</a>
+                </div>
             </div>
-          </div>
-        {% endfor %}
-      </div>
-    {% else %}
-      <!-- Empty State -->
-      <div class="text-center py-5">
-        {% if day_filter %}
-          <i class="fas fa-calendar-times fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No hay clientes para {{ day_filter|capfirst }}</h4>
-          <p class="text-muted">No hay clientes programados para visitarse en este día.</p>
-          <a href="{% url 'routes:detail' route.id %}" class="btn btn-outline-primary">
-            <i class="fas fa-calendar-alt me-2"></i>Ver todos los días
-          </a>
-        {% else %}
-          <i class="fas fa-users-slash fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No hay clientes en esta ruta</h4>
-          <p class="text-muted">Esta ruta aún no tiene clientes asignados.</p>
-          {% if user.is_staff %}
-            <a href="{% url 'admin:routes_routeclient_add' %}" class="btn btn-primary">
-              <i class="fas fa-plus me-2"></i>Asignar Clientes
-            </a>
-          {% endif %}
-        {% endif %}
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- Quick Order Modal (Optional Enhancement) -->
-  <div class="modal fade" id="quickOrderModal" tabindex="-1">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title">Crear Pedido Rápido</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-        <div class="modal-body">
-          <p>¿Deseas crear un pedido para <strong id="quickOrderClientName"></strong>?</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <a href="#" id="quickOrderConfirm" class="btn btn-success">Crear Pedido</a>
-        </div>
-      </div>
     </div>
-  </div>
-{% endblock %}
-
-{% block extra_js %}
-  <script>
-    // Quick Order Modal functionality (optional)
-    document.addEventListener('DOMContentLoaded', function() {
-      const quickOrderButtons = document.querySelectorAll('[data-quick-order]');
-      const quickOrderModal = new bootstrap.Modal(document.getElementById('quickOrderModal'));
-      const clientNameSpan = document.getElementById('quickOrderClientName');
-      const confirmButton = document.getElementById('quickOrderConfirm');
-      
-      quickOrderButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
-          e.preventDefault();
-          const clientName = this.dataset.clientName;
-          const orderUrl = this.href;
-          
-          clientNameSpan.textContent = clientName;
-          confirmButton.href = orderUrl;
-          quickOrderModal.show();
-        });
-      });
-    });
-  </script>
+</div>
 {% endblock %}

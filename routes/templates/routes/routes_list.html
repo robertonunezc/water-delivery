@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Routes - Water Delivery{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Routes</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Filter Form -->
+                    <form method="GET" class="mb-4">
+                        <div class="row">
+                            <div class="col-md-4">
+                                <label for="transportation">Transportation:</label>
+                                <select name="transportation" id="transportation" class="form-control">
+                                    <option value="">All Transportation</option>
+                                    {% for transport in transportations %}
+                                        <option value="{{ transport.id }}" 
+                                                {% if selected_transportation == transport.id|stringformat:"s" %}selected{% endif %}>
+                                            {{ transport.license_plate }} - {{ transport.model }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="weekday">Day:</label>
+                                <select name="weekday" id="weekday" class="form-control">
+                                    <option value="">All Days</option>
+                                    {% for value, display in weekday_choices %}
+                                        <option value="{{ value }}" 
+                                                {% if selected_weekday == value %}selected{% endif %}>
+                                            {{ display }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label>&nbsp;</label><br>
+                                <button type="submit" class="btn btn-primary">Filter</button>
+                                <a href="{% url 'routes:list' %}" class="btn btn-secondary">Clear</a>
+                            </div>
+                        </div>
+                    </form>
+
+                    <!-- Routes Table -->
+                    {% if routes %}
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Route Name</th>
+                                        <th>Transportation</th>
+                                        <th>Day</th>
+                                        <th>Active Clients</th>
+                                        <th>Description</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route in routes %}
+                                        <tr>
+                                            <td><strong>{{ route.name }}</strong></td>
+                                            <td>
+                                                {{ route.transportation.license_plate }}<br>
+                                                <small class="text-muted">{{ route.transportation.model }}</small>
+                                            </td>
+                                            <td>{{ route.get_weekday_display }}</td>
+                                            <td>
+                                                <span class="badge badge-info">
+                                                    {{ route.route_clients.count }} clients
+                                                </span>
+                                            </td>
+                                            <td>{{ route.description|default:"—"|truncatechars:50 }}</td>
+                                            <td>
+                                                <a href="{% url 'routes:detail' route.id %}" 
+                                                   class="btn btn-sm btn-primary">View</a>
+                                                <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
+                                                   class="btn btn-sm btn-success">Today's Orders</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <h4>No routes found</h4>
+                            <p>No routes match your current filters. Try adjusting the filters above or contact your administrator to set up routes.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-submit form when filters change
+    document.getElementById('transportation').addEventListener('change', function() {
+        this.form.submit();
+    });
+    
+    document.getElementById('weekday').addEventListener('change', function() {
+        this.form.submit();
+    });
+</script>
+{% endblock %}

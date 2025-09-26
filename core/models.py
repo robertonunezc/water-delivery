@@ -19,6 +19,15 @@ class Employee(models.Model):
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.position}"
+class Transport(models.Model):
+    license_plate = models.CharField(max_length=20, unique=True)
+    model = models.CharField(max_length=50)
+    capacity_liters = models.PositiveIntegerField()
+    is_active = models.BooleanField(default=True)
+    assigned_driver = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'position': 'driver'})
+    def __str__(self):
+        return f"{self.license_plate} - {self.model} - {self.assigned_driver}"
+    
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
         """By default, exclude soft-deleted records"""

@@ -1,48 +1,96 @@
 from django.db import models
+from datetime import date
 
 # Create your models here.
+WEEKDAY_CHOICES = [
+    ('monday', 'Monday'),
+    ('tuesday', 'Tuesday'),
+    ('wednesday', 'Wednesday'),
+    ('thursday', 'Thursday'),
+    ('friday', 'Friday'),
+    ('saturday', 'Saturday'),
+    ('sunday', 'Sunday'),
+]
+
 class Route(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    transportation = models.ForeignKey('core.Transport', related_name='routes', on_delete=models.SET_NULL, null=True)
+    weekday = models.CharField(max_length=10, choices=WEEKDAY_CHOICES, default='monday')
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    def __str__(self):
-        return self.name
-
-class RouteEmployee(models.Model):
-    route = models.ForeignKey(Route, related_name='route_employees', on_delete=models.CASCADE)
-    employee = models.ForeignKey('core.Employee', related_name='employee_routes', on_delete=models.CASCADE)
-    assigned_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=50, choices=[('active', 'Active'), ('inactive', 'Inactive')], default='active')
     class Meta:
-        unique_together = ('route', 'employee')
+        unique_together = ('transportation', 'weekday')
+        indexes = [
+            models.Index(fields=['weekday'], name='routes_route_weekday_idx'),
+            models.Index(fields=['is_active'], name='routes_route_active_idx'),
+            models.Index(fields=['transportation', 'weekday'], name='routes_transport_weekday_idx'),
+        ]
 
     def __str__(self):
-        return f"{self.employee} assigned to {self.route}"
+        return f"{self.name} - {self.transportation} - {self.get_weekday_display()}"
+
+    @classmethod
+    def get_today_routes(cls, transportation=None):
+        """Get routes for today's weekday"""
+        today_weekday = date.today().strftime('%A').lower()
+        routes = cls.objects.filter(weekday=today_weekday, is_active=True)
+        if transportation:
+            routes = routes.filter(transportation=transportation)
+        return routes
+
+class RouteClientOrder(models.Model):
+    """Links a route with a client and their specific order for that day"""
+    route = models.ForeignKey(Route, related_name='route_client_orders', on_delete=models.CASCADE)
+    client = models.ForeignKey('clients.Client', related_name='client_route_orders', on_delete=models.CASCADE)
+    order = models.ForeignKey('orders.Order', related_name='route_orders', on_delete=models.CASCADE)
+    sequence = models.PositiveIntegerField(help_text="Order of visit in the route")
+    visit_date = models.DateField(help_text="Specific date this order should be visited")
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    notes = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        unique_together = ('route', 'client', 'visit_date')
+        ordering = ['sequence']
+        indexes = [
+            models.Index(fields=['visit_date'], name='routes_clientorder_date_idx'),
+            models.Index(fields=['is_completed'], name='routes_clientorder_comptd_idx'),
+            models.Index(fields=['route', 'visit_date'], name='routes_route_date_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.client} - {self.order} on {self.visit_date} (Route: {self.route.name})"
+
+    def mark_completed(self):
+        """Mark this route client order as completed"""
+        from django.utils import timezone
+        self.is_completed = True
+        self.completed_at = timezone.now()
+        self.save()
 
 class RouteClient(models.Model):
+    """Regular client assignment to a route (for recurring weekly visits)"""
     route = models.ForeignKey(Route, related_name='route_clients', on_delete=models.CASCADE)
     client = models.ForeignKey('clients.Client', related_name='client_routes', on_delete=models.CASCADE)
-    sequence = models.PositiveIntegerField()
-    note = models.TextField(blank=True, null=True)
-    day_to_visit = models.CharField(max_length=50, choices=[
-        ('monday', 'Monday'),
-        ('tuesday', 'Tuesday'),
-        ('wednesday', 'Wednesday'),
-        ('thursday', 'Thursday'),
-        ('friday', 'Friday'),
-        ('saturday', 'Saturday'),
-        ('sunday', 'Sunday'),
-    ], default='monday')
-    frecuency = models.CharField(max_length=50, choices=[
+    sequence = models.PositiveIntegerField(help_text="Default sequence order for this client")
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True, null=True)
+    frequency = models.CharField(max_length=50, choices=[
         ('weekly', 'Weekly'),
         ('biweekly', 'Biweekly'),
         ('monthly', 'Monthly'),
     ], default='weekly')
+    
     class Meta:
         unique_together = ('route', 'client')
         ordering = ['sequence']
+        indexes = [
+            models.Index(fields=['is_active'], name='routes_client_active_idx'),
+            models.Index(fields=['frequency'], name='routes_client_frequency_idx'),
+        ]
 
     def __str__(self):
-        return f"{self.client} in {self.route} at position {self.sequence}"
+        return f"{self.client} in {self.route.name} (sequence: {self.sequence})"
