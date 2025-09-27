@@ -17,6 +17,17 @@
     .info-box {
         margin-bottom: 0.5rem;
     }
+    .text-sm {
+        font-size: 0.875rem;
+    }
+    .d-flex.align-items-center > div {
+        white-space: nowrap;
+    }
+    @media (max-width: 768px) {
+        .d-flex.flex-wrap > div {
+            margin-bottom: 0.25rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -53,154 +64,50 @@
                 <div class="card-body">
                     <!-- Route Info -->
                     <div class="row mb-2">
-                        <div class="col-md-6">
-                            <h5 class="mb-1">{{ route.name }}</h5>
-                            <p class="text-muted mb-1">{{ route.description|default:"No description available" }}</p>
-                            {% if not is_today_view %}
-                                <p class="mb-0"><strong>Dia:</strong> {{ route.get_weekday_display }}</p>
-                            {% endif %}
-                        </div>
-                        <div class="col-md-6 {% if not is_today_view %}text-right{% endif %}">
-                            <h6 class="mb-1">Transportation Details:</h6>
-                            <p class="mb-1">
-                                <strong>{{ route.transportation.license_plate }}</strong><br>
-                                {{ route.transportation.model }}<br>
-                                Capacity: {{ route.transportation.capacity_liters }}L
-                                {% if route.transportation.assigned_driver %}
-                                    <br><strong>Conductor:</strong> {{ route.transportation.assigned_driver.user.get_full_name }}
-                                {% endif %}
-                            </p>
-                            {% if not is_today_view %}
-                                <div class="info-box">
-                                    <span class="info-box-icon bg-info"><i class="fas fa-users"></i></span>
-                                    <div class="info-box-content">
-                                        <span class="info-box-text">Clientes Activos</span>
-                                        <span class="info-box-number">
-                                            {% if route_clients %}
-                                                {{ route_clients.count }}
-                                            {% elif regular_clients %}
-                                                {{ regular_clients.count }}
-                                            {% else %}
-                                                0
-                                            {% endif %}
+                        <!-- Route Summary - Horizontal Layout -->
+                        <div class="col-12">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                                <div class="d-flex align-items-center flex-wrap">
+                                    <h5 class="mb-0 me-3">{{ route.name }}</h5>
+                                    <span class="badge bg-info me-2">{{ route.get_weekday_display }}</span>
+                                    <small class="text-muted">{{ route.description|default:"No description" }}</small>
+                                </div>
+                                {% if not is_today_view %}
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-users me-1"></i>
+                                        <span class="badge bg-secondary">
+                                            {% if route_clients %}{{ route_clients.count }}{% elif regular_clients %}{{ regular_clients.count }}{% else %}0{% endif %} clients
                                         </span>
                                     </div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Transportation Info - Inline -->
+                            <div class="d-flex flex-wrap align-items-center text-sm">
+                                <div class="me-4">
+                                    <i class="fas fa-truck me-1"></i>
+                                    <strong>{{ route.transportation.license_plate }}</strong>
                                 </div>
-                            {% endif %}
+                                <div class="me-4">
+                                    <i class="fas fa-car me-1"></i>
+                                    <span>{{ route.transportation.model }}</span>
+                                </div>
+                                <div class="me-4">
+                                    <i class="fas fa-tint me-1"></i>
+                                    <span>{{ route.transportation.capacity_liters }}L</span>
+                                </div>
+                                {% if route.transportation.assigned_driver %}
+                                    <div class="me-4">
+                                        <i class="fas fa-user me-1"></i>
+                                        <span>{{ route.transportation.assigned_driver.user.get_full_name }}</span>
+                                    </div>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Today's Scheduled Orders (only for today view) -->
-                    {% if is_today_view and today_orders %}
-                        <h5 class="mb-2"><i class="fas fa-clipboard-list"></i> Today's Scheduled Orders</h5>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-bordered compact-table">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>#</th>
-                                        <th>Client</th>
-                                        <th>Order</th>
-                                        <th>Status</th>
-                                        <th>Notes</th>
-                                        <th>Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for route_order in today_orders %}
-                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
-                                            <td>{{ route_order.sequence }}</td>
-                                            <td>
-                                                <strong>{{ route_order.client.name }}</strong><br>
-                                                {% for address in route_order.client.addresses.all %}
-                                                    {% if address.active %}
-                                                        <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
-                                                        {% if forloop.first %}{% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>
-                                                Order #{{ route_order.order.id }}<br>
-                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
-                                            </td>
-                                            <td>
-                                                {% if route_order.is_completed %}
-                                                    <span class="badge badge-success">
-                                                        <i class="fas fa-check"></i> Completed
-                                                    </span>
-                                                    {% if route_order.completed_at %}
-                                                        <br><small class="text-muted">{{ route_order.completed_at|time:"H:i" }}</small>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="badge badge-warning">
-                                                        <i class="fas fa-clock"></i> Pending
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ route_order.notes|default:"—" }}</td>
-                                            <td>
-                                                {% if not route_order.is_completed %}
-                                                    <button class="btn btn-sm btn-success complete-order-btn" 
-                                                            data-order-id="{{ route_order.id }}">
-                                                        <i class="fas fa-check"></i> Mark Complete
-                                                    </button>
-                                                {% else %}
-                                                    <span class="text-success">
-                                                        <i class="fas fa-check-circle"></i> Done
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
-                    <!-- Recent Orders (only for detail view) -->
-                    {% if not is_today_view and recent_orders %}
-                        <h5 class="mt-3 mb-2">Recent Orders (Last 7 days)</h5>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-bordered compact-table">
-                                <thead class="thead-light">
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Sequence</th>
-                                        <th>Client</th>
-                                        <th>Order</th>
-                                        <th>Status</th>
-                                        <th>Completed</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for route_order in recent_orders %}
-                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
-                                            <td>{{ route_order.visit_date }}</td>
-                                            <td>{{ route_order.sequence }}</td>
-                                            <td>{{ route_order.client.name }}</td>
-                                            <td>
-                                                Order #{{ route_order.order.id }}<br>
-                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
-                                            </td>
-                                            <td>{{ route_order.order.get_status_display }}</td>
-                                            <td>
-                                                {% if route_order.is_completed %}
-                                                    <span class="badge badge-success">Yes</span>
-                                                    {% if route_order.completed_at %}
-                                                        <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="badge badge-warning">No</span>
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% endif %}
-
                     <!-- Regular Clients -->
-                    <h5 class="mb-2"><i class="fas fa-users"></i> Regular Clients on This Route</h5>
+                    <h5 class="mb-2"><i class="fas fa-users"></i> Clientes en Ruta</h5>
                     {% if route_clients or regular_clients %}
                         {% if route_clients %}
                             {% include 'includes/client_table.html' with items=route_clients table_context='route' show_id=False show_sequence=True show_frequency=True table_class='compact-table' %}
