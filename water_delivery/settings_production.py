@@ -7,9 +7,14 @@ DEBUG = False
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', SECRET_KEY)
 
 # Example: tighten allowed hosts in production
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else ['your-production-domain.com']
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '').split(',') if os.environ.get('DJANGO_ALLOWED_HOSTS') else ['*']
 
 # Database: the base settings use env vars already, so no change required here.
 
-# Production static settings (example using S3 or collectstatic)
-# STATIC_URL = 'https://your-cdn.example.com/static/'
+# Production static settings
+STATIC_ROOT = '/app/staticfiles/'
+STATIC_URL = '/static/'
+
+# Media files
+MEDIA_ROOT = '/app/media/'
+MEDIA_URL = '/media/'
