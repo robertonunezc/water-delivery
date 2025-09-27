@@ -14,6 +14,7 @@ RUN apt-get update \
         gcc \
         python3-dev \
         libpq-dev \
+        netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
@@ -26,11 +27,15 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project
 COPY . /app/
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
+# Copy and make entrypoint script executable
+COPY entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
+
+# Create staticfiles directory
+RUN mkdir -p /app/staticfiles
 
 # Expose port
 EXPOSE 8000
 
 # Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "water_delivery.wsgi:application"]
+CMD ["/app/entrypoint.sh"]
