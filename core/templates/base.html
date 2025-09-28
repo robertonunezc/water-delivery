@@ -46,7 +46,14 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="#">Mi Perfil</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'core:logout' %}">Cerrar Sesión</a></li>
+                                <li>
+                                    <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="dropdown-item" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left;">
+                                            Cerrar Sesión
+                                        </button>
+                                    </form>
+                                </li>
                             </ul>
                         </li>
                     {% else %}
