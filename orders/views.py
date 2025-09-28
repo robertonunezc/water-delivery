@@ -116,6 +116,7 @@ def list_orders(request):
     return render(request, 'orders/list_order.html', context)
 
 
+@login_required
 def create_order(request, client_pk):
     client = get_object_or_404(Client, pk=client_pk)
     order = services.create_order(client)
@@ -124,6 +125,7 @@ def create_order(request, client_pk):
     return render(request, 'create_order.html', {'client': client, 'order': order, 'client_products': client_products, 'payment_types': payment_types})
 
 
+@login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def update_order(request, order_pk):

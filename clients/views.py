@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from datetime import date, datetime, timedelta
@@ -50,6 +51,7 @@ def _is_valid_billing_date(candidate_date, billing_frequency, reference_date):
     return month_diff % interval_months == 0 or month_diff == 1  # Allow next month for monthly
 
 
+@login_required
 def list(request):
     # Get search query from request
     search_query = request.GET.get('search', '').strip()
@@ -96,6 +98,7 @@ def list(request):
     
     return render(request, 'list_clients.html', context)
 
+@login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     

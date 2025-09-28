@@ -1,4 +1,5 @@
 from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +9,7 @@ import json
 from .models import Payment
 from orders.models import OrderStatus, Order
 
+@login_required
 @require_http_methods(["POST"])
 @transaction.atomic
 def create_payment(request):

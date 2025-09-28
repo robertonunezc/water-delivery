@@ -46,12 +46,12 @@
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="#">Mi Perfil</a></li>
                                 <li><hr class="dropdown-divider"></li>
-                                <li><a class="dropdown-item" href="{% url 'logout' %}">Cerrar Sesión</a></li>
+                                <li><a class="dropdown-item" href="{% url 'core:logout' %}">Cerrar Sesión</a></li>
                             </ul>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{% url 'login' %}">Iniciar Sesión</a>
+                            <a class="nav-link" href="{% url 'core:login' %}">Iniciar Sesión</a>
                         </li>
                     {% endif %}
                 </ul>

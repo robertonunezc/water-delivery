@@ -1,10 +1,15 @@
 {% extends 'base.html' %}
 
 {% block content %}
+{% if user.is_authenticated %}
 <div class="container mt-4">
     <div class="row">
         <div class="col-12">
             <h1 class="mb-4">Panel Principal</h1>
+            <div class="alert alert-info">
+                <i class="fas fa-user me-2"></i>
+                Bienvenido, <strong>{{ user.get_full_name|default:user.username }}</strong>
+            </div>
         </div>
     </div>
     
@@ -12,6 +17,7 @@
         <div class="col-md-6 col-lg-4 mb-3">
             <div class="card">
                 <div class="card-body text-center">
+                    <i class="fas fa-plus-circle fa-2x text-primary mb-2"></i>
                     <h5 class="card-title">Nuevo Pedido</h5>
                     <p class="card-text">Crear un nuevo pedido de agua</p>
                     <a href="#" class="btn btn-primary">Crear Pedido</a>
@@ -22,6 +28,7 @@
         <div class="col-md-6 col-lg-4 mb-3">
             <div class="card">
                 <div class="card-body text-center">
+                    <i class="fas fa-route fa-2x text-success mb-2"></i>
                     <h5 class="card-title">Mi Ruta</h5>
                     <p class="card-text">Ver mi ruta de entregas del día</p>
                     <a href="/routes/today/" class="btn btn-success">Ver Ruta</a>
@@ -32,6 +39,7 @@
         <div class="col-md-6 col-lg-4 mb-3">
             <div class="card">
                 <div class="card-body text-center">
+                    <i class="fas fa-shopping-cart fa-2x text-info mb-2"></i>
                     <h5 class="card-title">Pedidos</h5>
                     <p class="card-text">Gestionar todos los pedidos</p>
                     <a href="{% url 'orders:list' %}" class="btn btn-info">Ver Pedidos</a>
@@ -42,12 +50,73 @@
         <div class="col-md-6 col-lg-4 mb-3">
             <div class="card">
                 <div class="card-body text-center">
+                    <i class="fas fa-users fa-2x text-secondary mb-2"></i>
                     <h5 class="card-title">Clientes</h5>
                     <p class="card-text">Gestionar información de clientes</p>
                     <a href="{% url 'clients:list' %}" class="btn btn-secondary">Ver Clientes</a>
                 </div>
             </div>
         </div>
+
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marked-alt fa-2x text-warning mb-2"></i>
+                    <h5 class="card-title">Rutas</h5>
+                    <p class="card-text">Gestionar rutas de entrega</p>
+                    <a href="{% url 'routes:list' %}" class="btn btn-warning">Ver Rutas</a>
+                </div>
+            </div>
+        </div>
+        
+        {% if user.is_staff %}
+        <div class="col-md-6 col-lg-4 mb-3">
+            <div class="card">
+                <div class="card-body text-center">
+                    <i class="fas fa-cog fa-2x text-dark mb-2"></i>
+                    <h5 class="card-title">Administración</h5>
+                    <p class="card-text">Panel de administración</p>
+                    <a href="{% url 'admin:index' %}" class="btn btn-dark">Admin</a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+{% else %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="jumbotron bg-primary text-white text-center py-5 rounded">
+                <i class="fas fa-tint fa-4x mb-4"></i>
+                <h1 class="display-4">Water Delivery</h1>
+                <p class="lead">Sistema de Gestión de Entregas de Agua</p>
+                <hr class="my-4" style="border-color: white;">
+                <p>Para acceder al sistema, por favor inicia sesión con tu cuenta.</p>
+                <a class="btn btn-light btn-lg" href="{% url 'core:login' %}" role="button">
+                    <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-5">
+        <div class="col-md-4 text-center">
+            <i class="fas fa-shipping-fast fa-3x text-primary mb-3"></i>
+            <h4>Entregas Rápidas</h4>
+            <p class="text-muted">Sistema eficiente de gestión de rutas y entregas</p>
+        </div>
+        <div class="col-md-4 text-center">
+            <i class="fas fa-users fa-3x text-success mb-3"></i>
+            <h4>Gestión de Clientes</h4>
+            <p class="text-muted">Control completo de información y historial de clientes</p>
+        </div>
+        <div class="col-md-4 text-center">
+            <i class="fas fa-chart-line fa-3x text-info mb-3"></i>
+            <h4>Reportes</h4>
+            <p class="text-muted">Análisis y reportes detallados de ventas y entregas</p>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
