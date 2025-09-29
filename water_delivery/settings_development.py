@@ -21,3 +21,4 @@ DATABASES = {
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'water.local']

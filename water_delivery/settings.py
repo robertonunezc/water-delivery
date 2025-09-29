@@ -60,8 +60,10 @@ SESSION_COOKIE_SECURE = True
 
 # Application definition
 
-INSTALLED_APPS = [
-    #'jazzmin',
+
+SHARED_APPS = (
+    'django_tenants',  # mandatory
+    'tenant_client',  # you must list the app where your tenant model resides in
     'unfold',
     "unfold.contrib.filters",  # optional, if special filters are needed
     "unfold.contrib.forms",  # optional, if special form elements are needed
@@ -76,6 +78,9 @@ INSTALLED_APPS = [
     'django_celery_results',
     "crispy_forms",
     # Local apps
+)
+
+TENANT_APPS = (
     'clients',
     'core',
     'payment',
@@ -85,9 +90,32 @@ INSTALLED_APPS = [
     'orders',
     'invoice.apps.InvoiceConfig',
     'notification',
-]
+)
+INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
+
+TENANT_MODEL = "tenant_client.ClientTenant"  # app.Model
+
+# INSTALLED_APPS = [
+#     'jazzmin',
+#     'django.contrib.admin',
+#     'django.contrib.auth',
+#     'django.contrib.contenttypes',
+#     'django.contrib.sessions',
+#     'django.contrib.messages',
+#     'django.contrib.staticfiles',
+#     # Local apps
+#     'clients',
+#     'core',
+#     'payment',
+#     'product',
+#     'report',
+#     'routes',
+#     'orders',
+    
+# ]
 
 MIDDLEWARE = [
+    'django_tenants.middleware.main.TenantMainMiddleware',
     'django.middleware.security.SecurityMiddleware',
     "core.middleware.request_id.RequestIdMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
@@ -143,7 +171,8 @@ WSGI_APPLICATION = 'water_delivery.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
+       # 'ENGINE': 'django.db.backends.postgresql',
+        'ENGINE': 'django_tenants.postgresql_backend',
         'NAME': os.environ.get('POSTGRES_DB', 'water_delivery'),
         'USER': os.environ.get('POSTGRES_USER', 'user'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'password'),
@@ -151,7 +180,9 @@ DATABASES = {
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }
-
+DATABASE_ROUTERS = (
+    'django_tenants.routers.TenantSyncRouter',
+)
 
 def _build_redis_url(db: int) -> str:
     host = os.environ.get('REDIS_HOST', 'localhost')
