@@ -17,11 +17,21 @@ PAYMENT_STATUS_CHOICES = [
     ('failed', 'Fallido'),
 ]
 class Payment(models.Model):
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    date = models.DateTimeField(auto_now_add=True)
-    method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
-    client = models.ForeignKey('clients.Client', related_name='payments', on_delete=models.PROTECT)
-    order = models.ForeignKey('orders.Order', related_name='payments', on_delete=models.PROTECT)
-    status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='completed')  # e.g., completed, pending, failed
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto del Pago")
+    date = models.DateTimeField(auto_now_add=True, verbose_name="Fecha")
+    method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, verbose_name="Método de Pago")
+    client = models.ForeignKey('clients.Client', related_name='payments', on_delete=models.PROTECT, verbose_name="Cliente")
+    order = models.ForeignKey('orders.Order', related_name='payments', on_delete=models.PROTECT, verbose_name="Orden")
+    status = models.CharField(max_length=20, choices=PAYMENT_STATUS_CHOICES, default='completed', verbose_name="Estado del Pago")  # e.g., completed, pending, failed
     def __str__(self):
         return f"Payment of {self.amount} on {self.date}"
+    class Meta:
+        verbose_name = 'Pago'
+        verbose_name_plural = 'Pagos'
+        ordering = ['-date']
+        indexes = [
+            models.Index(fields=['date'], name='payment_date_idx'),
+            models.Index(fields=['client'], name='payment_client_idx'),
+            models.Index(fields=['order'], name='payment_order_idx'),
+            models.Index(fields=['status'], name='payment_status_idx'),
+        ]
