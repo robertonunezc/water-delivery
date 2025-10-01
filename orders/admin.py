@@ -362,7 +362,6 @@ class OrderAdmin(admin.ModelAdmin):
     export_to_csv.short_description = 'Exportar a CSV'
 
 
-@admin.register(OrderProduct)
 class OrderProductAdmin(admin.ModelAdmin):
     list_display = (
         'order_link', 'product_name', 'quantity', 'unit_price', 

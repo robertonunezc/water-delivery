@@ -28,7 +28,7 @@ class RouteAdmin(admin.ModelAdmin):
         return obj.route_clients.filter(is_active=True).count()
     client_count.short_description = 'Active Clients'
 
-@admin.register(RouteClient)
+
 class RouteClientAdmin(admin.ModelAdmin):
     list_display = ('client', 'route', 'sequence', 'frequency', 'is_active')
     list_filter = ('frequency', 'is_active', 'route__weekday', 'route__transportation')
@@ -39,7 +39,7 @@ class RouteClientAdmin(admin.ModelAdmin):
         verbose_name = 'Route Client Assignment'
         verbose_name_plural = 'Route Client Assignments'
 
-@admin.register(RouteClientOrder)
+
 class RouteClientOrderAdmin(admin.ModelAdmin):
     list_display = ('client', 'route', 'order', 'visit_date', 'sequence', 'is_completed')
     list_filter = ('is_completed', 'visit_date', 'route__weekday', 'route__transportation')

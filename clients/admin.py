@@ -65,21 +65,19 @@ class ClientAdmin(admin.ModelAdmin):
 	readonly_fields = ('created_at', 'updated_at')
 	exclude = ('deleted_at',)
 
-@admin.register(models.Contact)
+
 class ContactAdmin(admin.ModelAdmin):
 	list_display = ('name', 'client', 'email', 'phone')
 	search_fields = ('name', 'client__name', 'email', 'phone')
 	exclude = ('deleted_at',)
 
 
-@admin.register(models.Address)
 class AddressAdmin(admin.ModelAdmin):
 	list_display = ('street', 'city', 'state', 'zip_code', 'client')
 	search_fields = ('street', 'city', 'client__name')
 	exclude = ('deleted_at',)
 
 
-@admin.register(models.BillingData)
 class BillingDataAdmin(admin.ModelAdmin):
 	# show related client name via a callable
 	list_display = ('rfc', 'razon_social', 'client_name')
@@ -90,7 +88,6 @@ class BillingDataAdmin(admin.ModelAdmin):
 	client_name.short_description = 'client'
 
 
-@admin.register(models.ClientBillingFrecuency)
 class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
 	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description', 'is_active')
 	search_fields = ('client__name', 'frequency')
