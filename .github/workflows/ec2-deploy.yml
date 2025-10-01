@@ -1,32 +1,37 @@
 name: Deploy to AWS EC2
-
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        script: |
-          set -e
-          echo "Deploying water-delivery application..."
-          cd app/water-delivery
-          echo "Pulling latest code from main branch..."
-          git pull origin main
-          echo "Stopping existing containers..."
-          docker-compose -f docker-compose.prod.yml down
-          echo "Building and starting containers..."
-          docker-compose -f docker-compose.prod.yml up -d --build
-          echo "Deployment completed successfully!"
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+      
+      - name: Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+      
+      - name: Deploy to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            echo "Deploying water-delivery application..."
+            cd app/water-delivery
+            echo "Pulling latest code from main branch..."
+            git pull origin main
+            echo "Stopping existing containers..."
+            docker-compose -f docker-compose.prod.yml down
+            echo "Building and starting containers..."
+            docker-compose -f docker-compose.prod.yml up -d --build
+            echo "Deployment completed successfully!"
+          EOF
