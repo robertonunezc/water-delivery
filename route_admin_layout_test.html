@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<                         <table>
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Secuencia</th>
+                        <th>Frecuencia</th>
+                        <th>Activo</th>
+                        <th>Notas</th>
+                        <th class="field-confirm_duplicate_assignment">Confirmar asignación</th>
+                        <th class="delete">Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="has-duplicate-warning">
+                        <td>Juan Pérez</td>
+                        <td>1</td>
+                        <td>Semanal</td>
+                        <td>✓</td>
+                        <td>Cliente regular</td>
+                        <td class="field-confirm_duplicate_assignment has-conflict">
+                            <label style="display: block;">
+                                <input type="checkbox" class="confirm-duplicate-checkbox" style="display: inline-block;"> ✓ Confirmar
+                            </label>
+                        </td>
+                        <td class="delete">
+                            <button type="button">🗑️</button>
+                        </td>
+                    </tr> class="has-duplicate-warning">
+                        <td>Juan Pérez</td>
+                        <td>1</td>
+                        <td>Semanal</td>
+                        <td>✓</td>
+                        <td>Cliente regular</td>
+                        <td class="field-confirm_duplicate_assignment has-conflict">
+                            <label style="display: block;">
+                                <input type="checkbox" class="confirm-duplicate-checkbox" style="display: inline-block;"> ✓ Confirmar
+                            </label>
+                        </td>
+                        <td class="delete">
+                            <button type="button">🗑️</button>
+                        </td>
+                    </tr><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Route Client Admin Layout Test</title>
+    <link rel="stylesheet" href="../routes/static/routes/css/route_admin.css">
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .tabular table { border: 1px solid #ccc; width: 100%; }
+        .tabular th, .tabular td { border: 1px solid #eee; padding: 8px; text-align: left; }
+        .tabular th { background: #f5f5f5; }
+        .delete { text-align: center; width: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Route Client Admin Layout Test</h1>
+    
+    <div class="test-section">
+        <h2>Tabular Inline with Duplicate Warning</h2>
+        <div class="tabular inline-related">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Secuencia</th>
+                        <th>Frecuencia</th>
+                        <th>Activo</th>
+                        <th>Notas</th>
+                        <th class="delete">Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="has-duplicate-warning" style="position: relative;">
+                        <td>Juan Pérez</td>
+                        <td>1</td>
+                        <td>Semanal</td>
+                        <td>✓</td>
+                        <td>Cliente regular</td>
+                        <td class="delete">
+                            <button type="button">🗑️</button>
+                        </td>
+                        
+
+                    </tr>
+                    
+                    <tr>
+                        <td>María González</td>
+                        <td>2</td>
+                        <td>Quincenal</td>
+                        <td>✓</td>
+                        <td>-</td>
+                        <td class="field-confirm_duplicate_assignment">
+                            <input type="checkbox" class="confirm-duplicate-checkbox" style="display: none;">
+                        </td>
+                        <td class="delete">
+                            <button type="button">🗑️</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Normal Inline (No Warning)</h2>
+        <div class="tabular inline-related">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Secuencia</th>
+                        <th>Frecuencia</th>
+                        <th>Activo</th>
+                        <th>Notas</th>
+                        <th class="delete">Eliminar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Ana López</td>
+                        <td>1</td>
+                        <td>Semanal</td>
+                        <td>✓</td>
+                        <td>Cliente nuevo</td>
+                        <td class="delete">
+                            <button type="button">🗑️</button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        console.log('Layout test loaded. Check for:');
+        console.log('1. Confirmation field appears below the row');
+        console.log('2. Delete button remains accessible');
+        console.log('3. Warning text is compact and readable');
+        console.log('4. No layout breaking or overlapping');
+    </script>
+</body>
+</html>

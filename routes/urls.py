@@ -10,4 +10,5 @@ urlpatterns = [
     path('<int:route_id>/orders/', views.route_orders_by_date, name='orders_by_date'),
     path('order/<int:route_order_id>/complete/', views.mark_order_completed, name='mark_completed'),
     path('api/routes.json', views.routes_api_json, name='api_routes'),
+    path('check-client-assignments/', views.check_client_assignments, name='check_client_assignments'),
 ]
