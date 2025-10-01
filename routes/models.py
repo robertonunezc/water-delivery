@@ -22,6 +22,8 @@ class Route(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name = 'Ruta'
+        verbose_name_plural = 'Rutas'
         unique_together = ('transportation', 'weekday')
         indexes = [
             models.Index(fields=['weekday'], name='routes_route_weekday_idx'),

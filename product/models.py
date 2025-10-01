@@ -24,6 +24,8 @@ class ProductCategory(models.Model):
 class Product(models.Model):
     class Meta:
         ordering = ['order']
+        verbose_name = 'Producto'
+        verbose_name_plural = 'Productos'
         permissions = [
             ("min_max_inventory", "Can control min max inventory quantity"),
         ]
@@ -52,8 +54,9 @@ class Product(models.Model):
 
 class ProductClientPrice(models.Model):
     class Meta: 
-        verbose_name_plural = 'Product prices'
+        verbose_name_plural = 'Precios de productos'
         unique_together = ('product', 'client',)
+
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="product", related_name='prices')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client", related_name='product_prices')

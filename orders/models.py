@@ -24,6 +24,8 @@ class Order(TimeStampedModel):
     
     class Meta:
         ordering = ['-order_date']
+        verbose_name = 'Orden'
+        verbose_name_plural = 'Órdenes'
         indexes = [
             models.Index(fields=['order_date'], name='orders_order_date_idx'),
             models.Index(fields=['status'], name='orders_order_status_idx'),

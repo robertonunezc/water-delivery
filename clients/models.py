@@ -5,9 +5,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
 #Client types
 CLIENT_TYPE_CHOICES = [
-    ('individual', 'Individual'),
-    ('corporate', 'Corporate'),
-    ('branch', 'Branch'),
+    ('corporate', 'Corporativo'),
+    ('branch', 'Sucursal'),
 ]
 PAYMENT_METHOD_CHOICES = [
     ('cash', 'Efectivo'),
@@ -51,12 +50,14 @@ OCCURRENCE_CHOICES = [
     (-1, 'Último'),
 ]  
 class Client(TimeStampedModel):
-    name = models.CharField(max_length=100, db_index=True)
-    active = models.BooleanField(default=True)
-    note = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='individual')
-    corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True)
+    name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente")
+    active = models.BooleanField(default=True, verbose_name="Activo")
+    note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='individual', verbose_name="Tipo de cliente")
+    corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True, verbose_name="Cliente corporativo")
     class Meta:
+        verbose_name = 'Cliente'
+        verbose_name_plural = 'Clientes'
         indexes = [
             models.Index(fields=['name'], name='clients_client_name_idx'),
             models.Index(fields=['active'], name='clients_client_active_idx'),
@@ -65,24 +66,33 @@ class Client(TimeStampedModel):
     
     def __str__(self):
         return self.name
+    # Validate that if type is 'branch', corporate must be set
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.type == 'branch' and not self.corporate:
+            raise ValidationError({'corporate': 'Cliente corporativo debe ser establecido.'})
+        if self.type == 'corporate' and self.corporate:
+            raise ValidationError({'corporate': 'Cliente corporativo no puede tener un padre corporativo.'})
 
 class ClientBillingFrecuency(models.Model):
     client = models.ForeignKey('Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')
-    frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='monthly')
-    billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, default='specific_date')
+    frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='monthly', verbose_name="Frecuencia de Facturación")
+    billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, default='specific_date', verbose_name="Fecha de Facturación")
     
     # For specific_date billing
-    specific_day = models.PositiveIntegerField(null=True, blank=True, help_text="Day of the month (1-31)")
-    
+    specific_day = models.PositiveIntegerField(null=True, blank=True, help_text="ía del mes (1-31)", verbose_name="Día Específico")
+
     # For weekday_occurrence billing (e.g., "third Monday")
-    weekday = models.IntegerField(choices=WEEKDAY_CHOICES, null=True, blank=True, help_text="Day of the week (0=Monday, 6=Sunday)")
-    occurrence = models.IntegerField(choices=OCCURRENCE_CHOICES, null=True, blank=True, help_text="Which occurrence in the month (1=First, -1=Last)")
-    
+    weekday = models.IntegerField(choices=WEEKDAY_CHOICES, null=True, blank=True, help_text="ía de la semana (0=Lunes, 6=Domingo)", verbose_name="Día de la Semana")
+    occurrence = models.IntegerField(choices=OCCURRENCE_CHOICES, null=True, blank=True, help_text="Qué ocurrencia en el mes (1=Primera, -1=Última)", verbose_name="Ocurrencia")
+
     # Additional settings
-    is_active = models.BooleanField(default=True)
-    notes = models.TextField(blank=True, null=True, help_text="Additional notes about billing schedule")
-    
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    notes = models.TextField(blank=True, null=True, help_text="Notas adicionales sobre el calendario de facturación", verbose_name="Notas")
+
     class Meta:
+        verbose_name = "Frecuencia de Facturación"
+        verbose_name_plural = "Frecuencias de Facturación"
         indexes = [
             models.Index(fields=['frequency'], name='clients_billing_frequency_idx'),
             models.Index(fields=['billing_date'], name='clients_billing_date_idx'),
@@ -228,12 +238,14 @@ class ClientBillingFrecuency(models.Model):
 
 class Contact(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='contacts', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    email = models.EmailField(blank=True, null=True)
-    phone = models.CharField(max_length=15, blank=True, null=True, db_index=True)
-    position = models.CharField(max_length=100, blank=True, null=True)
-    
+    name = models.CharField(max_length=100, verbose_name="Nombre")
+    email = models.EmailField(blank=True, null=True, verbose_name="Correo electrónico")
+    phone = models.CharField(max_length=15, blank=True, null=True, db_index=True, verbose_name="Teléfono")
+    position = models.CharField(max_length=100, blank=True, null=True, verbose_name="Puesto")
+
     class Meta:
+        verbose_name = 'Contacto'
+        verbose_name_plural = 'Contactos'
         indexes = [
             models.Index(fields=['phone'], name='clients_contact_phone_idx'),
             models.Index(fields=['email'], name='clients_contact_email_idx'),
@@ -245,16 +257,21 @@ class Contact(TimeStampedModel):
 
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.CASCADE)
-    street = models.CharField(max_length=255)
-    city = models.CharField(max_length=100, default='Queretaro')
-    state = models.CharField(max_length=100, default='Queretaro')
-    zip_code = models.CharField(max_length=20, default='76000')
-    country = models.CharField(max_length=100, default='Mexico')
-    active = models.BooleanField(default=True)
-    note = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=50, choices=[('billing', 'Billing'), ('shipping', 'Shipping'), ('other', 'Other')], default='other')
+    street = models.CharField(max_length=255, verbose_name="Calle")
+    number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número")
+    interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número Interior")
+    neighborhood = models.CharField(max_length=100, blank=True, null=True, verbose_name="Colonia")
+    city = models.CharField(max_length=100, default='Queretaro', verbose_name="Ciudad")
+    state = models.CharField(max_length=100, default='Queretaro', verbose_name="Estado")
+    zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
+    country = models.CharField(max_length=100, default='Mexico', verbose_name="País")
+    active = models.BooleanField(default=True, verbose_name="Activo")
+    note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    type = models.CharField(max_length=50, choices=[('billing', 'Facturación'), ('shipping', 'Envío'), ('other', 'Otro')], default='other', verbose_name="Tipo")
     
     class Meta:
+        verbose_name = 'Direccion'
+        verbose_name_plural = 'Direcciones'
         indexes = [
             models.Index(fields=['city'], name='clients_address_city_idx'),
             models.Index(fields=['state'], name='clients_address_state_idx'),
@@ -274,6 +291,8 @@ class BillingData(TimeStampedModel):
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
     
     class Meta:
+        verbose_name = 'Datos de facturación'
+        verbose_name_plural = 'Datos de facturación'
         indexes = [
             models.Index(fields=['rfc'], name='clients_billing_rfc_idx'),
         ]
