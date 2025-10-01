@@ -6,7 +6,7 @@ from .models import Employee, Transport
 class EmployeeInline(admin.StackedInline):
     model = Employee
     can_delete = False
-    verbose_name_plural = "employee"
+    verbose_name_plural = "empleado"
 
 class UserAdmin(BaseUserAdmin):
     inlines = [EmployeeInline]
@@ -17,7 +17,8 @@ class EmployeeAdmin(admin.ModelAdmin):
     list_filter = ('position', 'contract_type', 'city', 'state')
     search_fields = ('user__first_name', 'user__last_name', 'user__email', 'curp', 'rfc', 'phone')
     readonly_fields = ('user',)
-    
+    verbose_name = "Empleado"
+    verbose_name_plural = "Empleados"
     fieldsets = (
         ('User Information', {
             'fields': ('user',)
@@ -41,10 +42,10 @@ class TransportAdmin(admin.ModelAdmin):
     ordering = ('license_plate',)
     
     fieldsets = (
-        ('Vehicle Information', {
+        ('Información del Vehículo', {
             'fields': ('license_plate', 'model', 'capacity_liters')
         }),
-        ('Assignment', {
+        ('Asignación', {
             'fields': ('assigned_driver', 'is_active')
         }),
     )

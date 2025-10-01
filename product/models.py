@@ -30,16 +30,16 @@ class Product(models.Model):
             ("min_max_inventory", "Can control min max inventory quantity"),
         ]
 
-    name = models.CharField(max_length=200)
-    presentation = models.CharField(max_length=200, help_text="Garrafon, Botella, Caja")
-    unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0)
-    image = models.FileField(null=True, blank=True, upload_to='product_images/')
-    order = models.IntegerField(default=0)
-    quantity = models.IntegerField(default=0)
-    category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products')
-    min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity')
-    max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity')
-    note = models.TextField(blank=True, null=True)
+    name = models.CharField(max_length=200, verbose_name="Nombre")
+    presentation = models.CharField(max_length=200, help_text="20, 1, 500", verbose_name="Presentación")
+    unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0, verbose_name="Unidad de Medida")
+    image = models.FileField(null=True, blank=True, upload_to='product_images/', verbose_name="Imagen")
+    order = models.IntegerField(default=0, verbose_name="Orden")
+    quantity = models.IntegerField(default=0, verbose_name="Cantidad")
+    category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Categoría")
+    min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity', verbose_name="Cantidad mínima en inventario")
+    max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity', verbose_name="Cantidad máxima en inventario")
+    note = models.TextField(blank=True, null=True, verbose_name="Notas")
     def __str__(self):
         return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
 
@@ -59,10 +59,10 @@ class ProductClientPrice(models.Model):
 
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="product", related_name='prices')
-    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, verbose_name="client", related_name='product_prices')
-    price = models.FloatField(default=0.0)
-    note = models.TextField(blank=True, null=True)
-    until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido")
+    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='product_prices', verbose_name="Cliente" )
+    price = models.FloatField(default=0.0, verbose_name="Precio")
+    note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido", verbose_name="Fecha de Validez")
     def __str__(self):
         return "{} {} - ${}".format(self.product, self.client, self.price)
     def get_price_display(self):

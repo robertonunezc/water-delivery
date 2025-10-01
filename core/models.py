@@ -15,19 +15,25 @@ class Employee(models.Model):
     state = models.CharField(max_length=100, default='Queretaro')
     zip_code = models.CharField(max_length=20, default='76000')
     position = models.CharField(max_length=100, choices=EMPLOYEE_POSITIONS, null=True, blank=True)
-    contract_type = models.CharField(max_length=50, choices=[('full_time', 'Full Time'), ('part_time', 'Part Time'), ('contract', 'Contract')], default='full_time')
+    contract_type = models.CharField(max_length=50, choices=[('full_time', 'Tiempo Completo'), ('part_time', 'Tiempo Parcial'), ('contract', 'Contrato')], default='full_time')
 
     def __str__(self):
         return f"{self.user.get_full_name()} - {self.position}"
+    class Meta:
+        verbose_name = "Empleado"
+        verbose_name_plural = "Empleados"
 class Transport(models.Model):
-    license_plate = models.CharField(max_length=20, unique=True)
-    model = models.CharField(max_length=50)
-    capacity_liters = models.PositiveIntegerField()
-    is_active = models.BooleanField(default=True)
-    assigned_driver = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, limit_choices_to={'position': 'driver'})
+    license_plate = models.CharField(max_length=20, unique=True, verbose_name="Placa")
+    model = models.CharField(max_length=50, verbose_name="Modelo")
+    capacity_liters = models.PositiveIntegerField(verbose_name="Capacidad (litros)")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    assigned_driver = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True,  verbose_name="Chofer Asignado")
     def __str__(self):
         return f"{self.license_plate} - {self.model} - {self.assigned_driver}"
-    
+    class Meta:
+        verbose_name = "Vehículo"
+        verbose_name_plural = "Vehículos"
+
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
         """By default, exclude soft-deleted records"""

@@ -3,23 +3,23 @@ from datetime import date
 
 # Create your models here.
 WEEKDAY_CHOICES = [
-    ('monday', 'Monday'),
-    ('tuesday', 'Tuesday'),
-    ('wednesday', 'Wednesday'),
-    ('thursday', 'Thursday'),
-    ('friday', 'Friday'),
-    ('saturday', 'Saturday'),
-    ('sunday', 'Sunday'),
+    ('monday', 'Lunes'),
+    ('tuesday', 'Martes'),
+    ('wednesday', 'Miércoles'),
+    ('thursday', 'Jueves'),
+    ('friday', 'Viernes'),
+    ('saturday', 'Sábado'),
+    ('sunday', 'Domingo'),
 ]
 
 class Route(models.Model):
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True, null=True)
-    transportation = models.ForeignKey('core.Transport', related_name='routes', on_delete=models.SET_NULL, null=True)
-    weekday = models.CharField(max_length=10, choices=WEEKDAY_CHOICES, default='monday')
-    is_active = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length=100, verbose_name="Nombre de la Ruta")
+    description = models.TextField(blank=True, null=True, verbose_name="Descripción")
+    transportation = models.ForeignKey('core.Transport', related_name='routes', on_delete=models.SET_NULL, null=True, verbose_name="Vehículo")
+    weekday = models.CharField(max_length=10, choices=WEEKDAY_CHOICES, default='monday', verbose_name="Día de la Semana")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
 
     class Meta:
         verbose_name = 'Ruta'
@@ -76,14 +76,14 @@ class RouteClientOrder(models.Model):
 class RouteClient(models.Model):
     """Regular client assignment to a route (for recurring weekly visits)"""
     route = models.ForeignKey(Route, related_name='route_clients', on_delete=models.CASCADE)
-    client = models.ForeignKey('clients.Client', related_name='client_routes', on_delete=models.CASCADE)
-    sequence = models.PositiveIntegerField(help_text="Default sequence order for this client")
-    is_active = models.BooleanField(default=True)
-    notes = models.TextField(blank=True, null=True)
+    client = models.ForeignKey('clients.Client', verbose_name="Cliente", related_name='client_routes', on_delete=models.CASCADE)
+    sequence = models.PositiveIntegerField(help_text="Default sequence order for this client", verbose_name="Ordinal")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    notes = models.TextField(blank=True, null=True, verbose_name="Notas")
     frequency = models.CharField(max_length=50, choices=[
-        ('weekly', 'Weekly'),
-        ('biweekly', 'Biweekly'),
-        ('monthly', 'Monthly'),
+        ('weekly', 'Semanal'),
+        ('biweekly', 'Quincenal'),
+        ('monthly', 'Mensual'),
     ], default='weekly')
     
     class Meta:

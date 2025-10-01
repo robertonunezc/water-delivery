@@ -6,6 +6,8 @@ class RouteClientInline(admin.TabularInline):
     extra = 1
     fields = ('client', 'sequence', 'frequency', 'is_active', 'notes')
     ordering = ('sequence',)
+    verbose_name = "Cliente de la Ruta"
+    verbose_name_plural = "Clientes de la Ruta"
 
 class RouteClientOrderInline(admin.TabularInline):
     model = RouteClientOrder
@@ -20,7 +22,7 @@ class RouteAdmin(admin.ModelAdmin):
     list_filter = ('weekday', 'is_active', 'transportation', 'created_at')
     search_fields = ('name', 'description', 'transportation__license_plate')
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [RouteClientInline, RouteClientOrderInline]
+    inlines = [RouteClientInline,]
     
     def client_count(self, obj):
         return obj.route_clients.filter(is_active=True).count()
