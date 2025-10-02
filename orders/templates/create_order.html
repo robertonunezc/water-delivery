@@ -104,6 +104,108 @@
       </div>
     </div>
 
+    <!-- Client Financial Status -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="card border-info shadow-sm">
+          <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+              <i class="fas fa-wallet me-2"></i>Estado Financiero del Cliente
+            </h5>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              <!-- Balance Card -->
+              <div class="col-md-4">
+                <div class="d-flex align-items-center p-3 bg-light rounded">
+                  <div class="me-3">
+                    <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1 text-muted">Saldo Disponible</h6>
+                    <h4 class="mb-0 {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
+                      ${{ client.balance|floatformat:2 }}
+                    </h4>
+                    {% if client.balance > 0 %}
+                      <small class="text-success"><i class="fas fa-check-circle"></i> Puede usar saldo</small>
+                    {% elif client.balance == 0 %}
+                      <small class="text-muted">Sin saldo disponible</small>
+                    {% else %}
+                      <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Debt/Credit Card -->
+              <div class="col-md-4">
+                <div class="d-flex align-items-center p-3 bg-light rounded">
+                  <div class="me-3">
+                    <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1 text-muted">Deuda Actual</h6>
+                    <h4 class="mb-0 {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}">
+                      ${{ client.current_debt|floatformat:2 }}
+                    </h4>
+                    {% if client.current_debt > 0 %}
+                      <small class="text-warning"><i class="fas fa-exclamation-circle"></i> Debe dinero</small>
+                    {% else %}
+                      <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Available Credit Card -->
+              <div class="col-md-4">
+                <div class="d-flex align-items-center p-3 bg-light rounded">
+                  <div class="me-3">
+                    <i class="fas fa-hand-holding-usd fa-2x {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}"></i>
+                  </div>
+                  <div class="flex-grow-1">
+                    <h6 class="mb-1 text-muted">Crédito Disponible</h6>
+                    <h4 class="mb-0 {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}">
+                      ${{ client.get_available_credit|floatformat:2 }}
+                    </h4>
+                    {% if client.credit_limit > 0 %}
+                      {% if client.get_available_credit > 0 %}
+                        <small class="text-info"><i class="fas fa-check-circle"></i> Puede usar crédito</small>
+                      {% else %}
+                        <small class="text-danger"><i class="fas fa-times-circle"></i> Sin crédito disponible</small>
+                      {% endif %}
+                    {% else %}
+                      <small class="text-muted">Sin límite de crédito</small>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Total Purchasing Power -->
+            <div class="row mt-3">
+              <div class="col-12">
+                <div class="alert alert-primary d-flex align-items-center" role="alert">
+                  <i class="fas fa-calculator fa-lg me-3"></i>
+                  <div class="flex-grow-1">
+                    <strong>Poder de Compra Total: ${{ client.balance|add:client.get_available_credit|floatformat:2 }}</strong>
+                    <div class="mt-1">
+                      <small>
+                        Saldo (${{ client.balance|floatformat:2 }}) + Crédito Disponible (${{ client.get_available_credit|floatformat:2 }})
+                      </small>
+                    </div>
+                  </div>
+                  <div id="affordability-status" class="ms-3">
+                    <!-- Will be updated by JavaScript -->
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row">
       <!-- Main Content Area -->
       <div class="col-12 col-lg-7 col-xl-8 main-content-mobile">
@@ -359,6 +461,106 @@
 {% endblock %}
 {% block extra_js %}
   <script>
+    // Client financial data
+    const clientBalance = parseFloat('{{ client.balance|floatformat:2 }}');
+    const clientAvailableCredit = parseFloat('{{ client.get_available_credit|floatformat:2 }}');
+    const clientTotalPurchasingPower = clientBalance + clientAvailableCredit;
+
+    // Helper function to update affordability status
+    function updateAffordabilityStatus(orderTotal) {
+      const statusElement = document.getElementById('affordability-status');
+      const paymentMethodSelects = document.querySelectorAll('#payment-method-select, #payment-method-select-mobile');
+      
+      if (!statusElement) return;
+      
+      const total = parseFloat(orderTotal.toString().replace(/[^\d.-]/g, '')) || 0;
+      
+      if (total === 0) {
+        statusElement.innerHTML = '';
+        return;
+      }
+      
+      if (total <= clientTotalPurchasingPower) {
+        // Client can afford the order
+        if (total <= clientBalance) {
+          // Can pay entirely with balance
+          statusElement.innerHTML = `
+            <div class="badge bg-success">
+              <i class="fas fa-check-circle me-1"></i>
+              Puede pagar con saldo
+            </div>
+          `;
+          // Enable balance payment method
+          paymentMethodSelects.forEach(select => {
+            const balanceOption = select.querySelector('option[value="balance"]');
+            if (balanceOption) {
+              balanceOption.disabled = false;
+              balanceOption.textContent = 'Saldo (Suficiente)';
+            }
+          });
+        } else if (total <= clientAvailableCredit) {
+          // Can pay entirely with credit
+          statusElement.innerHTML = `
+            <div class="badge bg-info">
+              <i class="fas fa-credit-card me-1"></i>
+              Puede pagar con crédito
+            </div>
+          `;
+        } else {
+          // Needs mixed payment
+          const balanceUsed = clientBalance;
+          const creditNeeded = total - clientBalance;
+          statusElement.innerHTML = `
+            <div class="badge bg-warning">
+              <i class="fas fa-calculator me-1"></i>
+              Pago mixto necesario<br>
+              <small>Saldo: $${balanceUsed.toFixed(2)} + Crédito: $${creditNeeded.toFixed(2)}</small>
+            </div>
+          `;
+        }
+        
+        // Enable credit payment method if client has credit limit
+        if (clientAvailableCredit > 0) {
+          paymentMethodSelects.forEach(select => {
+            const creditOption = select.querySelector('option[value="credit"]');
+            if (creditOption) {
+              creditOption.disabled = false;
+              if (total <= clientAvailableCredit) {
+                creditOption.textContent = 'Crédito (Suficiente)';
+              } else {
+                creditOption.textContent = 'Crédito (Insuficiente solo)';
+              }
+            }
+          });
+        }
+        
+      } else {
+        // Client cannot afford the order
+        const shortfall = total - clientTotalPurchasingPower;
+        statusElement.innerHTML = `
+          <div class="badge bg-danger">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Fondos insuficientes<br>
+            <small>Falta: $${shortfall.toFixed(2)}</small>
+          </div>
+        `;
+        
+        // Disable balance and credit payment methods
+        paymentMethodSelects.forEach(select => {
+          const balanceOption = select.querySelector('option[value="balance"]');
+          const creditOption = select.querySelector('option[value="credit"]');
+          if (balanceOption) {
+            balanceOption.disabled = true;
+            balanceOption.textContent = 'Saldo (Insuficiente)';
+          }
+          if (creditOption) {
+            creditOption.disabled = true;
+            creditOption.textContent = 'Crédito (Insuficiente)';
+          }
+        });
+      }
+    }
+
     // Helper function to update order summary (both desktop and mobile)
     function updateOrderSummary(productId, quantity, data) {
       const summaryList = document.getElementById('order-summary-products');
@@ -472,6 +674,12 @@
 
     // add new product to order summary
     document.addEventListener('DOMContentLoaded', function() {
+      // Initialize affordability status on page load
+      const initialTotal = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
+      if (initialTotal) {
+        updateAffordabilityStatus(initialTotal.textContent);
+      }
+      
       const addButtons = document.querySelectorAll('button.btn-success');
       const removeButtons = document.querySelectorAll('button.btn-danger');
 
@@ -511,6 +719,8 @@
               if (totalElement) {
                 totalElement.textContent = data.order_total;
               }
+              // Update affordability status
+              updateAffordabilityStatus(data.order_total);
             }
 
             // Update or add item to order summary
@@ -578,6 +788,8 @@
               if (totalElement) {
                 totalElement.textContent = data.order_total;
               }
+              // Update affordability status
+              updateAffordabilityStatus(data.order_total);
             }
 
             // Update or add item to order summary
@@ -634,6 +846,8 @@
                 const totalMobile = document.querySelector('.total-mobile');
                 if (totalElement) totalElement.textContent = data.order_total;
                 if (totalMobile) totalMobile.textContent = data.order_total;
+                // Update affordability status
+                updateAffordabilityStatus(data.order_total);
               }
               
               // Update order summary using the helper function
