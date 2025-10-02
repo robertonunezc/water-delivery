@@ -129,6 +129,32 @@ def detail(request, pk):
         billing_frequency_info = billing_frequency
         next_billing_date = calculate_next_billing_date(billing_frequency)
     
+    # Get route information for the client
+    route_clients = client.client_routes.filter(is_active=True).select_related(
+        'route__transportation__assigned_driver__user',
+        'route'
+    ).order_by('sequence')
+    
+    # Get upcoming route client orders (specific deliveries)
+    today = date.today()
+    upcoming_route_orders = client.client_route_orders.filter(
+        visit_date__gte=today,
+        is_completed=False
+    ).select_related(
+        'route__transportation__assigned_driver__user',
+        'route',
+        'order'
+    ).order_by('visit_date')[:10]  # Limit to next 10 upcoming visits
+    
+    # Get recent completed route orders for reference
+    recent_completed_routes = client.client_route_orders.filter(
+        is_completed=True
+    ).select_related(
+        'route__transportation__assigned_driver__user',
+        'route',
+        'order'
+    ).order_by('-completed_at')[:5]  # Last 5 completed deliveries
+    
     context = {
         'client': client,
         'orders': orders[:10],  # Limit to recent 10 orders for performance
@@ -138,6 +164,9 @@ def detail(request, pk):
         'billing_data': billing_data,
         'billing_frequency': billing_frequency_info,
         'next_billing_date': next_billing_date,
+        'route_clients': route_clients,
+        'upcoming_route_orders': upcoming_route_orders,
+        'recent_completed_routes': recent_completed_routes,
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,

@@ -276,6 +276,190 @@
           </div>
         </div>
       {% endif %}
+
+      <!-- Routes Information -->
+      <div class="card mb-4">
+        <div class="card-header section-header">
+          <h5 class="mb-0"><i class="fas fa-route me-2"></i>Información de Rutas</h5>
+        </div>
+        <div class="card-body">
+          {% if route_clients or upcoming_route_orders %}
+            
+            <!-- Regular Route Assignments -->
+            {% if route_clients %}
+              <div class="mb-4">
+                <h6 class="text-primary mb-3">
+                  <i class="fas fa-calendar-week me-2"></i>Rutas Regulares Asignadas
+                </h6>
+                {% for route_client in route_clients %}
+                  <div class="border rounded p-3 mb-3 bg-light">
+                    <div class="row">
+                      <div class="col-sm-6">
+                        <div class="mb-2">
+                          <strong class="text-primary">{{ route_client.route.name }}</strong>
+                          <span class="badge bg-secondary ms-2">Secuencia: {{ route_client.sequence }}</span>
+                        </div>
+                        <div class="mb-2">
+                          <i class="fas fa-calendar-day me-1 text-info"></i>
+                          <strong>Día de visita:</strong> {{ route_client.route.get_weekday_display }}
+                        </div>
+                        <div class="mb-2">
+                          <i class="fas fa-sync-alt me-1 text-success"></i>
+                          <strong>Frecuencia:</strong> {{ route_client.get_frequency_display }}
+                        </div>
+                      </div>
+                      <div class="col-sm-6">
+                        {% if route_client.route.transportation %}
+                          <div class="mb-2">
+                            <i class="fas fa-truck me-1 text-warning"></i>
+                            <strong>Vehículo:</strong> {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
+                          </div>
+                          {% if route_client.route.transportation.assigned_driver %}
+                            <div class="mb-2">
+                              <i class="fas fa-user me-1 text-primary"></i>
+                              <strong>Conductor:</strong> {{ route_client.route.transportation.assigned_driver.user.get_full_name }}
+                            </div>
+                          {% else %}
+                            <div class="mb-2">
+                              <i class="fas fa-user-slash me-1 text-muted"></i>
+                              <span class="text-muted">Sin conductor asignado</span>
+                            </div>
+                          {% endif %}
+                        {% else %}
+                          <div class="mb-2">
+                            <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
+                            <span class="text-warning">Sin vehículo asignado</span>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </div>
+                    {% if route_client.notes %}
+                      <div class="mt-2 pt-2 border-top">
+                        <small class="text-muted">
+                          <i class="fas fa-sticky-note me-1"></i>
+                          <strong>Notas:</strong> {{ route_client.notes }}
+                        </small>
+                      </div>
+                    {% endif %}
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <!-- Upcoming Specific Visits -->
+            {% if upcoming_route_orders %}
+              <div class="mb-4">
+                <h6 class="text-success mb-3">
+                  <i class="fas fa-calendar-check me-2"></i>Próximas Visitas Programadas
+                </h6>
+                <div class="table-responsive">
+                  <table class="table table-sm table-hover">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Ruta</th>
+                        <th>Conductor</th>
+                        <th>Pedido</th>
+                        <th>Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for route_order in upcoming_route_orders %}
+                        <tr>
+                          <td>
+                            <strong>{{ route_order.visit_date|date:"d/m/Y" }}</strong>
+                            <br>
+                            <small class="text-muted">
+                              {% now "Y-m-d" as today %}
+                              {% if route_order.visit_date|date:"Y-m-d" == today %}
+                                <span class="badge bg-warning">Hoy</span>
+                              {% else %}
+                                En {{ route_order.visit_date|timeuntil }}
+                              {% endif %}
+                            </small>
+                          </td>
+                          <td>
+                            {{ route_order.route.name }}
+                            <br>
+                            <small class="text-muted">Seq: {{ route_order.sequence }}</small>
+                          </td>
+                          <td>
+                            {% if route_order.route.transportation.assigned_driver %}
+                              {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                              <br>
+                              <small class="text-muted">{{ route_order.route.transportation.license_plate }}</small>
+                            {% else %}
+                              <span class="text-muted">Sin asignar</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            <strong>#{{ route_order.order.id }}</strong>
+                            <br>
+                            <small class="text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small>
+                          </td>
+                          <td>
+                            <span class="badge bg-info">Programado</span>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {% endif %}
+
+            <!-- Recent Completed Deliveries -->
+            {% if recent_completed_routes %}
+              <div class="mb-3">
+                <h6 class="text-secondary mb-3">
+                  <i class="fas fa-history me-2"></i>Entregas Recientes Completadas
+                </h6>
+                <div class="table-responsive">
+                  <table class="table table-sm">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Completado</th>
+                        <th>Ruta</th>
+                        <th>Conductor</th>
+                        <th>Pedido</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for route_order in recent_completed_routes %}
+                        <tr>
+                          <td>
+                            {{ route_order.completed_at|date:"d/m/Y H:i" }}
+                          </td>
+                          <td>{{ route_order.route.name }}</td>
+                          <td>
+                            {% if route_order.route.transportation.assigned_driver %}
+                              {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                            {% else %}
+                              <span class="text-muted">N/A</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            <strong>#{{ route_order.order.id }}</strong>
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            {% endif %}
+
+          {% else %}
+            <div class="alert alert-light">
+              <i class="fas fa-info-circle me-2"></i>
+              Este cliente no tiene rutas asignadas actualmente.
+              <div class="mt-2">
+                <small class="text-muted">Las rutas se pueden asignar desde la sección de administración de rutas para programar entregas regulares.</small>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
     </div>
 
     <!-- Orders and Payments Column -->
