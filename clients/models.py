@@ -55,6 +55,9 @@ class Client(TimeStampedModel):
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='individual', verbose_name="Tipo de cliente")
     corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True, verbose_name="Cliente corporativo")
+    balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Saldo a favor", help_text="Monto prepagado disponible para usar en pedidos")
+    credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
+    current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
@@ -66,6 +69,163 @@ class Client(TimeStampedModel):
     
     def __str__(self):
         return self.name
+    
+    # Balance and Credit Management Methods
+    def add_balance(self, amount):
+        """Add money to client's balance"""
+        self.balance += amount
+        self.save()
+        return self.balance
+    
+    def deduct_balance(self, amount):
+        """Deduct money from client's balance. Returns True if successful, False if insufficient balance"""
+        if self.balance >= amount:
+            self.balance -= amount
+            self.save()
+            return True
+        return False
+    
+    def add_debt(self, amount):
+        """Add to client's debt. Returns True if within credit limit, False otherwise"""
+        new_debt = self.current_debt + amount
+        if new_debt <= self.credit_limit:
+            self.current_debt = new_debt
+            self.save()
+            return True
+        return False
+    
+    def pay_debt(self, amount):
+        """Pay down client's debt"""
+        payment_amount = min(amount, self.current_debt)
+        self.current_debt -= payment_amount
+        self.save()
+        return payment_amount
+    
+    def get_available_credit(self):
+        """Get remaining credit available"""
+        return self.credit_limit - self.current_debt
+    
+    def can_afford_order(self, order_amount):
+        """Check if client can afford an order using balance + available credit"""
+        return (self.balance + self.get_available_credit()) >= order_amount
+    
+    def process_order_payment(self, order_amount, preferred_method='auto'):
+        """
+        Process payment for an order using different strategies
+        preferred_method: 'auto', 'balance', 'credit', 'mixed'
+        """
+        remaining_amount = order_amount
+        balance_used = 0
+        credit_used = 0
+        
+        if preferred_method == 'balance':
+            # Try to pay entirely with balance
+            if self.balance >= order_amount:
+                balance_used = order_amount
+                remaining_amount = 0
+            else:
+                return {
+                    'success': False,
+                    'error': f'Insufficient balance. Available: ${self.balance:.2f}, Required: ${order_amount:.2f}',
+                    'balance_used': 0,
+                    'credit_used': 0
+                }
+                
+        elif preferred_method == 'credit':
+            # Try to pay entirely with credit
+            available_credit = self.get_available_credit()
+            if available_credit >= order_amount:
+                credit_used = order_amount
+                remaining_amount = 0
+            else:
+                return {
+                    'success': False,
+                    'error': f'Insufficient credit. Available: ${available_credit:.2f}, Required: ${order_amount:.2f}',
+                    'balance_used': 0,
+                    'credit_used': 0
+                }
+                
+        else:  # 'auto' or 'mixed'
+            # First, use available balance
+            balance_used = min(self.balance, remaining_amount)
+            remaining_amount -= balance_used
+            
+            # Then, use credit if needed and available
+            if remaining_amount > 0:
+                available_credit = self.get_available_credit()
+                credit_used = min(available_credit, remaining_amount)
+                remaining_amount -= credit_used
+        
+        # Check if we can cover the full amount
+        if remaining_amount > 0:
+            return {
+                'success': False,
+                'error': f'Insufficient funds. Need additional ${remaining_amount:.2f}',
+                'balance_used': 0,
+                'credit_used': 0,
+                'balance_available': self.balance,
+                'credit_available': self.get_available_credit()
+            }
+        
+        # Actually process the payment (deduct balance and add debt)
+        if balance_used > 0:
+            self.deduct_balance(balance_used)
+        if credit_used > 0:
+            self.add_debt(credit_used)
+        
+        return {
+            'success': True,
+            'balance_used': balance_used,
+            'credit_used': credit_used,
+            'remaining_balance': self.balance,
+            'current_debt': self.current_debt,
+            'available_credit': self.get_available_credit()
+        }
+    
+    def create_payment_for_order(self, order, payment_method='auto'):
+        """
+        Create payment records for an order based on how the payment was processed
+        """
+        from payment.models import Payment
+        
+        order_amount = order.total_amount
+        payment_result = self.process_order_payment(order_amount, payment_method)
+        
+        if not payment_result['success']:
+            return {'success': False, 'error': payment_result['error']}
+        
+        payments_created = []
+        
+        # Create balance payment if balance was used
+        if payment_result['balance_used'] > 0:
+            balance_payment = Payment.objects.create(
+                amount=payment_result['balance_used'],
+                method='balance',
+                client=self,
+                order=order,
+                status='completed',
+                balance_used=payment_result['balance_used']
+            )
+            payments_created.append(balance_payment)
+        
+        # Create credit payment if credit was used
+        if payment_result['credit_used'] > 0:
+            credit_payment = Payment.objects.create(
+                amount=payment_result['credit_used'],
+                method='credit',
+                client=self,
+                order=order,
+                status='completed',
+                credit_used=payment_result['credit_used']
+            )
+            payments_created.append(credit_payment)
+        
+        return {
+            'success': True,
+            'payments': payments_created,
+            'payment_breakdown': payment_result
+        }
+    
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
         from django.core.exceptions import ValidationError

@@ -88,6 +88,91 @@
     </div>
   </div>
 
+  <!-- Balance and Credit Section -->
+  <div class="row mb-4">
+    <div class="col-md-6">
+      <div class="card stat-card h-100 {% if client.balance > 0 %}border-success{% elif client.balance == 0 %}border-secondary{% else %}border-danger{% endif %}">
+        <div class="card-body text-center">
+          <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %} mb-2"></i>
+          <h5 class="card-title {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
+            ${{ client.balance|floatformat:2 }}
+          </h5>
+          <p class="card-text text-muted">Saldo a Favor</p>
+          {% if client.balance > 0 %}
+            <small class="text-success"><i class="fas fa-check-circle"></i> Saldo disponible</small>
+          {% elif client.balance == 0 %}
+            <small class="text-muted">Sin saldo</small>
+          {% else %}
+            <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card stat-card h-100 {% if client.current_debt > 0 %}border-danger{% else %}border-success{% endif %}">
+        <div class="card-body text-center">
+          <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %} mb-2"></i>
+          <h5 class="card-title {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %}">
+            ${{ client.current_debt|floatformat:2 }}
+          </h5>
+          <p class="card-text text-muted">Deuda Actual</p>
+          {% if client.current_debt > 0 %}
+            <small class="text-danger"><i class="fas fa-exclamation-circle"></i> Debe ${{ client.current_debt|floatformat:2 }}</small>
+          {% else %}
+            <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Credit Information -->
+  {% if client.credit_limit > 0 %}
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="card border-info">
+        <div class="card-body">
+          <div class="row align-items-center">
+            <div class="col-md-4 text-center">
+              <i class="fas fa-hand-holding-usd fa-2x text-info mb-2"></i>
+              <h6 class="text-info mb-0">Límite de Crédito</h6>
+              <h5 class="mb-0">${{ client.credit_limit|floatformat:2 }}</h5>
+            </div>
+            <div class="col-md-4 text-center">
+              <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
+              <h6 class="text-success mb-0">Crédito Disponible</h6>
+              <h5 class="mb-0">${{ client.get_available_credit|floatformat:2 }}</h5>
+            </div>
+            <div class="col-md-4">
+              <div class="progress mb-2" style="height: 20px;">
+                {% widthratio client.current_debt client.credit_limit 100 as debt_percentage %}
+                <div class="progress-bar {% if debt_percentage > 80 %}bg-danger{% elif debt_percentage > 60 %}bg-warning{% else %}bg-info{% endif %}" 
+                     role="progressbar" 
+                     style="width: {{ debt_percentage }}%"
+                     aria-valuenow="{{ debt_percentage }}" 
+                     aria-valuemin="0" 
+                     aria-valuemax="100">
+                  {{ debt_percentage }}%
+                </div>
+              </div>
+              <small class="text-muted">
+                Uso del crédito: {{ debt_percentage }}%
+                {% if debt_percentage > 80 %}
+                  <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite cercano</span>
+                {% elif debt_percentage > 60 %}
+                  <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Uso moderado</span>
+                {% else %}
+                  <span class="text-success"><i class="fas fa-check-circle"></i> Uso saludable</span>
+                {% endif %}
+              </small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row">
     <!-- Client Information Column -->
     <div class="col-md-4">

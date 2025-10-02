@@ -58,12 +58,52 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 
 @admin.register(models.Client)
 class ClientAdmin(admin.ModelAdmin):
-	list_display = ('name', 'active','type' ,'created_at', 'updated_at')
+	list_display = ('name', 'active','type', 'balance', 'current_debt', 'get_available_credit', 'created_at', 'updated_at')
 	search_fields = ('name','type',)
-	list_filter = ('active',)
+	list_filter = ('active', 'type')
 	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline]
-	readonly_fields = ('created_at', 'updated_at')
+	readonly_fields = ('created_at', 'updated_at', 'get_available_credit', 'get_balance_status')
 	exclude = ('deleted_at',)
+	
+	fieldsets = (
+		('Información Básica', {
+			'fields': (('name', 'active'), ('type', 'corporate'), 'note')
+		}),
+		('Balance y Crédito', {
+			'fields': (
+				('balance', 'current_debt'), 
+				('credit_limit', 'get_available_credit'),
+				'get_balance_status'
+			),
+			'description': 'Gestión de saldo prepagado y crédito del cliente'
+		}),
+		('Información del Sistema', {
+			'fields': (('created_at', 'updated_at'),),
+			'classes': ('collapse',)
+		})
+	)
+	
+	def get_available_credit(self, obj):
+		"""Display available credit for the client"""
+		return f"${obj.get_available_credit():.2f}"
+	get_available_credit.short_description = 'Crédito Disponible'
+	
+	def get_balance_status(self, obj):
+		"""Display balance and debt status with color coding"""
+		from django.utils.html import format_html
+		
+		balance_color = 'green' if obj.balance > 0 else 'orange' if obj.balance == 0 else 'red'
+		debt_color = 'red' if obj.current_debt > 0 else 'green'
+		
+		return format_html(
+			'<div><strong>Saldo:</strong> <span style="color: {};">${:.2f}</span></div>'
+			'<div><strong>Deuda:</strong> <span style="color: {};">${:.2f}</span></div>'
+			'<div><strong>Crédito Disponible:</strong> ${:.2f}</div>',
+			balance_color, obj.balance,
+			debt_color, obj.current_debt,
+			obj.get_available_credit()
+		)
+	get_balance_status.short_description = 'Estado Financiero'
 
 
 class ContactAdmin(admin.ModelAdmin):
