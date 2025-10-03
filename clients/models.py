@@ -680,7 +680,6 @@ class BalanceTransaction(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     balance_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Anterior")
     balance_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Posterior")
-    description = models.CharField(max_length=255, verbose_name="Descripción")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
     
     # References to related objects
@@ -751,7 +750,6 @@ class CreditTransaction(TimeStampedModel):
     debt_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Deuda Posterior")
     credit_limit_before = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Anterior")
     credit_limit_after = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Posterior")
-    description = models.CharField(max_length=255, verbose_name="Descripción")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
     
     # References to related objects
