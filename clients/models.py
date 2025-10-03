@@ -71,7 +71,7 @@ class Client(TimeStampedModel):
         return self.name
     
     # Balance and Credit Management Methods
-    def add_balance(self, amount, transaction_type='deposit', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None):
+    def add_balance(self, amount, transaction_type='deposit', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None, source='automatic'):
         """
         Add money to client's balance with transaction history
         

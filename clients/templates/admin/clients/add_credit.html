@@ -1,0 +1,168 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:clients_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+{% if client %}
+<div class="module">
+    <h2>Información del Cliente</h2>
+    <p><strong>Cliente:</strong> {{ client.name }}</p>
+    <p><strong>Saldo actual:</strong> ${{ client.balance }}</p>
+    <p><strong>Deuda actual:</strong> ${{ client.current_debt }}</p>
+    <p><strong>Límite de crédito:</strong> ${{ client.credit_limit }}</p>
+    <p><strong>Crédito disponible:</strong> ${{ client.get_available_credit }}</p>
+</div>
+{% endif %}
+
+<div class="module aligned">
+    <form method="post" action="">
+        {% csrf_token %}
+        
+        <div class="form-row">
+            <div class="field-box field-client">
+                {{ form.client.label_tag }}
+                {{ form.client }}
+                {% if form.client.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.client.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field-box field-transaction_type">
+                {{ form.transaction_type.label_tag }}
+                {{ form.transaction_type }}
+                {% if form.transaction_type.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.transaction_type.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field-box field-amount">
+                {{ form.amount.label_tag }}
+                {{ form.amount }}
+                {% if form.amount.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.amount.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.amount.help_text %}
+                    <p class="help">{{ form.amount.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row" id="credit_limit_row" style="display: none;">
+            <div class="field-box field-new_credit_limit">
+                {{ form.new_credit_limit.label_tag }}
+                {{ form.new_credit_limit }}
+                {% if form.new_credit_limit.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.new_credit_limit.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.new_credit_limit.help_text %}
+                    <p class="help">{{ form.new_credit_limit.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field-box field-description">
+                {{ form.description.label_tag }}
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.description.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.description.help_text %}
+                    <p class="help">{{ form.description.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="field-box field-notes">
+                {{ form.notes.label_tag }}
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                    <ul class="errorlist">
+                        {% for error in form.notes.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.notes.help_text %}
+                    <p class="help">{{ form.notes.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="submit-row">
+            <input type="submit" value="Procesar Transacción" class="default" />
+            <a href="{% url 'admin:clients_client_changelist' %}" class="button cancel-link">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<div class="module">
+    <h2>Tipos de Transacción</h2>
+    <ul>
+        <li><strong>Ajuste manual de deuda:</strong> Modificar deuda por razones administrativas</li>
+        <li><strong>Pago de deuda:</strong> Cliente pagó su deuda pendiente</li>
+        <li><strong>Condonación de deuda:</strong> Perdonar deuda por autorización especial</li>
+        <li><strong>Corrección:</strong> Corrección de error previo</li>
+        <li><strong>Cambio de límite de crédito:</strong> Modificar el límite de crédito del cliente</li>
+    </ul>
+    <p><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.</p>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const transactionTypeField = document.getElementById('id_transaction_type');
+    const creditLimitRow = document.getElementById('credit_limit_row');
+    const newCreditLimitField = document.getElementById('id_new_credit_limit');
+    
+    function toggleCreditLimitField() {
+        if (transactionTypeField.value === 'limit_change') {
+            creditLimitRow.style.display = 'block';
+            newCreditLimitField.required = true;
+        } else {
+            creditLimitRow.style.display = 'none';
+            newCreditLimitField.required = false;
+        }
+    }
+    
+    transactionTypeField.addEventListener('change', toggleCreditLimitField);
+    toggleCreditLimitField(); // Initial call
+});
+</script>
+{% endblock %}

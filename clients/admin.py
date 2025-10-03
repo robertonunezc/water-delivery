@@ -1,6 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.shortcuts import render, redirect
+from django.urls import path
+from django.contrib import messages
+from django.http import HttpResponseRedirect
+from django.urls import reverse
 from . import models
+from .forms import ManualBalanceTransactionForm, ManualCreditTransactionForm, BulkBalanceDepositForm
 
 
 class ContactInline(admin.TabularInline):
@@ -65,6 +71,7 @@ class ClientAdmin(admin.ModelAdmin):
 	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline]
 	readonly_fields = ('created_at', 'updated_at', 'get_available_credit', 'get_balance_status')
 	exclude = ('deleted_at',)
+	actions = ['add_balance_action', 'add_credit_action']
 	
 	fieldsets = (
 		('Información Básica', {
@@ -103,6 +110,224 @@ class ClientAdmin(admin.ModelAdmin):
 			obj.get_available_credit()
 		)
 	get_balance_status.short_description = 'Estado Financiero'
+	
+	def get_urls(self):
+		"""Add custom URLs for manual transactions"""
+		urls = super().get_urls()
+		custom_urls = [
+			path('add-balance/', self.admin_site.admin_view(self.add_balance_view), name='clients_client_add_balance'),
+			path('add-credit/', self.admin_site.admin_view(self.add_credit_view), name='clients_client_add_credit'),
+			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
+		]
+		return custom_urls + urls
+	
+	def add_balance_action(self, request, queryset):
+		"""Admin action to add balance to selected clients"""
+		if queryset.count() == 1:
+			client = queryset.first()
+			return HttpResponseRedirect(
+				reverse('admin:clients_client_add_balance') + f'?client_id={client.id}'
+			)
+		else:
+			return HttpResponseRedirect(reverse('admin:clients_client_bulk_deposit'))
+	
+	add_balance_action.short_description = "Agregar saldo a clientes seleccionados"
+	
+	def add_credit_action(self, request, queryset):
+		"""Admin action to manage credit for selected client"""
+		if queryset.count() != 1:
+			messages.error(request, "Seleccione exactamente un cliente para gestionar crédito.")
+			return
+		
+		client = queryset.first()
+		return HttpResponseRedirect(
+			reverse('admin:clients_client_add_credit') + f'?client_id={client.id}'
+		)
+	
+	add_credit_action.short_description = "Gestionar crédito del cliente seleccionado"
+	
+	def add_balance_view(self, request):
+		"""View for manually adding balance to a client"""
+		client_id = request.GET.get('client_id')
+		initial_data = {}
+		
+		if client_id:
+			try:
+				client = models.Client.objects.get(id=client_id)
+				initial_data['client'] = client
+			except models.Client.DoesNotExist:
+				messages.error(request, "Cliente no encontrado.")
+				return redirect('admin:clients_client_changelist')
+		
+		if request.method == 'POST':
+			form = ManualBalanceTransactionForm(request.POST)
+			if form.is_valid():
+				client = form.cleaned_data['client']
+				amount = form.cleaned_data['amount']
+				transaction_type = form.cleaned_data['transaction_type']
+				description = form.cleaned_data['description']
+				notes = form.cleaned_data['notes']
+				
+				try:
+					# Add balance with transaction history
+					new_balance = client.add_balance(
+						amount=amount,
+						transaction_type=transaction_type,
+						description=f"[MANUAL] {description}",
+						user=request.user,
+						notes=f"Transacción manual realizada por {request.user.username}. {notes}"
+					)
+					
+					messages.success(
+						request,
+						f"Saldo agregado exitosamente. {client.name} ahora tiene ${new_balance:.2f} de saldo."
+					)
+					return redirect('admin:clients_client_changelist')
+					
+				except Exception as e:
+					messages.error(request, f"Error al agregar saldo: {str(e)}")
+		else:
+			form = ManualBalanceTransactionForm(initial=initial_data)
+		
+		context = {
+			'form': form,
+			'title': 'Agregar Saldo Manualmente',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+		}
+		return render(request, 'admin/clients/add_balance.html', context)
+	
+	def add_credit_view(self, request):
+		"""View for manually managing client credit"""
+		client_id = request.GET.get('client_id')
+		initial_data = {}
+		
+		if client_id:
+			try:
+				client = models.Client.objects.get(id=client_id)
+				initial_data['client'] = client
+			except models.Client.DoesNotExist:
+				messages.error(request, "Cliente no encontrado.")
+				return redirect('admin:clients_client_changelist')
+		
+		if request.method == 'POST':
+			form = ManualCreditTransactionForm(request.POST)
+			if form.is_valid():
+				client = form.cleaned_data['client']
+				amount = form.cleaned_data['amount']
+				transaction_type = form.cleaned_data['transaction_type']
+				description = form.cleaned_data['description']
+				notes = form.cleaned_data['notes']
+				new_credit_limit = form.cleaned_data.get('new_credit_limit')
+				
+				try:
+					if transaction_type == 'limit_change':
+						# Update credit limit
+						client.update_credit_limit(
+							new_limit=new_credit_limit,
+							description=f"[MANUAL] {description}",
+							user=request.user,
+							notes=f"Cambio manual realizado por {request.user.username}. {notes}"
+						)
+						messages.success(
+							request,
+							f"Límite de crédito actualizado. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
+						)
+					
+					elif transaction_type in ['payment', 'forgiveness']:
+						# Pay down debt
+						paid_amount = client.pay_debt(
+							amount=amount,
+							transaction_type=transaction_type,
+							description=f"[MANUAL] {description}",
+							user=request.user,
+							notes=f"Transacción manual realizada por {request.user.username}. {notes}"
+						)
+						messages.success(
+							request,
+							f"Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
+						)
+					
+					elif transaction_type == 'adjustment':
+						# Manual debt adjustment (could increase or decrease)
+						# For simplicity, we'll treat as debt reduction
+						paid_amount = client.pay_debt(
+							amount=amount,
+							transaction_type=transaction_type,
+							description=f"[MANUAL] {description}",
+							user=request.user,
+							notes=f"Ajuste manual realizado por {request.user.username}. {notes}"
+						)
+						messages.success(
+							request,
+							f"Ajuste aplicado. {client.name} ahora debe ${client.current_debt:.2f}."
+						)
+					
+					return redirect('admin:clients_client_changelist')
+					
+				except Exception as e:
+					messages.error(request, f"Error al procesar transacción: {str(e)}")
+		else:
+			form = ManualCreditTransactionForm(initial=initial_data)
+		
+		context = {
+			'form': form,
+			'title': 'Gestionar Crédito Manualmente',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+			'client': models.Client.objects.get(id=client_id) if client_id else None,
+		}
+		return render(request, 'admin/clients/add_credit.html', context)
+	
+	def bulk_deposit_view(self, request):
+		"""View for bulk balance deposits to multiple clients"""
+		if request.method == 'POST':
+			form = BulkBalanceDepositForm(request.POST)
+			if form.is_valid():
+				clients = form.cleaned_data['clients']
+				amount = form.cleaned_data['amount']
+				description = form.cleaned_data['description']
+				notes = form.cleaned_data['notes']
+				
+				successful_count = 0
+				errors = []
+				
+				for client in clients:
+					try:
+						client.add_balance(
+							amount=amount,
+							transaction_type='deposit',
+							description=f"[MANUAL MASIVO] {description}",
+							user=request.user,
+							notes=f"Depósito masivo realizado por {request.user.username}. {notes}"
+						)
+						successful_count += 1
+					except Exception as e:
+						errors.append(f"{client.name}: {str(e)}")
+				
+				if successful_count > 0:
+					messages.success(
+						request,
+						f"Depósito exitoso para {successful_count} cliente(s). ${amount:.2f} agregados a cada uno."
+					)
+				
+				if errors:
+					messages.error(
+						request,
+						f"Errores en {len(errors)} cliente(s): " + "; ".join(errors[:5])
+					)
+				
+				return redirect('admin:clients_client_changelist')
+		else:
+			form = BulkBalanceDepositForm()
+		
+		context = {
+			'form': form,
+			'title': 'Depósito Masivo de Saldo',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+		}
+		return render(request, 'admin/clients/bulk_deposit.html', context)
 
 
 class ContactAdmin(admin.ModelAdmin):
