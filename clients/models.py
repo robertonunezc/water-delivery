@@ -71,35 +71,244 @@ class Client(TimeStampedModel):
         return self.name
     
     # Balance and Credit Management Methods
-    def add_balance(self, amount):
-        """Add money to client's balance"""
+    def add_balance(self, amount, transaction_type='deposit', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None):
+        """
+        Add money to client's balance with transaction history
+        
+        Args:
+            amount: Amount to add
+            transaction_type: Type of transaction (deposit, refund, transfer_in, adjustment, correction)
+            description: Description of the transaction
+            user: User performing the transaction
+            reference_order: Related order (if applicable)
+            reference_payment: Related payment (if applicable)
+            transfer_to_client: Target client for transfers (if applicable)
+            notes: Additional notes
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+        
+        # Store previous balance
+        balance_before = self.balance
+        
+        # Update balance
         self.balance += amount
+        balance_after = self.balance
+        
+        # Save client first
         self.save()
+        
+        # Create transaction record
+        BalanceTransaction.objects.create(
+            client=self,
+            transaction_type=transaction_type,
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
+            notes=notes,
+            reference_order=reference_order,
+            reference_payment=reference_payment,
+            transfer_to_client=transfer_to_client,
+            created_by=user
+        )
+        
         return self.balance
     
-    def deduct_balance(self, amount):
-        """Deduct money from client's balance. Returns True if successful, False if insufficient balance"""
-        if self.balance >= amount:
-            self.balance -= amount
-            self.save()
-            return True
-        return False
-    
-    def add_debt(self, amount):
-        """Add to client's debt. Returns True if within credit limit, False otherwise"""
-        new_debt = self.current_debt + amount
-        if new_debt <= self.credit_limit:
-            self.current_debt = new_debt
-            self.save()
-            return True
-        return False
-    
-    def pay_debt(self, amount):
-        """Pay down client's debt"""
-        payment_amount = min(amount, self.current_debt)
-        self.current_debt -= payment_amount
+    def deduct_balance(self, amount, transaction_type='payment', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None):
+        """
+        Deduct money from client's balance with transaction history
+        
+        Args:
+            amount: Amount to deduct
+            transaction_type: Type of transaction (payment, transfer_out, adjustment, correction)
+            description: Description of the transaction
+            user: User performing the transaction
+            reference_order: Related order (if applicable)
+            reference_payment: Related payment (if applicable)
+            transfer_to_client: Target client for transfers (if applicable)
+            notes: Additional notes
+            
+        Returns:
+            True if successful, False if insufficient balance
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+            
+        if self.balance < amount:
+            return False
+        
+        # Store previous balance
+        balance_before = self.balance
+        
+        # Update balance
+        self.balance -= amount
+        balance_after = self.balance
+        
+        # Save client first
         self.save()
+        
+        # Create transaction record
+        BalanceTransaction.objects.create(
+            client=self,
+            transaction_type=transaction_type,
+            amount=amount,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
+            notes=notes,
+            reference_order=reference_order,
+            reference_payment=reference_payment,
+            transfer_to_client=transfer_to_client,
+            created_by=user
+        )
+        
+        return True
+    
+    def add_debt(self, amount, transaction_type='purchase', description='', user=None, reference_order=None, reference_payment=None, notes=None):
+        """
+        Add to client's debt with transaction history
+        
+        Args:
+            amount: Amount to add to debt
+            transaction_type: Type of transaction (purchase, interest, fee, adjustment, correction)
+            description: Description of the transaction
+            user: User performing the transaction
+            reference_order: Related order (if applicable)
+            reference_payment: Related payment (if applicable)
+            notes: Additional notes
+            
+        Returns:
+            True if within credit limit, False otherwise
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+            
+        new_debt = self.current_debt + amount
+        if new_debt > self.credit_limit:
+            return False
+        
+        # Store previous values
+        debt_before = self.current_debt
+        credit_limit_before = self.credit_limit
+        
+        # Update debt
+        self.current_debt = new_debt
+        debt_after = self.current_debt
+        
+        # Save client first
+        self.save()
+        
+        # Create transaction record
+        CreditTransaction.objects.create(
+            client=self,
+            transaction_type=transaction_type,
+            amount=amount,
+            debt_before=debt_before,
+            debt_after=debt_after,
+            credit_limit_before=credit_limit_before,
+            credit_limit_after=self.credit_limit,
+            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
+            notes=notes,
+            reference_order=reference_order,
+            reference_payment=reference_payment,
+            created_by=user
+        )
+        
+        return True
+    
+    def pay_debt(self, amount, transaction_type='payment', description='', user=None, reference_order=None, reference_payment=None, notes=None):
+        """
+        Pay down client's debt with transaction history
+        
+        Args:
+            amount: Amount to pay towards debt
+            transaction_type: Type of transaction (payment, adjustment, forgiveness, correction)
+            description: Description of the transaction
+            user: User performing the transaction
+            reference_order: Related order (if applicable)
+            reference_payment: Related payment (if applicable)
+            notes: Additional notes
+            
+        Returns:
+            Amount actually paid (limited by current debt)
+        """
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+            
+        payment_amount = min(amount, self.current_debt)
+        
+        if payment_amount == 0:
+            return 0
+        
+        # Store previous values
+        debt_before = self.current_debt
+        credit_limit_before = self.credit_limit
+        
+        # Update debt
+        self.current_debt -= payment_amount
+        debt_after = self.current_debt
+        
+        # Save client first
+        self.save()
+        
+        # Create transaction record
+        CreditTransaction.objects.create(
+            client=self,
+            transaction_type=transaction_type,
+            amount=payment_amount,
+            debt_before=debt_before,
+            debt_after=debt_after,
+            credit_limit_before=credit_limit_before,
+            credit_limit_after=self.credit_limit,
+            description=description or f"{transaction_type.replace('_', ' ').title()} de ${payment_amount:.2f}",
+            notes=notes,
+            reference_order=reference_order,
+            reference_payment=reference_payment,
+            created_by=user
+        )
+        
         return payment_amount
+    
+    def update_credit_limit(self, new_limit, description='', user=None, notes=None):
+        """
+        Update client's credit limit with transaction history
+        
+        Args:
+            new_limit: New credit limit amount
+            description: Description of the change
+            user: User performing the transaction
+            notes: Additional notes
+        """
+        if new_limit < 0:
+            raise ValueError("Credit limit cannot be negative")
+            
+        if new_limit == self.credit_limit:
+            return  # No change needed
+        
+        # Store previous values
+        debt_before = self.current_debt
+        credit_limit_before = self.credit_limit
+        
+        # Update credit limit
+        self.credit_limit = new_limit
+        
+        # Save client first
+        self.save()
+        
+        # Create transaction record
+        CreditTransaction.objects.create(
+            client=self,
+            transaction_type='limit_change',
+            amount=abs(new_limit - credit_limit_before),
+            debt_before=debt_before,
+            debt_after=self.current_debt,
+            credit_limit_before=credit_limit_before,
+            credit_limit_after=new_limit,
+            description=description or f"Cambio de límite de crédito de ${credit_limit_before:.2f} a ${new_limit:.2f}",
+            notes=notes,
+            created_by=user
+        )
     
     def get_available_credit(self):
         """Get remaining credit available"""
@@ -109,10 +318,15 @@ class Client(TimeStampedModel):
         """Check if client can afford an order using balance + available credit"""
         return (self.balance + self.get_available_credit()) >= order_amount
     
-    def process_order_payment(self, order_amount, preferred_method='auto'):
+    def process_order_payment(self, order_amount, preferred_method='auto', order=None, user=None):
         """
         Process payment for an order using different strategies
-        preferred_method: 'auto', 'balance', 'credit', 'mixed'
+        
+        Args:
+            order_amount: Amount to process
+            preferred_method: 'auto', 'balance', 'credit', 'mixed'
+            order: Order object for transaction reference
+            user: User performing the operation
         """
         remaining_amount = order_amount
         balance_used = 0
@@ -169,9 +383,21 @@ class Client(TimeStampedModel):
         
         # Actually process the payment (deduct balance and add debt)
         if balance_used > 0:
-            self.deduct_balance(balance_used)
+            self.deduct_balance(
+                amount=balance_used,
+                transaction_type='payment',
+                description=f'Pago de orden con saldo - ${balance_used:.2f}',
+                user=user,
+                reference_order=order
+            )
         if credit_used > 0:
-            self.add_debt(credit_used)
+            self.add_debt(
+                amount=credit_used,
+                transaction_type='purchase',
+                description=f'Compra a crédito - ${credit_used:.2f}',
+                user=user,
+                reference_order=order
+            )
         
         return {
             'success': True,
@@ -182,14 +408,14 @@ class Client(TimeStampedModel):
             'available_credit': self.get_available_credit()
         }
     
-    def create_payment_for_order(self, order, payment_method='auto'):
+    def create_payment_for_order(self, order, payment_method='auto', user=None):
         """
         Create payment records for an order based on how the payment was processed
         """
         from payment.models import Payment
         
         order_amount = order.total_amount
-        payment_result = self.process_order_payment(order_amount, payment_method)
+        payment_result = self.process_order_payment(order_amount, payment_method, order=order, user=user)
         
         if not payment_result['success']:
             return {'success': False, 'error': payment_result['error']}
@@ -226,6 +452,205 @@ class Client(TimeStampedModel):
             'payment_breakdown': payment_result
         }
     
+    # Balance and Credit History Methods
+    def get_balance_history(self, start_date=None, end_date=None, transaction_types=None):
+        """
+        Get balance transaction history for the client
+        
+        Args:
+            start_date: Filter transactions after this date
+            end_date: Filter transactions before this date
+            transaction_types: List of transaction types to filter by
+            
+        Returns:
+            QuerySet of BalanceTransaction objects
+        """
+        queryset = self.balance_transactions.all()
+        
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+        if transaction_types:
+            queryset = queryset.filter(transaction_type__in=transaction_types)
+            
+        return queryset
+    
+    def get_credit_history(self, start_date=None, end_date=None, transaction_types=None):
+        """
+        Get credit transaction history for the client
+        
+        Args:
+            start_date: Filter transactions after this date
+            end_date: Filter transactions before this date
+            transaction_types: List of transaction types to filter by
+            
+        Returns:
+            QuerySet of CreditTransaction objects
+        """
+        queryset = self.credit_transactions.all()
+        
+        if start_date:
+            queryset = queryset.filter(created_at__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__lte=end_date)
+        if transaction_types:
+            queryset = queryset.filter(transaction_type__in=transaction_types)
+            
+        return queryset
+    
+    def get_balance_at_date(self, target_date):
+        """
+        Calculate client's balance at a specific date by replaying transactions
+        
+        Args:
+            target_date: Date to calculate balance for
+            
+        Returns:
+            Decimal: Balance amount at the specified date
+        """
+        from django.db.models import Sum
+        from decimal import Decimal
+        
+        # Get all balance transactions up to target date
+        transactions = self.balance_transactions.filter(created_at__lte=target_date).order_by('created_at')
+        
+        if not transactions.exists():
+            return Decimal('0.00')
+        
+        # Get the last transaction at or before target date
+        last_transaction = transactions.last()
+        return last_transaction.balance_after
+    
+    def get_debt_at_date(self, target_date):
+        """
+        Calculate client's debt at a specific date by replaying transactions
+        
+        Args:
+            target_date: Date to calculate debt for
+            
+        Returns:
+            Decimal: Debt amount at the specified date
+        """
+        from django.db.models import Sum
+        from decimal import Decimal
+        
+        # Get all credit transactions up to target date
+        transactions = self.credit_transactions.filter(created_at__lte=target_date).order_by('created_at')
+        
+        if not transactions.exists():
+            return Decimal('0.00')
+        
+        # Get the last transaction at or before target date
+        last_transaction = transactions.last()
+        return last_transaction.debt_after
+    
+    def get_financial_summary(self, start_date=None, end_date=None):
+        """
+        Get comprehensive financial summary for the client
+        
+        Args:
+            start_date: Filter transactions after this date
+            end_date: Filter transactions before this date
+            
+        Returns:
+            Dict with financial summary data
+        """
+        from django.db.models import Sum, Count
+        from decimal import Decimal
+        
+        # Balance transactions summary
+        balance_qs = self.get_balance_history(start_date, end_date)
+        balance_summary = {
+            'total_deposits': balance_qs.filter(
+                transaction_type__in=['deposit', 'refund', 'transfer_in']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
+            'total_payments': balance_qs.filter(
+                transaction_type__in=['payment', 'transfer_out']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
+            'transaction_count': balance_qs.count(),
+        }
+        
+        # Credit transactions summary
+        credit_qs = self.get_credit_history(start_date, end_date)
+        credit_summary = {
+            'total_purchases': credit_qs.filter(
+                transaction_type__in=['purchase', 'interest', 'fee']
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
+            'total_payments': credit_qs.filter(
+                transaction_type='payment'
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
+            'transaction_count': credit_qs.count(),
+        }
+        
+        return {
+            'current_balance': self.balance,
+            'current_debt': self.current_debt,
+            'credit_limit': self.credit_limit,
+            'available_credit': self.get_available_credit(),
+            'balance_summary': balance_summary,
+            'credit_summary': credit_summary,
+            'period_start': start_date,
+            'period_end': end_date,
+        }
+    
+    def transfer_balance_to(self, target_client, amount, description='', user=None, notes=None):
+        """
+        Transfer balance from this client to another client
+        
+        Args:
+            target_client: Client to transfer balance to
+            amount: Amount to transfer
+            description: Description of the transfer
+            user: User performing the transfer
+            notes: Additional notes
+            
+        Returns:
+            Dict with success status and details
+        """
+        if amount <= 0:
+            return {'success': False, 'error': 'Amount must be positive'}
+        
+        if self.balance < amount:
+            return {
+                'success': False, 
+                'error': f'Insufficient balance. Available: ${self.balance:.2f}, Required: ${amount:.2f}'
+            }
+        
+        try:
+            # Deduct from source client
+            success = self.deduct_balance(
+                amount=amount,
+                transaction_type='transfer_out',
+                description=description or f'Transferencia a {target_client.name}',
+                user=user,
+                transfer_to_client=target_client,
+                notes=notes
+            )
+            
+            if not success:
+                return {'success': False, 'error': 'Failed to deduct from source account'}
+            
+            # Add to target client
+            target_client.add_balance(
+                amount=amount,
+                transaction_type='transfer_in',
+                description=description or f'Transferencia de {self.name}',
+                user=user,
+                transfer_to_client=self,
+                notes=notes
+            )
+            
+            return {
+                'success': True,
+                'amount_transferred': amount,
+                'source_balance': self.balance,
+                'target_balance': target_client.balance
+            }
+            
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
         from django.core.exceptions import ValidationError
@@ -233,6 +658,150 @@ class Client(TimeStampedModel):
             raise ValidationError({'corporate': 'Cliente corporativo debe ser establecido.'})
         if self.type == 'corporate' and self.corporate:
             raise ValidationError({'corporate': 'Cliente corporativo no puede tener un padre corporativo.'})
+
+
+class BalanceTransaction(TimeStampedModel):
+    """
+    Track all balance-related transactions for complete audit trail
+    """
+    TRANSACTION_TYPES = [
+        ('deposit', 'Depósito'),           # Client adds money
+        ('payment', 'Pago con saldo'),     # Using balance for order payment
+        ('refund', 'Reembolso'),           # Money returned to balance
+        ('adjustment', 'Ajuste manual'),   # Manual adjustment
+        ('transfer_in', 'Transferencia recibida'),   # Transfer from another client
+        ('transfer_out', 'Transferencia enviada'),   # Transfer to another client
+        ('correction', 'Corrección'),      # Error correction
+    ]
+    
+    client = models.ForeignKey('Client', related_name='balance_transactions', on_delete=models.PROTECT, verbose_name="Cliente")
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
+    balance_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Anterior")
+    balance_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Posterior")
+    description = models.CharField(max_length=255, verbose_name="Descripción")
+    notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
+    
+    # References to related objects
+    reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")
+    reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")
+    transfer_to_client = models.ForeignKey('Client', null=True, blank=True, on_delete=models.SET_NULL, related_name='balance_transfers_received', verbose_name="Cliente destino (transferencia)")
+    
+    # Audit fields
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    
+    class Meta:
+        verbose_name = 'Transacción de Saldo'
+        verbose_name_plural = 'Transacciones de Saldo'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['client', '-created_at'], name='balance_tx_client_date_idx'),
+            models.Index(fields=['transaction_type'], name='balance_tx_type_idx'),
+            models.Index(fields=['created_at'], name='balance_tx_date_idx'),
+            models.Index(fields=['reference_order'], name='balance_tx_order_idx'),
+            models.Index(fields=['reference_payment'], name='balance_tx_payment_idx'),
+        ]
+    
+    def __str__(self):
+        return f"{self.client.name} - {self.get_transaction_type_display()} - ${self.amount:.2f} ({self.created_at.date()})"
+    
+    def clean(self):
+        """Validate transaction data"""
+        from django.core.exceptions import ValidationError
+        
+        # Validate amount is positive
+        if self.amount <= 0:
+            raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
+        
+        # Validate balance calculation
+        if self.transaction_type in ['deposit', 'refund', 'transfer_in', 'adjustment']:
+            # Additions to balance
+            if self.balance_after != self.balance_before + self.amount:
+                raise ValidationError('Error en cálculo de saldo: adición incorrecta.')
+        else:
+            # Deductions from balance
+            if self.balance_after != self.balance_before - self.amount:
+                raise ValidationError('Error en cálculo de saldo: deducción incorrecta.')
+        
+        # Validate sufficient balance for deductions
+        if self.transaction_type in ['payment', 'transfer_out'] and self.balance_before < self.amount:
+            raise ValidationError({'amount': f'Saldo insuficiente. Disponible: ${self.balance_before:.2f}'})
+
+
+class CreditTransaction(TimeStampedModel):
+    """
+    Track all credit-related transactions for complete audit trail
+    """
+    TRANSACTION_TYPES = [
+        ('purchase', 'Compra a crédito'),     # Adding debt
+        ('payment', 'Pago de deuda'),         # Reducing debt
+        ('adjustment', 'Ajuste manual'),      # Manual debt adjustment
+        ('limit_change', 'Cambio de límite'), # Credit limit modification
+        ('interest', 'Interés aplicado'),     # Interest charges
+        ('fee', 'Cargo adicional'),           # Additional fees
+        ('forgiveness', 'Condonación'),       # Debt forgiveness
+        ('correction', 'Corrección'),         # Error correction
+    ]
+    
+    client = models.ForeignKey('Client', related_name='credit_transactions', on_delete=models.PROTECT, verbose_name="Cliente")
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
+    debt_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Deuda Anterior")
+    debt_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Deuda Posterior")
+    credit_limit_before = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Anterior")
+    credit_limit_after = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Posterior")
+    description = models.CharField(max_length=255, verbose_name="Descripción")
+    notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
+    
+    # References to related objects
+    reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")
+    reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")
+    
+    # Audit fields
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    
+    class Meta:
+        verbose_name = 'Transacción de Crédito'
+        verbose_name_plural = 'Transacciones de Crédito'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['client', '-created_at'], name='credit_tx_client_date_idx'),
+            models.Index(fields=['transaction_type'], name='credit_tx_type_idx'),
+            models.Index(fields=['created_at'], name='credit_tx_date_idx'),
+            models.Index(fields=['reference_order'], name='credit_tx_order_idx'),
+            models.Index(fields=['reference_payment'], name='credit_tx_payment_idx'),
+        ]
+    
+    def __str__(self):
+        return f"{self.client.name} - {self.get_transaction_type_display()} - ${self.amount:.2f} ({self.created_at.date()})"
+    
+    def clean(self):
+        """Validate transaction data"""
+        from django.core.exceptions import ValidationError
+        
+        # Validate amount is positive
+        if self.amount <= 0:
+            raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
+        
+        # Validate debt calculation
+        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment']:
+            # Additions to debt
+            if self.debt_after != self.debt_before + self.amount:
+                raise ValidationError('Error en cálculo de deuda: adición incorrecta.')
+        else:
+            # Reductions from debt
+            if self.debt_after != self.debt_before - self.amount:
+                raise ValidationError('Error en cálculo de deuda: reducción incorrecta.')
+        
+        # Validate debt doesn't go negative
+        if self.debt_after < 0:
+            raise ValidationError({'amount': 'La deuda no puede ser negativa.'})
+        
+        # Validate credit limit constraints for purchases
+        if self.transaction_type == 'purchase' and self.credit_limit_after is not None:
+            if self.debt_after > self.credit_limit_after:
+                raise ValidationError({'amount': f'Excede límite de crédito. Límite: ${self.credit_limit_after:.2f}'})
+
 
 class ClientBillingFrecuency(models.Model):
     client = models.ForeignKey('Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')

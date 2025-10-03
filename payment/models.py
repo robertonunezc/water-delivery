@@ -28,6 +28,9 @@ class Payment(models.Model):
     balance_used = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Saldo Utilizado", help_text="Monto pagado usando saldo del cliente")
     credit_used = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Crédito Utilizado", help_text="Monto pagado usando crédito del cliente")
     
+    # Audit field
+    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    
     def clean(self):
         """Validate payment before saving"""
         from django.core.exceptions import ValidationError
@@ -61,7 +64,14 @@ class Payment(models.Model):
             # Process payment based on method
             if self.method == 'balance':
                 # Deduct from client balance
-                success = self.client.deduct_balance(self.amount)
+                success = self.client.deduct_balance(
+                    amount=self.amount,
+                    transaction_type='payment',
+                    description=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo',
+                    user=self.created_by,
+                    reference_order=self.order,
+                    reference_payment=None  # Will be set after save
+                )
                 if not success:
                     from django.core.exceptions import ValidationError
                     raise ValidationError("NO cuenta con saldo suficiente para el pago")
@@ -69,27 +79,76 @@ class Payment(models.Model):
                 
             elif self.method == 'credit':
                 # Add to client debt
-                success = self.client.add_debt(self.amount)
+                success = self.client.add_debt(
+                    amount=self.amount,
+                    transaction_type='purchase',
+                    description=f'Compra orden #{self.order.id if self.order else "N/A"} a crédito',
+                    user=self.created_by,
+                    reference_order=self.order,
+                    reference_payment=None  # Will be set after save
+                )
                 if not success:
                     from django.core.exceptions import ValidationError
                     raise ValidationError("NO cuenta con límite de crédito suficiente para el pago")
                 self.credit_used = self.amount
         
         super().save(*args, **kwargs)
+        
+        # Update transaction records with payment reference after save
+        if is_new_payment and self.status == 'completed':
+            if self.method == 'balance' and self.pk:
+                # Update the balance transaction with payment reference
+                balance_tx = self.client.balance_transactions.filter(
+                    reference_order=self.order,
+                    amount=self.amount,
+                    transaction_type='payment',
+                    reference_payment__isnull=True
+                ).first()
+                if balance_tx:
+                    balance_tx.reference_payment = self
+                    balance_tx.save()
+                    
+            elif self.method == 'credit' and self.pk:
+                # Update the credit transaction with payment reference
+                credit_tx = self.client.credit_transactions.filter(
+                    reference_order=self.order,
+                    amount=self.amount,
+                    transaction_type='purchase',
+                    reference_payment__isnull=True
+                ).first()
+                if credit_tx:
+                    credit_tx.reference_payment = self
+                    credit_tx.save()
     
-    def reverse_payment(self):
+    def reverse_payment(self, user=None, reason=''):
         """Reverse the payment by restoring balance or reducing debt"""
         if self.status != 'completed':
             return False
             
         if self.method == 'balance' and self.balance_used > 0:
             # Restore balance to client
-            self.client.add_balance(self.balance_used)
+            self.client.add_balance(
+                amount=self.balance_used,
+                transaction_type='refund',
+                description=f'Reversión de pago #{self.id} - {reason}',
+                user=user,
+                reference_order=self.order,
+                reference_payment=self,
+                notes=f'Reversión de pago original de ${self.balance_used:.2f}'
+            )
             self.balance_used = 0
             
         elif self.method == 'credit' and self.credit_used > 0:
             # Reduce client debt
-            self.client.pay_debt(self.credit_used)
+            self.client.pay_debt(
+                amount=self.credit_used,
+                transaction_type='adjustment',
+                description=f'Reversión de compra a crédito #{self.id} - {reason}',
+                user=user,
+                reference_order=self.order,
+                reference_payment=self,
+                notes=f'Reversión de compra a crédito original de ${self.credit_used:.2f}'
+            )
             self.credit_used = 0
         
         self.status = 'failed'
