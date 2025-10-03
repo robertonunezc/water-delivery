@@ -69,7 +69,7 @@ class ClientAdmin(admin.ModelAdmin):
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type')
 	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline]
-	readonly_fields = ('created_at', 'updated_at', 'get_available_credit', 'get_balance_status')
+	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action']
 	
@@ -83,7 +83,7 @@ class ClientAdmin(admin.ModelAdmin):
 				('credit_limit', 'get_available_credit'),
 				'get_balance_status'
 			),
-			'description': 'Gestión de saldo prepagado y crédito del cliente'
+			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
 		('Información del Sistema', {
 			'fields': (('created_at', 'updated_at'),),

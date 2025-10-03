@@ -361,8 +361,7 @@
                          name="cantidad_cobrada"
                          step="0.01" 
                          min="0"
-                         placeholder="0.00"
-                         value="{{ order.total_amount|floatformat:2 }}">
+                         placeholder="0.00">
                 </div>
                 <div class="form-text">
                   Si cobra más del total, la diferencia se agregará al saldo del cliente
@@ -432,8 +431,7 @@
                      name="cantidad_cobrada_mobile"
                      step="0.01" 
                      min="0"
-                     placeholder="0.00"
-                     value="{{ order.total_amount|default:'0.00' }}">
+                     placeholder="0.00">
             </div>
             <div id="balance-addition-alert-mobile" class="alert alert-info alert-sm mt-1 p-2" style="display: none;">
               <small id="balance-addition-text-mobile"></small>
@@ -714,12 +712,68 @@
       if (totalMobile && data.order_total) {
         totalMobile.textContent = data.order_total;
       }
+      
+      // Update cantidad cobrada fields with new total
+      if (data.order_total) {
+        const newTotal = parseFloat(data.order_total.replace(/[^\d.-]/g, '')) || 0;
+        updateCantidadCobradaFields(newTotal);
+        
+        // Update affordability status with new total
+        updateAffordabilityStatus(data.order_total);
+      }
+    }
+
+    // Function to get current order total from DOM
+    function getCurrentOrderTotal() {
+      const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
+      if (totalElement) {
+        const totalText = totalElement.textContent || totalElement.innerText;
+        return parseFloat(totalText.replace(/[^\d.-]/g, '')) || 0;
+      }
+      return 0;
+    }
+
+    // Function to update cantidad cobrada fields with current order total
+    function updateCantidadCobradaFields(newTotal) {
+      const cantidadCobradaInput = document.getElementById('cantidad_cobrada');
+      const cantidadCobradaMobileInput = document.getElementById('cantidad_cobrada_mobile');
+      
+      // Only update if field is empty or equals the previous total (not manually changed)
+      if (cantidadCobradaInput) {
+        const currentValue = parseFloat(cantidadCobradaInput.value) || 0;
+        // Update if field is empty or if it matches a previous order total
+        if (currentValue === 0 || cantidadCobradaInput.dataset.autoUpdated === 'true') {
+          cantidadCobradaInput.value = newTotal.toFixed(2);
+          cantidadCobradaInput.dataset.autoUpdated = 'true';
+        }
+      }
+      
+      if (cantidadCobradaMobileInput) {
+        const currentValue = parseFloat(cantidadCobradaMobileInput.value) || 0;
+        if (currentValue === 0 || cantidadCobradaMobileInput.dataset.autoUpdated === 'true') {
+          cantidadCobradaMobileInput.value = newTotal.toFixed(2);
+          cantidadCobradaMobileInput.dataset.autoUpdated = 'true';
+        }
+      }
+      
+      // Revalidate both fields
+      const balanceAlert = document.getElementById('balance-addition-alert');
+      const balanceAlertMobile = document.getElementById('balance-addition-alert-mobile');
+      const balanceText = document.getElementById('balance-addition-text');
+      const balanceTextMobile = document.getElementById('balance-addition-text-mobile');
+      
+      if (cantidadCobradaInput && balanceAlert && balanceText) {
+        validateCantidadCobrada(cantidadCobradaInput, balanceAlert, balanceText, false);
+      }
+      if (cantidadCobradaMobileInput && balanceAlertMobile && balanceTextMobile) {
+        validateCantidadCobrada(cantidadCobradaMobileInput, balanceAlertMobile, balanceTextMobile, true);
+      }
     }
 
     // Function to validate cantidad cobrada and show alert
     function validateCantidadCobrada(cantidadCobradaInput, alertElement, textElement, isMobile = false) {
       const cantidadCobrada = parseFloat(cantidadCobradaInput.value) || 0;
-      const orderTotal = parseFloat('{{ order.total_amount|floatformat:2 }}');
+      const orderTotal = getCurrentOrderTotal(); // Use dynamic order total
       const otherInput = isMobile ? 
         document.getElementById('cantidad_cobrada') : 
         document.getElementById('cantidad_cobrada_mobile');
@@ -785,22 +839,40 @@
       // Add event listeners for cantidad cobrada validation
       if (cantidadCobradaInput && balanceAlert && balanceText) {
         cantidadCobradaInput.addEventListener('input', function() {
+          // Mark as manually changed when user types
+          this.dataset.autoUpdated = 'false';
           validateCantidadCobrada(this, balanceAlert, balanceText, false);
         });
         
         cantidadCobradaInput.addEventListener('blur', function() {
           validateCantidadCobrada(this, balanceAlert, balanceText, false);
         });
+        
+        // Initialize with current order total
+        const initialTotal = getCurrentOrderTotal();
+        if (initialTotal > 0) {
+          cantidadCobradaInput.value = initialTotal.toFixed(2);
+          cantidadCobradaInput.dataset.autoUpdated = 'true';
+        }
       }
       
       if (cantidadCobradaMobileInput && balanceAlertMobile && balanceTextMobile) {
         cantidadCobradaMobileInput.addEventListener('input', function() {
+          // Mark as manually changed when user types
+          this.dataset.autoUpdated = 'false';
           validateCantidadCobrada(this, balanceAlertMobile, balanceTextMobile, true);
         });
         
         cantidadCobradaMobileInput.addEventListener('blur', function() {
           validateCantidadCobrada(this, balanceAlertMobile, balanceTextMobile, true);
         });
+        
+        // Initialize with current order total
+        const initialTotal = getCurrentOrderTotal();
+        if (initialTotal > 0) {
+          cantidadCobradaMobileInput.value = initialTotal.toFixed(2);
+          cantidadCobradaMobileInput.dataset.autoUpdated = 'true';
+        }
       }
       
       const addButtons = document.querySelectorAll('button.btn-success');
@@ -1211,6 +1283,23 @@
       document.getElementById('payment-method-select-mobile')?.addEventListener('change', function() {
         const desktopSelect = document.getElementById('payment-method-select');
         if (desktopSelect) desktopSelect.value = this.value;
+      });
+      
+      // Sync cantidad cobrada values between desktop and mobile (when manually changed)
+      document.getElementById('cantidad_cobrada')?.addEventListener('input', function() {
+        const mobileInput = document.getElementById('cantidad_cobrada_mobile');
+        if (mobileInput && this.dataset.autoUpdated !== 'true') {
+          mobileInput.value = this.value;
+          mobileInput.dataset.autoUpdated = 'false';
+        }
+      });
+      
+      document.getElementById('cantidad_cobrada_mobile')?.addEventListener('input', function() {
+        const desktopInput = document.getElementById('cantidad_cobrada');
+        if (desktopInput && this.dataset.autoUpdated !== 'true') {
+          desktopInput.value = this.value;
+          desktopInput.dataset.autoUpdated = 'false';
+        }
       });
     });
   </script>
