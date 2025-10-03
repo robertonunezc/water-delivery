@@ -340,18 +340,41 @@
               </h5>
             </div>
             <div class="card-body">
-              <select class="form-select form-select-lg" id="payment-method-select" name="payment_type">
-                <option value="">Seleccionar método de pago</option>
-                {% for code, label in payment_types %}
-                  <option value="{{ code }}">{{ label }}</option>
-                {% empty %}
-                  <option disabled>No hay métodos de pago disponibles</option>
-                {% endfor %}
-              </select>
+              <div class="mb-3">
+                <select class="form-select" id="payment-method-select" name="payment_type">
+                  {% for value, label in payment_types %}
+                    <option value="{{ value }}">{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              
+              <!-- Cantidad Cobrada Field -->
+              <div class="mb-3">
+                <label for="cantidad_cobrada" class="form-label">
+                  <i class="fas fa-dollar-sign me-1"></i>Cantidad Cobrada
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  <input type="number" 
+                         class="form-control" 
+                         id="cantidad_cobrada" 
+                         name="cantidad_cobrada"
+                         step="0.01" 
+                         min="0"
+                         placeholder="0.00"
+                         value="{{ order.total_amount|floatformat:2 }}">
+                </div>
+                <div class="form-text">
+                  Si cobra más del total, la diferencia se agregará al saldo del cliente
+                </div>
+                <!-- Alert for balance addition -->
+                <div id="balance-addition-alert" class="alert alert-info mt-2" style="display: none;">
+                  <i class="fas fa-info-circle me-2"></i>
+                  <span id="balance-addition-text"></span>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <!-- Total Card -->
+          </div>          <!-- Total Card -->
           <div class="card shadow-sm mb-4">
             <div class="card-body text-center">
               <div class="row">
@@ -381,7 +404,7 @@
 
       <!-- Mobile Order Summary (Fixed Bottom) -->
       <div class="d-lg-none order-summary-mobile">
-        <div class="row mb-3">
+        <div class="row mb-2">
           <div class="col-6">
             <select class="form-select" id="payment-method-select-mobile" name="payment_type">
               <option value="">Método de pago</option>
@@ -394,6 +417,27 @@
             <h4 class="text-success mb-0">
               Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
             </h4>
+          </div>
+        </div>
+        
+        <!-- Mobile Cantidad Cobrada -->
+        <div class="row mb-3">
+          <div class="col-12">
+            <label for="cantidad_cobrada_mobile" class="form-label small">Cantidad Cobrada</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" 
+                     class="form-control" 
+                     id="cantidad_cobrada_mobile" 
+                     name="cantidad_cobrada_mobile"
+                     step="0.01" 
+                     min="0"
+                     placeholder="0.00"
+                     value="{{ order.total_amount|default:'0.00' }}">
+            </div>
+            <div id="balance-addition-alert-mobile" class="alert alert-info alert-sm mt-1 p-2" style="display: none;">
+              <small id="balance-addition-text-mobile"></small>
+            </div>
           </div>
         </div>
         
@@ -672,12 +716,91 @@
       }
     }
 
+    // Function to validate cantidad cobrada and show alert
+    function validateCantidadCobrada(cantidadCobradaInput, alertElement, textElement, isMobile = false) {
+      const cantidadCobrada = parseFloat(cantidadCobradaInput.value) || 0;
+      const orderTotal = parseFloat('{{ order.total_amount|floatformat:2 }}');
+      const otherInput = isMobile ? 
+        document.getElementById('cantidad_cobrada') : 
+        document.getElementById('cantidad_cobrada_mobile');
+      
+      // Sync values between desktop and mobile
+      const otherAlert = isMobile ? 
+        document.getElementById('balance-addition-alert') : 
+        document.getElementById('balance-addition-alert-mobile');
+      const otherText = isMobile ? 
+        document.getElementById('balance-addition-text') : 
+        document.getElementById('balance-addition-text-mobile');
+      
+      if (otherInput) otherInput.value = cantidadCobrada;
+      
+      if (cantidadCobrada < orderTotal) {
+        // Invalid: less than order total
+        cantidadCobradaInput.setCustomValidity('La cantidad cobrada no puede ser menor al total de la orden');
+        cantidadCobradaInput.classList.add('is-invalid');
+        alertElement.style.display = 'none';
+        if (otherAlert) otherAlert.style.display = 'none';
+      } else if (cantidadCobrada > orderTotal) {
+        // Valid: more than order total - will add to balance
+        const excess = cantidadCobrada - orderTotal;
+        cantidadCobradaInput.setCustomValidity('');
+        cantidadCobradaInput.classList.remove('is-invalid');
+        cantidadCobradaInput.classList.add('is-valid');
+        
+        alertElement.style.display = 'block';
+        alertElement.className = 'alert alert-info mt-2';
+        textElement.innerHTML = `Vas a agregar <strong>$${excess.toFixed(2)}</strong> al saldo del cliente`;
+        
+        // Sync alert on other view
+        if (otherAlert && otherText) {
+          otherAlert.style.display = 'block';
+          otherAlert.className = isMobile ? 'alert alert-info mt-2' : 'alert alert-info alert-sm mt-1 p-2';
+          otherText.innerHTML = `Vas a agregar <strong>$${excess.toFixed(2)}</strong> al saldo del cliente`;
+        }
+      } else {
+        // Valid: exact amount
+        cantidadCobradaInput.setCustomValidity('');
+        cantidadCobradaInput.classList.remove('is-invalid', 'is-valid');
+        alertElement.style.display = 'none';
+        if (otherAlert) otherAlert.style.display = 'none';
+      }
+    }
+
     // add new product to order summary
     document.addEventListener('DOMContentLoaded', function() {
       // Initialize affordability status on page load
       const initialTotal = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
       if (initialTotal) {
         updateAffordabilityStatus(initialTotal.textContent);
+      }
+      
+      // Initialize cantidad cobrada validation
+      const cantidadCobradaInput = document.getElementById('cantidad_cobrada');
+      const cantidadCobradaMobileInput = document.getElementById('cantidad_cobrada_mobile');
+      const balanceAlert = document.getElementById('balance-addition-alert');
+      const balanceAlertMobile = document.getElementById('balance-addition-alert-mobile');
+      const balanceText = document.getElementById('balance-addition-text');
+      const balanceTextMobile = document.getElementById('balance-addition-text-mobile');
+      
+      // Add event listeners for cantidad cobrada validation
+      if (cantidadCobradaInput && balanceAlert && balanceText) {
+        cantidadCobradaInput.addEventListener('input', function() {
+          validateCantidadCobrada(this, balanceAlert, balanceText, false);
+        });
+        
+        cantidadCobradaInput.addEventListener('blur', function() {
+          validateCantidadCobrada(this, balanceAlert, balanceText, false);
+        });
+      }
+      
+      if (cantidadCobradaMobileInput && balanceAlertMobile && balanceTextMobile) {
+        cantidadCobradaMobileInput.addEventListener('input', function() {
+          validateCantidadCobrada(this, balanceAlertMobile, balanceTextMobile, true);
+        });
+        
+        cantidadCobradaMobileInput.addEventListener('blur', function() {
+          validateCantidadCobrada(this, balanceAlertMobile, balanceTextMobile, true);
+        });
       }
       
       const addButtons = document.querySelectorAll('button.btn-success');
@@ -954,28 +1077,59 @@
           finishButtonMobile.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
         }
         
+        // Get cantidad cobrada value
+        const cantidadCobradaInput = document.getElementById('cantidad_cobrada');
+        const cantidadCobradaMobileInput = document.getElementById('cantidad_cobrada_mobile');
+        let cantidadCobrada = null;
+        
+        if (cantidadCobradaInput && cantidadCobradaInput.value) {
+          cantidadCobrada = parseFloat(cantidadCobradaInput.value);
+        } else if (cantidadCobradaMobileInput && cantidadCobradaMobileInput.value) {
+          cantidadCobrada = parseFloat(cantidadCobradaMobileInput.value);
+        }
+        
         // Call payment creation endpoint
+        const requestData = {
+          order_id: orderId,
+          payment_method: selectedPaymentMethod,
+          amount: parseFloat(orderTotal.replace(/[^\d.-]/g, '')) // Remove currency symbols
+        };
+        
+        // Include cantidad_cobrada if provided
+        if (cantidadCobrada !== null && cantidadCobrada > 0) {
+          requestData.cantidad_cobrada = cantidadCobrada;
+        }
+        
         fetch('/payments/create/', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'X-CSRFToken': '{{ csrf_token }}'
           },
-          body: JSON.stringify({
-            order_id: orderId,
-            payment_method: selectedPaymentMethod,
-            amount: parseFloat(orderTotal.replace(/[^\d.-]/g, '')) // Remove currency symbols
-          })
+          body: JSON.stringify(requestData)
         }).then(response => response.json()).then(data => {
           if (data.success) {
             // Show success message
             const successDiv = document.createElement('div');
             successDiv.className = 'alert alert-success alert-dismissible fade show';
-            successDiv.innerHTML = `
+            
+            let successMessage = `
               <strong>¡Éxito!</strong> El pedido se ha completado y el pago se ha registrado correctamente.
               <br><small>Método de pago: ${data.method} - Monto: $${data.amount}</small>
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             `;
+            
+            // Add balance addition info if applicable
+            if (data.balance_added && data.cantidad_cobrada) {
+              successMessage += `<br><div class="mt-2 p-2 bg-light border rounded">
+                <i class="fas fa-plus-circle text-success me-1"></i>
+                <strong>Saldo agregado:</strong> $${data.balance_added}<br>
+                <small>Cantidad cobrada: $${data.cantidad_cobrada} | Total orden: $${data.order_total}</small><br>
+                <small>Nuevo saldo del cliente: $${data.new_client_balance}</small>
+              </div>`;
+            }
+            
+            successMessage += `<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>`;
+            successDiv.innerHTML = successMessage;
             
             const contentContainer = document.querySelector('.container-fluid.mt-4');
             const firstChild = contentContainer.firstElementChild;

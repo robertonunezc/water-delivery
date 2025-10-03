@@ -667,6 +667,7 @@ class BalanceTransaction(TimeStampedModel):
     TRANSACTION_TYPES = [
         ('deposit', 'Depósito'),           # Client adds money
         ('payment', 'Pago con saldo'),     # Using balance for order payment
+        ('added_in_order', 'Saldo agregado en venta'), # Using balance for deferred payment
         ('refund', 'Reembolso'),           # Money returned to balance
         ('adjustment', 'Ajuste manual'),   # Manual adjustment
         ('transfer_in', 'Transferencia recibida'),   # Transfer from another client
