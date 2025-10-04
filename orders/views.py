@@ -122,7 +122,18 @@ def create_order(request, client_pk):
     order = services.create_order(client)
     client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
     payment_types = PAYMENT_METHOD_CHOICES
-    return render(request, 'create_order.html', {'client': client, 'order': order, 'client_products': client_products, 'payment_types': payment_types})
+    
+    # Add client credit payment settings for frontend validation
+    context = {
+        'client': client, 
+        'order': order, 
+        'client_products': client_products, 
+        'payment_types': payment_types,
+        'can_use_credit': client.can_use_credit_for_payment(),
+        'requires_credit_note': client.requires_note_for_credit_payment(),
+    }
+    
+    return render(request, 'create_order.html', context)
 
 
 @login_required

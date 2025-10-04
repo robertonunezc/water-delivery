@@ -22,6 +22,7 @@ def create_payment(request):
     payment_method = data.get('payment_method')
     amount = data.get('amount')
     cantidad_cobrada = data.get('cantidad_cobrada')  # New field
+    credit_note = data.get('credit_note')  # Credit note for restricted clients
 
     if not order_id or not payment_method:
         return JsonResponse({'error': 'Missing required fields'}, status=400)
@@ -32,6 +33,28 @@ def create_payment(request):
         # Use order total if amount not provided
         if not amount:
             amount = order.total_amount
+        
+        # Validate credit payment restrictions
+        if payment_method == 'credit':
+            # Check if client can use credit
+            if not order.client.can_use_credit_for_payment():
+                return JsonResponse({
+                    'error': 'Este cliente no puede usar crédito para pagos en este momento.'
+                }, status=400)
+            
+            # Check if credit note is required
+            if order.client.requires_note_for_credit_payment():
+                if not credit_note or not credit_note.strip():
+                    return JsonResponse({
+                        'error': 'Se requiere una nota para pagos con crédito para este cliente.'
+                    }, status=400)
+            
+            # Validate client has sufficient credit
+            validation_result = order.client.validate_credit_payment(amount, credit_note)
+            if not validation_result['success']:
+                return JsonResponse({
+                    'error': validation_result['error']
+                }, status=400)
         
         # Validate cantidad_cobrada
         if cantidad_cobrada is not None:
@@ -62,13 +85,20 @@ def create_payment(request):
                 )
         
         # Create payment for the order amount (not the cantidad_cobrada)
-        payment = Payment.objects.create(
+        payment = Payment(
             amount=order.total_amount,  # Payment is always for the order total
             method=payment_method,
             client=order.client,
             order=order,
             created_by=request.user
         )
+        
+        # For credit payments, set the credit note before saving
+        if payment_method == 'credit' and credit_note:
+            payment._credit_note = credit_note.strip()
+        
+        # Save the payment (this will trigger the custom save logic)
+        payment.save()
         
         order.status = OrderStatus.COMPLETED 
         order.save()

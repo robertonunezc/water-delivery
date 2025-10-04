@@ -31,6 +31,9 @@ class Payment(models.Model):
     # Audit field
     created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
     
+    # Temporary field to hold credit note during payment processing (not stored in DB)
+    _credit_note = None
+    
     def clean(self):
         """Validate payment before saving"""
         from django.core.exceptions import ValidationError
@@ -46,8 +49,15 @@ class Payment(models.Model):
                     )
         
         elif self.method == 'credit':
-            # For credit payments, validate client has available credit
+            # For credit payments, use client's validation method
             if not self.pk:  # Only validate on creation, not updates
+                # Note: We can't validate the note requirement here since we don't have access to it
+                # The note validation should be done at the view level before creating the payment
+                if not self.client.can_use_credit_for_payment():
+                    raise ValidationError(
+                        "Este cliente no puede usar crédito para pagos en este momento."
+                    )
+                
                 available_credit = self.client.get_available_credit()
                 if available_credit < self.amount:
                     raise ValidationError(
@@ -85,7 +95,8 @@ class Payment(models.Model):
                     description=f'Compra orden #{self.order.id if self.order else "N/A"} a crédito',
                     user=self.created_by,
                     reference_order=self.order,
-                    reference_payment=None  # Will be set after save
+                    reference_payment=None,  # Will be set after save
+                    notes=getattr(self, '_credit_note', None)  # Use credit note if provided
                 )
                 if not success:
                     from django.core.exceptions import ValidationError

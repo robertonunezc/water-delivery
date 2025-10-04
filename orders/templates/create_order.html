@@ -348,6 +348,24 @@
                 </select>
               </div>
               
+              <!-- Credit Note Field (Hidden by default) -->
+              <div class="mb-3" id="credit-note-field" style="display: none;">
+                <label for="credit_note" class="form-label">
+                  <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
+                </label>
+                <textarea class="form-control" 
+                         id="credit_note" 
+                         name="credit_note"
+                         rows="3"
+                         placeholder="Ingrese una nota explicando el motivo del pago con crédito (requerido)"></textarea>
+                <div class="form-text">
+                  Esta nota es obligatoria para pagos con crédito para este cliente
+                </div>
+                <div class="invalid-feedback">
+                  Por favor ingrese una nota para el pago con crédito
+                </div>
+              </div>
+              
               <!-- Cantidad Cobrada Field -->
               <div class="mb-3">
                 <label for="cantidad_cobrada" class="form-label">
@@ -416,6 +434,21 @@
             <h4 class="text-success mb-0">
               Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
             </h4>
+          </div>
+        </div>
+        
+        <!-- Mobile Credit Note Field (Hidden by default) -->
+        <div class="row mb-3" id="credit-note-field-mobile" style="display: none;">
+          <div class="col-12">
+            <label for="credit_note_mobile" class="form-label small">Nota para Crédito <span class="text-danger">*</span></label>
+            <textarea class="form-control form-control-sm" 
+                     id="credit_note_mobile" 
+                     name="credit_note_mobile"
+                     rows="2"
+                     placeholder="Nota requerida para crédito"></textarea>
+            <div class="invalid-feedback">
+              Nota requerida para crédito
+            </div>
           </div>
         </div>
         
@@ -507,6 +540,68 @@
     const clientBalance = parseFloat('{{ client.balance|floatformat:2 }}');
     const clientAvailableCredit = parseFloat('{{ client.get_available_credit|floatformat:2 }}');
     const clientTotalPurchasingPower = clientBalance + clientAvailableCredit;
+    
+    // Client credit payment settings
+    const canUseCredit = {{ can_use_credit|yesno:"true,false" }};
+    const requiresCreditNote = {{ requires_credit_note|yesno:"true,false" }};
+
+    // Helper function to show/hide credit note fields
+    function toggleCreditNoteField(paymentMethod) {
+      const creditNoteField = document.getElementById('credit-note-field');
+      const creditNoteFieldMobile = document.getElementById('credit-note-field-mobile');
+      const creditNoteInput = document.getElementById('credit_note');
+      const creditNoteInputMobile = document.getElementById('credit_note_mobile');
+      
+      const shouldShow = paymentMethod === 'credit' && requiresCreditNote;
+      
+      if (creditNoteField) {
+        creditNoteField.style.display = shouldShow ? 'block' : 'none';
+      }
+      if (creditNoteFieldMobile) {
+        creditNoteFieldMobile.style.display = shouldShow ? 'block' : 'none';
+      }
+      
+      // Set required attribute based on visibility
+      if (creditNoteInput) {
+        creditNoteInput.required = shouldShow;
+        if (!shouldShow) {
+          creditNoteInput.value = '';
+          creditNoteInput.classList.remove('is-invalid', 'is-valid');
+        }
+      }
+      if (creditNoteInputMobile) {
+        creditNoteInputMobile.required = shouldShow;
+        if (!shouldShow) {
+          creditNoteInputMobile.value = '';
+          creditNoteInputMobile.classList.remove('is-invalid', 'is-valid');
+        }
+      }
+    }
+    
+    // Helper function to validate credit note when required
+    function validateCreditNote(input) {
+      if (!input.required) return true;
+      
+      const isValid = input.value.trim().length > 0;
+      
+      if (isValid) {
+        input.classList.remove('is-invalid');
+        input.classList.add('is-valid');
+      } else {
+        input.classList.remove('is-valid');
+        input.classList.add('is-invalid');
+      }
+      
+      return isValid;
+    }
+    
+    // Helper function to sync credit note values between desktop and mobile
+    function syncCreditNoteValues(sourceInput, targetInput) {
+      if (targetInput && sourceInput.value !== targetInput.value) {
+        targetInput.value = sourceInput.value;
+        validateCreditNote(targetInput);
+      }
+    }
 
     // Helper function to update affordability status
     function updateAffordabilityStatus(orderTotal) {
@@ -522,7 +617,11 @@
         return;
       }
       
-      if (total <= clientTotalPurchasingPower) {
+      // Calculate effective purchasing power based on credit restrictions
+      const effectiveCredit = canUseCredit ? clientAvailableCredit : 0;
+      const effectivePurchasingPower = clientBalance + effectiveCredit;
+      
+      if (total <= effectivePurchasingPower) {
         // Client can afford the order
         if (total <= clientBalance) {
           // Can pay entirely with balance
@@ -540,35 +639,57 @@
               balanceOption.textContent = 'Saldo (Suficiente)';
             }
           });
-        } else if (total <= clientAvailableCredit) {
+        } else if (total <= clientAvailableCredit && canUseCredit) {
           // Can pay entirely with credit
+          const noteText = requiresCreditNote ? ' (Requiere nota)' : '';
           statusElement.innerHTML = `
             <div class="badge bg-info">
               <i class="fas fa-credit-card me-1"></i>
-              Puede pagar con crédito
+              Puede pagar con crédito${noteText}
             </div>
           `;
-        } else {
+        } else if (canUseCredit) {
           // Needs mixed payment
           const balanceUsed = clientBalance;
           const creditNeeded = total - clientBalance;
+          const noteText = requiresCreditNote ? ' (Requiere nota)' : '';
           statusElement.innerHTML = `
             <div class="badge bg-warning">
               <i class="fas fa-calculator me-1"></i>
-              Pago mixto necesario<br>
+              Pago mixto necesario${noteText}<br>
               <small>Saldo: $${balanceUsed.toFixed(2)} + Crédito: $${creditNeeded.toFixed(2)}</small>
             </div>
           `;
+        } else {
+          // Client can't use credit, show appropriate message
+          if (total <= clientBalance) {
+            statusElement.innerHTML = `
+              <div class="badge bg-success">
+                <i class="fas fa-check-circle me-1"></i>
+                Puede pagar con saldo
+              </div>
+            `;
+          } else {
+            const shortfall = total - clientBalance;
+            statusElement.innerHTML = `
+              <div class="badge bg-danger">
+                <i class="fas fa-exclamation-triangle me-1"></i>
+                Saldo insuficiente<br>
+                <small>Falta: $${shortfall.toFixed(2)} (Crédito no disponible)</small>
+              </div>
+            `;
+          }
         }
         
-        // Enable credit payment method if client has credit limit
-        if (clientAvailableCredit > 0) {
+        // Enable credit payment method if client has credit limit and can use credit
+        if (clientAvailableCredit > 0 && canUseCredit) {
           paymentMethodSelects.forEach(select => {
             const creditOption = select.querySelector('option[value="credit"]');
             if (creditOption) {
               creditOption.disabled = false;
               if (total <= clientAvailableCredit) {
-                creditOption.textContent = 'Crédito (Suficiente)';
+                const noteText = requiresCreditNote ? ' - Requiere nota' : '';
+                creditOption.textContent = `Crédito (Suficiente)${noteText}`;
               } else {
                 creditOption.textContent = 'Crédito (Insuficiente solo)';
               }
@@ -578,12 +699,13 @@
         
       } else {
         // Client cannot afford the order
-        const shortfall = total - clientTotalPurchasingPower;
+        const shortfall = total - effectivePurchasingPower;
+        const creditStatus = canUseCredit ? 'insuficiente' : 'no disponible';
         statusElement.innerHTML = `
           <div class="badge bg-danger">
             <i class="fas fa-exclamation-triangle me-1"></i>
             Fondos insuficientes<br>
-            <small>Falta: $${shortfall.toFixed(2)}</small>
+            <small>Falta: $${shortfall.toFixed(2)} (Crédito ${creditStatus})</small>
           </div>
         `;
         
@@ -597,7 +719,11 @@
           }
           if (creditOption) {
             creditOption.disabled = true;
-            creditOption.textContent = 'Crédito (Insuficiente)';
+            if (!canUseCredit) {
+              creditOption.textContent = 'Crédito (No disponible)';
+            } else {
+              creditOption.textContent = 'Crédito (Insuficiente)';
+            }
           }
         });
       }
@@ -1132,6 +1258,48 @@
           return;
         }
         
+        // Validate credit note if payment method is credit and note is required
+        if (selectedPaymentMethod === 'credit' && requiresCreditNote) {
+          const creditNoteInput = document.getElementById('credit_note');
+          const creditNoteInputMobile = document.getElementById('credit_note_mobile');
+          
+          let creditNote = '';
+          if (creditNoteInput && creditNoteInput.value.trim()) {
+            creditNote = creditNoteInput.value.trim();
+          } else if (creditNoteInputMobile && creditNoteInputMobile.value.trim()) {
+            creditNote = creditNoteInputMobile.value.trim();
+          }
+          
+          if (!creditNote) {
+            // Show validation error for missing credit note
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'alert alert-warning alert-dismissible fade show';
+            errorDiv.innerHTML = `
+              <strong>¡Atención!</strong> Se requiere una nota para pagos con crédito para este cliente.
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            
+            const contentContainer = document.querySelector('.container-fluid.mt-4');
+            const firstChild = contentContainer.firstElementChild;
+            contentContainer.insertBefore(errorDiv, firstChild);
+            
+            // Highlight the credit note inputs
+            if (creditNoteInput) {
+              creditNoteInput.classList.add('is-invalid');
+              creditNoteInput.focus();
+            }
+            if (creditNoteInputMobile) {
+              creditNoteInputMobile.classList.add('is-invalid');
+            }
+            
+            setTimeout(() => {
+              errorDiv.remove();
+            }, 5000);
+            
+            return;
+          }
+        }
+        
         // Get order total
         const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
         const orderTotal = totalElement ? totalElement.textContent : '0.00';
@@ -1170,6 +1338,23 @@
         // Include cantidad_cobrada if provided
         if (cantidadCobrada !== null && cantidadCobrada > 0) {
           requestData.cantidad_cobrada = cantidadCobrada;
+        }
+        
+        // Include credit note if payment method is credit
+        if (selectedPaymentMethod === 'credit') {
+          const creditNoteInput = document.getElementById('credit_note');
+          const creditNoteInputMobile = document.getElementById('credit_note_mobile');
+          
+          let creditNote = '';
+          if (creditNoteInput && creditNoteInput.value.trim()) {
+            creditNote = creditNoteInput.value.trim();
+          } else if (creditNoteInputMobile && creditNoteInputMobile.value.trim()) {
+            creditNote = creditNoteInputMobile.value.trim();
+          }
+          
+          if (creditNote) {
+            requestData.credit_note = creditNote;
+          }
         }
         
         fetch('/payments/create/', {
@@ -1278,12 +1463,44 @@
       document.getElementById('payment-method-select')?.addEventListener('change', function() {
         const mobileSelect = document.getElementById('payment-method-select-mobile');
         if (mobileSelect) mobileSelect.value = this.value;
+        
+        // Show/hide credit note field based on selection
+        toggleCreditNoteField(this.value);
       });
       
       document.getElementById('payment-method-select-mobile')?.addEventListener('change', function() {
         const desktopSelect = document.getElementById('payment-method-select');
         if (desktopSelect) desktopSelect.value = this.value;
+        
+        // Show/hide credit note field based on selection
+        toggleCreditNoteField(this.value);
       });
+      
+      // Credit note validation and syncing
+      const creditNoteInput = document.getElementById('credit_note');
+      const creditNoteInputMobile = document.getElementById('credit_note_mobile');
+      
+      if (creditNoteInput) {
+        creditNoteInput.addEventListener('input', function() {
+          validateCreditNote(this);
+          syncCreditNoteValues(this, creditNoteInputMobile);
+        });
+        
+        creditNoteInput.addEventListener('blur', function() {
+          validateCreditNote(this);
+        });
+      }
+      
+      if (creditNoteInputMobile) {
+        creditNoteInputMobile.addEventListener('input', function() {
+          validateCreditNote(this);
+          syncCreditNoteValues(this, creditNoteInput);
+        });
+        
+        creditNoteInputMobile.addEventListener('blur', function() {
+          validateCreditNote(this);
+        });
+      }
       
       // Sync cantidad cobrada values between desktop and mobile (when manually changed)
       document.getElementById('cantidad_cobrada')?.addEventListener('input', function() {
