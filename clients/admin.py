@@ -174,9 +174,8 @@ class ClientAdmin(admin.ModelAdmin):
 					new_balance = client.add_balance(
 						amount=amount,
 						transaction_type=transaction_type,
-						description=f"[MANUAL] {description}",
 						user=request.user,
-						notes=f"Transacción manual realizada por {request.user.username}. {notes}"
+						notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}"
 					)
 					
 					messages.success(
@@ -226,9 +225,8 @@ class ClientAdmin(admin.ModelAdmin):
 						# Update credit limit
 						client.update_credit_limit(
 							new_limit=new_credit_limit,
-							description=f"[MANUAL] {description}",
 							user=request.user,
-							notes=f"Cambio manual realizado por {request.user.username}. {notes}"
+							notes=f"[MANUAL] {description}. Cambio manual realizado por {request.user.username}. {notes}"
 						)
 						messages.success(
 							request,
@@ -240,9 +238,8 @@ class ClientAdmin(admin.ModelAdmin):
 						paid_amount = client.pay_debt(
 							amount=amount,
 							transaction_type=transaction_type,
-							description=f"[MANUAL] {description}",
 							user=request.user,
-							notes=f"Transacción manual realizada por {request.user.username}. {notes}"
+							notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}"
 						)
 						messages.success(
 							request,
@@ -255,9 +252,8 @@ class ClientAdmin(admin.ModelAdmin):
 						paid_amount = client.pay_debt(
 							amount=amount,
 							transaction_type=transaction_type,
-							description=f"[MANUAL] {description}",
 							user=request.user,
-							notes=f"Ajuste manual realizado por {request.user.username}. {notes}"
+							notes=f"[MANUAL] {description}. Ajuste manual realizado por {request.user.username}. {notes}"
 						)
 						messages.success(
 							request,
@@ -298,9 +294,8 @@ class ClientAdmin(admin.ModelAdmin):
 						client.add_balance(
 							amount=amount,
 							transaction_type='deposit',
-							description=f"[MANUAL MASIVO] {description}",
 							user=request.user,
-							notes=f"Depósito masivo realizado por {request.user.username}. {notes}"
+							notes=f"[MANUAL MASIVO] {description}. Depósito masivo realizado por {request.user.username}. {notes}"
 						)
 						successful_count += 1
 					except Exception as e:

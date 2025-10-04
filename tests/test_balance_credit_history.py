@@ -57,9 +57,8 @@ def demo_balance_credit_history():
     client1.add_balance(
         amount=Decimal('500.00'),
         transaction_type='deposit',
-        description='Initial deposit',
         user=user,
-        notes='Demo deposit for testing'
+        notes='Initial deposit - Demo deposit for testing'
     )
     print(f"Client 1 new balance: ${client1.balance:.2f}")
     
@@ -68,9 +67,8 @@ def demo_balance_credit_history():
     client1.add_balance(
         amount=Decimal('200.00'),
         transaction_type='deposit',
-        description='Additional deposit on May 12',
         user=user,
-        notes='Second deposit for demo'
+        notes='Additional deposit on May 12 - Second deposit for demo'
     )
     print(f"Client 1 new balance: ${client1.balance:.2f}")
     
@@ -79,9 +77,8 @@ def demo_balance_credit_history():
     success = client1.deduct_balance(
         amount=Decimal('150.00'),
         transaction_type='payment',
-        description='Payment for order #123',
         user=user,
-        notes='Demo payment'
+        notes='Payment for order #123 - Demo payment'
     )
     print(f"Payment successful: {success}")
     print(f"Client 1 remaining balance: ${client1.balance:.2f}")
@@ -91,9 +88,8 @@ def demo_balance_credit_history():
     success = client1.add_debt(
         amount=Decimal('300.00'),
         transaction_type='purchase',
-        description='Credit purchase order #124',
         user=user,
-        notes='Demo credit purchase'
+        notes='Credit purchase order #124 - Demo credit purchase'
     )
     print(f"Credit purchase successful: {success}")
     print(f"Client 1 current debt: ${client1.current_debt:.2f}")
@@ -104,9 +100,8 @@ def demo_balance_credit_history():
     paid_amount = client1.pay_debt(
         amount=Decimal('100.00'),
         transaction_type='payment',
-        description='Debt payment',
         user=user,
-        notes='Partial debt payment'
+        notes='Debt payment - Partial debt payment'
     )
     print(f"Amount paid: ${paid_amount:.2f}")
     print(f"Client 1 remaining debt: ${client1.current_debt:.2f}")
@@ -129,9 +124,8 @@ def demo_balance_credit_history():
     print(f"\n7. Updating Client 1's credit limit from $1000 to $1500...")
     client1.update_credit_limit(
         new_limit=Decimal('1500.00'),
-        description='Credit limit increase',
         user=user,
-        notes='Increased due to good payment history'
+        notes='Credit limit increase - Increased due to good payment history'
     )
     print(f"Client 1 new credit limit: ${client1.credit_limit:.2f}")
     print(f"Client 1 available credit: ${client1.get_available_credit():.2f}")

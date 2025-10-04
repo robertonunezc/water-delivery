@@ -82,10 +82,10 @@ class Payment(models.Model):
                 success = self.client.deduct_balance(
                     amount=self.amount,
                     transaction_type='payment',
-                    description=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo',
                     user=self.created_by,
                     reference_order=self.order,
-                    reference_payment=None  # Will be set after save
+                    reference_payment=None,  # Will be set after save
+                    notes=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo'
                 )
                 if not success:
                     from django.core.exceptions import ValidationError
@@ -94,14 +94,17 @@ class Payment(models.Model):
                 
             elif self.method == 'credit':
                 # Add to client debt
+                credit_note = getattr(self, '_credit_note', None)
+                notes_text = f'Compra orden #{self.order.id if self.order else "N/A"} a crédito'
+                if credit_note:
+                    notes_text += f'. {credit_note}'
                 success = self.client.add_debt(
                     amount=self.amount,
                     transaction_type='purchase',
-                    description=f'Compra orden #{self.order.id if self.order else "N/A"} a crédito',
                     user=self.created_by,
                     reference_order=self.order,
                     reference_payment=None,  # Will be set after save
-                    notes=getattr(self, '_credit_note', None)  # Use credit note if provided
+                    notes=notes_text
                 )
                 if not success:
                     from django.core.exceptions import ValidationError
@@ -154,11 +157,10 @@ class Payment(models.Model):
             self.client.add_balance(
                 amount=self.balance_used,
                 transaction_type='refund',
-                description=f'Reversión de pago #{self.id} - {reason}',
                 user=user,
                 reference_order=self.order,
                 reference_payment=self,
-                notes=f'Reversión de pago original de ${self.balance_used:.2f}'
+                notes=f'Reversión de pago #{self.id} - {reason}'
             )
             self.balance_used = 0
             
@@ -167,11 +169,10 @@ class Payment(models.Model):
             self.client.pay_debt(
                 amount=self.credit_used,
                 transaction_type='adjustment',
-                description=f'Reversión de compra a crédito #{self.id} - {reason}',
                 user=user,
                 reference_order=self.order,
                 reference_payment=self,
-                notes=f'Reversión de compra a crédito original de ${self.credit_used:.2f}'
+                notes=f'Reversión de compra a crédito #{self.id} - {reason}'
             )
             self.credit_used = 0
         

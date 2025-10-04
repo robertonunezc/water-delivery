@@ -78,10 +78,9 @@ def create_payment(request):
                 order.client.add_balance(
                     amount=excess_amount,
                     transaction_type='added_in_order',
-                    description=f'Saldo agregado en venta - Orden #{order.id}',
                     user=request.user,
                     reference_order=order,
-                    notes=f'Diferencia entre cantidad cobrada (${cantidad_cobrada:.2f}) y total de orden (${order_total:.2f})'
+                    notes=f'Saldo agregado en venta - Orden #{order.id}. Diferencia entre cantidad cobrada (${cantidad_cobrada:.2f}) y total de orden (${order_total:.2f})'
                 )
         
         # Create payment for the order amount (not the cantidad_cobrada)

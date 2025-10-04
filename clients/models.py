@@ -73,14 +73,13 @@ class Client(TimeStampedModel):
         return self.name
     
     # Balance and Credit Management Methods
-    def add_balance(self, amount, transaction_type='deposit', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None, source='automatic'):
+    def add_balance(self, amount, transaction_type='deposit', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None, source='automatic'):
         """
         Add money to client's balance with transaction history
         
         Args:
             amount: Amount to add
             transaction_type: Type of transaction (deposit, refund, transfer_in, adjustment, correction)
-            description: Description of the transaction
             user: User performing the transaction
             reference_order: Related order (if applicable)
             reference_payment: Related payment (if applicable)
@@ -101,14 +100,14 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
+        final_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
         BalanceTransaction.objects.create(
             client=self,
             transaction_type=transaction_type,
             amount=amount,
             balance_before=balance_before,
             balance_after=balance_after,
-            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
-            notes=notes,
+            notes=final_notes,
             reference_order=reference_order,
             reference_payment=reference_payment,
             transfer_to_client=transfer_to_client,
@@ -117,14 +116,13 @@ class Client(TimeStampedModel):
         
         return self.balance
     
-    def deduct_balance(self, amount, transaction_type='payment', description='', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None):
+    def deduct_balance(self, amount, transaction_type='payment', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None):
         """
         Deduct money from client's balance with transaction history
         
         Args:
             amount: Amount to deduct
             transaction_type: Type of transaction (payment, transfer_out, adjustment, correction)
-            description: Description of the transaction
             user: User performing the transaction
             reference_order: Related order (if applicable)
             reference_payment: Related payment (if applicable)
@@ -151,14 +149,14 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
+        final_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
         BalanceTransaction.objects.create(
             client=self,
             transaction_type=transaction_type,
             amount=amount,
             balance_before=balance_before,
             balance_after=balance_after,
-            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
-            notes=notes,
+            notes=final_notes,
             reference_order=reference_order,
             reference_payment=reference_payment,
             transfer_to_client=transfer_to_client,
@@ -167,14 +165,13 @@ class Client(TimeStampedModel):
         
         return True
     
-    def add_debt(self, amount, transaction_type='purchase', description='', user=None, reference_order=None, reference_payment=None, notes=None):
+    def add_debt(self, amount, transaction_type='purchase', user=None, reference_order=None, reference_payment=None, notes=None):
         """
         Add to client's debt with transaction history
         
         Args:
             amount: Amount to add to debt
             transaction_type: Type of transaction (purchase, interest, fee, adjustment, correction)
-            description: Description of the transaction
             user: User performing the transaction
             reference_order: Related order (if applicable)
             reference_payment: Related payment (if applicable)
@@ -213,10 +210,7 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
-        # Combine description with notes since CreditTransaction doesn't have a description field
-        combined_notes = description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
-        if notes:
-            combined_notes += f" | {notes}"
+        combined_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
             
         CreditTransaction.objects.create(
             client=self,
@@ -234,14 +228,13 @@ class Client(TimeStampedModel):
         
         return True
     
-    def pay_debt(self, amount, transaction_type='payment', description='', user=None, reference_order=None, reference_payment=None, notes=None):
+    def pay_debt(self, amount, transaction_type='payment', user=None, reference_order=None, reference_payment=None, notes=None):
         """
         Pay down client's debt with transaction history
         
         Args:
             amount: Amount to pay towards debt
             transaction_type: Type of transaction (payment, adjustment, forgiveness, correction)
-            description: Description of the transaction
             user: User performing the transaction
             reference_order: Related order (if applicable)
             reference_payment: Related payment (if applicable)
@@ -270,6 +263,7 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
+        final_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${payment_amount:.2f}"
         CreditTransaction.objects.create(
             client=self,
             transaction_type=transaction_type,
@@ -278,8 +272,7 @@ class Client(TimeStampedModel):
             debt_after=debt_after,
             credit_limit_before=credit_limit_before,
             credit_limit_after=self.credit_limit,
-            description=description or f"{transaction_type.replace('_', ' ').title()} de ${payment_amount:.2f}",
-            notes=notes,
+            notes=final_notes,
             reference_order=reference_order,
             reference_payment=reference_payment,
             created_by=user
@@ -287,13 +280,12 @@ class Client(TimeStampedModel):
         
         return payment_amount
     
-    def update_credit_limit(self, new_limit, description='', user=None, notes=None):
+    def update_credit_limit(self, new_limit, user=None, notes=None):
         """
         Update client's credit limit with transaction history
         
         Args:
             new_limit: New credit limit amount
-            description: Description of the change
             user: User performing the transaction
             notes: Additional notes
         """
@@ -314,6 +306,7 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
+        final_notes = notes or f"Cambio de límite de crédito de ${credit_limit_before:.2f} a ${new_limit:.2f}"
         CreditTransaction.objects.create(
             client=self,
             transaction_type='limit_change',
@@ -322,8 +315,7 @@ class Client(TimeStampedModel):
             debt_after=self.current_debt,
             credit_limit_before=credit_limit_before,
             credit_limit_after=new_limit,
-            description=description or f"Cambio de límite de crédito de ${credit_limit_before:.2f} a ${new_limit:.2f}",
-            notes=notes,
+            notes=final_notes,
             created_by=user
         )
     
@@ -517,18 +509,17 @@ class Client(TimeStampedModel):
             self.deduct_balance(
                 amount=balance_used,
                 transaction_type='payment',
-                description=f'Pago de orden con saldo - ${balance_used:.2f}',
                 user=user,
-                reference_order=order
+                reference_order=order,
+                notes=f'Pago de orden con saldo - ${balance_used:.2f}'
             )
         if credit_used > 0:
             self.add_debt(
                 amount=credit_used,
                 transaction_type='purchase',
-                description=f'Compra a crédito - ${credit_used:.2f}',
                 user=user,
                 reference_order=order,
-                notes=credit_note
+                notes=f'Compra a crédito - ${credit_used:.2f}. {credit_note}' if credit_note else f'Compra a crédito - ${credit_used:.2f}'
             )
         
         return {
@@ -726,14 +717,13 @@ class Client(TimeStampedModel):
             'period_end': end_date,
         }
     
-    def transfer_balance_to(self, target_client, amount, description='', user=None, notes=None):
+    def transfer_balance_to(self, target_client, amount, user=None, notes=None):
         """
         Transfer balance from this client to another client
         
         Args:
             target_client: Client to transfer balance to
             amount: Amount to transfer
-            description: Description of the transfer
             user: User performing the transfer
             notes: Additional notes
             
@@ -751,26 +741,26 @@ class Client(TimeStampedModel):
         
         try:
             # Deduct from source client
+            transfer_notes = notes or f'Transferencia a {target_client.name}'
             success = self.deduct_balance(
                 amount=amount,
                 transaction_type='transfer_out',
-                description=description or f'Transferencia a {target_client.name}',
                 user=user,
                 transfer_to_client=target_client,
-                notes=notes
+                notes=transfer_notes
             )
             
             if not success:
                 return {'success': False, 'error': 'Failed to deduct from source account'}
             
             # Add to target client
+            receive_notes = notes or f'Transferencia de {self.name}'
             target_client.add_balance(
                 amount=amount,
                 transaction_type='transfer_in',
-                description=description or f'Transferencia de {self.name}',
                 user=user,
                 transfer_to_client=self,
-                notes=notes
+                notes=receive_notes
             )
             
             return {
