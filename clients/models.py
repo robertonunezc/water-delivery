@@ -58,6 +58,8 @@ class Client(TimeStampedModel):
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Saldo a favor", help_text="Monto prepagado disponible para usar en pedidos")
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
+    can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
+    requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere nota para crédito", help_text="Si está habilitado, se requerirá una nota obligatoria al realizar pagos con crédito")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
@@ -314,11 +316,80 @@ class Client(TimeStampedModel):
         """Get remaining credit available"""
         return self.credit_limit - self.current_debt
     
+    def can_use_credit_for_payment(self):
+        """
+        Check if client can use credit for payments based on their settings and available credit
+        
+        Returns:
+            bool: True if client can use credit, False otherwise
+        """
+        # If credit payment is disabled for this client
+        if not self.can_pay_with_credit:
+            # Only allow if they have available credit (positive balance)
+            return self.get_available_credit() > 0
+        
+        # If credit payment is enabled, they can use it regardless of current balance
+        return True
+    
+    def requires_note_for_credit_payment(self):
+        """
+        Check if client requires a note when making credit payments
+        
+        Returns:
+            bool: True if note is required, False otherwise
+        """
+        return self.requires_note_for_credit
+    
+    def validate_credit_payment(self, amount, note=None):
+        """
+        Validate if a credit payment can be processed
+        
+        Args:
+            amount: Amount to be paid with credit
+            note: Note provided for the transaction
+            
+        Returns:
+            dict: Validation result with success status and error message if applicable
+        """
+        # Check if client can use credit
+        if not self.can_use_credit_for_payment():
+            return {
+                'success': False,
+                'error': 'Client is not allowed to pay with credit at this time.',
+                'error_code': 'CREDIT_DISABLED'
+            }
+        
+        # Check if sufficient credit is available
+        available_credit = self.get_available_credit()
+        if available_credit < amount:
+            return {
+                'success': False,
+                'error': f'Insufficient credit. Available: ${available_credit:.2f}, Required: ${amount:.2f}',
+                'error_code': 'INSUFFICIENT_CREDIT'
+            }
+        
+        # Check if note is required
+        if self.requires_note_for_credit_payment() and not note:
+            return {
+                'success': False,
+                'error': 'A note is required for credit payments for this client.',
+                'error_code': 'NOTE_REQUIRED'
+            }
+        
+        return {'success': True}
+    
     def can_afford_order(self, order_amount):
         """Check if client can afford an order using balance + available credit"""
-        return (self.balance + self.get_available_credit()) >= order_amount
+        available_balance = self.balance
+        available_credit = 0
+        
+        # Only include available credit if client can use credit for payments
+        if self.can_use_credit_for_payment():
+            available_credit = self.get_available_credit()
+        
+        return (available_balance + available_credit) >= order_amount
     
-    def process_order_payment(self, order_amount, preferred_method='auto', order=None, user=None):
+    def process_order_payment(self, order_amount, preferred_method='auto', order=None, user=None, credit_note=None):
         """
         Process payment for an order using different strategies
         
@@ -327,6 +398,7 @@ class Client(TimeStampedModel):
             preferred_method: 'auto', 'balance', 'credit', 'mixed'
             order: Order object for transaction reference
             user: User performing the operation
+            credit_note: Required note when using credit if client requires it
         """
         remaining_amount = order_amount
         balance_used = 0
@@ -346,6 +418,25 @@ class Client(TimeStampedModel):
                 }
                 
         elif preferred_method == 'credit':
+            # Check if client can use credit
+            if not self.can_use_credit_for_payment():
+                return {
+                    'success': False,
+                    'error': 'Client is not allowed to pay with credit at this time.',
+                    'balance_used': 0,
+                    'credit_used': 0
+                }
+            
+            # Check if note is required for credit payments
+            if self.requires_note_for_credit_payment() and not credit_note:
+                return {
+                    'success': False,
+                    'error': 'A note is required for credit payments for this client.',
+                    'balance_used': 0,
+                    'credit_used': 0,
+                    'note_required': True
+                }
+            
             # Try to pay entirely with credit
             available_credit = self.get_available_credit()
             if available_credit >= order_amount:
@@ -366,6 +457,27 @@ class Client(TimeStampedModel):
             
             # Then, use credit if needed and available
             if remaining_amount > 0:
+                # Check if client can use credit
+                if not self.can_use_credit_for_payment():
+                    return {
+                        'success': False,
+                        'error': f'Client cannot use credit. Need additional ${remaining_amount:.2f} in balance.',
+                        'balance_used': 0,
+                        'credit_used': 0,
+                        'balance_available': self.balance,
+                        'credit_available': 0
+                    }
+                
+                # Check if note is required for credit payments
+                if self.requires_note_for_credit_payment() and not credit_note:
+                    return {
+                        'success': False,
+                        'error': 'A note is required for credit payments for this client.',
+                        'balance_used': 0,
+                        'credit_used': 0,
+                        'note_required': True
+                    }
+                
                 available_credit = self.get_available_credit()
                 credit_used = min(available_credit, remaining_amount)
                 remaining_amount -= credit_used
@@ -396,7 +508,8 @@ class Client(TimeStampedModel):
                 transaction_type='purchase',
                 description=f'Compra a crédito - ${credit_used:.2f}',
                 user=user,
-                reference_order=order
+                reference_order=order,
+                notes=credit_note
             )
         
         return {
@@ -408,14 +521,14 @@ class Client(TimeStampedModel):
             'available_credit': self.get_available_credit()
         }
     
-    def create_payment_for_order(self, order, payment_method='auto', user=None):
+    def create_payment_for_order(self, order, payment_method='auto', user=None, credit_note=None):
         """
         Create payment records for an order based on how the payment was processed
         """
         from payment.models import Payment
         
         order_amount = order.total_amount
-        payment_result = self.process_order_payment(order_amount, payment_method, order=order, user=user)
+        payment_result = self.process_order_payment(order_amount, payment_method, order=order, user=user, credit_note=credit_note)
         
         if not payment_result['success']:
             return {'success': False, 'error': payment_result['error']}
@@ -658,6 +771,13 @@ class Client(TimeStampedModel):
             raise ValidationError({'corporate': 'Cliente corporativo debe ser establecido.'})
         if self.type == 'corporate' and self.corporate:
             raise ValidationError({'corporate': 'Cliente corporativo no puede tener un padre corporativo.'})
+        
+        # Validate credit payment constraints - both cannot be restrictive at the same time
+        if not self.can_pay_with_credit and self.requires_note_for_credit:
+            raise ValidationError({
+                'can_pay_with_credit': 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.',
+                'requires_note_for_credit': 'No se puede requerir nota si el pago con crédito está deshabilitado.'
+            })
 
 
 class BalanceTransaction(TimeStampedModel):
