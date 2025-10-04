@@ -75,13 +75,14 @@ class ClientAdmin(admin.ModelAdmin):
 	
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('name', 'active'), ('type', 'corporate'), 'note')
+			'fields': (('name', 'active'), 'type', 'corporate', 'note')
 		}),
 		('Balance y Crédito', {
 			'fields': (
 				('balance', 'current_debt'), 
 				('credit_limit', 'get_available_credit'),
-				'get_balance_status'
+				('can_pay_with_credit', 'requires_note_for_credit'),				
+				'get_balance_status',
 			),
 			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
@@ -474,8 +475,7 @@ class CreditTransactionAdmin(admin.ModelAdmin):
 			'fields': (
 				('client', 'transaction_type'),
 				('amount', 'get_debt_change'),
-				('debt_before', 'debt_after'),
-				'description'
+				('debt_before', 'debt_after')
 			)
 		}),
 		('Límite de Crédito', {

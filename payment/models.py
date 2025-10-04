@@ -58,12 +58,17 @@ class Payment(models.Model):
                         "Este cliente no puede usar crédito para pagos en este momento."
                     )
                 
+                # For clients that can pay with credit, allow payments even if they exceed the credit limit
+                # This enables negative credit balances when necessary
                 available_credit = self.client.get_available_credit()
                 if available_credit < self.amount:
-                    raise ValidationError(
-                        f"Cliente no tiene suficiente crédito disponible. "
-                        f"Crédito disponible: ${available_credit:.2f}, "
-                        f"Monto requerido: ${self.amount:.2f}"
+                    # Log a warning but allow the payment to proceed
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        f'Payment {self.amount} for client {self.client.id} ({self.client.name}) '
+                        f'exceeds available credit of ${available_credit:.2f}. '
+                        f'This will result in exceeding credit limit.'
                     )
     
     def save(self, *args, **kwargs):
@@ -100,7 +105,15 @@ class Payment(models.Model):
                 )
                 if not success:
                     from django.core.exceptions import ValidationError
-                    raise ValidationError("NO cuenta con límite de crédito suficiente para el pago")
+                    # This should rarely happen now since add_debt allows exceeding limits for authorized clients
+                    available_credit = self.client.get_available_credit()
+                    can_use_credit = self.client.can_pay_with_credit
+                    raise ValidationError(
+                        f"No se puede procesar el pago con crédito. "
+                        f"Cliente puede usar crédito: {can_use_credit}, "
+                        f"Crédito disponible: ${available_credit:.2f}, "
+                        f"Monto requerido: ${self.amount:.2f}"
+                    )
                 self.credit_used = self.amount
         
         super().save(*args, **kwargs)

@@ -188,7 +188,18 @@ class Client(TimeStampedModel):
             
         new_debt = self.current_debt + amount
         if new_debt > self.credit_limit:
-            return False
+            # Only block if client cannot pay with credit
+            if not self.can_pay_with_credit:
+                return False
+            else:
+                # Log warning but allow the transaction for clients who can pay with credit
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    f'Client {self.id} ({self.name}) debt will exceed credit limit. '
+                    f'New debt: ${new_debt:.2f}, Credit limit: ${self.credit_limit:.2f}. '
+                    f'Allowing due to can_pay_with_credit=True.'
+                )
         
         # Store previous values
         debt_before = self.current_debt
@@ -202,6 +213,11 @@ class Client(TimeStampedModel):
         self.save()
         
         # Create transaction record
+        # Combine description with notes since CreditTransaction doesn't have a description field
+        combined_notes = description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
+        if notes:
+            combined_notes += f" | {notes}"
+            
         CreditTransaction.objects.create(
             client=self,
             transaction_type=transaction_type,
@@ -210,8 +226,7 @@ class Client(TimeStampedModel):
             debt_after=debt_after,
             credit_limit_before=credit_limit_before,
             credit_limit_after=self.credit_limit,
-            description=description or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}",
-            notes=notes,
+            notes=combined_notes,
             reference_order=reference_order,
             reference_payment=reference_payment,
             created_by=user
@@ -359,15 +374,6 @@ class Client(TimeStampedModel):
                 'error_code': 'CREDIT_DISABLED'
             }
         
-        # Check if sufficient credit is available
-        available_credit = self.get_available_credit()
-        if available_credit < amount:
-            return {
-                'success': False,
-                'error': f'Insufficient credit. Available: ${available_credit:.2f}, Required: ${amount:.2f}',
-                'error_code': 'INSUFFICIENT_CREDIT'
-            }
-        
         # Check if note is required
         if self.requires_note_for_credit_payment() and not note:
             return {
@@ -375,6 +381,19 @@ class Client(TimeStampedModel):
                 'error': 'A note is required for credit payments for this client.',
                 'error_code': 'NOTE_REQUIRED'
             }
+        
+        # For clients that can pay with credit, allow payments even if they exceed the credit limit
+        # This allows for negative credit balances when necessary
+        available_credit = self.get_available_credit()
+        if available_credit < amount:
+            # Log a warning but allow the payment to proceed
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f'Client {self.id} ({self.name}) credit payment of ${amount:.2f} '
+                f'exceeds available credit of ${available_credit:.2f}. '
+                f'This will result in exceeding credit limit.'
+            )
         
         return {'success': True}
     

@@ -698,31 +698,53 @@
         }
         
       } else {
-        // Client cannot afford the order
+        // Client cannot afford the order with current balance + available credit
         const shortfall = total - effectivePurchasingPower;
-        const creditStatus = canUseCredit ? 'insuficiente' : 'no disponible';
-        statusElement.innerHTML = `
-          <div class="badge bg-danger">
-            <i class="fas fa-exclamation-triangle me-1"></i>
-            Fondos insuficientes<br>
-            <small>Falta: $${shortfall.toFixed(2)} (Crédito ${creditStatus})</small>
-          </div>
-        `;
+        const creditStatus = canUseCredit ? 'disponible (excederá límite)' : 'no disponible';
         
-        // Disable balance and credit payment methods
+        if (canUseCredit) {
+          // If client can use credit, show warning but allow credit payment
+          const noteText = requiresCreditNote ? ' - Requiere nota' : '';
+          statusElement.innerHTML = `
+            <div class="badge bg-warning">
+              <i class="fas fa-exclamation-triangle me-1"></i>
+              Excederá límite de crédito<br>
+              <small>Crédito disponible para uso${noteText}</small>
+            </div>
+          `;
+        } else {
+          // If client cannot use credit, show error
+          statusElement.innerHTML = `
+            <div class="badge bg-danger">
+              <i class="fas fa-exclamation-triangle me-1"></i>
+              Fondos insuficientes<br>
+              <small>Falta: $${shortfall.toFixed(2)} (Crédito ${creditStatus})</small>
+            </div>
+          `;
+        }
+        
+        // Disable/enable payment methods based on client settings
         paymentMethodSelects.forEach(select => {
           const balanceOption = select.querySelector('option[value="balance"]');
           const creditOption = select.querySelector('option[value="credit"]');
+          
+          // Always disable balance option if insufficient
           if (balanceOption) {
             balanceOption.disabled = true;
             balanceOption.textContent = 'Saldo (Insuficiente)';
           }
+          
+          // Handle credit option based on client settings
           if (creditOption) {
-            creditOption.disabled = true;
-            if (!canUseCredit) {
-              creditOption.textContent = 'Crédito (No disponible)';
+            if (canUseCredit) {
+              // Client can use credit even if it exceeds limit
+              creditOption.disabled = false;
+              const noteText = requiresCreditNote ? ' (Requiere nota)' : '';
+              creditOption.textContent = `Crédito${noteText}`;
             } else {
-              creditOption.textContent = 'Crédito (Insuficiente)';
+              // Client cannot use credit at all
+              creditOption.disabled = true;
+              creditOption.textContent = 'Crédito (No disponible)';
             }
           }
         });
