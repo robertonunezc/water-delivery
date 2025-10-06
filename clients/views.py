@@ -108,6 +108,76 @@ def detail(request, pk):
     # Get client's payments with related data
     payments = client.payments.all().select_related('order').order_by('-date')
     
+    # Get credit and balance transactions
+    balance_transactions = client.balance_transactions.all().select_related('reference_order', 'reference_payment', 'created_by').order_by('-created_at')
+    credit_transactions = client.credit_transactions.all().select_related('reference_order', 'reference_payment', 'created_by').order_by('-created_at')
+    
+    # Combine all payment-related data for the recent transactions view
+    all_payment_data = []
+    
+    # Add regular payments
+    for payment in payments:
+        all_payment_data.append({
+            'type': 'payment',
+            'id': payment.id,
+            'date': payment.date,
+            'amount': payment.amount,
+            'method': payment.get_method_display(),
+            'status': payment.get_status_display(),
+            'status_class': 'success' if payment.status == 'completed' else 'warning' if payment.status == 'pending' else 'danger',
+            'order_id': payment.order.id if payment.order else None,
+            'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
+            'is_positive': True,  # Regular payments are always positive from client perspective
+            'object': payment
+        })
+    
+    # Add balance transactions  
+    for balance_tx in balance_transactions:
+        # Skip balance transactions that are already represented as payments
+        if balance_tx.reference_payment:
+            continue
+            
+        status_class = 'success' if balance_tx.transaction_type in ['deposit', 'refund', 'transfer_in'] else 'info'
+        is_positive = balance_tx.transaction_type in ['deposit', 'refund', 'transfer_in', 'adjustment']
+        all_payment_data.append({
+            'type': 'balance_transaction',
+            'id': balance_tx.id,
+            'date': balance_tx.created_at,
+            'amount': balance_tx.amount,
+            'method': balance_tx.get_transaction_type_display(),
+            'status': 'Completado',
+            'status_class': status_class,
+            'order_id': balance_tx.reference_order.id if balance_tx.reference_order else None,
+            'description': balance_tx.notes or balance_tx.get_transaction_type_display(),
+            'is_positive': is_positive,
+            'object': balance_tx
+        })
+    
+    # Add credit transactions
+    for credit_tx in credit_transactions:
+        # Skip credit transactions that are already represented as payments
+        if credit_tx.reference_payment:
+            continue
+            
+        status_class = 'warning' if credit_tx.transaction_type in ['purchase', 'interest', 'fee'] else 'success'
+        is_positive = credit_tx.transaction_type in ['payment', 'adjustment', 'forgiveness', 'correction']
+        all_payment_data.append({
+            'type': 'credit_transaction',
+            'id': credit_tx.id,
+            'date': credit_tx.created_at,
+            'amount': credit_tx.amount,
+            'method': credit_tx.get_transaction_type_display(),
+            'status': 'Completado',
+            'status_class': status_class,
+            'order_id': credit_tx.reference_order.id if credit_tx.reference_order else None,
+            'description': credit_tx.notes or credit_tx.get_transaction_type_display(),
+            'is_positive': is_positive,
+            'object': credit_tx
+        })
+    
+    # Sort all payment data by date (most recent first)
+    all_payment_data.sort(key=lambda x: x['date'], reverse=True)
+    
     # Calculate client statistics
     total_orders = orders.count()
     total_spent = payments.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
@@ -158,7 +228,8 @@ def detail(request, pk):
     context = {
         'client': client,
         'orders': orders[:10],  # Limit to recent 10 orders for performance
-        'payments': payments[:10],  # Limit to recent 10 payments
+        'payments': payments[:10],  # Limit to recent 10 payments for backward compatibility
+        'all_payment_data': all_payment_data[:10],  # Combined payment data - limit to recent 10
         'contacts': contacts,
         'addresses': addresses,
         'billing_data': billing_data,

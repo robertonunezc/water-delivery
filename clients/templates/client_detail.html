@@ -612,42 +612,72 @@
       <div class="card">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Pagos Recientes</h5>
-          <small class="text-muted">Mostrando los últimos 10</small>
+          <small class="text-muted">Mostrando los últimos 10 (Pagos, Créditos y Saldos)</small>
         </div>
         <div class="card-body">
-          {% if payments %}
+          {% if all_payment_data %}
             <div class="table-responsive">
               <table class="table table-hover">
                 <thead class="table-light">
                   <tr>
+                    <th>Tipo</th>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Pedido</th>
-                    <th>Método</th>
+                    <th>Método/Tipo</th>
                     <th>Estado</th>
                     <th>Monto</th>
+                    <th>Descripción</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {% for payment in payments %}
+                  {% for payment_data in all_payment_data %}
                     <tr>
-                      <td><strong>#{{ payment.id }}</strong></td>
-                      <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
-                      <td><a href="#" class="text-decoration-none">#{{ payment.order.id }}</a></td>
-                      <td>{{ payment.get_method_display }}</td>
                       <td>
-                        <span class="badge bg-{% if payment.status == 'completed' %}success{% elif payment.status == 'pending' %}warning{% else %}danger{% endif %}">
-                          {{ payment.get_status_display }}
+                        {% if payment_data.type == 'payment' %}
+                          <span class="badge bg-primary">Pago</span>
+                        {% elif payment_data.type == 'balance_transaction' %}
+                          <span class="badge bg-info">Saldo</span>
+                        {% elif payment_data.type == 'credit_transaction' %}
+                          <span class="badge bg-warning">Crédito</span>
+                        {% endif %}
+                      </td>
+                      <td><strong>#{{ payment_data.id }}</strong></td>
+                      <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
+                      <td>
+                        {% if payment_data.order_id %}
+                          <a href="#" class="text-decoration-none">#{{ payment_data.order_id }}</a>
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td>{{ payment_data.method }}</td>
+                      <td>
+                        <span class="badge bg-{{ payment_data.status_class }}">
+                          {{ payment_data.status }}
                         </span>
                       </td>
-                      <td class="fw-bold text-success">${{ payment.amount|floatformat:2 }}</td>
+                      <td class="fw-bold">
+                        {% if payment_data.type == 'payment' %}
+                          <span class="text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                        {% else %}
+                          {% if payment_data.is_positive %}
+                            <span class="text-success">+${{ payment_data.amount|floatformat:2 }}</span>
+                          {% else %}
+                            <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
+                          {% endif %}
+                        {% endif %}
+                      </td>
+                      <td>
+                        <small class="text-muted">{{ payment_data.description|truncatechars:50 }}</small>
+                      </td>
                     </tr>
                   {% endfor %}
                 </tbody>
               </table>
             </div>
           {% else %}
-            <p class="text-muted">No hay pagos registrados para este cliente.</p>
+            <p class="text-muted">No hay transacciones registradas para este cliente.</p>
           {% endif %}
         </div>
       </div>
