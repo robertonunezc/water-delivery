@@ -1,0 +1,449 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <style>
+    .search-results-info {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .debt-stats-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .debt-stat-item {
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .debt-stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    
+    .debt-stat-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .debt-amount {
+      font-weight: bold;
+    }
+    
+    .debt-high {
+      color: #dc3545;
+    }
+    
+    .debt-medium {
+      color: #fd7e14;
+    }
+    
+    .debt-low {
+      color: #28a745;
+    }
+    
+    .filter-form {
+      background-color: #f8f9fa;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .pagination .page-link {
+      color: #0d6efd;
+    }
+    
+    .pagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+    
+    .last-payment-info {
+      font-size: 0.85rem;
+    }
+    
+    .no-payment {
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .table th {
+      background-color: #f8f9fa;
+      border-top: none;
+    }
+    
+    .credit-info {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1><i class="fas fa-file-invoice-dollar me-2"></i>Reporte de Clientes con Deuda</h1>
+        {% if has_search or has_filters %}
+          <p class="text-muted mb-0">
+            {% if has_search %}
+              Resultados para: <strong>"{{ search_query }}"</strong>
+            {% endif %}
+            {% if has_filters %}
+              {% if has_search %} | {% endif %}
+              Con filtros aplicados
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{% url 'clients:list' %}" class="btn btn-outline-primary">
+          <i class="fas fa-users"></i> Ver Todos los Clientes
+        </a>
+      </div>
+    </div>
+
+    <!-- Debt Statistics Summary -->
+    {% if debt_stats.total_debt %}
+      <div class="debt-stats-card">
+        <div class="row">
+          <div class="col-md-3 debt-stat-item">
+            <div class="debt-stat-value">${{ debt_stats.total_debt|floatformat:2 }}</div>
+            <div class="debt-stat-label">Deuda Total</div>
+          </div>
+          <div class="col-md-3 debt-stat-item">
+            <div class="debt-stat-value">${{ debt_stats.avg_debt|floatformat:2 }}</div>
+            <div class="debt-stat-label">Deuda Promedio</div>
+          </div>
+          <div class="col-md-3 debt-stat-item">
+            <div class="debt-stat-value">${{ debt_stats.min_debt_stat|floatformat:2 }}</div>
+            <div class="debt-stat-label">Deuda Mínima</div>
+          </div>
+          <div class="col-md-3 debt-stat-item">
+            <div class="debt-stat-value">${{ debt_stats.max_debt_stat|floatformat:2 }}</div>
+            <div class="debt-stat-label">Deuda Máxima</div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+      <form method="get" action="{% url 'report:client_debt' %}">
+        <div class="row">
+          <div class="col-md-4">
+            <label for="search" class="form-label">Buscar Cliente:</label>
+            <input type="search" 
+                   class="form-control" 
+                   id="search"
+                   name="search" 
+                   value="{{ search_query }}" 
+                   placeholder="Nombre, contacto, teléfono...">
+          </div>
+          <div class="col-md-3">
+            <label for="min_debt" class="form-label">Deuda Mínima:</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" 
+                     class="form-control" 
+                     id="min_debt"
+                     name="min_debt" 
+                     value="{{ min_debt }}" 
+                     placeholder="0.00"
+                     step="0.01"
+                     min="0">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label for="max_debt" class="form-label">Deuda Máxima:</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" 
+                     class="form-control" 
+                     id="max_debt"
+                     name="max_debt" 
+                     value="{{ max_debt }}" 
+                     placeholder="999999.99"
+                     step="0.01"
+                     min="0">
+            </div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">&nbsp;</label>
+            <div class="d-grid gap-2">
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-filter me-1"></i>Filtrar
+              </button>
+              {% if has_search or has_filters %}
+                <a href="{% url 'report:client_debt' %}" class="btn btn-outline-secondary btn-sm">
+                  <i class="fas fa-times me-1"></i>Limpiar
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Results Info -->
+    {% if total_clients > 0 %}
+      <div class="search-results-info">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <i class="fas fa-info-circle me-2"></i>
+            Se encontraron <strong>{{ total_clients }}</strong> cliente{{ total_clients|pluralize }} con deuda
+            {% if has_search or has_filters %}
+              que coincide{{ total_clients|pluralize:"," }} con los filtros aplicados
+            {% endif %}
+          </div>
+          <div class="col-md-4 text-md-end">
+            <small class="text-muted">
+              {% if clients.has_other_pages %}
+                Página {{ clients.number }} de {{ clients.paginator.num_pages }}
+                ({{ clients.start_index }}-{{ clients.end_index }} de {{ total_clients }})
+              {% endif %}
+            </small>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Clients Debt Table -->
+    {% if clients %}
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Cliente</th>
+                  <th scope="col">Contacto</th>
+                  <th scope="col" class="text-end">Deuda Actual</th>
+                  <th scope="col" class="text-end">Límite Crédito</th>
+                  <th scope="col" class="text-center">Último Pago</th>
+                  <th scope="col" class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for client in clients %}
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div>
+                          <h6 class="mb-0">
+                            <a href="{% url 'clients:detail' client.pk %}" class="text-decoration-none">
+                              {{ client.name }}
+                            </a>
+                          </h6>
+                          {% if client.type == 'branch' %}
+                            <small class="text-muted">
+                              <i class="fas fa-building me-1"></i>Sucursal
+                              {% if client.corporate %}
+                                de {{ client.corporate.name }}
+                              {% endif %}
+                            </small>
+                          {% elif client.type == 'corporate' %}
+                            <small class="text-muted">
+                              <i class="fas fa-industry me-1"></i>Corporativo
+                            </small>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      {% with client.contacts.first as contact %}
+                        {% if contact %}
+                          <div>
+                            <strong>{{ contact.name }}</strong>
+                            {% if contact.phone %}
+                              <br><small class="text-muted">
+                                <i class="fas fa-phone me-1"></i>{{ contact.phone }}
+                              </small>
+                            {% endif %}
+                            {% if contact.email %}
+                              <br><small class="text-muted">
+                                <i class="fas fa-envelope me-1"></i>{{ contact.email }}
+                              </small>
+                            {% endif %}
+                          </div>
+                        {% else %}
+                          <small class="text-muted">Sin contacto</small>
+                        {% endif %}
+                      {% endwith %}
+                    </td>
+                    <td class="text-end">
+                      <span class="debt-amount {% if client.current_debt >= 10000 %}debt-high{% elif client.current_debt >= 5000 %}debt-medium{% else %}debt-low{% endif %}">
+                        ${{ client.current_debt|floatformat:2 }}
+                      </span>
+                    </td>
+                    <td class="text-end">
+                      <span class="fw-bold">${{ client.credit_limit|floatformat:2 }}</span>
+                      {% if client.current_debt > client.credit_limit %}
+                        <br><small class="text-danger">
+                          <i class="fas fa-exclamation-triangle me-1"></i>Excedido
+                        </small>
+                      {% else %}
+                        <br><small class="credit-info">
+                          Disponible: ${{ client.get_available_credit|floatformat:2 }}
+                        </small>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      {% if client.last_payment_date %}
+                        <div class="last-payment-info">
+                          <strong>${{ client.last_payment_amount|floatformat:2 }}</strong>
+                          <br><small class="text-muted">{{ client.last_payment_date|date:"d/m/Y" }}</small>
+                          <br><small class="text-muted">{{ client.last_payment_date|timesince }} atrás</small>
+                        </div>
+                      {% else %}
+                        <span class="no-payment">
+                          <i class="fas fa-minus-circle me-1"></i>Sin pagos
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      <div class="btn-group" role="group">
+                        <a href="{% url 'clients:detail' client.pk %}" 
+                           class="btn btn-sm btn-outline-primary" 
+                           title="Ver detalles">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        <!-- Add more action buttons here if needed -->
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      {% if clients.has_other_pages %}
+        <div class="row mt-4">
+          <div class="col-12">
+            <nav aria-label="Navegación de páginas del reporte">
+              <ul class="pagination justify-content-center">
+                {% if clients.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page=1" aria-label="Primera página">
+                      <i class="fas fa-angle-double-left"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page={{ clients.previous_page_number }}" aria-label="Página anterior">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                  </li>
+                {% endif %}
+
+                <!-- Page numbers -->
+                {% for page_num in clients.paginator.page_range %}
+                  {% if page_num == clients.number %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                  {% elif page_num > clients.number|add:'-3' and page_num < clients.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == 1 or page_num == clients.paginator.num_pages %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == clients.number|add:'-4' or page_num == clients.number|add:'4' %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% if clients.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page={{ clients.next_page_number }}" aria-label="Página siguiente">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if min_debt %}min_debt={{ min_debt }}&{% endif %}{% if max_debt %}max_debt={{ max_debt }}&{% endif %}page={{ clients.paginator.num_pages }}" aria-label="Última página">
+                      <i class="fas fa-angle-double-right"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <!-- Empty State -->
+      <div class="text-center py-5">
+        {% if has_search or has_filters %}
+          <i class="fas fa-search fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No se encontraron resultados</h4>
+          <p class="text-muted">
+            No hay clientes con deuda que coincidan con los filtros aplicados
+          </p>
+          <div class="mt-3">
+            <a href="{% url 'report:client_debt' %}" class="btn btn-outline-primary me-2">
+              <i class="fas fa-arrow-left me-2"></i>Ver todos los clientes con deuda
+            </a>
+          </div>
+        {% else %}
+          <i class="fas fa-smile fa-4x text-success mb-3"></i>
+          <h4 class="text-success">¡Excelente!</h4>
+          <p class="text-muted">No hay clientes con deuda en este momento</p>
+          <a href="{% url 'clients:list' %}" class="btn btn-primary">
+            <i class="fas fa-users me-2"></i>Ver Todos los Clientes
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Auto-format currency inputs
+  document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener('blur', function() {
+      if (this.value && !isNaN(this.value)) {
+        this.value = parseFloat(this.value).toFixed(2);
+      }
+    });
+  });
+  
+  // Clear individual filters
+  function clearMinDebt() {
+    document.getElementById('min_debt').value = '';
+  }
+  
+  function clearMaxDebt() {
+    document.getElementById('max_debt').value = '';
+  }
+</script>
+{% endblock %}
