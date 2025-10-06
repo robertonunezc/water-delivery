@@ -246,6 +246,30 @@ class ClientAdmin(admin.ModelAdmin):
 							f"Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
 						)
 					
+					elif transaction_type == 'payment_from_balance':
+						# Pay debt using client's balance
+						result = client.pay_debt_from_balance(
+							amount=amount,
+							user=request.user,
+							notes=f"[MANUAL] {description}. Pago con saldo realizado por {request.user.username}. {notes}"
+						)
+						if result['success']:
+							messages.success(
+								request,
+								f"Pago con saldo exitoso. ${result['amount_paid']:.2f} descontados del saldo. "
+								f"Saldo restante: ${result['remaining_balance']:.2f}. "
+								f"Deuda restante: ${result['remaining_debt']:.2f}."
+							)
+						else:
+							messages.error(request, f"Error en pago con saldo: {result['error']}")
+							return render(request, 'admin/clients/add_credit.html', {
+								'form': form,
+								'title': 'Gestionar Crédito Manualmente',
+								'opts': self.model._meta,
+								'has_view_permission': True,
+								'client': client,
+							})
+					
 					elif transaction_type == 'adjustment':
 						# Manual debt adjustment (could increase or decrease)
 						# For simplicity, we'll treat as debt reduction

@@ -81,6 +81,7 @@ class ManualCreditTransactionForm(forms.Form):
     CREDIT_TRANSACTION_TYPES = [
         ('adjustment', 'Ajuste manual de deuda'),
         ('payment', 'Pago de deuda'),
+        ('payment_from_balance', 'Pago con Saldo'),
         ('forgiveness', 'Condonación de deuda'),
         ('correction', 'Corrección'),
         ('limit_change', 'Cambio de límite de crédito'),
@@ -173,10 +174,17 @@ class ManualCreditTransactionForm(forms.Form):
                 })
         
         # Validate debt payment doesn't exceed current debt
-        if transaction_type in ['payment', 'forgiveness'] and client and amount:
+        if transaction_type in ['payment', 'forgiveness', 'payment_from_balance'] and client and amount:
             if amount > client.current_debt:
                 raise ValidationError({
                     'amount': f'El monto (${amount:.2f}) no puede ser mayor que la deuda actual (${client.current_debt:.2f}).'
+                })
+        
+        # Validate balance availability for payment_from_balance
+        if transaction_type == 'payment_from_balance' and client and amount:
+            if amount > client.balance:
+                raise ValidationError({
+                    'amount': f'Saldo insuficiente. Disponible: ${client.balance:.2f}, Requerido: ${amount:.2f}'
                 })
         
         return cleaned_data

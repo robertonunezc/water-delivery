@@ -319,6 +319,95 @@ class Client(TimeStampedModel):
             created_by=user
         )
     
+    def pay_debt_from_balance(self, amount, user=None, reference_order=None, reference_payment=None, notes=None):
+        """
+        Pay client's debt using their available balance
+        
+        Args:
+            amount: Amount to pay towards debt using balance
+            user: User performing the transaction
+            reference_order: Related order (if applicable)
+            reference_payment: Related payment (if applicable)
+            notes: Additional notes
+            
+        Returns:
+            dict: Result with success status and details
+        """
+        if amount <= 0:
+            return {'success': False, 'error': 'Amount must be positive'}
+        
+        # Check if client has sufficient balance
+        if self.balance < amount:
+            return {
+                'success': False,
+                'error': f'Saldo insuficiente. Disponible: ${self.balance:.2f}, Requerido: ${amount:.2f}'
+            }
+        
+        # Check if there's enough debt to pay
+        if self.current_debt < amount:
+            return {
+                'success': False,
+                'error': f'Monto excede la deuda actual. Deuda: ${self.current_debt:.2f}, Intentando pagar: ${amount:.2f}'
+            }
+        
+        # Calculate actual payment amount (limited by debt)
+        payment_amount = min(amount, self.current_debt)
+        
+        try:
+            # Store previous values for both balance and debt
+            balance_before = self.balance
+            debt_before = self.current_debt
+            
+            # Update both balance and debt
+            self.balance -= payment_amount
+            self.current_debt -= payment_amount
+            
+            # Save client
+            self.save()
+            
+            # Create balance transaction (deduction)
+            balance_notes = notes or f"Pago de deuda con saldo - ${payment_amount:.2f}"
+            BalanceTransaction.objects.create(
+                client=self,
+                transaction_type='payment',
+                amount=payment_amount,
+                balance_before=balance_before,
+                balance_after=self.balance,
+                notes=f"[PAGO DEUDA] {balance_notes}",
+                reference_order=reference_order,
+                reference_payment=reference_payment,
+                created_by=user
+            )
+            
+            # Create credit transaction (debt reduction)
+            credit_notes = notes or f"Pago con saldo - ${payment_amount:.2f}"
+            CreditTransaction.objects.create(
+                client=self,
+                transaction_type='payment_from_balance',
+                amount=payment_amount,
+                debt_before=debt_before,
+                debt_after=self.current_debt,
+                credit_limit_before=self.credit_limit,
+                credit_limit_after=self.credit_limit,
+                notes=f"[PAGO CON SALDO] {credit_notes}",
+                reference_order=reference_order,
+                reference_payment=reference_payment,
+                created_by=user
+            )
+            
+            return {
+                'success': True,
+                'amount_paid': payment_amount,
+                'remaining_balance': self.balance,
+                'remaining_debt': self.current_debt,
+                'available_credit': self.get_available_credit()
+            }
+            
+        except Exception as e:
+            # Rollback client changes
+            self.refresh_from_db()
+            return {'success': False, 'error': f'Error processing payment: {str(e)}'}
+    
     def get_available_credit(self):
         """Get remaining credit available"""
         return self.credit_limit - self.current_debt
@@ -864,6 +953,7 @@ class CreditTransaction(TimeStampedModel):
     TRANSACTION_TYPES = [
         ('purchase', 'Compra a crédito'),     # Adding debt
         ('payment', 'Pago de deuda'),         # Reducing debt
+        ('payment_from_balance', 'Pago con Saldo'),  # Payment using client's balance
         ('adjustment', 'Ajuste manual'),      # Manual debt adjustment
         ('limit_change', 'Cambio de límite'), # Credit limit modification
         ('interest', 'Interés aplicado'),     # Interest charges
@@ -917,13 +1007,20 @@ class CreditTransaction(TimeStampedModel):
             if self.debt_after != self.debt_before + self.amount:
                 raise ValidationError('Error en cálculo de deuda: adición incorrecta.')
         else:
-            # Reductions from debt
+            # Reductions from debt (including payment_from_balance)
             if self.debt_after != self.debt_before - self.amount:
                 raise ValidationError('Error en cálculo de deuda: reducción incorrecta.')
         
         # Validate debt doesn't go negative
         if self.debt_after < 0:
             raise ValidationError({'amount': 'La deuda no puede ser negativa.'})
+        
+        # Validate balance availability for payment_from_balance transactions
+        if self.transaction_type == 'payment_from_balance':
+            if self.client and self.client.balance < self.amount:
+                raise ValidationError({
+                    'amount': f'Saldo insuficiente. Disponible: ${self.client.balance:.2f}, Requerido: ${self.amount:.2f}'
+                })
         
         # Validate credit limit constraints for purchases
         if self.transaction_type == 'purchase' and self.credit_limit_after is not None:
