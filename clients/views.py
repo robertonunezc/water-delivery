@@ -101,12 +101,12 @@ def list(request):
 @login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
-    
+    first_day_of_month = date.today().replace(day=1)
     # Get client's orders with related data
     orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-created_at')
     
     # Get client's payments with related data
-    payments = client.payments.all().select_related('order').order_by('-date')
+    payments = client.payments.filter(date__gte=first_day_of_month).select_related('order').order_by('-date')
     
     # Get credit and balance transactions
     balance_transactions = client.balance_transactions.all().select_related('reference_order', 'reference_payment', 'created_by').order_by('-created_at')
@@ -227,6 +227,7 @@ def detail(request, pk):
     
     context = {
         'client': client,
+        'date_since': first_day_of_month,
         'orders': orders[:10],  # Limit to recent 10 orders for performance
         'payments': payments[:10],  # Limit to recent 10 payments for backward compatibility
         'all_payment_data': all_payment_data[:10],  # Combined payment data - limit to recent 10

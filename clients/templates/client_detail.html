@@ -56,24 +56,8 @@
           <i class="fas fa-shopping-cart fa-2x text-primary mb-2"></i>
           <h5 class="card-title">{{ stats.total_orders }}</h5>
           <p class="card-text text-muted">Total Pedidos</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card stat-card h-100 border-success">
-        <div class="card-body text-center">
-          <i class="fas fa-check-circle fa-2x text-success mb-2"></i>
-          <h5 class="card-title">{{ stats.completed_orders }}</h5>
-          <p class="card-text text-muted">Completados</p>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card stat-card h-100 border-warning">
-        <div class="card-body text-center">
-          <i class="fas fa-clock fa-2x text-warning mb-2"></i>
-          <h5 class="card-title">{{ stats.pending_orders }}</h5>
-          <p class="card-text text-muted">Pendientes</p>
+                        <small class="text-muted">
+Desde {{date_since}}</small>
         </div>
       </div>
     </div>
@@ -83,14 +67,12 @@
           <i class="fas fa-dollar-sign fa-2x text-info mb-2"></i>
           <h5 class="card-title">${{ stats.total_spent|floatformat:2 }}</h5>
           <p class="card-text text-muted">Total Gastado</p>
+            <small class="text-muted">
+Desde {{date_since}}</small>
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Balance and Credit Section -->
-  <div class="row mb-4">
-    <div class="col-md-6">
+    <div class="col-md-3">
       <div class="card stat-card h-100 {% if client.balance > 0 %}border-success{% elif client.balance == 0 %}border-secondary{% else %}border-danger{% endif %}">
         <div class="card-body text-center">
           <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %} mb-2"></i>
@@ -108,7 +90,7 @@
         </div>
       </div>
     </div>
-    <div class="col-md-6">
+      <div class="col-md-3">
       <div class="card stat-card h-100 {% if client.current_debt > 0 %}border-danger{% else %}border-success{% endif %}">
         <div class="card-body text-center">
           <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %} mb-2"></i>
@@ -125,7 +107,6 @@
       </div>
     </div>
   </div>
-
   <!-- Credit Information -->
   {% if client.credit_limit > 0 %}
   <div class="row mb-4">
@@ -566,7 +547,8 @@
                     <th>Estado</th>
                     <th>Total</th>
                     <th>Productos</th>
-                    <th>Acciones</th>
+                    <th>Pago</th>
+                    {% comment %} <th>Acciones</th> {% endcomment %}
                   </tr>
                 </thead>
                 <tbody>
@@ -588,12 +570,35 @@
                         </small>
                       </td>
                       <td>
+                        {% for payment in order.payments.all %}
+                             #{{ payment.id }}-  
+                          {% if payment.method == 'credit_card' %}
+  <span class="badge bg-primary">Tarjeta de Crédito</span>
+{% elif payment.method == 'debit_card' %}
+  <span class="badge bg-primary">Tarjeta de Débito</span>
+{% elif payment.method == 'cash' %}
+  <span class="badge bg-success">Efectivo</span>
+{% elif payment.method == 'balance' %}
+  <span class="badge bg-info">Saldo</span>
+{% elif payment.method == 'paypal' %}
+  <span class="badge bg-warning">PayPal</span>
+{% elif payment.method == 'credit' %}
+  <span class="badge bg-danger">Crédito</span>
+{% elif payment.method == 'bank_transfer' %}
+  <span class="badge bg-secondary">Transferencia Bancaria</span>
+{% else %}
+  <span class="badge bg-light text-dark">{{ payment.get_method_display }}</span>
+{% endif %}
+                          <br>
+                        {% endfor %}
+                      </td>
+                      {% comment %} <td>
                         {% if order.status == 'pending' %}
                           <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-edit"></i>
                           </a>
                         {% endif %}
-                      </td>
+                      </td> {% endcomment %}
                     </tr>
                   {% endfor %}
                 </tbody>
