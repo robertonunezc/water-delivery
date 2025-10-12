@@ -59,7 +59,7 @@ class Client(TimeStampedModel):
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
-    requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere nota para crédito", help_text="Si está habilitado, se requerirá una nota obligatoria al realizar pagos con crédito")
+    requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
