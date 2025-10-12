@@ -91,7 +91,7 @@
     <!-- Header Section -->
     <div class="row mb-4">
       <div class="col-md-8">
-        <h1><i class="fas fa-shopping-cart me-2"></i>Gestión de Pedidos</h1>
+        <h1><i class="fas fa-shopping-cart me-2"></i>Gestión de Ventas</h1>
         {% if has_filters %}
           <p class="text-muted mb-0">
             Mostrando resultados filtrados
@@ -111,7 +111,7 @@
         <div class="row text-center">
           <div class="col-md-3">
             <h4>{{ total_orders }}</h4>
-            <p class="mb-0">Total Pedidos</p>
+            <p class="mb-0">Total ventas</p>
           </div>
           <div class="col-md-3">
             <h4>{{ page_stats.count }}</h4>
@@ -224,7 +224,7 @@
                     <div class="d-flex align-items-center mb-2">
                       <span class="order-id me-2">#{{ order.id }}</span>
                       <span class="badge status-badge {{ order.status }} badge-sm">
-                        {{ order.get_status_display }}
+                        {{ order.get_status_display_fixed }}
                       </span>
                     </div>
                     <h6 class="mb-1">
@@ -321,7 +321,7 @@
       {% if orders.has_other_pages %}
         <div class="row mt-4">
           <div class="col-12">
-            <nav aria-label="Navegación de páginas de pedidos">
+            <nav aria-label="Navegación de páginas de ventas">
               <ul class="pagination justify-content-center">
                 {% if orders.has_previous %}
                   <li class="page-item">
@@ -389,7 +389,7 @@
             <!-- Pagination Info -->
             <div class="text-center text-muted mt-2">
               <small>
-                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }} pedidos
+                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }} ventas
               </small>
             </div>
           </div>
@@ -401,9 +401,9 @@
       <div class="text-center py-5">
         {% if has_filters %}
           <i class="fas fa-search fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No se encontraron pedidos</h4>
+          <h4 class="text-muted">No se encontraron ventas</h4>
           <p class="text-muted">
-            No hay pedidos que coincidan con los filtros aplicados.
+            No hay ventas que coincidan con los filtros aplicados.
           </p>
           <div class="mt-3">
             <a href="{% url 'orders:list' %}" class="btn btn-outline-primary me-2">
@@ -415,7 +415,7 @@
           </div>
         {% else %}
           <i class="fas fa-shopping-cart fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No hay pedidos registrados</h4>
+          <h4 class="text-muted">No hay ventas registrados</h4>
           <p class="text-muted">Comienza creando tu primer pedido seleccionando un cliente</p>
           <a href="{% url 'clients:list' %}" class="btn btn-primary">
             <i class="fas fa-plus"></i> Crear Primer Pedido

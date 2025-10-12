@@ -77,7 +77,7 @@
                                                 Order #{{ route_order.order.id }}<br>
                                                 <small class="text-muted">${{ route_order.order.total_amount }}</small>
                                             </td>
-                                            <td>{{ route_order.order.get_status_display }}</td>
+                                            <td>{{ route_order.order.get_status_display_fixed }}</td>
                                             <td>
                                                 {% if route_order.is_completed %}
                                                     <span class="badge badge-success">Yes</span>

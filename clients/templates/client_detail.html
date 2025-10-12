@@ -55,7 +55,7 @@
         <div class="card-body text-center">
           <i class="fas fa-shopping-cart fa-2x text-primary mb-2"></i>
           <h5 class="card-title">{{ stats.total_orders }}</h5>
-          <p class="card-text text-muted">Total Pedidos</p>
+          <p class="card-text text-muted">Total Ventas</p>
                         <small class="text-muted">
 Desde {{date_since}}</small>
         </div>
@@ -79,7 +79,7 @@ Desde {{date_since}}</small>
           <h5 class="card-title {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
             ${{ client.balance|floatformat:2 }}
           </h5>
-          <p class="card-text text-muted">Saldo a Favor</p>
+          <p class="card-text text-muted">Saldo del Prepago</p>
           {% if client.balance > 0 %}
             <small class="text-success"><i class="fas fa-check-circle"></i> Saldo disponible</small>
           {% elif client.balance == 0 %}
@@ -533,7 +533,7 @@ Desde {{date_since}}</small>
       <!-- Recent Orders -->
       <div class="card mb-4">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Pedidos Recientes</h5>
+          <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Ventas Recientes</h5>
           <small class="text-muted">Mostrando los últimos 10</small>
         </div>
         <div class="card-body">
@@ -558,7 +558,7 @@ Desde {{date_since}}</small>
                       <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                       <td>
                         <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% else %}secondary{% endif %}">
-                          {{ order.get_status_display }}
+                          {{ order.get_status_display_fixed }}
                         </span>
                       </td>
                       <td>${{ order.total_amount|floatformat:2 }}</td>
@@ -605,7 +605,7 @@ Desde {{date_since}}</small>
               </table>
             </div>
           {% else %}
-            <p class="text-muted">No hay pedidos registrados para este cliente.</p>
+            <p class="text-muted">No hay ventas registrados para este cliente.</p>
             <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-primary">
               <i class="fas fa-plus"></i> Crear Primer Pedido
             </a>
