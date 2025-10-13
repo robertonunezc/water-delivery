@@ -40,35 +40,27 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 		'notes'
 	)
 	exclude = ('deleted_at',)
+
+
+class ClientCreditConfigInline(admin.StackedInline):
+	model = models.ClientCreditConfig
+	extra = 0
+	verbose_name = "Configuración de Crédito"
+	verbose_name_plural = "Configuraciones de Crédito"
+	fields = (
+		'max_payment_days',
+		('first_notification_days', 'second_notification_days'),
+		'overdue_notification_days'
+	)
 	
-	def get_fieldsets(self, request, obj=None):
-		fieldsets = (
-			('Configuración Básica', {
-				'fields': (('frequency', 'is_active'), 'billing_date')
-			}),
-			('Fecha Específica', {
-				'fields': ('specific_day',),
-				'classes': ('collapse',),
-				'description': 'Usar solo cuando el tipo de fecha sea "Fecha específica del mes"'
-			}),
-			('Día de la Semana', {
-				'fields': (('weekday', 'occurrence'),),
-				'classes': ('collapse',),
-				'description': 'Usar solo cuando el tipo de fecha sea "Día específico de la semana"'
-			}),
-			('Notas', {
-				'fields': ('notes',),
-				'classes': ('collapse',)
-			})
-		)
-		return fieldsets
+	
 
 @admin.register(models.Client)
 class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type', 'balance', 'current_debt', 'get_available_credit', 'created_at', 'updated_at')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type')
-	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline]
+	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action']

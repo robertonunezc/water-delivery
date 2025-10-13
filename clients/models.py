@@ -1254,6 +1254,12 @@ class BillingData(TimeStampedModel):
     def __str__(self):
         return f"Billing data for {self.client.name}"
     
+class ClientCreditConfig(TimeStampedModel):
+    client = models.OneToOneField(Client, related_name='credit_config', on_delete=models.CASCADE)
+    max_payment_days = models.PositiveIntegerField(default=30, verbose_name="Días máximos para pagar")
+    first_notification_days = models.PositiveIntegerField(default=5, verbose_name="Días antes del vencimiento para la primera notificación")
+    second_notification_days = models.PositiveIntegerField(default=2, verbose_name="Días antes del vencimiento para la segunda notificación")
+    overdue_notification_days = models.PositiveIntegerField(default=1, verbose_name="Días después del vencimiento para notificación de morosidad")
 def get_first_last_day(year, month):
     # First day of the month
     first_day = date(year, month, 1)
