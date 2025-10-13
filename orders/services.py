@@ -17,11 +17,11 @@ class OrderData:
     items: List = None
 
 
-def create_order(client):
+def create_order(client, owner=None) -> Order:
     #TODO: decouple this logic from QuerySet and use dataclasses or similar
     if get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).exists():
         return get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).first()
-    order = Order.objects.create(client=client, total_amount=Decimal('0.00'))
+    order = Order.objects.create(client=client, total_amount=Decimal('0.00'), owner=owner)
     return order
 
 

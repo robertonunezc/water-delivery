@@ -78,12 +78,13 @@ class OrderProductInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
-        'order_id_display', 'client_link', 'status_display', 'order_date_formatted',
+        'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted',
         'total_amount_display', 'items_count', 'payment_status', 'created_display'
     )
     
     list_filter = (
         'status',
+        'owner',
         'order_date',
         'created_at',
         OrderAmountFilter,
@@ -97,6 +98,7 @@ class OrderAdmin(admin.ModelAdmin):
         'id',
         'client__name',
         'notes',
+        'owner__name',
         'items__product__name',
         'client__contacts__phone',
         'client__contacts__email',

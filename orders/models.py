@@ -22,7 +22,7 @@ class Order(TimeStampedModel):
     cantidad_cobrada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Cantidad Cobrada", help_text="Cantidad realmente cobrada al cliente (puede ser mayor al total para agregar saldo)")
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default='PENDING', db_index=True)
     notes = models.TextField(blank=True, null=True)
-    
+    owner = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
     class Meta:
         ordering = ['-order_date']
         verbose_name = 'Orden'

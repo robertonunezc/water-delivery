@@ -1,0 +1,685 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <style>
+    .search-results-info {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .order-stats-card {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: white;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .order-stat-item {
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .order-stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    
+    .order-stat-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .amount-high {
+      color: #198754;
+      font-weight: bold;
+    }
+    
+    .amount-medium {
+      color: #fd7e14;
+      font-weight: bold;
+    }
+    
+    .amount-low {
+      color: #6c757d;
+      font-weight: bold;
+    }
+    
+    .filter-form {
+      background-color: #f8f9fa;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .pagination .page-link {
+      color: #0d6efd;
+    }
+    
+    .pagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+    
+    .order-details {
+      font-size: 0.85rem;
+    }
+    
+    .status-badge {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+    }
+    
+    .status-pending {
+      background-color: #ffc107;
+      color: #000;
+    }
+    
+    .status-completed {
+      background-color: #198754;
+      color: #fff;
+    }
+    
+    .status-cancelled {
+      background-color: #dc3545;
+      color: #fff;
+    }
+    
+    .table th {
+      background-color: #f8f9fa;
+      border-top: none;
+    }
+    
+    .client-info {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+    
+    .date-info {
+      font-size: 0.85rem;
+    }
+    
+    .employee-info {
+      font-size: 0.85rem;
+      color: #6c757d;
+    }
+    
+    .order-items-summary {
+      font-size: 0.8rem;
+      color: #6c757d;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    
+    .status-distribution {
+      background-color: #e9ecef;
+      border-radius: 0.375rem;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .status-item {
+      display: inline-block;
+      margin-right: 1rem;
+      font-size: 0.85rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1><i class="fas fa-shopping-cart me-2"></i>Reporte de Órdenes</h1>
+        {% if has_search or has_filters %}
+          <p class="text-muted mb-0">
+            {% if has_search %}
+              Resultados para: <strong>"{{ search_query }}"</strong>
+            {% endif %}
+            {% if has_filters %}
+              {% if has_search %} | {% endif %}
+              Con filtros aplicados
+            {% endif %}
+          </p>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{% url 'clients:list' %}" class="btn btn-outline-primary me-2">
+          <i class="fas fa-users"></i> Ver Clientes
+        </a>
+        <div class="btn-group" role="group">
+          <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
+            <i class="fas fa-download"></i> Exportar
+          </button>
+          <ul class="dropdown-menu">
+            <li><a class="dropdown-item" href="#"><i class="fas fa-file-excel me-2"></i>Excel</a></li>
+            <li><a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i>PDF</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Statistics Summary -->
+    {% if order_stats.total_orders %}
+      <div class="order-stats-card">
+        <div class="row">
+          <div class="col-md-3 order-stat-item">
+            <div class="order-stat-value">{{ order_stats.total_orders }}</div>
+            <div class="order-stat-label">Total Órdenes</div>
+          </div>
+          <div class="col-md-3 order-stat-item">
+            <div class="order-stat-value">${{ order_stats.total_amount_sum|floatformat:2 }}</div>
+            <div class="order-stat-label">Monto Total</div>
+          </div>
+          <div class="col-md-3 order-stat-item">
+            <div class="order-stat-value">${{ order_stats.avg_amount|floatformat:2 }}</div>
+            <div class="order-stat-label">Promedio por Orden</div>
+          </div>
+          <div class="col-md-3 order-stat-item">
+            <div class="order-stat-value">${{ order_stats.max_amount_stat|floatformat:2 }}</div>
+            <div class="order-stat-label">Orden Más Alta</div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Status Distribution -->
+    {% if status_distribution %}
+      <div class="status-distribution">
+        <strong>Distribución por Estado:</strong>
+        {% for status_item in status_distribution %}
+          <span class="status-item">
+            <span class="badge status-{{ status_item.status|lower }}">
+              {% for choice_value, choice_display in order_status_choices %}
+                {% if choice_value == status_item.status %}{{ choice_display }}{% endif %}
+              {% endfor %}
+            </span>
+            {{ status_item.count }}
+          </span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+      <form method="get" action="{% url 'report:orders_report' %}">
+        <div class="row mb-3">
+          <div class="col-md-4">
+            <label for="search" class="form-label">Buscar:</label>
+            <input type="search" 
+                   class="form-control" 
+                   id="search"
+                   name="search" 
+                   value="{{ search_query }}" 
+                   placeholder="Cliente, ID de orden, notas...">
+          </div>
+          <div class="col-md-2">
+            <label for="status" class="form-label">Estado:</label>
+            <select class="form-select" id="status" name="status">
+              <option value="all" {% if status_filter == 'all' or not status_filter %}selected{% endif %}>Todos</option>
+              {% for choice_value, choice_display in order_status_choices %}
+                <option value="{{ choice_value }}" {% if status_filter == choice_value %}selected{% endif %}>
+                  {{ choice_display }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <label for="date_filter" class="form-label">Período:</label>
+            <select class="form-select" id="date_filter" name="date_filter">
+              <option value="" {% if not date_filter %}selected{% endif %}>Todas las fechas</option>
+              <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Hoy</option>
+              <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Esta semana</option>
+              <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Este mes</option>
+              <option value="custom" {% if date_filter == 'custom' %}selected{% endif %}>Rango personalizado</option>
+            </select>
+          </div>
+                          {% if user.is_superuser%}
+
+          <div class="col-md-2">
+            <label for="employee" class="form-label">Empleado:</label>
+            <select class="form-select" id="employee" name="employee">
+              <option value="all" {% if employee_filter == 'all' or not employee_filter %}selected{% endif %}>Todos</option>
+              {% for employee in employees %}
+                <option value="{{ employee.id }}" {% if employee_filter == employee.id|stringformat:"s" %}selected{% endif %}>
+                  {{ employee.get_full_name|default:employee.username }}
+                </option>
+              {% endfor %}
+            </select>
+          </div>
+                            {% endif %}
+          <div class="col-md-2">
+            <label for="sort_by" class="form-label">Ordenar por:</label>
+            <select class="form-select" id="sort_by" name="sort_by">
+              <option value="-order_date" {% if sort_by == '-order_date' %}selected{% endif %}>Fecha (más reciente)</option>
+              <option value="order_date" {% if sort_by == 'order_date' %}selected{% endif %}>Fecha (más antigua)</option>
+              <option value="-total_amount" {% if sort_by == '-total_amount' %}selected{% endif %}>Monto (mayor)</option>
+              <option value="total_amount" {% if sort_by == 'total_amount' %}selected{% endif %}>Monto (menor)</option>
+              <option value="client__name" {% if sort_by == 'client__name' %}selected{% endif %}>Cliente (A-Z)</option>
+              <option value="-client__name" {% if sort_by == '-client__name' %}selected{% endif %}>Cliente (Z-A)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Custom Date Range (shown when custom is selected) -->
+        <div class="row mb-3" id="custom-date-range" style="{% if date_filter != 'custom' %}display: none;{% endif %}">
+          <div class="col-md-3">
+            <label for="start_date" class="form-label">Fecha inicio:</label>
+            <input type="date" 
+                   class="form-control" 
+                   id="start_date"
+                   name="start_date" 
+                   value="{{ start_date }}"
+                   max="{{ today_date }}">
+          </div>
+          <div class="col-md-3">
+            <label for="end_date" class="form-label">Fecha fin:</label>
+            <input type="date" 
+                   class="form-control" 
+                   id="end_date"
+                   name="end_date" 
+                   value="{{ end_date }}"
+                   max="{{ today_date }}">
+          </div>
+        </div>
+
+        <!-- Amount Range Filters -->
+        <div class="row mb-3">
+          <div class="col-md-3">
+            <label for="min_amount" class="form-label">Monto Mínimo:</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" 
+                     class="form-control" 
+                     id="min_amount"
+                     name="min_amount" 
+                     value="{{ min_amount }}" 
+                     placeholder="0.00"
+                     step="0.01"
+                     min="0">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label for="max_amount" class="form-label">Monto Máximo:</label>
+            <div class="input-group">
+              <span class="input-group-text">$</span>
+              <input type="number" 
+                     class="form-control" 
+                     id="max_amount"
+                     name="max_amount" 
+                     value="{{ max_amount }}" 
+                     placeholder="999999.99"
+                     step="0.01"
+                     min="0">
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">&nbsp;</label>
+            <div class="d-grid gap-2 d-md-flex">
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-filter me-1"></i>Filtrar
+              </button>
+              {% if has_search or has_filters %}
+                <a href="{% url 'report:orders_report' %}" class="btn btn-outline-secondary">
+                  <i class="fas fa-times me-1"></i>Limpiar Filtros
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Results Info -->
+    {% if total_orders > 0 %}
+      <div class="search-results-info">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <i class="fas fa-info-circle me-2"></i>
+            Se encontraron <strong>{{ total_orders }}</strong> orden{{ total_orders|pluralize:"es" }}
+            {% if has_search or has_filters %}
+              que coincide{{ total_orders|pluralize:"," }} con los filtros aplicados
+            {% endif %}
+          </div>
+          <div class="col-md-4 text-md-end">
+            <small class="text-muted">
+              {% if orders.has_other_pages %}
+                Página {{ orders.number }} de {{ orders.paginator.num_pages }}
+                ({{ orders.start_index }}-{{ orders.end_index }} de {{ total_orders }})
+              {% endif %}
+            </small>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Orders Table -->
+    {% if orders %}
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">ID / Cliente</th>
+                  <th scope="col">Fecha</th>
+                  <th scope="col" class="text-end">Monto</th>
+                  <th scope="col" class="text-center">Estado</th>
+                  <th scope="col">Empleado</th>
+                  <th scope="col">Productos</th>
+                  <th scope="col" class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for order in orders %}
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div>
+                          <h6 class="mb-0">
+                            <strong>#{{ order.id }}</strong>
+                          </h6>
+                          <div class="client-info">
+                            <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none">
+                              {{ order.client.name }}
+                            </a>
+                            {% with order.client.contacts.first as contact %}
+                              {% if contact %}
+                                <br><small>{{ contact.name }}</small>
+                                {% if contact.phone %}
+                                  <br><small><i class="fas fa-phone me-1"></i>{{ contact.phone }}</small>
+                                {% endif %}
+                              {% endif %}
+                            {% endwith %}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div class="date-info">
+                        <strong>{{ order.order_date|date:"d/m/Y" }}</strong>
+                        <br><small class="text-muted">{{ order.order_date|date:"H:i" }}</small>
+                        <br><small class="text-muted">{{ order.order_date|timesince }} atrás</small>
+                      </div>
+                    </td>
+                    <td class="text-end">
+                      <span class="{% if order.total_amount >= 1000 %}amount-high{% elif order.total_amount >= 500 %}amount-medium{% else %}amount-low{% endif %}">
+                        ${{ order.total_amount|floatformat:2 }}
+                      </span>
+                      {% if order.cantidad_cobrada and order.cantidad_cobrada != order.total_amount %}
+                        <br><small class="text-muted">
+                          Cobrado: ${{ order.cantidad_cobrada|floatformat:2 }}
+                        </small>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      <span class="badge status-{{ order.status|lower }} status-badge">
+                        {{ order.get_status_display_fixed }}
+                      </span>
+                    </td>
+                    <td>
+                      {% if order.owner %}
+                        <div class="employee-info">
+                          <strong>{{ order.owner.get_full_name|default:order.owner.username }}</strong>
+                          <br><small class="text-muted">{{ order.owner.username }}</small>
+                        </div>
+                      {% else %}
+                        <small class="text-muted">Sin asignar</small>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="order-items-summary">
+                        {% if order.items.all %}
+                          {% for item in order.items.all|slice:":2" %}
+                            {{ item.quantity }}x {{ item.product.name }}{% if not forloop.last %}, {% endif %}
+                          {% endfor %}
+                          {% if order.items.count > 2 %}
+                            <br><small class="text-muted">y {{ order.items.count|add:"-2" }} más...</small>
+                          {% endif %}
+                        {% else %}
+                          <small class="text-muted">Sin productos</small>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <div class="btn-group" role="group">
+                        <a href="#" 
+                           class="btn btn-sm btn-outline-primary" 
+                           title="Ver detalles"
+                           data-bs-toggle="modal"
+                           data-bs-target="#orderModal{{ order.id }}">
+                          <i class="fas fa-eye"></i>
+                        </a>
+                        {% if order.status == 'PENDING' %}
+                          <a href="#" 
+                             class="btn btn-sm btn-outline-success" 
+                             title="Marcar como completado">
+                            <i class="fas fa-check"></i>
+                          </a>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      {% if orders.has_other_pages %}
+        <div class="row mt-4">
+          <div class="col-12">
+            <nav aria-label="Navegación de páginas del reporte">
+              <ul class="pagination justify-content-center">
+                {% if orders.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
+                      <i class="fas fa-angle-double-left"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                  </li>
+                {% endif %}
+
+                <!-- Page numbers -->
+                {% for page_num in orders.paginator.page_range %}
+                  {% if page_num == orders.number %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                  {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
+                    <li class="page-item disabled">
+                      <span class="page-link">...</span>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% if orders.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
+                      <i class="fas fa-angle-double-right"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                  </li>
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <!-- Empty State -->
+      <div class="text-center py-5">
+        {% if has_search or has_filters %}
+          <i class="fas fa-search fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No se encontraron resultados</h4>
+          <p class="text-muted">
+            No hay órdenes que coincidan con los filtros aplicados
+          </p>
+          <div class="mt-3">
+            <a href="{% url 'report:orders_report' %}" class="btn btn-outline-primary me-2">
+              <i class="fas fa-arrow-left me-2"></i>Ver todas las órdenes
+            </a>
+          </div>
+        {% else %}
+          <i class="fas fa-inbox fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No hay órdenes</h4>
+          <p class="text-muted">No se han registrado órdenes en el sistema</p>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Order Detail Modals -->
+  {% for order in orders %}
+    <div class="modal fade" id="orderModal{{ order.id }}" tabindex="-1" aria-labelledby="orderModalLabel{{ order.id }}" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="orderModalLabel{{ order.id }}">
+              <i class="fas fa-shopping-cart me-2"></i>Orden #{{ order.id }}
+            </h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h6><i class="fas fa-user me-2"></i>Cliente</h6>
+                <p>{{ order.client.name }}</p>
+                
+                <h6><i class="fas fa-calendar me-2"></i>Fecha</h6>
+                <p>{{ order.order_date|date:"d/m/Y H:i" }}</p>
+                
+                <h6><i class="fas fa-dollar-sign me-2"></i>Monto</h6>
+                <p>${{ order.total_amount|floatformat:2 }}</p>
+              </div>
+              <div class="col-md-6">
+                <h6><i class="fas fa-info-circle me-2"></i>Estado</h6>
+                <p><span class="badge status-{{ order.status|lower }}">{{ order.get_status_display_fixed }}</span></p>
+                <h6><i class="fas fa-user-tie me-2"></i>Empleado</h6>
+                <p>
+                  {% if order.owner %}
+                    {{ order.owner.get_full_name|default:order.owner.username }}
+                  {% else %}
+                    Sin asignar
+                  {% endif %}
+                </p>
+                
+                {% if order.cantidad_cobrada %}
+                  <h6><i class="fas fa-cash-register me-2"></i>Cantidad Cobrada</h6>
+                  <p>${{ order.cantidad_cobrada|floatformat:2 }}</p>
+                {% endif %}
+              </div>
+            </div>
+            
+            {% if order.items.all %}
+              <h6><i class="fas fa-list me-2"></i>Productos</h6>
+              <div class="table-responsive">
+                <table class="table table-sm">
+                  <thead>
+                    <tr>
+                      <th>Producto</th>
+                      <th>Cantidad</th>
+                      <th>Precio Unit.</th>
+                      <th>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for item in order.items.all %}
+                      <tr>
+                        <td>{{ item.product.name }}</td>
+                        <td>{{ item.quantity }}</td>
+                        <td>${{ item.unit_price|floatformat:2 }}</td>
+                        <td>${{ item.get_total_price|floatformat:2 }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+            
+            {% if order.notes %}
+              <h6><i class="fas fa-sticky-note me-2"></i>Notas</h6>
+              <p>{{ order.notes }}</p>
+            {% endif %}
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-primary">Ver Cliente</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Show/hide custom date range based on selection
+  document.getElementById('date_filter').addEventListener('change', function() {
+    const customDateRange = document.getElementById('custom-date-range');
+    if (this.value === 'custom') {
+      customDateRange.style.display = 'block';
+    } else {
+      customDateRange.style.display = 'none';
+    }
+  });
+  
+  // Auto-format currency inputs
+  document.querySelectorAll('input[type="number"]').forEach(input => {
+    input.addEventListener('blur', function() {
+      if (this.value && !isNaN(this.value)) {
+        this.value = parseFloat(this.value).toFixed(2);
+      }
+    });
+  });
+  
+  // Set end date min value to start date
+  document.getElementById('start_date').addEventListener('change', function() {
+    document.getElementById('end_date').min = this.value;
+  });
+  
+  // Set start date max value to end date
+  document.getElementById('end_date').addEventListener('change', function() {
+    document.getElementById('start_date').max = this.value;
+  });
+</script>
+{% endblock %}

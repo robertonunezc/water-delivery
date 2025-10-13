@@ -36,7 +36,9 @@
                             </a>
                             <ul class="dropdown-menu">
                                 <li><a class="dropdown-item" href="{% url 'report:client_debt' %}">Clientes con Deuda</a></li>
+                                 <li><a class="dropdown-item" href="{% url 'report:orders_report' %}">Órdenes</a></li>
                             </ul>
+                          
                         </li>
                         {% if user.is_staff %}
                             <li class="nav-item">

@@ -119,7 +119,8 @@ def list_orders(request):
 @login_required
 def create_order(request, client_pk):
     client = get_object_or_404(Client, pk=client_pk)
-    order = services.create_order(client)
+    owner = request.user
+    order = services.create_order(client, owner=owner)
     client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
     payment_types = PAYMENT_METHOD_CHOICES
     
