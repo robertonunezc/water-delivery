@@ -292,34 +292,17 @@
         <!-- Amount Range Filters -->
         <div class="row mb-3">
           <div class="col-md-3">
-            <label for="min_amount" class="form-label">Monto Mínimo:</label>
-            <div class="input-group">
-              <span class="input-group-text">$</span>
-              <input type="number" 
-                     class="form-control" 
-                     id="min_amount"
-                     name="min_amount" 
-                     value="{{ min_amount }}" 
-                     placeholder="0.00"
-                     step="0.01"
-                     min="0">
-            </div>
+            <label for="payment_method" class="form-label">Método de Pago:</label>
+            <select class="form-select" id="payment_method" name="payment_method">
+              <option value="">Todos</option>
+              {% for method in payment_methods %}
+                <option value="{{ method.0 }}" {% if method.0 == payment_method %}selected{% endif %}>
+                  {{ method.1 }}
+                </option>
+              {% endfor %}
+            </select>
           </div>
-          <div class="col-md-3">
-            <label for="max_amount" class="form-label">Monto Máximo:</label>
-            <div class="input-group">
-              <span class="input-group-text">$</span>
-              <input type="number" 
-                     class="form-control" 
-                     id="max_amount"
-                     name="max_amount" 
-                     value="{{ max_amount }}" 
-                     placeholder="999999.99"
-                     step="0.01"
-                     min="0">
-            </div>
-          </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <label class="form-label">&nbsp;</label>
             <div class="d-grid gap-2 d-md-flex">
               <button class="btn btn-primary" type="submit">
@@ -333,6 +316,7 @@
             </div>
           </div>
         </div>
+          
       </form>
     </div>
 

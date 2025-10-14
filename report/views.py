@@ -8,6 +8,7 @@ from decimal import Decimal
 from django.contrib.auth.models import User
 from clients.models import Client, CreditTransaction
 from orders.models import Order, ORDER_STATUS_CHOICES
+from payment.models import PAYMENT_METHOD_CHOICES
 
 
 @login_required
@@ -123,9 +124,9 @@ def orders_report(request):
     
     # Start with all orders
     orders_queryset = Order.objects.select_related(
-        'client', 'owner'
+        'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts'
+        'items__product', 'client__contacts', 'payments'
     )
     
     # Apply search filter
@@ -137,6 +138,11 @@ def orders_report(request):
             Q(client__contacts__name__icontains=search_query)
         ).distinct()
     
+    #Apply payment method filter
+    payment_method = request.GET.get('payment_method', '').strip()
+    if payment_method:
+        orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
+
     # Apply status filter
     if status_filter and status_filter != 'all':
         orders_queryset = orders_queryset.filter(status=status_filter)
@@ -226,13 +232,14 @@ def orders_report(request):
     # Check if filters are applied
     has_filters = bool(
         search_query or (status_filter and status_filter != 'all') or
-        date_filter or employee_filter or min_amount or max_amount
+        date_filter or employee_filter or min_amount or max_amount or payment_method
     )
-    
+
     context = {
         'orders': orders,
         'search_query': search_query,
         'status_filter': status_filter,
+        'payment_methods': PAYMENT_METHOD_CHOICES,
         'date_filter': date_filter,
         'start_date': start_date,
         'end_date': end_date,
