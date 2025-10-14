@@ -8,11 +8,8 @@
                 {% if show_id %}<th>#</th>{% endif %}
                 {% if show_sequence %}<th>Sequence</th>{% endif %}
                 <th>Nombre</th>
-                <th>Tipo</th>
                 <th>Contacto</th>
                 <th>Direcciones</th>
-                <th>Estado</th>
-                {% if show_frequency %}<th>Frecuencia</th>{% endif %}
                 <th>Notas</th>
                 <th>Acciones</th>
             </tr>
@@ -27,16 +24,19 @@
                             {% include 'includes/client_table_row.html' with client=client show_frequency=True frequency_display=item.get_frequency_display %}
                             <td>{{ item.notes|default:"—"|truncatechars:30 }}</td>
                             <td>
-                                <div class="btn-group" role="group">
+                                <div class="btn-group d-flex flex-wrap gap-1" role="group">
                                     {% if table_context == 'route' %}
-                                        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-outline-primary" title="Ver Cliente">
-                                            <i class="fas fa-eye"></i>
+                                        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-primary px-3 py-2" title="Ver Cliente">
+                                            <i class="fas fa-eye me-1"></i>
+                                            <span class="d-none d-md-inline">Ver</span>
                                         </a>
-                                        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-success" title="Nuevo Pedido">
-                                            <i class="fas fa-shopping-cart"></i>
+                                        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-outline-success px-3 py-2" title="Nuevo Pedido">
+                                            <i class="fas fa-shopping-cart me-1"></i>
+                                            <span class="d-none d-md-inline">Pedido</span>
                                         </a>
-                                        <a href="#" class="btn btn-sm btn-outline-warning" title="Editar en Ruta">
-                                            <i class="fas fa-edit"></i>
+                                        <a href="#" class="btn btn-outline-warning px-3 py-2" title="Editar en Ruta">
+                                            <i class="fas fa-edit me-1"></i>
+                                            <span class="d-none d-md-inline">Editar</span>
                                         </a>
                                     {% endif %}
                                 </div>
@@ -50,16 +50,23 @@
                         {% include 'includes/client_table_row.html' with client=item %}
                         <td>{{ item.note|default_if_none:"-"|truncatechars:30 }}</td>
                         <td>
-                            <div class="btn-group" role="group">
+                            <div class="btn-group d-flex flex-wrap gap-1" role="group">
                                 {% if table_context == 'client_list' %}
-                                    <a href="{% url 'clients:detail' item.pk %}" class="btn btn-sm btn-outline-primary" title="Ver Detalles">
-                                        <i class="fas fa-eye"></i>
+                                    <a href="{% url 'clients:detail' item.pk %}" class="btn btn-outline-primary px-3 py-2" title="Ver Detalles">
+                                        <i class="fas fa-eye me-1"></i>
+                                        <span class="d-none d-md-inline">Ver</span>
                                     </a>
-                                    <a href="{% url 'orders:create_order' item.pk %}" class="btn btn-sm btn-outline-success" title="Nuevo Pedido">
-                                        <i class="fas fa-shopping-cart"></i>
+                                    <a href="{% url 'orders:create_order' item.pk %}" class="btn btn-outline-success px-3 py-2" title="Nuevo Pedido">
+                                        <i class="fas fa-shopping-cart me-1"></i>
+                                        <span class="d-none d-md-inline">Pedido</span>
                                     </a>
-                                    <a href="#" class="btn btn-sm btn-outline-secondary" title="Facturar">
-                                        <i class="fas fa-file-invoice"></i>
+                                    <a href="#" class="btn btn-outline-secondary px-3 py-2" title="Facturar">
+                                        <i class="fas fa-plus me-1"></i>
+                                        <span class="d-none d-md-inline">Saldo</span>
+                                    </a>
+                                      <a href="#" class="btn btn-outline-danger px-3 py-2" title="Facturar">
+                                        <i class="fas fa-credit-card me-1"></i>
+                                        <span class="d-none d-md-inline">Credito</span>
                                     </a>
                                 {% endif %}
                             </div>

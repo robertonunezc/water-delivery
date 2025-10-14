@@ -8,9 +8,7 @@
         {% endif %}
     </a>
 </td>
-<td>
-    <span class="badge bg-info">{{ client.get_type_display }}</span>
-</td>
+
 <td>
     <small class="text-muted">
         {% for contact in client.contacts.all %}
@@ -36,13 +34,3 @@
         {% endfor %}
     </small>
 </td>
-<td>
-    <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %}">
-        {% if client.active %}Activo{% else %}Inactivo{% endif %}
-    </span>
-</td>
-{% if show_frequency %}
-<td>
-    <span class="badge bg-primary">{{ frequency_display|default:"Semanal" }}</span>
-</td>
-{% endif %}
