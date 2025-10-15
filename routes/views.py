@@ -43,17 +43,9 @@ def routes_by_transportation_and_day(request):
 @login_required
 def today_route(request):
     """Show today's route for the logged-in employee"""
-    try:
-        employee = request.user.employee
-        if employee.position != 'driver':
-            return render(request, 'routes/access_denied.html', {
-                'message': 'Only drivers can access route information.'
-            })
-    except Employee.DoesNotExist:
-        return render(request, 'routes/access_denied.html', {
-            'message': 'You must be an employee to access routes.'
-        })
-    
+
+    employee = request.user.employee
+
     # Get the transportation assigned to this driver
     try:
         transportation = Transport.objects.get(assigned_driver=employee, is_active=True)
@@ -105,11 +97,18 @@ def route_detail(request, route_id):
     """Detailed view of a specific route"""
     route = get_object_or_404(Route, id=route_id, is_active=True)
     
-    # Get regular clients in this route
+    # Get regular clients in this route with prefetched related data
     route_clients = RouteClient.objects.filter(
         route=route,
         is_active=True
-    ).select_related('client').order_by('sequence')
+    ).select_related('client').prefetch_related(
+        'client__addresses',
+        'client__contacts',
+        'client__product_prices__product',
+        Prefetch('client__orders',
+                 queryset=Order.objects.select_related().prefetch_related('items__product').order_by('-created_at'),
+                 to_attr='recent_orders')
+    ).order_by('sequence')
     
     # Get recent client orders for this route
     recent_orders = RouteClientOrder.objects.filter(

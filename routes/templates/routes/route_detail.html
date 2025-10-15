@@ -8,11 +8,19 @@
     }
     .compact-table {
         margin-bottom: 0.5rem;
+        font-size: 0.9rem;
     }
     .compact-table th,
     .compact-table td {
         padding: 0.5rem;
         vertical-align: middle;
+    }
+    .compact-table th {
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    .compact-table td {
+        font-size: 0.85rem;
     }
     .info-box {
         margin-bottom: 0.5rem;
@@ -23,8 +31,37 @@
     .d-flex.align-items-center > div {
         white-space: nowrap;
     }
+    .table-responsive {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .badge {
+        font-size: 0.75rem;
+        padding: 0.25em 0.5em;
+    }
+    .btn-group .btn {
+        margin: 0;
+    }
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
     @media (max-width: 768px) {
         .d-flex.flex-wrap > div {
+            margin-bottom: 0.25rem;
+        }
+        .compact-table {
+            font-size: 0.75rem;
+        }
+        .compact-table th,
+        .compact-table td {
+            padding: 0.25rem;
+        }
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .btn-group .btn {
             margin-bottom: 0.25rem;
         }
     }
@@ -108,12 +145,122 @@
 
                     <!-- Regular Clients -->
                     <h5 class="mb-2"><i class="fas fa-users"></i> Clientes en Ruta</h5>
-                    {% if route_clients or regular_clients %}
-                        {% if route_clients %}
-                            {% include 'includes/client_table.html' with items=route_clients table_context='route' show_id=False show_sequence=True show_frequency=True table_class='compact-table' %}
-                        {% elif regular_clients %}
-                            {% include 'includes/client_table.html' with items=regular_clients table_context='route' show_id=False show_sequence=True show_frequency=True table_class='compact-table' %}
-                        {% endif %}
+                    {% if route_clients %}
+                        <div class="table-responsive">
+                            <table class="table table-striped table-hover compact-table">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Cliente</th>
+                                        <th>Dirección</th>
+                                        <th>Contacto</th>
+                                        <th>Saldo/Crédito</th>
+                                        <th>Productos y Precio</th>
+                                        <th>Último Pedido</th>
+                                        <th>Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for route_client in route_clients %}
+                                    <tr>
+                                        <td>{{ route_client.sequence }}</td>
+                                        <td>
+                                            <strong>{{ route_client.client.name }}</strong>
+                                            {% if not route_client.client.active %}
+                                                <span class="badge badge-warning">Inactivo</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% with route_client.client.addresses.filter|first as address %}
+                                                {% if address %}
+                                                    {{ address.street }}
+                                                    {% if address.number %} #{{ address.number }}{% endif %}
+                                                    {% if address.interior_number %} Int. {{ address.interior_number }}{% endif %}
+                                                    <br>
+                                                    <small class="text-muted">
+                                                        {{ address.neighborhood|default:"" }}
+                                                        {% if address.neighborhood and address.zip_code %}, {% endif %}
+                                                        {{ address.zip_code|default:"" }}
+                                                    </small>
+                                                {% else %}
+                                                    <span class="text-muted">Sin dirección</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            {% with route_client.client.contacts.first as contact %}
+                                                {% if contact %}
+                                                    <strong>{{ contact.name }}</strong>
+                                                    {% if contact.phone %}
+                                                        <br><i class="fas fa-phone"></i> {{ contact.phone }}
+                                                    {% endif %}
+                                                    {% if contact.email %}
+                                                        <br><i class="fas fa-envelope"></i> <small>{{ contact.email }}</small>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <span class="text-muted">Sin contacto</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            <div class="mb-1">
+                                                <small class="text-muted">Saldo:</small>
+                                                <span class="badge {% if route_client.client.balance > 0 %}bg-success{% else %}bg-secondary{% endif %}">
+                                                    ${{ route_client.client.balance|floatformat:2 }}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <small class="text-muted">Crédito:</small>
+                                                <span class="badge {% if route_client.client.current_debt > 0 %}bg-warning{% else %}bg-info{% endif %}">
+                                                    ${{ route_client.client.current_debt|floatformat:2 }} / ${{ route_client.client.credit_limit|floatformat:2 }}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if route_client.client.product_prices.all %}
+                                                {% for product_price in route_client.client.product_prices.all %}
+                                                    <div class="mb-1">
+                                                        <strong>{{ product_price.product.name }}</strong>
+                                                        <span class="text-muted">{{ product_price.product.get_presentation_display }}</span>
+                                                        - <span class="text-success">${{ product_price.price|floatformat:2 }}</span>
+                                                    </div>
+                                                {% endfor %}
+                                            {% else %}
+                                                <span class="text-muted">Sin productos asignados</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% with route_client.client.recent_orders|first as last_order %}
+                                                {% if last_order %}
+                                                    <span class="badge badge-info" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
+                                                        {{ last_order.created_at|timesince }}
+                                                    </span>
+                                                    <br>
+                                                    <small class="text-muted">{{ last_order.created_at|date:"d/m/Y" }}</small>
+                                                {% else %}
+                                                    <span class="badge badge-secondary">Sin pedidos</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </td>
+                                        <td>
+                                            <div class="btn-group" role="group">
+                                                <a href="{% url 'clients:detail' route_client.client.id %}" 
+                                                   class="btn btn-sm btn-info" 
+                                                   title="Ver detalles del cliente">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{% url 'orders:create_order' route_client.client.id %}" 
+                                                   class="btn btn-sm btn-success" 
+                                                   title="Crear pedido">
+                                                    <i class="fas fa-plus-circle"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                     {% else %}
                         <div class="alert alert-info">
                             <h6>No {% if is_today_view %}regular {% endif %}clients</h6>
@@ -122,7 +269,7 @@
                     {% endif %}
                 </div>
                 
-                <!-- Footer with navigation buttons -->
+                {% comment %} <!-- Footer with navigation buttons -->
                 <div class="card-footer">
                     {% if is_today_view %}
                         <a href="{% url 'routes:list' %}" class="btn btn-secondary">View All Routes</a>
@@ -132,7 +279,7 @@
                         <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
                            class="btn btn-primary">View Today's Orders</a>
                     {% endif %}
-                </div>
+                </div> {% endcomment %}
             </div>
         </div>
     </div>
@@ -143,59 +290,47 @@
 <!-- Include CSRF token for AJAX requests -->
 {% csrf_token %}
 
-{% if is_today_view %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Handle complete order buttons
-    document.querySelectorAll('.complete-order-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const orderId = this.dataset.orderId;
-            const button = this;
+    // Color-code days since last order badges
+    document.querySelectorAll('[data-order-date]').forEach(badge => {
+        const orderDateStr = badge.dataset.orderDate;
+        if (orderDateStr) {
+            // Parse dates at midnight to compare only the date part
+            const orderDate = new Date(orderDateStr);
+            orderDate.setHours(0, 0, 0, 0);
             
-            if (confirm('Mark this order as completed?')) {
-                fetch(`{% url 'routes:mark_completed' 0 %}`.replace('0', orderId), {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({})
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        // Update the UI
-                        const row = button.closest('tr');
-                        row.classList.add('table-success');
-                        
-                        const statusCell = row.querySelector('td:nth-child(4)');
-                        statusCell.innerHTML = `
-                            <span class="badge badge-success">
-                                <i class="fas fa-check"></i> Completed
-                            </span>
-                            <br><small class="text-muted">${new Date().toLocaleTimeString()}</small>
-                        `;
-                        
-                        button.outerHTML = `
-                            <span class="text-success">
-                                <i class="fas fa-check-circle"></i> Done
-                            </span>
-                        `;
-                        
-                        // Show success message
-                        alert('Order marked as completed successfully!');
-                    } else {
-                        alert('Error: ' + (data.error || 'Could not complete order'));
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('An error occurred while completing the order.');
-                });
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            // Calculate difference in days
+            const diffTime = today - orderDate;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            // Remove existing badge classes
+            badge.classList.remove('bg-info', 'bg-success', 'bg-warning', 'bg-danger');
+            
+            // Add appropriate class based on days
+            if (diffDays > 7) {
+                badge.classList.add('bg-danger');
+            } else if (diffDays > 3) {
+                badge.classList.add('bg-warning');
+            } else {
+                badge.classList.add('bg-success');
             }
-        });
+            
+            // Update text to show days
+            if (diffDays === 0) {
+                badge.innerHTML = 'Hoy';
+            } else if (diffDays === 1) {
+                badge.innerHTML = 'Hace 1 día';
+            } else {
+                badge.innerHTML = `Hace ${diffDays} días`;
+            }
+        }
     });
 });
 </script>
-{% endif %}
+
+
 {% endblock %}
