@@ -1,10 +1,12 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.contrib import messages
 from datetime import date, datetime, timedelta
 from calendar import monthrange
 from .models import Client
+from .forms import ManualCreditTransactionForm
 
 
 def calculate_next_billing_date(billing_frequency):
@@ -248,3 +250,83 @@ def detail(request, pk):
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@login_required
+def pay_credit(request, pk):
+    """View for paying credit (reducing debt) for a client"""
+    client = get_object_or_404(Client, pk=pk)
+    
+    if request.method == 'POST':
+        form = ManualCreditTransactionForm(request.POST)
+        if form.is_valid():
+            amount = form.cleaned_data['amount']
+            transaction_type = form.cleaned_data['transaction_type']
+            description = form.cleaned_data['description']
+            notes = form.cleaned_data['notes']
+            new_credit_limit = form.cleaned_data.get('new_credit_limit')
+            
+            try:
+                if transaction_type == 'limit_change':
+                    # Update credit limit
+                    client.update_credit_limit(
+                        new_limit=new_credit_limit,
+                        user=request.user,
+                        notes=f"{description}. {notes}"
+                    )
+                    messages.success(
+                        request,
+                        f"Límite de crédito actualizado exitosamente. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
+                    )
+                
+                elif transaction_type in ['payment', 'forgiveness', 'adjustment', 'correction']:
+                    # Pay down debt
+                    paid_amount = client.pay_debt(
+                        amount=amount,
+                        transaction_type=transaction_type,
+                        user=request.user,
+                        notes=f"{description}. {notes}"
+                    )
+                    messages.success(
+                        request,
+                        f"Pago aplicado exitosamente. Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
+                    )
+                
+                elif transaction_type == 'payment_from_balance':
+                    # Pay debt using client's balance
+                    result = client.pay_debt_from_balance(
+                        amount=amount,
+                        user=request.user,
+                        notes=f"{description}. {notes}"
+                    )
+                    if result['success']:
+                        messages.success(
+                            request,
+                            f"Pago con saldo exitoso. ${result['amount_paid']:.2f} descontados del saldo. "
+                            f"Saldo restante: ${result['remaining_balance']:.2f}. "
+                            f"Deuda restante: ${result['remaining_debt']:.2f}."
+                        )
+                    else:
+                        messages.error(request, f"Error en pago con saldo: {result['error']}")
+                        return render(request, 'pay_credit.html', {
+                            'form': form,
+                            'client': client,
+                        })
+                
+                return redirect('clients:detail', pk=client.pk)
+                
+            except Exception as e:
+                messages.error(request, f"Error al procesar la transacción: {str(e)}")
+    else:
+        # Initialize form with the client pre-selected and default to 'payment'
+        form = ManualCreditTransactionForm(initial={'client': client, 'transaction_type': 'payment'})
+        # Make client field readonly by disabling it
+        form.fields['client'].widget.attrs['disabled'] = True
+        form.fields['client'].required = False
+    
+    context = {
+        'form': form,
+        'client': client,
+    }
+    
+    return render(request, 'pay_credit.html', context)

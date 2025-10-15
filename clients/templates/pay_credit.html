@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Pagar Crédito - {{ client.name }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Inicio</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'clients:list' %}">Clientes</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'clients:detail' client.pk %}">{{ client.name }}</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Pagar Crédito</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-credit-card me-2"></i>
+                        Pagar Crédito - {{ client.name }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Client Information -->
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">Información del Cliente</h5>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Cliente:</strong> {{ client.name }}</p>
+                                <p class="mb-2"><strong>Saldo actual:</strong> 
+                                    <span class="badge bg-{% if client.balance > 0 %}success{% elif client.balance == 0 %}secondary{% else %}danger{% endif %}">
+                                        ${{ client.balance|floatformat:2 }}
+                                    </span>
+                                </p>
+                            </div>
+                            <div class="col-md-6">
+                                <p class="mb-2"><strong>Deuda actual:</strong> 
+                                    <span class="badge bg-{% if client.current_debt > 0 %}danger{% else %}success{% endif %}">
+                                        ${{ client.current_debt|floatformat:2 }}
+                                    </span>
+                                </p>
+                                <p class="mb-2"><strong>Límite de crédito:</strong> ${{ client.credit_limit|floatformat:2 }}</p>
+                                <p class="mb-2"><strong>Crédito disponible:</strong> 
+                                    <span class="badge bg-primary">
+                                        ${{ client.get_available_credit|floatformat:2 }}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form -->
+                    <form method="post" action="">
+                        {% csrf_token %}
+                        
+                        <input type="hidden" name="client" value="{{ client.id }}">
+                        
+                        <div class="mb-3">
+                            <label for="{{ form.transaction_type.id_for_label }}" class="form-label">
+                                {{ form.transaction_type.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.transaction_type }}
+                            {% if form.transaction_type.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.transaction_type.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3" id="amount_row">
+                            <label for="{{ form.amount.id_for_label }}" class="form-label">
+                                {{ form.amount.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.help_text %}
+                                <small class="form-text text-muted d-block">{{ form.amount.help_text }}</small>
+                            {% endif %}
+                            {% if form.amount.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.amount.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3" id="credit_limit_row" style="display: none;">
+                            <label for="{{ form.new_credit_limit.id_for_label }}" class="form-label">
+                                {{ form.new_credit_limit.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.new_credit_limit }}
+                            {% if form.new_credit_limit.help_text %}
+                                <small class="form-text text-muted d-block">{{ form.new_credit_limit.help_text }}</small>
+                            {% endif %}
+                            {% if form.new_credit_limit.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.new_credit_limit.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.description.id_for_label }}" class="form-label">
+                                {{ form.description.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.help_text %}
+                                <small class="form-text text-muted d-block">{{ form.description.help_text }}</small>
+                            {% endif %}
+                            {% if form.description.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.description.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.notes.id_for_label }}" class="form-label">
+                                {{ form.notes.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.help_text %}
+                                <small class="form-text text-muted d-block">{{ form.notes.help_text }}</small>
+                            {% endif %}
+                            {% if form.notes.errors %}
+                                <div class="text-danger mt-1">
+                                    {% for error in form.notes.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'clients:detail' client.pk %}" class="btn btn-secondary">
+                                <i class="fas fa-times me-1"></i>
+                                Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-check me-1"></i>
+                                Procesar Transacción
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Transaction Types Info -->
+                    <div class="card mt-4 border-info">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0">Tipos de Transacción</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled mb-0">
+                                <li class="mb-2">
+                                    <strong>Pago de deuda:</strong> Cliente pagó su deuda pendiente (efectivo, transferencia, etc.)
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Pago con Saldo:</strong> Usar el saldo prepagado del cliente para pagar su deuda
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Ajuste manual de deuda:</strong> Modificar deuda por razones administrativas
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Condonación de deuda:</strong> Perdonar deuda por autorización especial
+                                </li>
+                                <li class="mb-2">
+                                    <strong>Corrección:</strong> Corrección de error previo
+                                </li>
+                                <li class="mb-0">
+                                    <strong>Cambio de límite de crédito:</strong> Modificar el límite de crédito del cliente
+                                </li>
+                            </ul>
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const transactionTypeField = document.getElementById('id_transaction_type');
+    const creditLimitRow = document.getElementById('credit_limit_row');
+    const amountRow = document.getElementById('amount_row');
+    const newCreditLimitField = document.getElementById('id_new_credit_limit');
+    const amountField = document.getElementById('id_amount');
+    
+    function toggleFields() {
+        if (transactionTypeField.value === 'limit_change') {
+            creditLimitRow.style.display = 'block';
+            amountRow.style.display = 'none';
+            newCreditLimitField.required = true;
+            amountField.required = false;
+        } else {
+            creditLimitRow.style.display = 'none';
+            amountRow.style.display = 'block';
+            newCreditLimitField.required = false;
+            amountField.required = true;
+        }
+    }
+    
+    transactionTypeField.addEventListener('change', toggleFields);
+    toggleFields(); // Initial call
+});
+</script>
+{% endblock %}
