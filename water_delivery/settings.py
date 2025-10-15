@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'report',
     'routes',
     'orders',
+    'billing',
     
 ]
 

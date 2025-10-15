@@ -6,19 +6,6 @@
 {% block content %}
 <div class="container-fluid py-4">
     <div class="row">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'core:home' %}">Inicio</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'clients:list' %}">Clientes</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'clients:detail' client.pk %}">{{ client.name }}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Pagar Crédito</li>
-                </ol>
-            </nav>
-        </div>
-    </div>
-
-    <div class="row">
         <div class="col-lg-8 mx-auto">
             <div class="card shadow">
                 <div class="card-header bg-danger text-white">
@@ -27,6 +14,7 @@
                         Pagar Crédito - {{ client.name }}
                     </h4>
                 </div>
+                {% if client.current_debt > 0 %}
                 <div class="card-body">
                     <!-- Client Information -->
                     <div class="alert alert-info mb-4">
@@ -195,6 +183,14 @@
                         </div>
                     </div>
                 </div>
+                {% else %}
+                <div class="card-body">
+                    <div class="alert alert-success mb-0">
+                        <i class="fas fa-check-circle me-2"></i>
+                        El cliente no tiene deuda pendiente.
+                    </div>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
