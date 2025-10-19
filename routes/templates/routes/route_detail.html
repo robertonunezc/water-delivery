@@ -233,7 +233,7 @@
                                             {% with route_client.client.recent_orders|first as last_order %}
                                                 {% if last_order %}
                                                     <span class="badge badge-info" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
-                                                        {{ last_order.created_at|timesince }}
+                                                        {{ last_order.created_at|timesince }} 
                                                     </span>
                                                     <br>
                                                     <small class="text-muted">{{ last_order.created_at|date:"d/m/Y" }}</small>
@@ -248,11 +248,13 @@
                                                    class="btn btn-sm btn-info" 
                                                    title="Ver detalles del cliente">
                                                     <i class="fas fa-eye"></i>
+                                                    Informacion
                                                 </a>
                                                 <a href="{% url 'orders:create_order' route_client.client.id %}" 
                                                    class="btn btn-sm btn-success" 
                                                    title="Crear pedido">
                                                     <i class="fas fa-plus-circle"></i>
+                                                    Vender
                                                 </a>
                                             </div>
                                         </td>
@@ -296,9 +298,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[data-order-date]').forEach(badge => {
         const orderDateStr = badge.dataset.orderDate;
         if (orderDateStr) {
-            // Parse dates at midnight to compare only the date part
-            const orderDate = new Date(orderDateStr);
-            orderDate.setHours(0, 0, 0, 0);
+            // Parse dates at midnight in local timezone
+            // Adding 'T00:00:00' forces JavaScript to interpret as local time
+            const orderDate = new Date(orderDateStr + 'T00:00:00');
             
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -306,7 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Calculate difference in days
             const diffTime = today - orderDate;
             const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
+            console.log(`Days since last order: ${today} - ${orderDate} = ${diffDays}`);
             // Remove existing badge classes
             badge.classList.remove('bg-info', 'bg-success', 'bg-warning', 'bg-danger');
             
