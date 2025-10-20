@@ -82,28 +82,9 @@
         <div class="col-12">
             <div class="card compact-card">
                 <div class="card-header {% if is_today_view %}bg-primary text-white{% endif %}">
-                    <h3 class="card-title">
-                        {% if is_today_view %}
-                            <i class="fas fa-route"></i> Today's Route - {{ today|date:"l, F d, Y" }}
-                        {% else %}
-                            {{ route.name }}
-                        {% endif %}
-                    </h3>
+                    
                     <div class="card-tools">
-                        {% if is_today_view %}
-                            <span class="badge badge-light">{{ transportation.license_plate }}</span>
-                        {% else %}
-                            <span class="badge badge-info">{{ route.get_weekday_display }}</span>
-                            <span class="badge badge-primary">{{ route.transportation.license_plate }}</span>
-                        {% endif %}
-                    </div>
-                </div>
-                <div class="card-body">
-                    <!-- Route Info -->
-                    <div class="row mb-2">
-                        <!-- Route Summary - Horizontal Layout -->
-                        <div class="col-12">
-                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
+                       <div class="d-flex flex-wrap align-items-center justify-content-between mb-2">
                                 <div class="d-flex align-items-center flex-wrap">
                                     <h5 class="mb-0 me-3">{{ route.name }}</h5>
                                     <span class="badge bg-info me-2">{{ route.get_weekday_display }}</span>
@@ -118,6 +99,14 @@
                                     </div>
                                 {% endif %}
                             </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <!-- Route Info -->
+                    <div class="row mb-2">
+                        <!-- Route Summary - Horizontal Layout -->
+                        <div class="col-12">
+                          
                             
                             <!-- Transportation Info - Inline -->
                             <div class="d-flex flex-wrap align-items-center text-sm">
