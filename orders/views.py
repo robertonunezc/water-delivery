@@ -10,7 +10,8 @@ from django.db.models import Q, Sum, Count, Prefetch
 from decimal import Decimal
 import json
 
-from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES
+from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, OrderSplit
+from .forms import SplitOrderForm
 from product.models import Product, ProductClientPrice
 from clients.models import Client
 from orders import services
@@ -165,3 +166,158 @@ def update_order(request, order_pk):
            order = services.update_order(pending_client_order, quantity, product, order.client)
 
         return JsonResponse({'status': 'success', 'order_total': str(order.total_amount)})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+@transaction.atomic
+def split_order(request, order_id):
+    """View to split an order into two orders"""
+    order = get_object_or_404(Order.objects.prefetch_related('items__product'), pk=order_id)
+    
+    if request.method == 'POST':
+        form = SplitOrderForm(request.POST, order=order)
+        
+        if form.is_valid():
+            # Create the new order
+            new_order = Order.objects.create(
+                client=order.client,
+                order_date=order.order_date,
+                status=order.status,
+                total_amount=Decimal('0.00'),  # Will be calculated
+                cantidad_cobrada=None,  # Will be calculated
+                owner=order.owner,
+                notes=f'Dividida de Orden #{order.id}'
+            )
+            
+            # Track amounts for proportional cantidad_cobrada split
+            original_total = Decimal('0.00')
+            new_total = Decimal('0.00')
+            
+            # Process each item
+            for item in order.items.all():
+                field_name = f'quantity_{item.id}'
+                quantity_to_move = form.cleaned_data.get(field_name, 0)
+                
+                if quantity_to_move > 0:
+                    # Create item in new order
+                    OrderProduct.objects.create(
+                        order=new_order,
+                        product=item.product,
+                        quantity=quantity_to_move,
+                        unit_price=item.unit_price,
+                        note=item.note
+                    )
+                    
+                    # Calculate amounts
+                    new_total += quantity_to_move * item.unit_price
+                    
+                    # Update original order item
+                    remaining_quantity = item.quantity - quantity_to_move
+                    if remaining_quantity > 0:
+                        item.quantity = remaining_quantity
+                        item.save()
+                        original_total += remaining_quantity * item.unit_price
+                    else:
+                        # Remove item if quantity is 0
+                        item.delete()
+            
+            # Update totals
+            order.total_amount = original_total
+            new_order.total_amount = new_total
+            
+            # Split cantidad_cobrada proportionally if it exists
+            if order.cantidad_cobrada is not None and order.cantidad_cobrada > 0:
+                original_order_total = original_total + new_total
+                if original_order_total > 0:
+                    # Store the original cantidad_cobrada before modifying
+                    original_cantidad_cobrada = order.cantidad_cobrada
+                    
+                    # Calculate proportional split
+                    proportion_original = original_total / original_order_total
+                    proportion_new = new_total / original_order_total
+                    
+                    order.cantidad_cobrada = (original_cantidad_cobrada * proportion_original).quantize(Decimal('0.01'))
+                    new_order.cantidad_cobrada = (original_cantidad_cobrada * proportion_new).quantize(Decimal('0.01'))
+            
+            order.save()
+            new_order.save()
+            
+            # Handle payments - split them proportionally
+            original_payments = Payment.objects.filter(order=order, status='completed')
+            if original_payments.exists():
+                original_order_total = original_total + new_total
+                if original_order_total > 0:
+                    proportion_original = original_total / original_order_total
+                    proportion_new = new_total / original_order_total
+                    
+                    for payment in original_payments:
+                        # Store original amount before modifying
+                        original_amount = payment.amount
+                        original_balance_used = payment.balance_used
+                        original_credit_used = payment.credit_used
+                        
+                        # Calculate proportional amounts
+                        original_payment_amount = (original_amount * proportion_original).quantize(Decimal('0.01'))
+                        new_payment_amount = (original_amount * proportion_new).quantize(Decimal('0.01'))
+                        
+                        # Create new payment for the new order (skip processing by setting status after creation)
+                        new_payment = Payment(
+                            order=new_order,
+                            client=new_order.client,
+                            amount=new_payment_amount,
+                            method=payment.method,
+                            status='pending',  # Set as pending first to avoid triggering save logic
+                            balance_used=(original_balance_used * proportion_new).quantize(Decimal('0.01')) if original_balance_used else Decimal('0.00'),
+                            credit_used=(original_credit_used * proportion_new).quantize(Decimal('0.01')) if original_credit_used else Decimal('0.00'),
+                            created_by=request.user
+                        )
+                        new_payment.save()
+                        # Now update status to completed without triggering balance/credit logic
+                        Payment.objects.filter(pk=new_payment.pk).update(status='completed')
+                        
+                        # Update the original payment amount directly to avoid triggering save logic
+                        Payment.objects.filter(pk=payment.pk).update(
+                            amount=original_payment_amount,
+                            balance_used=(original_balance_used * proportion_original).quantize(Decimal('0.01')) if original_balance_used else Decimal('0.00'),
+                            credit_used=(original_credit_used * proportion_original).quantize(Decimal('0.01')) if original_credit_used else Decimal('0.00')
+                        )
+            
+            # Create split record for tracking
+            OrderSplit.objects.create(
+                source_order=order,
+                child_order=new_order,
+                split_by=request.user
+            )
+            
+            # Redirect back to admin with success message
+            from django.contrib import messages
+            messages.success(
+                request,
+                f'Orden dividida exitosamente. Nueva orden #{new_order.id} creada con total ${new_order.total_amount}. '
+                f'Orden original #{order.id} actualizada con total ${order.total_amount}.'
+            )
+            
+            return redirect('admin:orders_order_change', order.id)
+    else:
+        form = SplitOrderForm(order=order)
+    
+    # Create a list pairing items with their form fields
+    items_with_fields = []
+    for item in order.items.all():
+        field_name = f'quantity_{item.id}'
+        items_with_fields.append({
+            'item': item,
+            'field': form[field_name] if field_name in form.fields else None
+        })
+    
+    context = {
+        'form': form,
+        'order': order,
+        'items': order.items.all(),
+        'items_with_fields': items_with_fields,
+        'title': f'Dividir Orden #{order.id}',
+    }
+    
+    return render(request, 'admin/orders/split_order.html', context)
+

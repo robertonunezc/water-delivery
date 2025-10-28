@@ -1,12 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.urls import reverse
+from django.urls import reverse, path
 from django.utils.safestring import mark_safe
 from django.db.models import Sum, Count, Q
 from django.http import HttpResponse
 from decimal import Decimal
 import csv
-from .models import Order, OrderProduct, OrderStatus
+from .models import Order, OrderProduct, OrderStatus, OrderSplit
 
 
 class OrderAmountFilter(admin.SimpleListFilter):
@@ -105,16 +105,19 @@ class OrderAdmin(admin.ModelAdmin):
     )
     
     readonly_fields = (
-        'order_id_display', 'created_at', 'updated_at', 'total_items_display',
-        'order_summary', 'client_info_display'
+        'order_id_display', 'order_date', 'created_at', 'updated_at', 'total_items_display',
+        'order_summary', 'client_info_display', 'split_order_button', 'split_history_display'
     )
     
     fieldsets = (
         ('Información del Pedido', {
-            'fields': ('order_id_display', 'client', 'status', 'order_date')
+            'fields': ('order_id_display', 'client', 'owner', 'status', 'order_date')
         }),
         ('Detalles', {
-            'fields': ('notes', 'total_amount', 'total_items_display')
+            'fields': ('notes', 'total_amount', 'cantidad_cobrada', 'total_items_display')
+        }),
+        ('Acciones', {
+            'fields': ('split_order_button',),
         }),
         ('Resumen del Pedido', {
             'fields': ('order_summary',),
@@ -122,6 +125,10 @@ class OrderAdmin(admin.ModelAdmin):
         }),
         ('Información del Cliente', {
             'fields': ('client_info_display',),
+            'classes': ('collapse',)
+        }),
+        ('Historial de Divisiones', {
+            'fields': ('split_history_display',),
             'classes': ('collapse',)
         }),
         ('Timestamps', {
@@ -321,6 +328,88 @@ class OrderAdmin(admin.ModelAdmin):
         )
     client_info_display.short_description = 'Información del Cliente'
     
+    def split_order_button(self, obj):
+        """Display a button to split the order"""
+        if obj.pk and obj.items.count() > 0:
+            url = reverse('orders:split_order', args=[obj.id])
+            return format_html(
+                '<a class="button" href="{}" style="'
+                'background-color: #417690; '
+                'color: white; '
+                'padding: 10px 15px; '
+                'text-decoration: none; '
+                'border-radius: 4px; '
+                'display: inline-block; '
+                'font-weight: bold;">'
+                '✂️ Dividir Orden'
+                '</a>'
+                '<p style="margin-top: 10px; color: #666; font-size: 12px;">'
+                'Divide esta orden en dos, moviendo productos a una nueva orden.'
+                '</p>',
+                url
+            )
+        return format_html(
+            '<p style="color: #999;">No se puede dividir una orden sin productos.</p>'
+        )
+    split_order_button.short_description = 'Dividir Orden'
+    
+    def split_history_display(self, obj):
+        """Display split history for this order"""
+        if not obj.pk:
+            return 'Guarde la orden primero.'
+        
+        # Check if this order was split from another order
+        as_child = OrderSplit.objects.filter(child_order=obj).select_related('source_order', 'split_by').first()
+        
+        # Check if this order was split into other orders
+        as_source = OrderSplit.objects.filter(source_order=obj).select_related('child_order', 'split_by')
+        
+        history = []
+        
+        if as_child:
+            source_url = reverse('admin:orders_order_change', args=[as_child.source_order.id])
+            split_by_name = as_child.split_by.username if as_child.split_by else "N/A"
+            split_date = as_child.created_at.strftime("%d/%m/%Y %H:%M")
+            history.append(
+                '<div style="padding: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; margin-bottom: 10px;">'
+                '<strong>📥 Derivada de:</strong> '
+                '<a href="{}" target="_blank">Orden #{}</a><br>'
+                '<small>Dividida por: {}</small><br>'
+                '<small>Fecha: {}</small>'
+                '</div>'.format(source_url, as_child.source_order.id, split_by_name, split_date)
+            )
+        
+        if as_source.exists():
+            history.append('<strong>📤 Órdenes derivadas de esta:</strong><ul>')
+            for split in as_source:
+                child_url = reverse('admin:orders_order_change', args=[split.child_order.id])
+                split_by_name = split.split_by.username if split.split_by else "N/A"
+                split_date = split.created_at.strftime("%d/%m/%Y %H:%M")
+                history.append(
+                    '<li>'
+                    '<a href="{}" target="_blank">Orden #{}</a> '
+                    '- Total: ${} '
+                    '<br><small>Dividida por: {} '
+                    'el {}</small>'
+                    '</li>'.format(
+                        child_url, 
+                        split.child_order.id, 
+                        split.child_order.total_amount,
+                        split_by_name,
+                        split_date
+                    )
+                )
+            history.append('</ul>')
+        
+        if not history:
+            return format_html('<p style="color: #999;">Esta orden no tiene historial de divisiones.</p>')
+        
+        return format_html(
+            '<div style="line-height: 1.6;">{}</div>',
+            ''.join(history)
+        )
+    split_history_display.short_description = 'Historial de Divisiones'
+    
     # Custom actions
     def mark_as_completed(self, request, queryset):
         updated = queryset.update(status='COMPLETED')
@@ -471,3 +560,139 @@ class OrderProductAdmin(admin.ModelAdmin):
             '<br>'.join(info)
         )
     order_info_display.short_description = 'Información del Pedido'
+
+
+@admin.register(OrderSplit)
+class OrderSplitAdmin(admin.ModelAdmin):
+    """Admin for tracking order splits"""
+    list_display = (
+        'id', 'source_order_link', 'child_order_link', 'split_by',
+        'created_at_display', 'source_total', 'child_total'
+    )
+    
+    list_filter = (
+        'created_at',
+        ('split_by', admin.RelatedOnlyFieldListFilter),
+    )
+    
+    search_fields = (
+        'source_order__id',
+        'child_order__id',
+        'split_by__username',
+        'notes',
+    )
+    
+    readonly_fields = (
+        'source_order', 'child_order', 'split_by', 'created_at', 'updated_at',
+        'split_summary'
+    )
+    
+    fieldsets = (
+        ('Información de la División', {
+            'fields': ('source_order', 'child_order', 'split_by', 'created_at')
+        }),
+        ('Resumen', {
+            'fields': ('split_summary',)
+        }),
+        ('Notas', {
+            'fields': ('notes',)
+        }),
+        ('Timestamps', {
+            'fields': ('updated_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            'source_order', 'child_order', 'split_by',
+            'source_order__client', 'child_order__client'
+        )
+    
+    def has_add_permission(self, request):
+        """Prevent manual creation of split records"""
+        return False
+    
+    def has_delete_permission(self, request, obj=None):
+        """Prevent deletion of split records for audit trail"""
+        return request.user.is_superuser
+    
+    def source_order_link(self, obj):
+        url = reverse('admin:orders_order_change', args=[obj.source_order.id])
+        return format_html(
+            '<a href="{}" target="_blank">Orden #{} ({})</a>',
+            url,
+            obj.source_order.id,
+            obj.source_order.client.name if obj.source_order.client else 'N/A'
+        )
+    source_order_link.short_description = 'Orden Original'
+    source_order_link.admin_order_field = 'source_order__id'
+    
+    def child_order_link(self, obj):
+        url = reverse('admin:orders_order_change', args=[obj.child_order.id])
+        return format_html(
+            '<a href="{}" target="_blank">Orden #{} ({})</a>',
+            url,
+            obj.child_order.id,
+            obj.child_order.client.name if obj.child_order.client else 'N/A'
+        )
+    child_order_link.short_description = 'Orden Derivada'
+    child_order_link.admin_order_field = 'child_order__id'
+    
+    def created_at_display(self, obj):
+        return obj.created_at.strftime('%d/%m/%Y %H:%M')
+    created_at_display.short_description = 'Fecha de División'
+    created_at_display.admin_order_field = 'created_at'
+    
+    def source_total(self, obj):
+        return format_html('${:.2f}', obj.source_order.total_amount)
+    source_total.short_description = 'Total Original'
+    source_total.admin_order_field = 'source_order__total_amount'
+    
+    def child_total(self, obj):
+        return format_html('${:.2f}', obj.child_order.total_amount)
+    child_total.short_description = 'Total Derivada'
+    child_total.admin_order_field = 'child_order__total_amount'
+    
+    def split_summary(self, obj):
+        """Display detailed summary of the split"""
+        source_items = obj.source_order.items.select_related('product').all()
+        child_items = obj.child_order.items.select_related('product').all()
+        
+        summary = []
+        summary.append('<div style="font-family: monospace;">')
+        summary.append('<h3>📦 Orden Original #{}</h3>'.format(obj.source_order.id))
+        summary.append('<ul>')
+        
+        for item in source_items:
+            summary.append(
+                '<li>{}x {} - ${} = ${}</li>'.format(
+                    item.quantity, 
+                    item.product.name, 
+                    item.unit_price, 
+                    item.get_total_price()
+                )
+            )
+        
+        summary.append('</ul><strong>Total: ${}</strong>'.format(obj.source_order.total_amount))
+        summary.append('<h3>📦 Orden Derivada #{}</h3><ul>'.format(obj.child_order.id))
+        
+        for item in child_items:
+            summary.append(
+                '<li>{}x {} - ${} = ${}</li>'.format(
+                    item.quantity, 
+                    item.product.name, 
+                    item.unit_price, 
+                    item.get_total_price()
+                )
+            )
+        
+        summary.append('</ul><strong>Total: ${}</strong>'.format(obj.child_order.total_amount))
+        summary.append('</div>')
+        
+        return format_html(''.join(summary))
+    split_summary.short_description = 'Resumen de la División'
+

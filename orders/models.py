@@ -65,3 +65,22 @@ class OrderProduct(models.Model):
         return f"{self.quantity} x {self.product.name} @ {self.unit_price}"
     def get_total_price(self):
         return self.quantity * self.unit_price
+
+
+class OrderSplit(TimeStampedModel):
+    """Track order split operations for reporting purposes"""
+    source_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='split_as_source', verbose_name="Orden Original")
+    child_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='split_as_child', verbose_name="Orden Derivada")
+    split_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, verbose_name="Dividido por")
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'División de Orden'
+        verbose_name_plural = 'Divisiones de Órdenes'
+        indexes = [
+            models.Index(fields=['source_order'], name='ordersplit_source_idx'),
+            models.Index(fields=['child_order'], name='ordersplit_child_idx'),
+        ]
+    
+    def __str__(self):
+        return f"Split: Order #{self.source_order.id} → Order #{self.child_order.id}"

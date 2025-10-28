@@ -1,0 +1,332 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .split-order-container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        
+        .order-info {
+            background: #f8f9fa;
+            border-left: 4px solid #417690;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+        
+        .order-info h2 {
+            margin-top: 0;
+            color: #417690;
+        }
+        
+        .order-info .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .order-info .info-item {
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        
+        .order-info .info-label {
+            font-weight: bold;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .order-info .info-value {
+            font-size: 16px;
+            color: #333;
+        }
+        
+        .products-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background: white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        .products-table th {
+            background: #417690;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: bold;
+        }
+        
+        .products-table td {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .products-table tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .products-table input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .products-table input[type="number"]:focus {
+            outline: none;
+            border-color: #417690;
+        }
+        
+        .help-text {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .form-actions {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 4px;
+            text-decoration: none;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: #417690;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #2e5568;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .alert-warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            color: #856404;
+        }
+        
+        .alert-info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            color: #0c5460;
+        }
+        
+        .errorlist {
+            list-style: none;
+            padding: 0;
+            margin: 10px 0;
+        }
+        
+        .errorlist li {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-left: 4px solid #dc3545;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        
+        .summary-box {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+        
+        .summary-box h3 {
+            margin-top: 0;
+            color: #417690;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="split-order-container">
+    <h1>{{ title }}</h1>
+    
+    <div class="order-info">
+        <h2>📋 Información de la Orden Original</h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <div class="info-label">Cliente</div>
+                <div class="info-value">{{ order.client.name }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Estado</div>
+                <div class="info-value">{{ order.get_status_display }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Fecha</div>
+                <div class="info-value">{{ order.order_date|date:"d/m/Y H:i" }}</div>
+            </div>
+            <div class="info-item">
+                <div class="info-label">Total</div>
+                <div class="info-value" style="color: #28a745; font-weight: bold;">${{ order.total_amount }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="alert alert-info">
+        <strong>ℹ️ Instrucciones:</strong><br>
+        Especifique la cantidad de cada producto que desea mover a la nueva orden. 
+        La orden original mantendrá la cantidad restante de cada producto.
+        <br><br>
+        <strong>Importante:</strong> La orden original debe mantener al menos un producto con cantidad mayor a 0.
+    </div>
+    
+    {% if form.non_field_errors %}
+        <ul class="errorlist">
+            {% for error in form.non_field_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    
+    <form method="post" id="splitOrderForm">
+        {% csrf_token %}
+        
+        <h2>🔀 Seleccione las cantidades a mover</h2>
+        
+        <table class="products-table">
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Cantidad Actual</th>
+                    <th>Precio Unitario</th>
+                    <th>Total Actual</th>
+                    <th>Cantidad a Mover</th>
+                    <th>Quedará en Original</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item_data in items_with_fields %}
+                <tr data-item-id="{{ item_data.item.id }}" data-max-quantity="{{ item_data.item.quantity }}">
+                    <td>
+                        <strong>{{ item_data.item.product.name }}</strong>
+                        {% if item_data.item.note %}
+                            <br><small style="color: #666;">Nota: {{ item_data.item.note }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ item_data.item.quantity }}</td>
+                    <td>${{ item_data.item.unit_price }}</td>
+                    <td><strong>${{ item_data.item.get_total_price }}</strong></td>
+                    <td>
+                        {% if item_data.field %}
+                            {{ item_data.field }}
+                            {% if item_data.field.errors %}
+                                <ul class="errorlist">
+                                    {% for error in item_data.field.errors %}
+                                        <li>{{ error }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if item_data.field.help_text %}
+                                <div class="help-text">{{ item_data.field.help_text }}</div>
+                            {% endif %}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span id="remaining_{{ item_data.item.id }}" style="font-weight: bold; color: #417690;">
+                            {{ item_data.item.quantity }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div class="summary-box">
+            <h3>📊 Resumen</h3>
+            <p>La nueva orden tendrá el mismo cliente, estado y fecha de la orden original.</p>
+            <p>El campo "cantidad_cobrada" será dividido proporcionalmente según los totales de cada orden.</p>
+            <p><strong>Nota:</strong> Se creará un registro automático en el historial de divisiones para fines de reporte.</p>
+        </div>
+        
+        <div class="form-actions">
+            <a href="{% url 'admin:orders_order_change' order.id %}" class="btn btn-secondary">
+                ← Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary">
+                ✂️ Dividir Orden
+            </button>
+        </div>
+    </form>
+</div>
+
+<script>
+// Update remaining quantities dynamically
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('splitOrderForm');
+    const inputs = form.querySelectorAll('input[type="number"]');
+    
+    inputs.forEach(input => {
+        const itemId = input.name.replace('quantity_', '');
+        const maxQuantity = parseInt(input.max);
+        
+        input.addEventListener('input', function() {
+            let value = parseInt(this.value) || 0;
+            
+            // Ensure value is within bounds
+            if (value < 0) value = 0;
+            if (value > maxQuantity) value = maxQuantity;
+            
+            // Update the remaining quantity display
+            const remaining = maxQuantity - value;
+            const remainingSpan = document.getElementById('remaining_' + itemId);
+            
+            if (remainingSpan) {
+                remainingSpan.textContent = remaining;
+                
+                // Color code the remaining quantity
+                if (remaining === 0) {
+                    remainingSpan.style.color = '#dc3545'; // red
+                } else if (remaining < maxQuantity / 2) {
+                    remainingSpan.style.color = '#ffc107'; // yellow
+                } else {
+                    remainingSpan.style.color = '#28a745'; // green
+                }
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
