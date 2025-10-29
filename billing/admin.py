@@ -11,9 +11,9 @@ class BillingRecordInlineAdmin(admin.StackedInline):
     show_change_link = True
 
 class BillingRecordAdmin(admin.ModelAdmin):
-    list_display = ('id', 'client', 'amount', 'date', 'description')
+    list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
     list_filter = ('date', 'client')
-    search_fields = ('client__name', 'description')
+    search_fields = ('client__name', 'description', 'identifier')
     ordering = ('-date',)
     inlines = [BillingRecordInlineAdmin]
 

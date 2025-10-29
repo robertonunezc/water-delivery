@@ -80,7 +80,7 @@ class OrderProductInline(admin.TabularInline):
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
         'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted',
-        'total_amount_display', 'items_count', 'payment_status', 'created_display'
+        'total_amount_display', 'items_count', 'payment_status', 'billing_status', 'created_display'
     )
     
     list_filter = (
@@ -259,6 +259,47 @@ class OrderAdmin(admin.ModelAdmin):
         except ImportError:
             return '-'
     payment_status.short_description = 'Pago'
+    
+    def billing_status(self, obj):
+        """Display billing status and associated billing records"""
+        try:
+            from billing.models import BillingOrder
+            billing_orders = BillingOrder.objects.filter(order=obj).select_related('billing_record')
+            
+            if not billing_orders.exists():
+                return format_html('<span style="color: #6c757d;">-</span>')
+            
+            billing_info = []
+            for billing_order in billing_orders:
+                identifier = billing_order.billing_record.identifier
+                url = reverse('admin:billing_billingrecord_change', args=[billing_order.billing_record.id])
+                
+                if billing_order.is_paid:
+                    status_icon = '✓'
+                    color = '#28a745'
+                    status_text = 'Pagado'
+                elif billing_order.partially_paid:
+                    status_icon = '⚠'
+                    color = '#ffc107'
+                    status_text = f'Parcial ${billing_order.amount_paid}'
+                else:
+                    status_icon = '✗'
+                    color = '#dc3545'
+                    status_text = 'Pendiente'
+                
+                billing_info.append(
+                    f'<div style="margin: 2px 0;">'
+                    f'<a href="{url}" target="_blank" style="color: {color}; text-decoration: none;" title="{status_text}">'
+                    f'{status_icon} {identifier}'
+                    f'</a>'
+                    f'</div>'
+                )
+            
+            return format_html(''.join(billing_info))
+        except ImportError:
+            return '-'
+    
+    billing_status.short_description = 'Facturación'
     
     def created_display(self, obj):
         return obj.created_at.strftime('%d/%m/%Y')

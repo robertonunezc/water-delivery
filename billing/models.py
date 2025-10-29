@@ -4,6 +4,7 @@ from django.db import models
 class BillingRecord(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
+    identifier = models.CharField(max_length=100, unique=True, verbose_name="Identificador de Factura")
     date = models.DateTimeField(auto_now_add=True)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
