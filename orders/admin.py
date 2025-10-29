@@ -4,6 +4,7 @@ from django.urls import reverse, path
 from django.utils.safestring import mark_safe
 from django.db.models import Sum, Count, Q
 from django.http import HttpResponse
+from django.shortcuts import redirect
 from decimal import Decimal
 import csv
 from .models import Order, OrderProduct, OrderStatus, OrderSplit
@@ -106,7 +107,7 @@ class OrderAdmin(admin.ModelAdmin):
     
     readonly_fields = (
         'order_id_display', 'order_date', 'created_at', 'updated_at', 'total_items_display',
-        'order_summary', 'client_info_display', 'split_order_button', 'split_history_display'
+        'order_summary', 'client_info_display', 'split_history_display'
     )
     
     fieldsets = (
@@ -115,9 +116,6 @@ class OrderAdmin(admin.ModelAdmin):
         }),
         ('Detalles', {
             'fields': ('notes', 'total_amount', 'cantidad_cobrada', 'total_items_display')
-        }),
-        ('Acciones', {
-            'fields': ('split_order_button',),
         }),
         ('Resumen del Pedido', {
             'fields': ('order_summary',),
@@ -143,7 +141,7 @@ class OrderAdmin(admin.ModelAdmin):
     ordering = ('-order_date', '-id')
     list_per_page = 25
     
-    actions = ['mark_as_completed', 'mark_as_cancelled', 'mark_as_pending', 'export_to_csv']
+    actions = ['mark_as_completed', 'mark_as_cancelled', 'mark_as_pending', 'split_order_action', 'export_to_csv']
     
     class Media:
         css = {
@@ -328,31 +326,6 @@ class OrderAdmin(admin.ModelAdmin):
         )
     client_info_display.short_description = 'Información del Cliente'
     
-    def split_order_button(self, obj):
-        """Display a button to split the order"""
-        if obj.pk and obj.items.count() > 0:
-            url = reverse('orders:split_order', args=[obj.id])
-            return format_html(
-                '<a class="button" href="{}" style="'
-                'background-color: #417690; '
-                'color: white; '
-                'padding: 10px 15px; '
-                'text-decoration: none; '
-                'border-radius: 4px; '
-                'display: inline-block; '
-                'font-weight: bold;">'
-                '✂️ Dividir Orden'
-                '</a>'
-                '<p style="margin-top: 10px; color: #666; font-size: 12px;">'
-                'Divide esta orden en dos, moviendo productos a una nueva orden.'
-                '</p>',
-                url
-            )
-        return format_html(
-            '<p style="color: #999;">No se puede dividir una orden sin productos.</p>'
-        )
-    split_order_button.short_description = 'Dividir Orden'
-    
     def split_history_display(self, obj):
         """Display split history for this order"""
         if not obj.pk:
@@ -425,6 +398,43 @@ class OrderAdmin(admin.ModelAdmin):
         updated = queryset.update(status='PENDING')
         self.message_user(request, f'{updated} pedidos marcados como pendientes.')
     mark_as_pending.short_description = 'Marcar como pendiente'
+    
+    def split_order_action(self, request, queryset):
+        """Action to split a single order"""
+        # Validate only one order is selected
+        if queryset.count() != 1:
+            self.message_user(
+                request, 
+                'Debes seleccionar exactamente una orden para dividir.',
+                level='error'
+            )
+            return
+        
+        order = queryset.first()
+        
+        # Validate order status is COMPLETED
+        if order.status != "OrderStatus.COMPLETED":
+            self.message_user(
+                request,
+                f'Solo se pueden dividir órdenes completadas. La orden #{order.id} tiene estado: {order.get_status_display()}',
+                level='error'
+            )
+            return
+        
+        # Validate order has items
+        if order.items.count() == 0:
+            self.message_user(
+                request,
+                f'La orden #{order.id} no tiene productos para dividir.',
+                level='error'
+            )
+            return
+        
+        # Redirect to the split order page
+        url = reverse('orders:split_order', args=[order.id])
+        return redirect(url)
+    
+    split_order_action.short_description = '✂️ Dividir orden (solo completadas)'
     
     def export_to_csv(self, request, queryset):
         """Export selected orders to CSV"""
