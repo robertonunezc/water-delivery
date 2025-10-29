@@ -413,7 +413,7 @@ class OrderAdmin(admin.ModelAdmin):
         order = queryset.first()
         
         # Validate order status is COMPLETED
-        if order.status != "OrderStatus.COMPLETED":
+        if order.status != OrderStatus.COMPLETED.value:
             self.message_user(
                 request,
                 f'Solo se pueden dividir órdenes completadas. La orden #{order.id} tiene estado: {order.get_status_display()}',

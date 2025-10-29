@@ -99,7 +99,7 @@ def create_payment(request):
         # Save the payment (this will trigger the custom save logic)
         payment.save()
         
-        order.status = OrderStatus.COMPLETED 
+        order.status = OrderStatus.COMPLETED.value
         order.save()
         
         response_data = {

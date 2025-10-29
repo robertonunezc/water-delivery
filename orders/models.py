@@ -20,7 +20,7 @@ class Order(TimeStampedModel):
     order_date = models.DateTimeField(auto_now_add=True, db_index=True)
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cantidad_cobrada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Cantidad Cobrada", help_text="Cantidad realmente cobrada al cliente (puede ser mayor al total para agregar saldo)")
-    status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default='PENDING', db_index=True)
+    status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default=OrderStatus.PENDING.value, db_index=True)
     notes = models.TextField(blank=True, null=True)
     owner = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
     class Meta:
@@ -36,21 +36,10 @@ class Order(TimeStampedModel):
     
     def get_status_display_fixed(self):
         """
-        Helper method to properly display status even if it's stored as 'OrderStatus.COMPLETED' format
+        Helper method - now just an alias to get_status_display() since status values are fixed.
+        Kept for backward compatibility with existing templates.
         """
-        # Handle cases where status might be stored as 'OrderStatus.COMPLETED' format
-        if self.status.startswith('OrderStatus.'):
-            # Extract the actual status value (e.g., 'COMPLETED' from 'OrderStatus.COMPLETED')
-            actual_status = self.status.replace('OrderStatus.', '')
-            # Find the display name from choices
-            for choice_value, choice_display in ORDER_STATUS_CHOICES:
-                if choice_value == actual_status:
-                    return choice_display
-            # Fallback if not found in choices
-            return actual_status.replace('_', ' ').title()
-        else:
-            # Use Django's built-in get_status_display for normal cases
-            return self.get_status_display()
+        return self.get_status_display()
     
     def __str__(self):
         return f"Order {self.id} for {self.client.name} - {self.status} ({self.total_amount})"
