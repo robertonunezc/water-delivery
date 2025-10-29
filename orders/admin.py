@@ -658,12 +658,12 @@ class OrderSplitAdmin(admin.ModelAdmin):
     created_at_display.admin_order_field = 'created_at'
     
     def source_total(self, obj):
-        return format_html('${:.2f}', obj.source_order.total_amount)
+        return format_html('${}', obj.source_order.total_amount)
     source_total.short_description = 'Total Original'
     source_total.admin_order_field = 'source_order__total_amount'
     
     def child_total(self, obj):
-        return format_html('${:.2f}', obj.child_order.total_amount)
+        return format_html('${}', obj.child_order.total_amount)
     child_total.short_description = 'Total Derivada'
     child_total.admin_order_field = 'child_order__total_amount'
     
