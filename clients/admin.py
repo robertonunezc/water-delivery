@@ -67,7 +67,7 @@ class ClientAdmin(admin.ModelAdmin):
 	
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('name', 'active'), 'type', 'corporate', 'note')
+			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link')
 		}),
 		('Balance y Crédito', {
 			'fields': (

@@ -60,6 +60,7 @@ class Client(TimeStampedModel):
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
+    address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'

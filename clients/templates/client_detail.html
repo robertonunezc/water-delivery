@@ -205,6 +205,13 @@ Desde {{date_since}}</small>
           {% else %}
             <p class="text-muted">No hay direcciones registradas.</p>
           {% endif %}
+                {% if client.address_link %}
+        <div class="mb-3">
+          <a href="{{ client.address_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+            <i class="fas fa-map-marker-alt"></i> Ver Ubicación en Google Maps
+          </a>
+        </div>
+      {% endif %}
         </div>
       </div>
 
