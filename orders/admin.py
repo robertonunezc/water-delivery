@@ -60,6 +60,26 @@ class ItemsCountFilter(admin.SimpleListFilter):
             return queryset.filter(items_count__gte=11)
 
 
+class BillingAttachedFilter(admin.SimpleListFilter):
+    """Filter orders by presence of related billing records (BillingOrder)."""
+    title = 'Tiene facturación'
+    parameter_name = 'has_billing'
+
+    def lookups(self, request, model_admin):
+        return (
+            ('yes', 'Con Facturación'),
+            ('no', 'Sin Facturación'),
+        )
+
+    def queryset(self, request, queryset):
+        if self.value() == 'yes':
+            # Orders that have at least one BillingOrder
+            return queryset.filter(billing_orders__isnull=False).distinct()
+        elif self.value() == 'no':
+            # Orders without any BillingOrder
+            return queryset.filter(billing_orders__isnull=True)
+
+
 class OrderProductInline(admin.TabularInline):
     model = OrderProduct
     extra = 1
@@ -90,6 +110,7 @@ class OrderAdmin(admin.ModelAdmin):
         'created_at',
         OrderAmountFilter,
         ItemsCountFilter,
+        BillingAttachedFilter,
         ('client', admin.RelatedOnlyFieldListFilter),
         ('client__type', admin.ChoicesFieldListFilter),
         ('client__active', admin.BooleanFieldListFilter),

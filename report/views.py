@@ -118,6 +118,7 @@ def orders_report(request):
     start_date = request.GET.get('start_date', '').strip()
     end_date = request.GET.get('end_date', '').strip()
     employee_filter = request.GET.get('employee', '').strip()
+    has_billing = request.GET.get('has_billing', '').strip()
     min_amount = request.GET.get('min_amount', '').strip()
     max_amount = request.GET.get('max_amount', '').strip()
     sort_by = request.GET.get('sort_by', '-order_date').strip()
@@ -126,7 +127,7 @@ def orders_report(request):
     orders_queryset = Order.objects.select_related(
         'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts', 'payments'
+        'items__product', 'client__contacts', 'payments', 'billing_orders__billing_record'
     )
     
     # Apply search filter
@@ -142,6 +143,12 @@ def orders_report(request):
     payment_method = request.GET.get('payment_method', '').strip()
     if payment_method:
         orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
+
+    # Apply billing attached filter: 'yes' => has billing_orders, 'no' => no billing_orders
+    if has_billing == 'yes':
+        orders_queryset = orders_queryset.filter(billing_orders__isnull=False).distinct()
+    elif has_billing == 'no':
+        orders_queryset = orders_queryset.filter(billing_orders__isnull=True)
 
     # Apply status filter
     if status_filter and status_filter != 'all':
@@ -235,10 +242,15 @@ def orders_report(request):
         date_filter or employee_filter or min_amount or max_amount or payment_method
     )
 
+    # consider has_billing as a filter when set to yes/no
+    if has_billing:
+        has_filters = has_filters or (has_billing in ('yes', 'no'))
+
     context = {
         'orders': orders,
         'search_query': search_query,
         'status_filter': status_filter,
+        'has_billing': has_billing,
         'payment_methods': PAYMENT_METHOD_CHOICES,
         'date_filter': date_filter,
         'start_date': start_date,

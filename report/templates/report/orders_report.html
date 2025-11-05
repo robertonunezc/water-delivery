@@ -302,6 +302,14 @@
               {% endfor %}
             </select>
           </div>
+          <div class="col-md-2">
+            <label for="has_billing" class="form-label">Facturación:</label>
+            <select class="form-select" id="has_billing" name="has_billing">
+              <option value="" {% if not has_billing %}selected{% endif %}>Todos</option>
+              <option value="yes" {% if has_billing == 'yes' %}selected{% endif %}>Con Facturación</option>
+              <option value="no" {% if has_billing == 'no' %}selected{% endif %}>Sin Facturación</option>
+            </select>
+          </div>
           <div class="col-md-4">
             <label class="form-label">&nbsp;</label>
             <div class="d-grid gap-2 d-md-flex">
@@ -355,6 +363,7 @@
                   <th scope="col">Fecha</th>
                   <th scope="col" class="text-end">Monto</th>
                   <th scope="col" class="text-center">Estado</th>
+                  <th scope="col" class="text-center">Facturación</th>
                   <th scope="col">Empleado</th>
                   <th scope="col">Productos</th>
                   <th scope="col" class="text-center">Acciones</th>
@@ -406,6 +415,19 @@
                       <span class="badge status-{{ order.status|lower }} status-badge">
                         {{ order.get_status_display_fixed }}
                       </span>
+                    </td>
+                    <td class="text-center">
+                      {% with billing_list=order.billing_orders.all %}
+                        {% if billing_list %}
+                          {% for bo in billing_list %}
+                            <span class="badge" style="background:#28a745; color:#fff; margin-right:4px;">
+                              {{ bo.billing_record.identifier }}
+                            </span>
+                          {% endfor %}
+                        {% else %}
+                          <small class="text-muted">Sin</small>
+                        {% endif %}
+                      {% endwith %}
                     </td>
                     <td>
                       {% if order.owner %}
@@ -465,12 +487,12 @@
               <ul class="pagination justify-content-center">
                 {% if orders.has_previous %}
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
                       <i class="fas fa-angle-double-left"></i>
                     </a>
                   </li>
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
                       <i class="fas fa-angle-left"></i>
                     </a>
                   </li>
@@ -491,11 +513,11 @@
                     </li>
                   {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
                     <li class="page-item">
-                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
                     <li class="page-item">
-                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
                     <li class="page-item disabled">
@@ -506,12 +528,12 @@
 
                 {% if orders.has_next %}
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
                       <i class="fas fa-angle-right"></i>
                     </a>
                   </li>
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
                       <i class="fas fa-angle-double-right"></i>
                     </a>
                   </li>
@@ -619,6 +641,33 @@
                 </table>
               </div>
             {% endif %}
+            {% comment %} Billing information for the order (if any) {% endcomment %}
+            {% with billing_list=order.billing_orders.all %}
+              {% if billing_list %}
+                <h6><i class="fas fa-file-invoice-dollar me-2"></i>Facturación</h6>
+                <ul>
+                  {% for bo in billing_list %}
+                    <li>
+                      <strong>{{ bo.billing_record.identifier }}</strong>
+                      - Monto: ${{ bo.billing_record.amount|floatformat:2 }}
+                      {% if bo.is_paid %}
+                        <span class="badge bg-success ms-2">Pagado</span>
+                      {% elif bo.partially_paid %}
+                        <span class="badge bg-warning text-dark ms-2">Parcial</span>
+                      {% else %}
+                        <span class="badge bg-danger ms-2">Pendiente</span>
+                      {% endif %}
+                      {% if bo.amount_paid and bo.amount_paid > 0 %}
+                        - Cobrado: ${{ bo.amount_paid|floatformat:2 }}
+                      {% endif %}
+                      {% if bo.payment_date %}
+                        - Fecha Pago: {{ bo.payment_date|date:"d/m/Y" }}
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            {% endwith %}
             
             {% if order.notes %}
               <h6><i class="fas fa-sticky-note me-2"></i>Notas</h6>
