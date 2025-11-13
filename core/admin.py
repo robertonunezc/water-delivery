@@ -16,7 +16,7 @@ class EmployeeAdmin(admin.ModelAdmin):
     list_display = ('user', 'position', 'phone', 'city', 'state', 'contract_type')
     list_filter = ('position', 'contract_type', 'city', 'state')
     search_fields = ('user__first_name', 'user__last_name', 'user__email', 'curp', 'rfc', 'phone')
-    readonly_fields = ('user',)
+    # Allow assigning or creating a user from the Employee admin.
     verbose_name = "Empleado"
     verbose_name_plural = "Empleados"
     fieldsets = (
@@ -33,6 +33,32 @@ class EmployeeAdmin(admin.ModelAdmin):
             'fields': ('position', 'contract_type')
         }),
     )
+    def save_model(self, request, obj, form, change):
+        """
+        If an Employee is saved without a linked User, create a new User with an unusable password
+        and assign it to the employee. This allows creating employees that also get a User account
+        from the admin UI.
+        """
+        # If no user is set, save the employee first so we have a PK to build a username
+        if obj.user is None:
+            super().save_model(request, obj, form, change)
+            from django.contrib.auth.models import User as AuthUser
+
+            base_username = f"employee_{obj.pk}"
+            username = base_username
+            i = 1
+            while AuthUser.objects.filter(username=username).exists():
+                username = f"{base_username}_{i}"
+                i += 1
+
+            user = AuthUser.objects.create(username=username)
+            user.set_unusable_password()
+            user.save()
+
+            obj.user = user
+            obj.save()
+        else:
+            super().save_model(request, obj, form, change)
 
 @admin.register(Transport)
 class TransportAdmin(admin.ModelAdmin):

@@ -1,4 +1,4 @@
-from time import timezone
+from django.utils import timezone
 from django.db import models
 from django.contrib.auth.models import User
 # Create your models here.
@@ -6,15 +6,19 @@ from django.contrib.auth.models import User
 EMPLOYEE_POSITIONS = [('manager', 'Administrador'), ('driver', 'Chofer'), ('staff', 'Ventas')]
 
 class Employee(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    # Allow employees without a linked User account (some employees don't access the system)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
+    nombre = models.CharField(max_length=100, default='')
+    apellidos = models.CharField(max_length=100, default='')
+    sexo = models.CharField(max_length=10, choices=[('M', 'Masculino'), ('F', 'Femenino')], null=True, blank=True)
     curp = models.CharField(max_length=18, unique=True)
     rfc = models.CharField(max_length=13, unique=True)
-    phone = models.CharField(max_length=15, blank=True, null=True)
-    street_number = models.CharField(max_length=255)
-    city = models.CharField(max_length=100, default='Queretaro')
-    state = models.CharField(max_length=100, default='Queretaro')
-    zip_code = models.CharField(max_length=20, default='76000')
-    position = models.CharField(max_length=100, choices=EMPLOYEE_POSITIONS, null=True, blank=True)
+    phone = models.CharField(max_length=15, blank=True, null=True, verbose_name="Teléfono")
+    street_number = models.CharField(max_length=255, verbose_name="Calle y Número")
+    city = models.CharField(max_length=100, default='Queretaro', verbose_name="Ciudad")
+    state = models.CharField(max_length=100, default='Queretaro', verbose_name="Estado")
+    zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
+    position = models.CharField(max_length=100, choices=EMPLOYEE_POSITIONS, null=True, blank=True, verbose_name="Puesto")
     contract_type = models.CharField(max_length=50, choices=[('full_time', 'Tiempo Completo'), ('part_time', 'Tiempo Parcial'), ('contract', 'Contrato')], default='full_time')
 
     def __str__(self):
