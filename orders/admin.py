@@ -8,6 +8,7 @@ from django.shortcuts import redirect
 from decimal import Decimal
 import csv
 from .models import Order, OrderProduct, OrderStatus, OrderSplit
+from django.core.exceptions import PermissionDenied
 
 
 class OrderAmountFilter(admin.SimpleListFilter):
@@ -94,6 +95,33 @@ class OrderProductInline(admin.TabularInline):
             )
         return '-'
     total_price_display.short_description = 'Total'
+
+    # Inline permission controls: allow adding when creating a new Order,
+    # but make inline read-only when viewing an existing Order for non-superusers.
+    def get_readonly_fields(self, request, obj=None):
+        # If editing an existing order and user is not superuser, make all fields readonly
+        if obj is not None and not request.user.is_superuser:
+            return tuple(self.fields)
+        return self.readonly_fields
+
+    def has_change_permission(self, request, obj=None):
+        # Allow viewing change page for everyone; only superusers can change
+        if request.user.is_superuser:
+            return True
+        # Return True so non-superusers can open the inline in the order change view
+        return True
+
+    def has_add_permission(self, request, obj=None):
+        # Allow adding inline rows when creating a new order (obj is None) for non-superusers
+        if request.user.is_superuser:
+            return True
+        return obj is None
+
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers may delete inline items from existing orders
+        if request.user.is_superuser:
+            return True
+        return False
 
 
 @admin.register(Order)
@@ -189,6 +217,75 @@ class OrderAdmin(admin.ModelAdmin):
         
         extra_context['order_stats'] = stats
         return super().changelist_view(request, extra_context)
+
+    # --- Permission / visibility controls ---
+    def is_super(self, request):
+        return request.user and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        # Everyone can view orders in the admin
+        return True
+
+    def has_add_permission(self, request):
+        # Allow creating orders for all users
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        # Allow the change view to be opened by everyone (so they can visualize),
+        # but only superusers may actually edit/save changes.
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        # Only superusers may delete orders
+        return self.is_super(request)
+
+    def get_readonly_fields(self, request, obj=None):
+        # If the user is not superuser and is viewing an existing object, make fields readonly
+        if not self.is_super(request) and obj is not None:
+            # Make all concrete model fields readonly to prevent edits
+            model_fields = [f.name for f in self.model._meta.concrete_fields]
+            # Include existing readonly fields (display helpers)
+            model_fields += list(self.readonly_fields)
+            # Remove duplicates while preserving order
+            seen = set()
+            readonly = []
+            for f in model_fields:
+                if f not in seen:
+                    readonly.append(f)
+                    seen.add(f)
+            return tuple(readonly)
+        return self.readonly_fields
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        """Adjust change form UI: hide save/delete buttons for non-superusers viewing existing orders."""
+        extra_context = extra_context or {}
+        if not self.is_super(request) and object_id is not None:
+            # Hide save buttons and delete link in the change form
+            extra_context.update({
+                'show_save': False,
+                'show_save_and_continue': False,
+                'show_save_and_add_another': False,
+                'show_delete': False,
+            })
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def get_actions(self, request):
+        # Only superusers can run admin actions which may mutate orders
+        if not self.is_super(request):
+            return {}
+        return super().get_actions(request)
+
+    def save_model(self, request, obj, form, change):
+        # Prevent non-superusers from saving edits to existing orders
+        if change and not self.is_super(request):
+            raise PermissionDenied("You do not have permission to edit this order.")
+        return super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        # Prevent non-superusers from saving related objects when editing
+        if change and not self.is_super(request):
+            raise PermissionDenied("You do not have permission to modify related items for this order.")
+        return super().save_related(request, form, formsets, change)
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
@@ -568,6 +665,40 @@ class OrderProductAdmin(admin.ModelAdmin):
         return super().get_queryset(request).select_related(
             'order', 'order__client', 'product'
         )
+
+    # Restrict edit/delete actions to superusers; non-superusers can view and add new entries
+    def is_super(self, request):
+        return request.user and request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return True
+
+    def has_add_permission(self, request):
+        return True
+
+    def has_change_permission(self, request, obj=None):
+        # Allow opening change view for visualization, but prevent saving for non-superusers
+        return True
+
+    def has_delete_permission(self, request, obj=None):
+        return self.is_super(request)
+
+    def get_readonly_fields(self, request, obj=None):
+        if not self.is_super(request) and obj is not None:
+            # Make all fields readonly for existing objects
+            field_names = [f.name for f in self.model._meta.concrete_fields]
+            field_names += list(self.readonly_fields)
+            seen = set(); readonly = []
+            for f in field_names:
+                if f not in seen:
+                    readonly.append(f); seen.add(f)
+            return tuple(readonly)
+        return self.readonly_fields
+
+    def get_actions(self, request):
+        if not self.is_super(request):
+            return {}
+        return super().get_actions(request)
     
     def order_link(self, obj):
         url = reverse('admin:orders_order_change', args=[obj.order.id])
