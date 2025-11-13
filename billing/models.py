@@ -9,11 +9,11 @@ class BillingRecord(models.Model):
     description = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
     def __str__(self):
-        return f"BillingRecord {self.id} for {self.client.name} - {self.amount}"
+        return f"Factura Emitida #{self.id} para {self.client.name} - {self.amount}"
     class Meta:
         ordering = ['-date']
         verbose_name = 'Facturación'
-        verbose_name_plural = 'Facturasciones'
+        verbose_name_plural = 'Facturas Emitidas'
 
 class BillingOrder(models.Model):
     billing_record = models.ForeignKey('billing.BillingRecord', on_delete=models.CASCADE)
@@ -24,7 +24,7 @@ class BillingOrder(models.Model):
     payment_date = models.DateTimeField(blank=True, null=True, verbose_name='Fecha de pago')
 
     def __str__(self):
-        return f"BillingOrder {self.id} for Order {self.order.id} - Paid: {self.is_paid}"
+        return f"Agregar venta a factura #{self.id} para Pedido {self.order.id} - Pagado: {self.is_paid}"
     class Meta:
         ordering = ['-payment_date']
         verbose_name = 'Agregar venta a factura'
