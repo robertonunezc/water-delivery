@@ -3,13 +3,9 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import Employee, Transport
 
-class EmployeeInline(admin.StackedInline):
-    model = Employee
-    can_delete = False
-    verbose_name_plural = "empleado"
-
 class UserAdmin(BaseUserAdmin):
-    inlines = [EmployeeInline]
+    # Do not inline Employee here. We want Employee created/managed only from the Employee admin.
+    pass
 
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
@@ -20,17 +16,18 @@ class EmployeeAdmin(admin.ModelAdmin):
     verbose_name = "Empleado"
     verbose_name_plural = "Empleados"
     fieldsets = (
-        ('User Information', {
-            'fields': ('user',)
+       
+        ('Informacion personal', {
+            'fields': ('nombre', 'apellidos', 'sexo', 'curp', 'rfc', 'phone')
         }),
-        ('Personal Information', {
-            'fields': ('curp', 'rfc', 'phone')
-        }),
-        ('Address', {
+        ('Dirección', {
             'fields': ('street_number', 'city', 'state', 'zip_code')
         }),
-        ('Employment', {
+        ('Empleo', {
             'fields': ('position', 'contract_type')
+        }),
+         ('Usuario acceso al sistema', {
+            'fields': ('user',)
         }),
     )
     def save_model(self, request, obj, form, change):
@@ -79,7 +76,6 @@ class TransportAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('assigned_driver__user')
 
-# Unregister the original User admin
+# Unregister the original User admin and register our (inline-free) UserAdmin
 admin.site.unregister(User)
-# Register the User admin with Employee inline
 admin.site.register(User, UserAdmin)
