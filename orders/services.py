@@ -7,6 +7,7 @@ from product.models import ProductClientPrice
 from dataclasses import dataclass
 from typing import List, Optional
 from datetime import datetime
+import logging
 @dataclass
 class OrderData:
     id: int
@@ -64,3 +65,12 @@ def calculate_order_total(order):
         qty = Decimal(str(item.quantity))
         total += unit * qty
     return total
+
+
+def get_logger(name: str):
+    """Return a logger for the orders module.
+
+    This simple helper centralizes logger creation so views can call
+    `services.get_logger(__name__)` without needing additional imports.
+    """
+    return logging.getLogger(name)

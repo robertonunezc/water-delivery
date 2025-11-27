@@ -128,6 +128,49 @@ USE_I18N = True
 
 USE_TZ = True
 
+#Implement django logging
+from pythonjsonlogger import jsonlogger
+
+# Ensure a writable logs directory exists inside the project for local dev.
+# Using a workspace-local `logs/` directory avoids permission issues when
+# running Django locally (instead of in a container where `/var/log/...` may
+# be appropriate).
+LOG_DIR = BASE_DIR / 'logs'
+try:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    # If directory creation fails for any reason, fall back to BASE_DIR
+    LOG_DIR = BASE_DIR
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+        '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+        'fmt': '%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
+        },
+    },
+    'handlers': {
+        'file': {
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': str(LOG_DIR / 'app.log'),
+        'maxBytes': 10*1024*1024,
+        'backupCount': 5,
+        'formatter': 'json',
+        },
+        'console': {
+        'class': 'logging.StreamHandler',
+        'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['file','console'],
+        'level': 'INFO',
+    },
+}
+
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/

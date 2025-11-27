@@ -1,0 +1,27 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+# Development Promtail config — tails project-local log files (macOS-friendly).
+clients:
+  - # Replace the URL below with your Grafana Cloud Loki push endpoint
+    url: https://logs-prod-021.grafana.net/loki/api/v1/push
+    basic_auth:
+      username: ""
+      password_file: /etc/promtail/api_key
+
+positions:
+  filename: /tmp/positions.yaml
+
+scrape_configs:
+  - job_name: django_app_dev
+    static_configs:
+      - targets: ['localhost']
+        labels:
+          job: django
+          env: dev
+          __path__: /var/log/water_delivery/*.log
+
+# Notes: For dev on macOS we tail files under ./logs which are mounted into
+# the container at /var/log/water_delivery. For production use the
+# promtail-config-prod.yaml which tails container json-file logs on Linux.

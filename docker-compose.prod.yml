@@ -74,7 +74,21 @@ services:
       - "project=water-delivery"
       - "environment=production"
       - "service=nginx"
-
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail_prod
+    restart: unless-stopped
+    env_file: 
+      - .env
+    environment:
+      - PROMTAIL_LOKI_API_KEY
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/observability/promtail-config-prod.yaml:/etc/promtail/promtail-config.yaml:ro
+    command: /bin/sh -c "echo ${PROMTAIL_LOKI_API_KEY} > /etc/promtail/api_key && /usr/bin/promtail -config.file=/etc/promtail/promtail-config.yaml"
+    depends_on:
+      - web
 volumes:
   postgres_data:
   redis_data:

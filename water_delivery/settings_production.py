@@ -19,3 +19,27 @@ STATIC_URL = '/static/'
 # Media files
 MEDIA_ROOT = '/app/media/'
 MEDIA_URL = '/media/'
+
+# settings_production.py (add/replace LOGGING)
+from pythonjsonlogger import jsonlogger
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'json': {
+            '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
+            'fmt': '%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'json',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+}

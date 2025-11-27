@@ -17,6 +17,7 @@ from clients.models import Client
 from orders import services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
 
+log = services.get_logger(__name__)
 
 @login_required
 def list_orders(request):
@@ -134,6 +135,7 @@ def create_order(request, client_pk):
         'can_use_credit': client.can_use_credit_for_payment(),
         'requires_credit_note': client.requires_note_for_credit_payment(),
     }
+    log.info(f"Created new order #{order.id} for client {client.name} by user {owner.username}")
     
     return render(request, 'create_order.html', context)
 
