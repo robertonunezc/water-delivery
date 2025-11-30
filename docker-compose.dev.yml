@@ -35,19 +35,18 @@ services:
 
   promtail:
     image: grafana/promtail:latest
-    container_name: promtail_dev
-    restart: unless-stopped
     env_file:
       - .env
     environment:
-      # Set this in your .env file: PROMTAIL_LOKI_API_KEY=glc_...
-      - PROMTAIL_LOKI_API_KEY
+      PROMTAIL_LOKI_API_KEY: ${PROMTAIL_LOKI_API_KEY}
     volumes:
-      # Dev: mount the project logs directory so Promtail can tail host files
       - ./logs:/var/log/water_delivery:ro
-      # Use the repo observability config for dev
       - ./infra/observability/promtail-config-dev.yaml:/etc/promtail/promtail-config.yaml:ro
-    command: /bin/sh -c "mkdir -p /etc/promtail && echo \"${PROMTAIL_LOKI_API_KEY}\" > /etc/promtail/api_key && /usr/bin/promtail -config.file=/etc/promtail/promtail-config.yaml"
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "echo -n \"$PROMTAIL_LOKI_API_KEY\" > /etc/promtail/api_key &&
+      ls -l /etc/promtail &&
+      /usr/bin/promtail -config.file=/etc/promtail/promtail-config.yaml"
     labels:
       - "project=water-delivery"
       - "environment=development"
