@@ -43,7 +43,6 @@ LOGGING = {
         'level': 'INFO',
     },
 }
-import os
 from dotenv import load_dotenv
 load_dotenv('.env.prod')
 DATABASES = {
@@ -52,7 +51,7 @@ DATABASES = {
         'NAME': os.environ.get('POSTGRES_DB', 'water_delivery'),
         'USER': os.environ.get('POSTGRES_USER', 'user'),
         'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'password'),
-        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'host.docker.internal'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
 }

@@ -25,7 +25,7 @@ SECRET_KEY = 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*j-f2^k5a5v8d3t9m+etkcvi2
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'puntoreica.com', 'www.puntoreica.com']
 
 
 # Application definition
@@ -83,7 +83,19 @@ WSGI_APPLICATION = 'water_delivery.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-
+import os
+from dotenv import load_dotenv
+load_dotenv()
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('POSTGRES_DB', 'water_delivery'),
+        'USER': os.environ.get('POSTGRES_USER', 'user'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'password'),
+        'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+        'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+    }
+}
 
 
 # Password validation
@@ -174,3 +186,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'core:login'
 LOGIN_REDIRECT_URL = 'core:home'
 LOGOUT_REDIRECT_URL = 'core:home'
+
+# Production static settings
+STATIC_ROOT = '/app/staticfiles/'
+STATIC_URL = '/static/'
+
+# Media files
+MEDIA_ROOT = '/app/media/'
+MEDIA_URL = '/media/'
