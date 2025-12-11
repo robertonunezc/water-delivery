@@ -1214,13 +1214,16 @@ class Contact(TimeStampedModel):
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.CASCADE)
     street = models.CharField(max_length=255, verbose_name="Calle")
-    number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número")
-    interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número Interior")
+    exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
+    interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
     neighborhood = models.CharField(max_length=100, blank=True, null=True, verbose_name="Colonia")
+    locality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Localidad")
+    municipality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Delegación o Municipio")
     city = models.CharField(max_length=100, default='Queretaro', verbose_name="Ciudad")
     state = models.CharField(max_length=100, default='Queretaro', verbose_name="Estado")
     zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
     country = models.CharField(max_length=100, default='Mexico', verbose_name="País")
+    reference = models.TextField(blank=True, null=True, verbose_name="Referencia")
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=[('billing', 'Facturación'), ('shipping', 'Envío'), ('other', 'Otro')], default='other', verbose_name="Tipo")
@@ -1242,10 +1245,11 @@ class BillingData(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='billing_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
-    #uso_cfdi = models.CharField(max_length=255)
+    uso_cfdi = models.CharField(max_length=255, verbose_name="Uso de CFDI", null=True, blank=True)
     metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other', verbose_name="Forma de pago")
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
-    
+    regimen_fiscal = models.CharField(max_length=255, blank=True, null=True, verbose_name="Régimen Fiscal")
+    curp = models.CharField(max_length=255, blank=True, null=True, verbose_name="CURP")
     class Meta:
         verbose_name = 'Datos de facturación'
         verbose_name_plural = 'Datos de facturación'

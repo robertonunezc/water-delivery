@@ -1,0 +1,400 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+    .billing-section {
+        background: #f8f9fa;
+        padding: 20px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+        border: 1px solid #dee2e6;
+    }
+    .billing-section h2 {
+        margin-top: 0;
+        color: #417690;
+        font-size: 1.3em;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #417690;
+    }
+    .form-row {
+        margin-bottom: 15px;
+    }
+    .field-box {
+        padding: 10px 0;
+    }
+    .field-box label {
+        display: block;
+        font-weight: bold;
+        margin-bottom: 5px;
+        color: #333;
+    }
+    .form-control {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+    }
+    .form-check-input {
+        margin-right: 5px;
+    }
+    .help {
+        color: #666;
+        font-size: 0.9em;
+        margin-top: 5px;
+    }
+    .errorlist {
+        color: #ba2121;
+        margin: 5px 0;
+        padding: 0;
+        list-style: none;
+    }
+    .submit-row {
+        padding: 15px;
+        text-align: right;
+        background: #f8f9fa;
+        border-top: 1px solid #dee2e6;
+    }
+    .client-info {
+        background: #e8f4f8;
+        padding: 15px;
+        margin-bottom: 20px;
+        border-radius: 5px;
+        border-left: 4px solid #417690;
+    }
+    .client-info h3 {
+        margin: 0 0 10px 0;
+        color: #417690;
+    }
+    .alert {
+        padding: 12px 20px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+    }
+    .alert-info {
+        background-color: #d1ecf1;
+        border: 1px solid #bee5eb;
+        color: #0c5460;
+    }
+    .conditional-fields {
+        background: #fff;
+        padding: 15px;
+        margin-top: 10px;
+        border-left: 3px solid #ffc107;
+        border-radius: 3px;
+    }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle billing date type changes to show/hide conditional fields
+    const billingDateField = document.querySelector('select[name="billing_date"]');
+    const specificDayField = document.querySelector('input[name="specific_day"]').closest('.form-row');
+    const weekdayField = document.querySelector('select[name="weekday"]').closest('.form-row');
+    const occurrenceField = document.querySelector('select[name="occurrence"]').closest('.form-row');
+    
+    function updateConditionalFields() {
+        const value = billingDateField.value;
+        
+        // Hide all conditional fields by default
+        specificDayField.style.display = 'none';
+        weekdayField.style.display = 'none';
+        occurrenceField.style.display = 'none';
+        
+        // Show relevant fields based on selection
+        if (value === 'specific_date') {
+            specificDayField.style.display = 'block';
+        } else if (value === 'weekday_occurrence') {
+            weekdayField.style.display = 'block';
+            occurrenceField.style.display = 'block';
+        }
+    }
+    
+    if (billingDateField) {
+        billingDateField.addEventListener('change', updateConditionalFields);
+        updateConditionalFields(); // Initial call
+    }
+});
+</script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+    &rsaquo; <a href="{% url 'admin:clients_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+    &rsaquo; <a href="{% url 'admin:clients_client_change' client.id %}">{{ client.name }}</a>
+    &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>{{ title }}</h1>
+
+<div class="client-info">
+    <h3>Cliente: {{ client.name }}</h3>
+    <p><strong>Tipo:</strong> {{ client.get_type_display }}</p>
+    <p><strong>Requiere facturación:</strong> {% if client.requires_billing %}Sí{% else %}No{% endif %}</p>
+</div>
+
+{% if not client.requires_billing %}
+<div class="alert alert-info">
+    <strong>Nota:</strong> Este cliente actualmente no tiene marcado que requiere facturación. 
+    Puede configurar los datos de facturación de todos modos, pero asegúrese de marcar "Requiere facturación" en la configuración del cliente si es necesario.
+</div>
+{% endif %}
+
+<form method="post" action="">
+    {% csrf_token %}
+    
+    <!-- Billing Data Section -->
+    <div class="billing-section">
+        <h2>Datos de Facturación</h2>
+        
+        {% if not client.addresses.all %}
+        <div class="alert alert-info">
+            <strong>Aviso:</strong> Este cliente no tiene direcciones registradas. Por favor, agregue al menos una dirección al cliente antes de configurar la facturación.
+        </div>
+        {% endif %}
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.rfc.label_tag }}
+                {{ billing_form.rfc }}
+                {% if billing_form.rfc.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.rfc.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if billing_form.rfc.help_text %}
+                    <p class="help">{{ billing_form.rfc.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.curp.label_tag }}
+                {{ billing_form.curp }}
+                {% if billing_form.curp.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.curp.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">CURP es opcional. Requerido solo para personas físicas.</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.razon_social.label_tag }}
+                {{ billing_form.razon_social }}
+                {% if billing_form.razon_social.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.razon_social.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if billing_form.razon_social.help_text %}
+                    <p class="help">{{ billing_form.razon_social.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.regimen_fiscal.label_tag }}
+                {{ billing_form.regimen_fiscal }}
+                {% if billing_form.regimen_fiscal.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.regimen_fiscal.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">Ejemplo: 601 - General de Ley Personas Morales, 612 - Personas Físicas con Actividades Empresariales</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.uso_cfdi.label_tag }}
+                {{ billing_form.uso_cfdi }}
+                {% if billing_form.uso_cfdi.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.uso_cfdi.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">Ejemplo: G03 - Gastos en general, D01 - Honorarios médicos, P01 - Por definir</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.metodo_pago.label_tag }}
+                {{ billing_form.metodo_pago }}
+                {% if billing_form.metodo_pago.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.metodo_pago.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if billing_form.metodo_pago.help_text %}
+                    <p class="help">{{ billing_form.metodo_pago.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ billing_form.address.label_tag }}
+                {{ billing_form.address }}
+                {% if billing_form.address.errors %}
+                    <ul class="errorlist">
+                        {% for error in billing_form.address.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">Seleccione la dirección que se usará para facturación. Si no hay direcciones disponibles, primero agregue una dirección al cliente.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Billing Frequency Section -->
+    <div class="billing-section">
+        <h2>Frecuencia de Facturación</h2>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ frequency_form.frequency.label_tag }}
+                {{ frequency_form.frequency }}
+                {% if frequency_form.frequency.errors %}
+                    <ul class="errorlist">
+                        {% for error in frequency_form.frequency.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if frequency_form.frequency.help_text %}
+                    <p class="help">{{ frequency_form.frequency.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ frequency_form.billing_date.label_tag }}
+                {{ frequency_form.billing_date }}
+                {% if frequency_form.billing_date.errors %}
+                    <ul class="errorlist">
+                        {% for error in frequency_form.billing_date.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">Seleccione cómo se determinará la fecha de facturación cada periodo.</p>
+            </div>
+        </div>
+        
+        <div class="conditional-fields">
+            <p><strong>Campos condicionales:</strong> Los siguientes campos se mostrarán según el tipo de fecha seleccionado arriba.</p>
+            
+            <div class="form-row">
+                <div class="field-box">
+                    {{ frequency_form.specific_day.label_tag }}
+                    {{ frequency_form.specific_day }}
+                    {% if frequency_form.specific_day.errors %}
+                        <ul class="errorlist">
+                            {% for error in frequency_form.specific_day.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    <p class="help">Usar solo cuando el tipo de fecha sea "Fecha específica del mes". Ejemplo: día 15 de cada mes.</p>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-box">
+                    {{ frequency_form.weekday.label_tag }}
+                    {{ frequency_form.weekday }}
+                    {% if frequency_form.weekday.errors %}
+                        <ul class="errorlist">
+                            {% for error in frequency_form.weekday.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    <p class="help">Usar solo cuando el tipo de fecha sea "Día específico de la semana".</p>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="field-box">
+                    {{ frequency_form.occurrence.label_tag }}
+                    {{ frequency_form.occurrence }}
+                    {% if frequency_form.occurrence.errors %}
+                        <ul class="errorlist">
+                            {% for error in frequency_form.occurrence.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    <p class="help">Usar solo cuando el tipo de fecha sea "Día específico de la semana". Ejemplo: tercer lunes de cada mes.</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                <label>
+                    {{ frequency_form.is_active }}
+                    {{ frequency_form.is_active.label }}
+                </label>
+                {% if frequency_form.is_active.errors %}
+                    <ul class="errorlist">
+                        {% for error in frequency_form.is_active.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                <p class="help">Marque si esta configuración de facturación está activa.</p>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="field-box">
+                {{ frequency_form.notes.label_tag }}
+                {{ frequency_form.notes }}
+                {% if frequency_form.notes.errors %}
+                    <ul class="errorlist">
+                        {% for error in frequency_form.notes.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if frequency_form.notes.help_text %}
+                    <p class="help">{{ frequency_form.notes.help_text }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="submit-row">
+        <input type="submit" value="Guardar" class="default" />
+        <a href="{% url 'admin:clients_client_change' client.id %}" class="button cancel-link">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

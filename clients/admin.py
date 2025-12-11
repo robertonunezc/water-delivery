@@ -1,12 +1,18 @@
 from django.contrib import admin
 from django.utils.html import format_html
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
 from django.contrib import messages
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from . import models
-from .forms import ManualBalanceTransactionForm, ManualCreditTransactionForm, BulkBalanceDepositForm
+from .forms import (
+	ManualBalanceTransactionForm, 
+	ManualCreditTransactionForm, 
+	BulkBalanceDepositForm,
+	ClientBillingDataForm,
+	ClientBillingFrequencyForm
+)
 
 
 class ContactInline(admin.TabularInline):
@@ -60,15 +66,19 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
-	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status')
+	inlines = [ContactInline, AddressInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
+	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
-	actions = ['add_balance_action', 'add_credit_action']
+	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
 	
 	fieldsets = (
 		('Información Básica', {
 			'fields': (('name', 'active'), 'type', 'corporate', 'requires_billing', 'note', 'address_link'),
-			'description': 'Si requiere datos de facturación, agréguelos en la pestaña DATOS DE FACTURACIÓN'
+			'description': 'Si requiere datos de facturación, use el botón "Gestionar Datos de Facturación" más abajo'
+		}),
+		('Datos de Facturación', {
+			'fields': ('get_billing_data_button',),
+			'description': 'Configure los datos de facturación y frecuencia del cliente'
 		}),
 		('Balance y Crédito', {
 			'fields': (
@@ -89,6 +99,29 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Display available credit for the client"""
 		return f"${obj.get_available_credit():.2f}"
 	get_available_credit.short_description = 'Crédito Disponible'
+	
+	def get_billing_data_button(self, obj):
+		"""Display a button to manage billing data and frequency"""
+		if obj.pk:
+			url = reverse('admin:clients_client_manage_billing', args=[obj.pk])
+			has_billing = hasattr(obj, 'billing_data') and obj.billing_data.exists()
+			has_frequency = hasattr(obj, 'billing_frecuency') and obj.billing_frecuency.exists()
+			
+			if has_billing and has_frequency:
+				status = '<span style="color: green;">✓ Configurado</span>'
+			elif has_billing or has_frequency:
+				status = '<span style="color: orange;">⚠ Parcialmente configurado</span>'
+			else:
+				status = '<span style="color: red;">✗ No configurado</span>'
+			
+			return format_html(
+				'<div style="padding: 10px;">{}<br><br>'
+				'<a href="{}" class="button" style="margin-top: 10px;">'
+				'Gestionar Datos de Facturación</a></div>',
+				status, url
+			)
+		return '-'
+	get_billing_data_button.short_description = 'Gestión de Facturación'
 	
 	def get_balance_status(self, obj):
 		"""Display balance and debt status with color coding"""
@@ -112,6 +145,7 @@ class ClientAdmin(admin.ModelAdmin):
 			path('add-balance/', self.admin_site.admin_view(self.add_balance_view), name='clients_client_add_balance'),
 			path('add-credit/', self.admin_site.admin_view(self.add_credit_view), name='clients_client_add_credit'),
 			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
+			path('<path:object_id>/manage-billing/', self.admin_site.admin_view(self.manage_billing_view), name='clients_client_manage_billing'),
 		]
 		return custom_urls + urls
 	
@@ -139,6 +173,19 @@ class ClientAdmin(admin.ModelAdmin):
 		)
 	
 	add_credit_action.short_description = "Gestionar crédito del cliente seleccionado"
+	
+	def manage_billing_action(self, request, queryset):
+		"""Admin action to manage billing data for selected client"""
+		if queryset.count() != 1:
+			messages.error(request, "Seleccione exactamente un cliente para gestionar facturación.")
+			return
+		
+		client = queryset.first()
+		return HttpResponseRedirect(
+			reverse('admin:clients_client_manage_billing', args=[client.id])
+		)
+	
+	manage_billing_action.short_description = "Gestionar datos de facturación del cliente"
 	
 	def add_balance_view(self, request):
 		"""View for manually adding balance to a client"""
@@ -341,6 +388,59 @@ class ClientAdmin(admin.ModelAdmin):
 			'has_view_permission': True,
 		}
 		return render(request, 'admin/clients/bulk_deposit.html', context)
+	
+	def manage_billing_view(self, request, object_id):
+		"""View for managing billing data and frequency together"""
+		client = get_object_or_404(models.Client, pk=object_id)
+		
+		# Get or create billing data and frequency instances
+		try:
+			billing_data = client.billing_data.get()
+		except models.BillingData.DoesNotExist:
+			billing_data = None
+		
+		try:
+			frequency = client.billing_frecuency.get()
+		except models.ClientBillingFrecuency.DoesNotExist:
+			frequency = None
+		
+		if request.method == 'POST':
+			billing_form = ClientBillingDataForm(request.POST, instance=billing_data, client=client)
+			frequency_form = ClientBillingFrequencyForm(request.POST, instance=frequency)
+			
+			if billing_form.is_valid() and frequency_form.is_valid():
+				try:
+					# Save billing data
+					billing_instance = billing_form.save(commit=False)
+					billing_instance.client = client
+					billing_instance.save()
+					
+					# Save billing frequency
+					frequency_instance = frequency_form.save(commit=False)
+					frequency_instance.client = client
+					frequency_instance.save()
+					
+					messages.success(
+						request,
+						f"Datos de facturación actualizados exitosamente para {client.name}."
+					)
+					return redirect('admin:clients_client_change', object_id=client.id)
+					
+				except Exception as e:
+					messages.error(request, f"Error al guardar datos de facturación: {str(e)}")
+		else:
+			billing_form = ClientBillingDataForm(instance=billing_data, client=client)
+			frequency_form = ClientBillingFrequencyForm(instance=frequency)
+		
+		context = {
+			'billing_form': billing_form,
+			'frequency_form': frequency_form,
+			'client': client,
+			'title': f'Gestionar Datos de Facturación - {client.name}',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+		}
+		return render(request, 'admin/clients/manage_billing.html', context)
 
 
 class ContactAdmin(admin.ModelAdmin):
