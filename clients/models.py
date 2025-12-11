@@ -1281,11 +1281,11 @@ class Address(TimeStampedModel):
     reference = models.TextField(blank=True, null=True, verbose_name="Referencia")
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
-    type = models.CharField(max_length=50, choices=[('billing', 'Facturación'), ('shipping', 'Envío'), ('other', 'Otro')], default='other', verbose_name="Tipo")
+    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='other', verbose_name="Tipo")
     
     class Meta:
-        verbose_name = 'Direccion'
-        verbose_name_plural = 'Direcciones'
+        verbose_name = 'Domicilio'
+        verbose_name_plural = 'Domicilios'
         indexes = [
             models.Index(fields=['city'], name='clients_address_city_idx'),
             models.Index(fields=['state'], name='clients_address_state_idx'),
@@ -1294,16 +1294,42 @@ class Address(TimeStampedModel):
 
     def __str__(self):
         return f"{self.street}, {self.city}, {self.state}, {self.zip_code}, {self.country}"
+    
+    def clean(self):
+        """Validate that each client has only one address of type billing and one of type shipping"""
+        from django.core.exceptions import ValidationError
+        
+        # Only validate for billing and shipping types
+        if self.type not in ['billing', 'shipping']:
+            return
+        
+        # Build query to find existing addresses of the same type for this client
+        existing_query = Address.objects.filter(
+            client=self.client,
+            type=self.type
+        )
+        
+        # Exclude current instance if updating (not creating)
+        if self.pk:
+            existing_query = existing_query.exclude(pk=self.pk)
+        
+        # Check if another address of this type exists
+        if existing_query.exists():
+            type_display = self.get_type_display()
+            raise ValidationError({
+                'type': f'El cliente ya tiene una dirección de tipo "{type_display}". '
+                        f'Solo se permite una dirección por tipo (Fiscal/Ubicación física).'
+            })
 
 
 class BillingData(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='billing_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
-    uso_cfdi = models.CharField(max_length=10, choices=USO_CFDI_CHOICES, verbose_name="Uso de CFDI", null=True, blank=True)
+    #uso_cfdi = models.CharField(max_length=10, choices=USO_CFDI_CHOICES, verbose_name="Uso de CFDI", null=True, blank=True)
     metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other', verbose_name="Forma de pago")
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
-    regimen_fiscal = models.CharField(max_length=10, choices=REGIMEN_FISCAL_CHOICES, blank=True, null=True, verbose_name="Régimen Fiscal")
+    #regimen_fiscal = models.CharField(max_length=10, choices=REGIMEN_FISCAL_CHOICES, blank=True, null=True, verbose_name="Régimen Fiscal")
     curp = models.CharField(max_length=255, blank=True, null=True, verbose_name="CURP")
     class Meta:
         verbose_name = 'Datos de facturación'

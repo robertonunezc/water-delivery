@@ -258,7 +258,7 @@ class ClientBillingDataForm(forms.ModelForm):
     class Meta:
         from .models import BillingData
         model = BillingData
-        fields = ['rfc', 'curp', 'razon_social', 'regimen_fiscal', 'uso_cfdi', 'metodo_pago', 'address']
+        fields = ['rfc', 'curp', 'razon_social', 'metodo_pago', 'address']
         widgets = {
             'rfc': forms.TextInput(attrs={
                 'class': 'form-control',
@@ -275,14 +275,7 @@ class ClientBillingDataForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Razón social completa'
             }),
-            'regimen_fiscal': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ejemplo: 601 - General de Ley Personas Morales'
-            }),
-            'uso_cfdi': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Ejemplo: G03 - Gastos en general'
-            }),
+          
             'metodo_pago': forms.Select(attrs={'class': 'form-control'}),
             'address': forms.Select(attrs={'class': 'form-control'}),
         }
@@ -290,9 +283,7 @@ class ClientBillingDataForm(forms.ModelForm):
             'rfc': 'RFC',
             'curp': 'CURP',
             'razon_social': 'Razón Social',
-            'regimen_fiscal': 'Régimen Fiscal',
-            'uso_cfdi': 'Uso de CFDI',
-            'metodo_pago': 'Método de Pago',
+                      'metodo_pago': 'Método de Pago',
             'address': 'Dirección de Facturación',
         }
     

@@ -211,36 +211,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         <div class="form-row">
             <div class="field-box">
-                {{ billing_form.regimen_fiscal.label_tag }}
-                {{ billing_form.regimen_fiscal }}
-                {% if billing_form.regimen_fiscal.errors %}
-                    <ul class="errorlist">
-                        {% for error in billing_form.regimen_fiscal.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                <p class="help">Ejemplo: 601 - General de Ley Personas Morales, 612 - Personas Físicas con Actividades Empresariales</p>
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="field-box">
-                {{ billing_form.uso_cfdi.label_tag }}
-                {{ billing_form.uso_cfdi }}
-                {% if billing_form.uso_cfdi.errors %}
-                    <ul class="errorlist">
-                        {% for error in billing_form.uso_cfdi.errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                {% endif %}
-                <p class="help">Ejemplo: G03 - Gastos en general, D01 - Honorarios médicos, P01 - Por definir</p>
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="field-box">
                 {{ billing_form.metodo_pago.label_tag }}
                 {{ billing_form.metodo_pago }}
                 {% if billing_form.metodo_pago.errors %}
