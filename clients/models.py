@@ -48,7 +48,62 @@ OCCURRENCE_CHOICES = [
     (3, 'Tercer'),
     (4, 'Cuarto'),
     (-1, 'Último'),
-]  
+]
+
+REGIMEN_FISCAL_CHOICES = [
+    ('601', '601 - Régimen General de Ley Personas Morales'),
+    ('602', '602 - Régimen Simplificado de Ley Personas Morales'),
+    ('603', '603 - Personas Morales con Fines no Lucrativos'),
+    ('604', '604 - Régimen de Pequeños Contribuyentes'),
+    ('605', '605 - Régimen de Sueldos y Salarios e Ingresos Asimilados a Salarios'),
+    ('606', '606 - Régimen de Arrendamiento'),
+    ('607', '607 - Régimen de Enajenación o Adquisición de Bienes'),
+    ('608', '608 - Régimen de los Demás Ingresos'),
+    ('609', '609 - Régimen de Consolidación'),
+    ('610', '610 - Régimen Residentes en el Extranjero sin Establecimiento Permanente en México'),
+    ('611', '611 - Régimen de Ingresos por Dividendos (socios y accionistas)'),
+    ('612', '612 - Régimen de las Personas Físicas con Actividades Empresariales y Profesionales'),
+    ('613', '613 - Régimen Intermedio de las Personas Físicas con Actividades Empresariales'),
+    ('614', '614 - Régimen de los Ingresos por Intereses'),
+    ('615', '615 - Régimen de los Ingresos por Obtención de Premios'),
+    ('616', '616 - Sin Obligaciones Fiscales'),
+    ('617', '617 - PEMEX'),
+    ('618', '618 - Régimen Simplificado de Ley Personas Físicas'),
+    ('619', '619 - Ingresos por la Obtención de Préstamos'),
+    ('620', '620 - Sociedades Cooperativas de Producción que Optan por Diferir sus Ingresos'),
+    ('621', '621 - Régimen de Incorporación Fiscal'),
+    ('622', '622 - Régimen de Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras PM'),
+    ('623', '623 - Régimen de Opcional para Grupos de Sociedades'),
+    ('624', '624 - Régimen de los Coordinados'),
+    ('625', '625 - Régimen de las Actividades Empresariales con Ingresos a través de Plataformas Tecnológicas'),
+    ('626', '626 - Régimen Simplificado de Confianza'),
+]
+
+USO_CFDI_CHOICES = [
+    ('G01', 'G01 - Adquisición de mercancías'),
+    ('G02', 'G02 - Devoluciones, descuentos o bonificaciones'),
+    ('G03', 'G03 - Gastos en general'),
+    ('I01', 'I01 - Construcciones'),
+    ('I02', 'I02 - Mobilario y equipo de oficina por inversiones'),
+    ('I03', 'I03 - Equipo de transporte'),
+    ('I04', 'I04 - Equipo de computo y accesorios'),
+    ('I05', 'I05 - Dados, troqueles, moldes, matrices y herramental'),
+    ('I06', 'I06 - Comunicaciones telefónicas'),
+    ('I07', 'I07 - Comunicaciones satelitales'),
+    ('I08', 'I08 - Otra maquinaria y equipo'),
+    ('D01', 'D01 - Honorarios médicos, dentales y gastos hospitalarios'),
+    ('D02', 'D02 - Gastos médicos por incapacidad o discapacidad'),
+    ('D03', 'D03 - Gastos funerales'),
+    ('D04', 'D04 - Donativos'),
+    ('D05', 'D05 - Intereses reales efectivamente pagados por créditos hipotecarios (casa habitación)'),
+    ('D06', 'D06 - Aportaciones voluntarias al SAR'),
+    ('D07', 'D07 - Primas por seguros de gastos médicos'),
+    ('D08', 'D08 - Gastos de transportación escolar obligatoria'),
+    ('D09', 'D09 - Depósitos en cuentas para el ahorro, primas que tengan como base planes de pensiones'),
+    ('D10', 'D10 - Pagos por servicios educativos (colegiaturas)'),
+    ('P01', 'P01 - Por definir'),
+]
+
 class Client(TimeStampedModel):
     name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente")
     active = models.BooleanField(default=True, verbose_name="Activo")
@@ -1245,10 +1300,10 @@ class BillingData(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='billing_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
-    uso_cfdi = models.CharField(max_length=255, verbose_name="Uso de CFDI", null=True, blank=True)
+    uso_cfdi = models.CharField(max_length=10, choices=USO_CFDI_CHOICES, verbose_name="Uso de CFDI", null=True, blank=True)
     metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other', verbose_name="Forma de pago")
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
-    regimen_fiscal = models.CharField(max_length=255, blank=True, null=True, verbose_name="Régimen Fiscal")
+    regimen_fiscal = models.CharField(max_length=10, choices=REGIMEN_FISCAL_CHOICES, blank=True, null=True, verbose_name="Régimen Fiscal")
     curp = models.CharField(max_length=255, blank=True, null=True, verbose_name="CURP")
     class Meta:
         verbose_name = 'Datos de facturación'
