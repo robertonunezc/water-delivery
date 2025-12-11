@@ -57,9 +57,9 @@ class ClientCreditConfigInline(admin.StackedInline):
 
 @admin.register(models.Client)
 class ClientAdmin(admin.ModelAdmin):
-	list_display = ('name', 'active','type', 'balance', 'current_debt', 'get_available_credit', 'created_at', 'updated_at')
+	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
-	list_filter = ('active', 'type')
+	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	inlines = [ContactInline, AddressInline, BillingDataInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status')
 	exclude = ('deleted_at',)
@@ -67,7 +67,8 @@ class ClientAdmin(admin.ModelAdmin):
 	
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link')
+			'fields': (('name', 'active'), 'type', 'corporate', 'requires_billing', 'note', 'address_link'),
+			'description': 'Si requiere datos de facturación, agréguelos en la pestaña DATOS DE FACTURACIÓN'
 		}),
 		('Balance y Crédito', {
 			'fields': (

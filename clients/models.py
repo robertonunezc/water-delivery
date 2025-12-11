@@ -53,7 +53,7 @@ class Client(TimeStampedModel):
     name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente")
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
-    type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='individual', verbose_name="Tipo de cliente")
+    type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='branch', verbose_name="Tipo de cliente")
     corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True, verbose_name="Cliente corporativo")
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Saldo a favor", help_text="Monto prepagado disponible para usar en pedidos")
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
@@ -61,6 +61,7 @@ class Client(TimeStampedModel):
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
+    requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
@@ -1241,8 +1242,8 @@ class BillingData(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='billing_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
-    uso_cfdi = models.CharField(max_length=255)
-    metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other')
+    #uso_cfdi = models.CharField(max_length=255)
+    metodo_pago = models.CharField(max_length=255, choices=PAYMENT_METHOD_CHOICES, default='other', verbose_name="Forma de pago")
     address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
     
     class Meta:
