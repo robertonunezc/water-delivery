@@ -1284,10 +1284,8 @@ class Address(TimeStampedModel):
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
-    neighborhood = models.CharField(max_length=100, blank=True, null=True, verbose_name="Colonia")
     locality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Localidad")
     municipality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Delegación o Municipio")
-    city = models.CharField(max_length=100, default='Queretaro', verbose_name="Ciudad")
     state = models.CharField(max_length=100, default='Queretaro', verbose_name="Estado")
     zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
     country = models.CharField(max_length=100, default='Mexico', verbose_name="País")
@@ -1300,7 +1298,7 @@ class Address(TimeStampedModel):
         verbose_name = 'Domicilio'
         verbose_name_plural = 'Domicilios'
         indexes = [
-            models.Index(fields=['city'], name='clients_address_city_idx'),
+            models.Index(fields=['municipality'], name='clients_address_munic_idx'),
             models.Index(fields=['state'], name='clients_address_state_idx'),
             models.Index(fields=['active'], name='clients_address_active_idx'),
         ]

@@ -454,8 +454,8 @@ class ContactAdmin(admin.ModelAdmin):
 
 
 class AddressAdmin(admin.ModelAdmin):
-	list_display = ('street', 'city', 'state', 'zip_code', 'client')
-	search_fields = ('street', 'city', 'client__name')
+	list_display = ('street', 'municipality', 'state', 'zip_code', 'client')
+	search_fields = ('street', 'municipality', 'client__name')
 	exclude = ('deleted_at',)
 
 
