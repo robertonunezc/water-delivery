@@ -10,6 +10,8 @@ services:
       - .env
     environment:
       - DEBUG=False
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
     volumes:
       - ./staticfiles:/app/staticfiles
       - ./media:/app/media
