@@ -41,7 +41,6 @@ services:
       - "project=water-delivery"
       - "environment=production"
       - "service=postgres"
-      - postgres_data:/var/lib/postgresql/data
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
