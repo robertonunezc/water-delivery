@@ -17,7 +17,9 @@ jobs:
           chmod 700 ~/.ssh
           printf "%s" "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -T 10 -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts || { echo "keyscan failed"; cat ~/.ssh/known_hosts; exit 1; }
+          HOST="${{ secrets.EC2_HOST }}"
+          PORT="${{ secrets.EC2_SSH_PORT || '22' }}"
+          ssh-keyscan -p "$PORT" -T 10 -H "$HOST" >> ~/.ssh/known_hosts || { echo "keyscan failed"; cat ~/.ssh/known_hosts; exit 1; }
           chmod 644 ~/.ssh/known_hosts
           # Verify the key was created
           ls -la ~/.ssh/
@@ -25,9 +27,12 @@ jobs:
       
       - name: Test SSH connection
         run: |
+          set -euxo pipefail
+          HOST="${{ secrets.EC2_HOST }}"
+          PORT="${{ secrets.EC2_SSH_PORT || '22' }}"
           # Verify key still exists
           ls -la ~/.ssh/id_rsa
-          ssh -vvv -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+          ssh -p "$PORT" -o StrictHostKeyChecking=yes -vvv -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}"@"$HOST" "echo 'SSH connection successful'"
       
       - name: Deploy to EC2
         run: |
