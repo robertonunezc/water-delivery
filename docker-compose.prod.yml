@@ -10,7 +10,6 @@ services:
       - .env
     environment:
       - DEBUG=False
-      - DJANGO_SETTINGS_MODULE=water_delivery.settings_production
       - POSTGRES_HOST=postgres
       - REDIS_HOST=redis
     volumes:

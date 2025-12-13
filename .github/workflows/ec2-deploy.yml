@@ -39,7 +39,7 @@ jobs:
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
             echo "Deploying water-delivery application..."
-            cd app/water-delivery
+            cd projects/water-delivery
             echo "Pulling latest code from main branch..."
             git pull origin main
             echo "Stopping existing containers..."
