@@ -10,8 +10,6 @@ services:
       - .env
     environment:
       - DEBUG=False
-      - POSTGRES_HOST=postgres
-      - REDIS_HOST=redis
     volumes:
       - ./staticfiles:/app/staticfiles
       - ./media:/app/media
