@@ -1304,7 +1304,7 @@ class Address(TimeStampedModel):
         ]
 
     def __str__(self):
-        return f"{self.street}, {self.city}, {self.state}, {self.zip_code}, {self.country}"
+        return f"{self.street}, {self.municipality}, {self.state}, {self.zip_code}, {self.country}"
     
     def clean(self):
         """Validate that each client has only one address of type billing and one of type shipping"""

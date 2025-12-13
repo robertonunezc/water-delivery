@@ -195,7 +195,7 @@ Desde {{date_since}}</small>
               <div class="mb-3 border-bottom pb-2">
                 <span class="badge bg-secondary mb-2">{{ address.get_type_display }}</span>
                 <div>{{ address.street }}</div>
-                <div>{{ address.city }}, {{ address.state }} {{ address.zip_code }}</div>
+                <div>{{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
                 <div>{{ address.country }}</div>
                 {% if address.note %}
                   <small class="text-muted">{{ address.note }}</small>
