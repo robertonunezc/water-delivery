@@ -53,6 +53,7 @@ class ClientCreditConfigInline(admin.StackedInline):
 	extra = 0
 	verbose_name = "Configuración de Crédito"
 	verbose_name_plural = "Configuraciones de Crédito"
+	classes = ('tab-balance-credit',)
 	fields = (
 		'max_payment_days',
 		('first_notification_days', 'second_notification_days'),
@@ -66,27 +67,30 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ContactInline, AddressInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
-	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'credit_limit', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
+	inlines = [ContactInline, AddressInline, ClientBillingFrecuencyInline]
+	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
 	
 	fieldsets = (
 		('Información Básica', {
 			'fields': (('name', 'active'), 'type', 'corporate', 'requires_billing', 'note', 'address_link'),
-			'description': 'Si requiere datos de facturación, use el botón "Gestionar Datos de Facturación" más abajo'
+			
 		}),
-		('Datos de Facturación', {
-			'fields': ('get_billing_data_button',),
-			'description': 'Configure los datos de facturación y frecuencia del cliente'
-		}),
+		# ('Datos de Facturación', {
+		# 	'fields': ('get_billing_data_button',),
+		# 	'description': 'Configure los datos de facturación y frecuencia del cliente'
+		# }),
 		('Balance y Crédito', {
 			'fields': (
-				('balance', 'current_debt'), 
-				('credit_limit', 'get_available_credit'),
-				('can_pay_with_credit', 'requires_note_for_credit'),				
+				('can_pay_with_credit', 'requires_note_for_credit'),	
+				('credit_limit', 'max_payment_days',),		
+					
+				('balance', 'current_debt', ), 
+				('get_available_credit'),
 				'get_balance_status',
 			),
+			'classes': ('tab-balance-credit',),
 			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
 		('Información del Sistema', {
@@ -120,7 +124,7 @@ class ClientAdmin(admin.ModelAdmin):
 				'Gestionar Datos de Facturación</a></div>',
 				status, url
 			)
-		return '-'
+		return 'Debe crear el cliente antes de gestionar los datos de facturación.'
 	get_billing_data_button.short_description = 'Gestión de Facturación'
 	
 	def get_balance_status(self, obj):

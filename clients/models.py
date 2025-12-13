@@ -114,6 +114,7 @@ class Client(TimeStampedModel):
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
+    max_payment_days = models.PositiveIntegerField(default=30, null=True, blank=True, verbose_name="Cantidad días para pagar")
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
@@ -932,6 +933,18 @@ class Client(TimeStampedModel):
             raise ValidationError({
                 'can_pay_with_credit': 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.',
                 'requires_note_for_credit': 'No se puede requerir nota si el pago con crédito está deshabilitado.'
+            })
+        if not self.can_pay_with_credit and self.current_debt > 0:
+            raise ValidationError({
+                'can_pay_with_credit': 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
+            })
+        if self.current_debt > self.credit_limit:
+            raise ValidationError({
+                'current_debt': 'La deuda actual no puede exceder el límite de crédito.'
+            })
+        if not self.can_pay_with_credit and self.credit_limit > 0:
+            raise ValidationError({
+                'can_pay_with_credit': 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
             })
 
 
