@@ -40,11 +40,24 @@ jobs:
             set -e
             echo "Deploying water-delivery application..."
             cd projects/water-delivery
+            
+            echo "Creating static and media directories..."
+            mkdir -p staticfiles media
+            
             echo "Pulling latest code from main branch..."
             git pull origin main
+            
             echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
+            
             echo "Building and starting containers..."
             docker-compose -f docker-compose.prod.yml up -d --build
+            
+            echo "Collecting static files..."
+            docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+            
+            echo "Running database migrations..."
+            docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            
             echo "Deployment completed successfully!"
           EOF
