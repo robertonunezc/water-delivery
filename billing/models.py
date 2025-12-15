@@ -2,12 +2,14 @@ from django.db import models
 
 # Create your models here.
 class BillingRecord(models.Model):
-    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    identifier = models.CharField(max_length=100, unique=True, verbose_name="Identificador de Factura")
+    client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='billing_records', verbose_name='Cliente')
+    amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
+    identifier = models.CharField(max_length=100, unique=True, verbose_name="Serie")
+    folio = models.CharField(max_length=100, unique=True, verbose_name="Folio")
     date = models.DateTimeField(auto_now_add=True)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
+    emmited_at = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de emisión")
     def __str__(self):
         return f"Factura Emitida #{self.id} para {self.client.name} - {self.amount}"
     class Meta:

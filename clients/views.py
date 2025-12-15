@@ -1,3 +1,4 @@
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, Q
@@ -7,7 +8,7 @@ from datetime import date, datetime, timedelta
 from calendar import monthrange
 from .models import Client
 from .forms import ManualCreditTransactionForm
-
+from orders.services import get_client_order_without_bill
 
 def calculate_next_billing_date(billing_frequency):
     """Calculate the next billing date based on frequency settings"""
@@ -251,6 +252,11 @@ def detail(request, pk):
     
     return render(request, 'client_detail.html', context)
 
+@login_required
+def client_orders(request, client_pk):
+    client = get_object_or_404(Client, pk=client_pk)
+    orders = get_client_order_without_bill(client)
+    return JsonResponse({'orders': orders}, safe=False)
 
 @login_required
 def pay_credit(request, pk):

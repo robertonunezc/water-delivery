@@ -323,3 +323,19 @@ def split_order(request, order_id):
     
     return render(request, 'admin/orders/split_order.html', context)
 
+@login_required
+def client_order_history(request, client_pk):
+    client = get_object_or_404(Client, pk=client_pk)
+    orders = Order.objects.filter(client=client).order_by('-order_date', '-id')
+    
+    paginator = Paginator(orders, 15)  # Show 15 orders per page
+    page_number = request.GET.get('page', 1)
+    orders_page = paginator.get_page(page_number)
+    
+    context = {
+        'client': client,
+        'orders': orders_page,
+    }
+    
+    return render(request, 'orders/client_order_history.html', context)
+
