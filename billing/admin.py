@@ -26,7 +26,9 @@ class BillingOrderAdminForm(forms.ModelForm):
         fields = ['billing_record', 'order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date']
     
     class Media:
-        js = ('admin/js/billing_order_admin.js',)
+        js = (
+            'admin/js/billing_order_admin.js',  # Then our script
+        )
 
     def __init__(self, *args, **kwargs):
         # For inline forms, we inject parent BillingRecord via FormSet
