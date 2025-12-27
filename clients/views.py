@@ -8,6 +8,7 @@ from datetime import date, datetime, timedelta
 from calendar import monthrange
 from .models import Client
 from .forms import ManualCreditTransactionForm
+from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from orders.services import get_client_order_without_bill
 
 def calculate_next_billing_date(billing_frequency):
@@ -209,24 +210,10 @@ def detail(request, pk):
     ).order_by('sequence')
     
     # Get upcoming route client orders (specific deliveries)
-    today = date.today()
-    upcoming_route_orders = client.client_route_orders.filter(
-        visit_date__gte=today,
-        is_completed=False
-    ).select_related(
-        'route__transportation__assigned_driver__user',
-        'route',
-        'order'
-    ).order_by('visit_date')[:10]  # Limit to next 10 upcoming visits
+    upcoming_route_orders = get_upcoming_route_orders(client, limit=10)
     
     # Get recent completed route orders for reference
-    recent_completed_routes = client.client_route_orders.filter(
-        is_completed=True
-    ).select_related(
-        'route__transportation__assigned_driver__user',
-        'route',
-        'order'
-    ).order_by('-completed_at')[:5]  # Last 5 completed deliveries
+    recent_completed_routes = get_recent_completed_route_orders(client, limit=5)
     
     context = {
         'client': client,

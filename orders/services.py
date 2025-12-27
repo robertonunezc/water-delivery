@@ -38,7 +38,7 @@ def get_product_price_for_client(product, client):
     except ProductClientPrice.DoesNotExist:
         return Decimal(str(getattr(product, 'base_price', 0.0)))
     
-def update_order(order, quantity, product, client):
+def update_order(order:Order, quantity:int, product, client:Client) -> Order:
     unit_price = get_product_price_for_client(product, client)
     if not isinstance(unit_price, Decimal):
         unit_price = Decimal(str(unit_price))

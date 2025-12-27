@@ -19,6 +19,52 @@ from payment.models import Payment, PAYMENT_METHOD_CHOICES
 
 log = services.get_logger(__name__)
 
+
+def calculate_payment_breakdown(order_total, client_balance):
+    """
+    Calculate how an order should be paid based on available client balance.
+    
+    Rules:
+    - If client has balance >= order total: pay entirely with balance
+    - If client has balance < order total: use all balance, pay rest with other method
+    - If client has no balance: pay entirely with other method
+    
+    Returns:
+        dict: Payment breakdown with balance_amount, remaining_amount, and use_balance flag
+    """
+    order_total = Decimal(str(order_total))
+    client_balance = Decimal(str(client_balance))
+    
+    if client_balance <= 0:
+        # No balance available
+        return {
+            'use_balance': False,
+            'balance_amount': '0.00',
+            'remaining_amount': str(order_total),
+            'balance_covers_order': False,
+            'message': 'Sin saldo disponible. Pago completo con otro método.'
+        }
+    elif client_balance >= order_total:
+        # Balance covers the entire order
+        return {
+            'use_balance': True,
+            'balance_amount': str(order_total),
+            'remaining_amount': '0.00',
+            'balance_covers_order': True,
+            'message': f'Pago completo con saldo disponible (${order_total:.2f})'
+        }
+    else:
+        # Partial payment with balance
+        remaining = order_total - client_balance
+        return {
+            'use_balance': True,
+            'balance_amount': str(client_balance),
+            'remaining_amount': str(remaining),
+            'balance_covers_order': False,
+            'message': f'Saldo: ${client_balance:.2f} + Otro método: ${remaining:.2f}'
+        }
+
+
 @login_required
 def list_orders(request):
     """List all orders with comprehensive filtering options"""
@@ -126,6 +172,9 @@ def create_order(request, client_pk):
     client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
     payment_types = PAYMENT_METHOD_CHOICES
     
+    # Calculate initial payment breakdown based on client balance and order total
+    initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
+    
     # Add client credit payment settings for frontend validation
     context = {
         'client': client, 
@@ -134,6 +183,7 @@ def create_order(request, client_pk):
         'payment_types': payment_types,
         'can_use_credit': client.can_use_credit_for_payment(),
         'requires_credit_note': client.requires_note_for_credit_payment(),
+        'initial_payment_breakdown': json.dumps(initial_breakdown),
     }
     log.info(f"Created new order #{order.id} for client {client.name} by user {owner.username}")
     
@@ -167,7 +217,20 @@ def update_order(request, order_pk):
         else:
            order = services.update_order(pending_client_order, quantity, product, order.client)
 
-        return JsonResponse({'status': 'success', 'order_total': str(order.total_amount)})
+        # Calculate payment breakdown based on client's available balance
+        client = order.client
+        order_total = order.total_amount
+        client_balance = client.balance
+        
+        # Calculate how much can be paid with balance and how much needs other payment method
+        payment_breakdown = calculate_payment_breakdown(order_total, client_balance)
+        
+        return JsonResponse({
+            'status': 'success', 
+            'order_total': str(order.total_amount),
+            'client_balance': str(client_balance),
+            'payment_breakdown': payment_breakdown
+        })
 
 
 @login_required

@@ -332,6 +332,90 @@
             </div>
           </div>
 
+          <!-- Payment Breakdown Card (Balance First) -->
+          <div class="card shadow-sm mb-4" id="payment-breakdown-card">
+            <div class="card-header bg-success text-white">
+              <h5 class="mb-0">
+                <i class="fas fa-calculator me-2"></i>Desglose de Pago
+              </h5>
+            </div>
+            <div class="card-body">
+              <div id="payment-breakdown-content">
+                <!-- Balance Payment Section -->
+                <div class="payment-breakdown-item mb-3" id="balance-payment-section" style="display: none;">
+                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-success">
+                    <div>
+                      <i class="fas fa-piggy-bank text-success me-2"></i>
+                      <strong>Pago con Saldo</strong>
+                    </div>
+                    <div class="text-end">
+                      <span class="badge bg-success fs-6" id="balance-payment-amount">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Remaining Payment Section -->
+                <div class="payment-breakdown-item mb-3" id="remaining-payment-section" style="display: none;">
+                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-warning">
+                    <div>
+                      <i class="fas fa-money-bill-wave text-warning me-2"></i>
+                      <strong>Restante a pagar</strong>
+                    </div>
+                    <div class="text-end">
+                      <span class="badge bg-warning text-dark fs-6" id="remaining-payment-amount">$0.00</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Secondary Payment Method Select -->
+                  <div class="mt-2" id="secondary-payment-method-container">
+                    <label for="secondary-payment-method" class="form-label small text-muted">
+                      <i class="fas fa-credit-card me-1"></i>Método de pago para el restante:
+                    </label>
+                    <select class="form-select form-select-sm" id="secondary-payment-method">
+                      {% for value, label in payment_types %}
+                        {% if value != 'balance' %}
+                          <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
+                        {% endif %}
+                      {% endfor %}
+                    </select>
+                  </div>
+                  
+                  <!-- Credit Note for Secondary Payment -->
+                  <div class="mt-2" id="secondary-credit-note-field" style="display: none;">
+                    <label for="secondary_credit_note" class="form-label small">
+                      <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
+                    </label>
+                    <textarea class="form-control form-control-sm" 
+                             id="secondary_credit_note" 
+                             rows="2"
+                             placeholder="Nota requerida para crédito"></textarea>
+                  </div>
+                </div>
+                
+                <!-- Full Payment Without Balance -->
+                <div class="payment-breakdown-item mb-3" id="no-balance-payment-section" style="display: none;">
+                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-secondary">
+                    <div>
+                      <i class="fas fa-info-circle text-secondary me-2"></i>
+                      <span class="text-muted">Sin saldo disponible</span>
+                    </div>
+                    <div class="text-end">
+                      <span class="badge bg-secondary fs-6" id="full-payment-amount">$0.00</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Summary Message -->
+                <div class="alert alert-light border mt-2" id="payment-breakdown-summary">
+                  <small class="text-muted" id="payment-breakdown-message">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Agregue productos para ver el desglose de pago
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Payment Method Card -->
           <div class="card shadow-sm mb-4">
             <div class="card-header bg-warning text-dark">
@@ -544,6 +628,116 @@
     // Client credit payment settings
     const canUseCredit = {{ can_use_credit|yesno:"true,false" }};
     const requiresCreditNote = {{ requires_credit_note|yesno:"true,false" }};
+    
+    // Current payment breakdown state (updated dynamically)
+    let currentPaymentBreakdown = {
+      use_balance: false,
+      balance_amount: '0.00',
+      remaining_amount: '0.00',
+      balance_covers_order: false,
+      message: ''
+    };
+    
+    // Track updated client balance (after payments in this session)
+    let currentClientBalance = clientBalance;
+    
+    /**
+     * Update the payment breakdown UI based on the breakdown data from server
+     */
+    function updatePaymentBreakdownUI(breakdown, orderTotal) {
+      currentPaymentBreakdown = breakdown;
+      
+      const balanceSection = document.getElementById('balance-payment-section');
+      const remainingSection = document.getElementById('remaining-payment-section');
+      const noBalanceSection = document.getElementById('no-balance-payment-section');
+      const summaryMessage = document.getElementById('payment-breakdown-message');
+      const paymentMethodCard = document.querySelector('#payment-method-select')?.closest('.card');
+      
+      const balanceAmount = document.getElementById('balance-payment-amount');
+      const remainingAmount = document.getElementById('remaining-payment-amount');
+      const fullPaymentAmount = document.getElementById('full-payment-amount');
+      
+      // Reset visibility
+      if (balanceSection) balanceSection.style.display = 'none';
+      if (remainingSection) remainingSection.style.display = 'none';
+      if (noBalanceSection) noBalanceSection.style.display = 'none';
+      
+      // Hide the old payment method card when using balance-first mode
+      if (paymentMethodCard) {
+        paymentMethodCard.style.display = 'none';
+      }
+      
+      const total = parseFloat(orderTotal) || 0;
+      
+      if (total === 0) {
+        // No order total yet
+        if (summaryMessage) {
+          summaryMessage.innerHTML = '<i class="fas fa-info-circle me-1"></i>Agregue productos para ver el desglose de pago';
+        }
+        if (paymentMethodCard) paymentMethodCard.style.display = 'block';
+        return;
+      }
+      
+      if (breakdown.use_balance) {
+        // Show balance payment section
+        if (balanceSection) {
+          balanceSection.style.display = 'block';
+          balanceAmount.textContent = '$' + parseFloat(breakdown.balance_amount).toFixed(2);
+        }
+        
+        if (breakdown.balance_covers_order) {
+          // Balance covers everything - hide remaining section
+          if (remainingSection) remainingSection.style.display = 'none';
+          if (summaryMessage) {
+            summaryMessage.innerHTML = `
+              <i class="fas fa-check-circle text-success me-1"></i>
+              <strong class="text-success">${breakdown.message}</strong>
+            `;
+          }
+        } else {
+          // Partial balance - show remaining section
+          if (remainingSection) {
+            remainingSection.style.display = 'block';
+            remainingAmount.textContent = '$' + parseFloat(breakdown.remaining_amount).toFixed(2);
+          }
+          if (summaryMessage) {
+            summaryMessage.innerHTML = `
+              <i class="fas fa-calculator text-warning me-1"></i>
+              <strong class="text-warning">${breakdown.message}</strong>
+            `;
+          }
+          // Check if secondary payment method is credit and needs note
+          toggleSecondaryCreditNoteField();
+        }
+      } else {
+        // No balance available
+        if (noBalanceSection) {
+          noBalanceSection.style.display = 'block';
+          fullPaymentAmount.textContent = '$' + total.toFixed(2);
+        }
+        if (summaryMessage) {
+          summaryMessage.innerHTML = `
+            <i class="fas fa-info-circle text-secondary me-1"></i>
+            <span class="text-muted">${breakdown.message}</span>
+          `;
+        }
+        // Show the old payment method card for full payment without balance
+        if (paymentMethodCard) paymentMethodCard.style.display = 'block';
+      }
+    }
+    
+    /**
+     * Toggle secondary credit note field visibility
+     */
+    function toggleSecondaryCreditNoteField() {
+      const secondaryPaymentMethod = document.getElementById('secondary-payment-method');
+      const secondaryCreditNoteField = document.getElementById('secondary-credit-note-field');
+      
+      if (secondaryPaymentMethod && secondaryCreditNoteField) {
+        const shouldShow = secondaryPaymentMethod.value === 'credit' && requiresCreditNote;
+        secondaryCreditNoteField.style.display = shouldShow ? 'block' : 'none';
+      }
+    }
 
     // Helper function to show/hide credit note fields
     function toggleCreditNoteField(paymentMethod) {
@@ -1066,6 +1260,15 @@
               updateAffordabilityStatus(data.order_total);
             }
 
+            // Update payment breakdown if provided
+            if (data.payment_breakdown) {
+              updatePaymentBreakdownUI(data.payment_breakdown, data.order_total);
+              // Update current client balance from response
+              if (data.client_balance) {
+                currentClientBalance = parseFloat(data.client_balance);
+              }
+            }
+
             // Update or add item to order summary
             updateOrderSummary(productId, qtyInput.value, data);
 
@@ -1135,6 +1338,15 @@
               updateAffordabilityStatus(data.order_total);
             }
 
+            // Update payment breakdown if provided
+            if (data.payment_breakdown) {
+              updatePaymentBreakdownUI(data.payment_breakdown, data.order_total);
+              // Update current client balance from response
+              if (data.client_balance) {
+                currentClientBalance = parseFloat(data.client_balance);
+              }
+            }
+
             // Update or add item to order summary
             updateOrderSummary(productId, qtyInput.value, data);
 
@@ -1193,6 +1405,15 @@
                 updateAffordabilityStatus(data.order_total);
               }
               
+              // Update payment breakdown if provided
+              if (data.payment_breakdown) {
+                updatePaymentBreakdownUI(data.payment_breakdown, data.order_total);
+                // Update current client balance from response
+                if (data.client_balance) {
+                  currentClientBalance = parseFloat(data.client_balance);
+                }
+              }
+              
               // Update order summary using the helper function
               updateOrderSummary(productId, 0, data);
               
@@ -1242,89 +1463,130 @@
       // Handle "Terminar Pedido" button (both desktop and mobile)
       function handleFinishOrder(button) {
         const orderId = button.getAttribute('data-order-id');
-        const paymentMethodSelect = document.getElementById('payment-method-select');
-        const paymentMethodSelectMobile = document.getElementById('payment-method-select-mobile');
-        
-        // Get selected payment method from either desktop or mobile select
-        let selectedPaymentMethod = '';
-        if (paymentMethodSelect && paymentMethodSelect.value) {
-          selectedPaymentMethod = paymentMethodSelect.value;
-        } else if (paymentMethodSelectMobile && paymentMethodSelectMobile.value) {
-          selectedPaymentMethod = paymentMethodSelectMobile.value;
-        }
-        
-        // Validate payment method selection
-        if (!selectedPaymentMethod) {
-          // Show validation error
-          const errorDiv = document.createElement('div');
-          errorDiv.className = 'alert alert-warning alert-dismissible fade show';
-          errorDiv.innerHTML = `
-            <strong>¡Atención!</strong> Por favor seleccione un método de pago antes de continuar.
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          `;
-          
-          const contentContainer = document.querySelector('.container-fluid.mt-4');
-          const firstChild = contentContainer.firstElementChild;
-          contentContainer.insertBefore(errorDiv, firstChild);
-          
-          // Highlight the payment selects
-          if (paymentMethodSelect) paymentMethodSelect.classList.add('is-invalid');
-          if (paymentMethodSelectMobile) paymentMethodSelectMobile.classList.add('is-invalid');
-          
-          setTimeout(() => {
-            errorDiv.remove();
-            if (paymentMethodSelect) paymentMethodSelect.classList.remove('is-invalid');
-            if (paymentMethodSelectMobile) paymentMethodSelectMobile.classList.remove('is-invalid');
-          }, 5000);
-          
-          return;
-        }
-        
-        // Validate credit note if payment method is credit and note is required
-        if (selectedPaymentMethod === 'credit' && requiresCreditNote) {
-          const creditNoteInput = document.getElementById('credit_note');
-          const creditNoteInputMobile = document.getElementById('credit_note_mobile');
-          
-          let creditNote = '';
-          if (creditNoteInput && creditNoteInput.value.trim()) {
-            creditNote = creditNoteInput.value.trim();
-          } else if (creditNoteInputMobile && creditNoteInputMobile.value.trim()) {
-            creditNote = creditNoteInputMobile.value.trim();
-          }
-          
-          if (!creditNote) {
-            // Show validation error for missing credit note
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'alert alert-warning alert-dismissible fade show';
-            errorDiv.innerHTML = `
-              <strong>¡Atención!</strong> Se requiere una nota para pagos con crédito para este cliente.
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            
-            const contentContainer = document.querySelector('.container-fluid.mt-4');
-            const firstChild = contentContainer.firstElementChild;
-            contentContainer.insertBefore(errorDiv, firstChild);
-            
-            // Highlight the credit note inputs
-            if (creditNoteInput) {
-              creditNoteInput.classList.add('is-invalid');
-              creditNoteInput.focus();
-            }
-            if (creditNoteInputMobile) {
-              creditNoteInputMobile.classList.add('is-invalid');
-            }
-            
-            setTimeout(() => {
-              errorDiv.remove();
-            }, 5000);
-            
-            return;
-          }
-        }
         
         // Get order total
         const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
-        const orderTotal = totalElement ? totalElement.textContent : '0.00';
+        const orderTotalStr = totalElement ? totalElement.textContent : '0.00';
+        const orderTotal = parseFloat(orderTotalStr.replace(/[^\d.-]/g, '')) || 0;
+        
+        if (orderTotal === 0) {
+          showAlert('warning', '¡Atención!', 'El pedido está vacío. Agregue productos antes de terminar.');
+          return;
+        }
+        
+        // Build payments array based on current payment breakdown
+        const payments = [];
+        
+        if (currentPaymentBreakdown.use_balance) {
+          const balanceAmount = parseFloat(currentPaymentBreakdown.balance_amount) || 0;
+          
+          if (balanceAmount > 0) {
+            // Add balance payment
+            payments.push({
+              amount: balanceAmount,
+              payment_method: 'balance'
+            });
+          }
+          
+          // Check if there's remaining amount to pay
+          const remainingAmount = parseFloat(currentPaymentBreakdown.remaining_amount) || 0;
+          
+          if (remainingAmount > 0) {
+            // Get secondary payment method
+            const secondaryPaymentSelect = document.getElementById('secondary-payment-method');
+            let secondaryPaymentMethod = secondaryPaymentSelect ? secondaryPaymentSelect.value : 'cash';
+            
+            // Validate credit note if secondary payment is credit
+            if (secondaryPaymentMethod === 'credit') {
+              if (!canUseCredit) {
+                showAlert('warning', '¡Atención!', 'Este cliente no puede usar crédito para pagos.');
+                return;
+              }
+              
+              if (requiresCreditNote) {
+                const secondaryCreditNote = document.getElementById('secondary_credit_note');
+                if (!secondaryCreditNote || !secondaryCreditNote.value.trim()) {
+                  showAlert('warning', '¡Atención!', 'Se requiere una nota para pagos con crédito.');
+                  if (secondaryCreditNote) secondaryCreditNote.focus();
+                  return;
+                }
+                
+                payments.push({
+                  amount: remainingAmount,
+                  payment_method: secondaryPaymentMethod,
+                  credit_note: secondaryCreditNote.value.trim()
+                });
+              } else {
+                payments.push({
+                  amount: remainingAmount,
+                  payment_method: secondaryPaymentMethod
+                });
+              }
+            } else {
+              payments.push({
+                amount: remainingAmount,
+                payment_method: secondaryPaymentMethod
+              });
+            }
+          }
+        } else {
+          // No balance - use the standard payment method selector
+          const paymentMethodSelect = document.getElementById('payment-method-select');
+          const paymentMethodSelectMobile = document.getElementById('payment-method-select-mobile');
+          
+          let selectedPaymentMethod = '';
+          if (paymentMethodSelect && paymentMethodSelect.value) {
+            selectedPaymentMethod = paymentMethodSelect.value;
+          } else if (paymentMethodSelectMobile && paymentMethodSelectMobile.value) {
+            selectedPaymentMethod = paymentMethodSelectMobile.value;
+          }
+          
+          if (!selectedPaymentMethod) {
+            showAlert('warning', '¡Atención!', 'Por favor seleccione un método de pago antes de continuar.');
+            return;
+          }
+          
+          // Validate credit note if payment is credit
+          if (selectedPaymentMethod === 'credit') {
+            if (!canUseCredit) {
+              showAlert('warning', '¡Atención!', 'Este cliente no puede usar crédito para pagos.');
+              return;
+            }
+            
+            if (requiresCreditNote) {
+              const creditNoteInput = document.getElementById('credit_note');
+              const creditNoteInputMobile = document.getElementById('credit_note_mobile');
+              
+              let creditNote = '';
+              if (creditNoteInput && creditNoteInput.value.trim()) {
+                creditNote = creditNoteInput.value.trim();
+              } else if (creditNoteInputMobile && creditNoteInputMobile.value.trim()) {
+                creditNote = creditNoteInputMobile.value.trim();
+              }
+              
+              if (!creditNote) {
+                showAlert('warning', '¡Atención!', 'Se requiere una nota para pagos con crédito para este cliente.');
+                return;
+              }
+              
+              payments.push({
+                amount: orderTotal,
+                payment_method: selectedPaymentMethod,
+                credit_note: creditNote
+              });
+            } else {
+              payments.push({
+                amount: orderTotal,
+                payment_method: selectedPaymentMethod
+              });
+            }
+          } else {
+            payments.push({
+              amount: orderTotal,
+              payment_method: selectedPaymentMethod
+            });
+          }
+        }
         
         // Disable buttons to prevent double submission
         const finishButton = document.getElementById('finish-order-btn');
@@ -1350,11 +1612,10 @@
           cantidadCobrada = parseFloat(cantidadCobradaMobileInput.value);
         }
         
-        // Call payment creation endpoint
+        // Build request data with payments array
         const requestData = {
           order_id: orderId,
-          payment_method: selectedPaymentMethod,
-          amount: parseFloat(orderTotal.replace(/[^\d.-]/g, '')) // Remove currency symbols
+          payments: payments
         };
         
         // Include cantidad_cobrada if provided
@@ -1362,22 +1623,7 @@
           requestData.cantidad_cobrada = cantidadCobrada;
         }
         
-        // Include credit note if payment method is credit
-        if (selectedPaymentMethod === 'credit') {
-          const creditNoteInput = document.getElementById('credit_note');
-          const creditNoteInputMobile = document.getElementById('credit_note_mobile');
-          
-          let creditNote = '';
-          if (creditNoteInput && creditNoteInput.value.trim()) {
-            creditNote = creditNoteInput.value.trim();
-          } else if (creditNoteInputMobile && creditNoteInputMobile.value.trim()) {
-            creditNote = creditNoteInputMobile.value.trim();
-          }
-          
-          if (creditNote) {
-            requestData.credit_note = creditNote;
-          }
-        }
+        console.log('Submitting payment:', requestData);
         
         fetch('/payments/create/', {
           method: 'POST',
@@ -1388,18 +1634,32 @@
           body: JSON.stringify(requestData)
         }).then(response => response.json()).then(data => {
           if (data.success) {
-            // Show success message
+            // Show success message with payment details
             const successDiv = document.createElement('div');
             successDiv.className = 'alert alert-success alert-dismissible fade show';
             
             let successMessage = `
-              <strong>¡Éxito!</strong> El pedido se ha completado y el pago se ha registrado correctamente.
-              <br><small>Método de pago: ${data.method} - Monto: $${data.amount}</small>
+              <strong>¡Éxito!</strong> El pedido se ha completado correctamente.
             `;
+            
+            // Show payment breakdown if multiple payments
+            if (data.payments && data.payments.length > 0) {
+              successMessage += `<br><div class="mt-2 p-2 bg-light border rounded">
+                <strong><i class="fas fa-receipt me-1"></i>Pagos registrados:</strong><ul class="mb-0 mt-1">`;
+              
+              data.payments.forEach(p => {
+                successMessage += `<li>${p.method}: $${p.amount}</li>`;
+              });
+              
+              successMessage += `</ul></div>`;
+            } else if (data.method && data.amount) {
+              // Legacy single payment response
+              successMessage += `<br><small>Método de pago: ${data.method} - Monto: $${data.amount}</small>`;
+            }
             
             // Add balance addition info if applicable
             if (data.balance_added && data.cantidad_cobrada) {
-              successMessage += `<br><div class="mt-2 p-2 bg-light border rounded">
+              successMessage += `<br><div class="mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">
                 <i class="fas fa-plus-circle text-success me-1"></i>
                 <strong>Saldo agregado:</strong> $${data.balance_added}<br>
                 <small>Cantidad cobrada: $${data.cantidad_cobrada} | Total orden: $${data.order_total}</small><br>
@@ -1454,22 +1714,26 @@
             finishButtonMobile.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar';
           }
           
-          // Show error message
-          const errorDiv = document.createElement('div');
-          errorDiv.className = 'alert alert-danger alert-dismissible fade show';
-          errorDiv.innerHTML = `
-            <strong>Error:</strong> No se pudo procesar el pago. ${error.message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-          `;
-          
-          const contentContainer = document.querySelector('.container-fluid.mt-4');
-          const firstChild = contentContainer.firstElementChild;
-          contentContainer.insertBefore(errorDiv, firstChild);
-
-          setTimeout(() => {
-            errorDiv.remove();
-          }, 8000);
+          showAlert('danger', 'Error:', `No se pudo procesar el pago. ${error.message}`);
         });
+      }
+      
+      // Helper function to show alerts
+      function showAlert(type, title, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+        alertDiv.innerHTML = `
+          <strong>${title}</strong> ${message}
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        
+        const contentContainer = document.querySelector('.container-fluid.mt-4');
+        const firstChild = contentContainer.firstElementChild;
+        contentContainer.insertBefore(alertDiv, firstChild);
+        
+        setTimeout(() => {
+          alertDiv.remove();
+        }, 8000);
       }
 
       // Event listeners for finish order buttons
@@ -1540,6 +1804,19 @@
           desktopInput.dataset.autoUpdated = 'false';
         }
       });
+      
+      // Secondary payment method change listener
+      document.getElementById('secondary-payment-method')?.addEventListener('change', function() {
+        toggleSecondaryCreditNoteField();
+      });
+      
+      // Initialize payment breakdown on page load with initial data from server
+      const initialBreakdown = {{ initial_payment_breakdown|safe }};
+      const initialOrderTotal = parseFloat('{{ order.total_amount|floatformat:2 }}');
+      if (initialBreakdown) {
+        currentPaymentBreakdown = initialBreakdown;
+        updatePaymentBreakdownUI(initialBreakdown, initialOrderTotal);
+      }
     });
   </script>
 {% endblock %}
