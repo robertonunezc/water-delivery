@@ -13,7 +13,7 @@ from billing.models import BillingOrder, BillingRecord
 class BillingRecordInlineAdmin(admin.StackedInline):
     model = BillingOrder
     extra = 0
-    fields = ('order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date')
+    fields = ('order', 'is_paid', 'partially_paid')
     can_delete = False
     show_change_link = True
     # Custom form and formset to enforce queryset filtering and validation
@@ -23,7 +23,7 @@ class BillingRecordInlineAdmin(admin.StackedInline):
 class BillingOrderAdminForm(forms.ModelForm):
     class Meta:
         model = BillingOrder
-        fields = ['billing_record', 'order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date']
+        fields = ['billing_record', 'order', 'is_paid', 'partially_paid']
         readonly_fields = ['billing_record','order']
     class Media:
         js = (
@@ -95,7 +95,7 @@ class BillingOrderAdminForm(forms.ModelForm):
             if total_existing + new_amount > max_amount:
                 raise ValidationError({
                     'order': (
-                        f"La suma de montos ({total_existing + new_amount}) excede el monto de la factura ({max_amount})."
+                        f"La suma de montos de las ventas associadas ({total_existing}) más el monto de la venta actual ({new_amount}) , ({total_existing + new_amount})excede el monto de la factura ({max_amount})."
                     )
                 })
 
@@ -120,10 +120,10 @@ class BillingRecordAdmin(admin.ModelAdmin):
 
 
 class BillingOrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date')
-    list_filter = ('is_paid', 'partially_paid', 'payment_date')
+    list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid')
+    list_filter = ('is_paid', 'partially_paid', 'billing_record__client', 'billing_record')
     search_fields = ('billing_record__client__name', 'order__id')
-    ordering = ('-payment_date',)
+    ordering = ('-created_at',)
     form = BillingOrderAdminForm
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):

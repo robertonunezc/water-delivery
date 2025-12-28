@@ -1,6 +1,8 @@
 from django.db import models
 from django.forms import ValidationError
 
+from core.models import TimeStampedModel
+
 # Create your models here.
 class BillingRecord(models.Model):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='billing_records', verbose_name='Cliente')
@@ -24,17 +26,15 @@ class BillingRecord(models.Model):
     #         for record in existing_records:
     #             if not record.billing_orders.exists():
     #                 raise ValidationError(f"El cliente {self.client.name} ya tiene un registro de facturación sin ventas asociadas (ID: {record.id}). Por favor, complete ese registro antes de crear uno nuevo.")
-class BillingOrder(models.Model):
+class BillingOrder(TimeStampedModel):
     billing_record = models.ForeignKey('billing.BillingRecord', on_delete=models.CASCADE, related_name='billing_orders', verbose_name='Registro de Facturación')
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='billing_orders', verbose_name='Venta')
     is_paid = models.BooleanField(default=False, verbose_name='Pagado Totalmente')
     partially_paid = models.BooleanField(default=False, verbose_name='Pago parcial')
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name='Monto pagado')
-    payment_date = models.DateTimeField(blank=True, null=True, verbose_name='Fecha de pago')
 
     def __str__(self):
         return f"Agregar venta a factura #{self.id} para Pedido {self.order.id} - Pagado: {self.is_paid}"
     class Meta:
-        ordering = ['-payment_date']
+        ordering = ['-created_at']
         verbose_name = 'Agregar venta a factura'
         verbose_name_plural = 'Agregar ventas a factura'
