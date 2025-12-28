@@ -1,4 +1,5 @@
 from django.db import models
+from django.forms import ValidationError
 
 # Create your models here.
 class BillingRecord(models.Model):
@@ -16,9 +17,15 @@ class BillingRecord(models.Model):
         ordering = ['-date']
         verbose_name = 'Facturación'
         verbose_name_plural = 'Facturas Emitidas'
-
+    # def clean(self):
+    #     # Check if there is a billing record from this client without billing orders
+    #     if self.pk is None:  # Only check for new records
+    #         existing_records = BillingRecord.objects.filter(client=self.client)
+    #         for record in existing_records:
+    #             if not record.billing_orders.exists():
+    #                 raise ValidationError(f"El cliente {self.client.name} ya tiene un registro de facturación sin ventas asociadas (ID: {record.id}). Por favor, complete ese registro antes de crear uno nuevo.")
 class BillingOrder(models.Model):
-    billing_record = models.ForeignKey('billing.BillingRecord', on_delete=models.CASCADE)
+    billing_record = models.ForeignKey('billing.BillingRecord', on_delete=models.CASCADE, related_name='billing_orders', verbose_name='Registro de Facturación')
     order = models.ForeignKey('orders.Order', on_delete=models.CASCADE, related_name='billing_orders', verbose_name='Venta')
     is_paid = models.BooleanField(default=False, verbose_name='Pagado Totalmente')
     partially_paid = models.BooleanField(default=False, verbose_name='Pago parcial')

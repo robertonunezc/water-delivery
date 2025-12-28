@@ -24,10 +24,11 @@ class BillingOrderAdminForm(forms.ModelForm):
     class Meta:
         model = BillingOrder
         fields = ['billing_record', 'order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date']
-    
+        readonly_fields = ['billing_record','order']
     class Media:
         js = (
             'admin/js/billing_order_admin.js',  # Then our script
+            'admin/js/hide_add_modify_dropdown_options.js',  # Hide add/modify options for billing_record and order
         )
 
     def __init__(self, *args, **kwargs):
@@ -68,6 +69,7 @@ class BillingOrderAdminForm(forms.ModelForm):
             self.fields['billing_record'].widget.attrs['class'] = 'billing-record-select'
             # Store client_id mapping in widget for JS to access
             self.fields['billing_record'].widget.attrs['data-enable-dynamic-orders'] = 'true'
+
 
     def clean(self):
         cleaned = super().clean()
@@ -116,12 +118,30 @@ class BillingRecordAdmin(admin.ModelAdmin):
     ordering = ('-date',)
     inlines = [BillingRecordInlineAdmin]
 
+
 class BillingOrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid', 'amount_paid', 'payment_date')
     list_filter = ('is_paid', 'partially_paid', 'payment_date')
     search_fields = ('billing_record__client__name', 'order__id')
     ordering = ('-payment_date',)
     form = BillingOrderAdminForm
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name in ['billing_record', 'order']:
+            kwargs['widget'] = admin.widgets.ForeignKeyRawIdWidget(
+                db_field.remote_field,
+                self.admin_site,
+                using=kwargs.get('using'),
+            )
+            kwargs['widget'].can_add_related = False
+            kwargs['widget'].can_change_related = False
+            kwargs['widget'].can_delete_related = False
+            # Use regular Select widget instead of raw id for cleaner dropdown
+            from django.forms import Select
+            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
+            formfield.widget = Select(choices=formfield.choices)
+            return formfield
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def get_urls(self):
         urls = super().get_urls()
