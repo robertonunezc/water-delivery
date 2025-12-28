@@ -29,7 +29,7 @@
   <div class="container mt-4">
     <!-- Header Section -->
     <div class="row mb-4">
-      <div class="col-md-6">
+      <div class="col-md-3">
         <h1><i class="fas fa-users me-2"></i>Clientes</h1>
         {% if has_search %}
           <p class="text-muted mb-0">
@@ -37,16 +37,7 @@
           </p>
         {% endif %}
       </div>
-      <div class="col-md-6 text-md-end">
-        <a href="#" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Nuevo Cliente
-        </a>
-      </div>
-    </div>
-
-    <!-- Search Form -->
-    <div class="row mb-4">
-      <div class="col-12">
+      <div class="col-md-7">
         <form method="get" action="{% url 'clients:list' %}" class="search-form mx-auto">
           <div class="input-group">
             <input type="search" 
@@ -65,6 +56,11 @@
             {% endif %}
           </div>
         </form>
+      </div>
+      <div class="col-md-2 text-md-end">
+        <a href="#" class="btn btn-primary">
+          <i class="fas fa-plus"></i> Nuevo Cliente
+        </a>
       </div>
     </div>
 
