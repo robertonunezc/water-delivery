@@ -22,7 +22,9 @@ class Employee(models.Model):
     contract_type = models.CharField(max_length=50, choices=[('full_time', 'Tiempo Completo'), ('part_time', 'Tiempo Parcial'), ('contract', 'Contrato')], default='full_time')
 
     def __str__(self):
-        return f"{self.user.get_full_name()} - {self.position}"
+        if self.user:
+            return f"{self.user.get_full_name()} - {self.position}"
+        return f"{self.nombre} {self.apellidos} - {self.position}"
     class Meta:
         verbose_name = "Empleado"
         verbose_name_plural = "Empleados"

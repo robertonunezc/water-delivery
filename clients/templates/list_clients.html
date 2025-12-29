@@ -65,29 +65,7 @@
     </div>
 
     <!-- Results Info -->
-    {% if total_clients > 0 %}
-      <div class="search-results-info">
-        <div class="row align-items-center">
-          <div class="col-md-8">
-            <i class="fas fa-info-circle me-2"></i>
-            {% if has_search %}
-              Se encontraron <strong>{{ total_clients }}</strong> cliente{{ total_clients|pluralize }} 
-              que coincide{{ total_clients|pluralize:"," }} con "<strong>{{ search_query }}</strong>"
-            {% else %}
-              Mostrando <strong>{{ total_clients }}</strong> cliente{{ total_clients|pluralize }} en total
-            {% endif %}
-          </div>
-          <div class="col-md-4 text-md-end">
-            <small class="text-muted">
-              {% if clients.has_other_pages %}
-                Página {{ clients.number }} de {{ clients.paginator.num_pages }}
-                ({{ clients.start_index }}-{{ clients.end_index }} de {{ total_clients }})
-              {% endif %}
-            </small>
-          </div>
-        </div>
-      </div>
-    {% endif %}
+
 
     <!-- Clients Table -->
     {% if clients %}
