@@ -56,13 +56,21 @@ class BillingOrderAdminForm(forms.ModelForm):
             # Resolve current order id (editing existing record)
             current_order_id = getattr(self.instance, 'order_id', None)
             from orders.models import Order
+            # Filter orders: same client, not already billed (or current order if editing)
+            # Note: Removed order_date__gte filter as it was too restrictive with datetime precision
             qs = Order.objects.filter(
                 client=billing_record.client,
-                order_date__gte=billing_record.date,
             ).filter(
                 Q(billing_orders__isnull=True) | Q(pk=current_order_id)
             ).distinct()
             self.fields['order'].queryset = qs
+        elif 'order' in self.fields:
+            # No billing_record available yet - show all unbilled orders
+            # This happens on initial form render before billing_record is selected
+            from orders.models import Order
+            self.fields['order'].queryset = Order.objects.filter(
+                billing_orders__isnull=True
+            ).distinct()
         
         # Add data-client-id to billing_record select for JavaScript
         if 'billing_record' in self.fields:
@@ -169,12 +177,9 @@ class BillingOrderAdmin(admin.ModelAdmin):
         
         # Get billing_record_id from query params to filter by date
         billing_record_id = request.GET.get('billing_record_id')
-        billing_record_date = None
-        
         if billing_record_id:
             try:
-                billing_record = BillingRecord.objects.get(pk=billing_record_id)
-                billing_record_date = billing_record.date
+                BillingRecord.objects.get(pk=billing_record_id)
             except BillingRecord.DoesNotExist:
                 pass
         
@@ -182,12 +187,7 @@ class BillingOrderAdmin(admin.ModelAdmin):
         orders_qs = Order.objects.filter(
             client=client,
             billing_orders__isnull=True
-        )
-        
-        if billing_record_date:
-            orders_qs = orders_qs.filter(order_date__gte=billing_record_date)
-        
-        orders = orders_qs.order_by('-order_date')
+        ).order_by('-order_date')
 
         orders_data = [
             {
@@ -196,7 +196,7 @@ class BillingOrderAdmin(admin.ModelAdmin):
                 'total_amount': str(order.total_amount),
                 'display': f"Order #{order.id} - {order.order_date.strftime('%Y-%m-%d')} - ${order.total_amount}"
             }
-            for order in orders
+            for order in orders_qs
         ]
 
         return JsonResponse({'orders': orders_data})
