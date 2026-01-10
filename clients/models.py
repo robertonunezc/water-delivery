@@ -17,12 +17,10 @@ PAYMENT_METHOD_CHOICES = [
     ('other', 'Otro'),
 ]
 BILLING_FREQUENCY_CHOICES = [
+    ('when_delivery', 'Contra entrega'),
+    ('weekly', 'Semanal'),
+    ('biweekly', 'Quincenal'),
     ('monthly', 'Mensual'),
-    ('bimonthly', 'Bimestral'),
-    ('quarterly', 'Trimestral'),
-    ('semiannual', 'Semestral'),
-    ('annual', 'Anual'),
-    ('other', 'Otro'),
 ]
 BILLING_DATE_CHOICES = [
     ('specific_date', 'Fecha específica del mes'),
@@ -1104,7 +1102,7 @@ class ClientBillingFrecuency(models.Model):
     billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, default='specific_date', verbose_name="Fecha de Facturación")
     
     # For specific_date billing
-    specific_day = models.PositiveIntegerField(null=True, blank=True, help_text="ía del mes (1-31)", verbose_name="Día Específico")
+    specific_day = models.PositiveIntegerField(null=True, blank=True, help_text="Día del mes (1-31)", verbose_name="Día Específico")
 
     # For weekday_occurrence billing (e.g., "third Monday")
     weekday = models.IntegerField(choices=WEEKDAY_CHOICES, null=True, blank=True, help_text="ía de la semana (0=Lunes, 6=Domingo)", verbose_name="Día de la Semana")
