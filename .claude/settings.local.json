@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Implement payment notification system with multi-channel support\n\n- Add DefaultNotificationConfig model for system-wide notification settings\n- Add ClientNotificationConfig model for per-client overrides\n- Add NotificationLog model for full audit trail\n- Implement notification services with envio_factura condition logic\n- Add scaffold for dias_credito_vencido condition \\(to be completed later\\)\n- Support email \\(working\\), WhatsApp and SMS \\(scaffold\\) channels\n- Add send_notifications management command for daily cron execution\n- Register notification app in INSTALLED_APPS\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(source:*)",
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(git add:*)",
+      "Bash(python manage.py test:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

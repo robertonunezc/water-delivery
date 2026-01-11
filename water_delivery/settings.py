@@ -47,7 +47,7 @@ INSTALLED_APPS = [
     'routes',
     'orders',
     'billing',
-    
+    'notification',
 ]
 
 MIDDLEWARE = [
