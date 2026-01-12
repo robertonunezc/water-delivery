@@ -34,7 +34,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
 
 
-class BillingNotificationSettingAdmin(admin.ModelAdmin):
+class ClientNotificationSettingAdmin(admin.ModelAdmin):
     list_display = (
         'client',
         'first_reminder_days',
@@ -82,7 +82,7 @@ class BillingNotificationSettingAdmin(admin.ModelAdmin):
         })
     )
 
-    def get_configuration_summary(self, obj: models.BillingNotificationSetting) -> str:
+    def get_configuration_summary(self, obj: models.ClientNotificationSetting) -> str:
         """Display a human-readable summary of notification settings"""
         summary = '<div style="line-height: 1.8;">'
         summary += '<h3>Configuración de Notificaciones</h3>'
@@ -110,4 +110,4 @@ class BillingNotificationSettingAdmin(admin.ModelAdmin):
     get_configuration_summary.short_description = 'Resumen de Configuración'
 
 admin.site.register(models.Notification, NotificationAdmin)
-admin.site.register(models.BillingNotificationSetting, BillingNotificationSettingAdmin)
+admin.site.register(models.ClientNotificationSetting, ClientNotificationSettingAdmin)

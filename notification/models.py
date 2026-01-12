@@ -38,8 +38,8 @@ BILLING_NOTIFICATION_MOMENTS = [
     ('before', 'Antes'),
     ('after', 'Después'),
 ]
-class BillingNotificationSetting(TimeStampedModel):
-    client = models.OneToOneField('clients.Client', on_delete=models.CASCADE, related_name='billing_notification_setting')
+class ClientNotificationSetting(TimeStampedModel):
+    client = models.OneToOneField('clients.Client', on_delete=models.CASCADE, related_name='notification_setting')
     first_reminder_days = models.PositiveIntegerField(default=10, help_text="Días antes del vencimiento para el primer recordatorio")
     first_condition = models.CharField(choices=BILLING_NOTIFICATION_CONDITION,default='credit_days', max_length=50, help_text="Condición para enviar notificaciones de facturación")
     first_moment = models.CharField(choices=BILLING_NOTIFICATION_MOMENTS, max_length=50,default='after', help_text="Momento para enviar notificaciones de facturación")
@@ -50,8 +50,8 @@ class BillingNotificationSetting(TimeStampedModel):
     cancellation_condition = models.CharField(choices=BILLING_NOTIFICATION_CONDITION,default='credit_days', max_length=50, help_text="Condición para enviar notificaciones de facturación")
     cancellation_moment = models.CharField(choices=BILLING_NOTIFICATION_MOMENTS, max_length=50,default='after', help_text="Momento para enviar notificaciones de facturación")
     def __str__(self):
-        return f"Billing Notification Settings for {self.client.name}"
+        return f"Configuracion de notificationes {self.client.name}"
 
     class Meta:
-        verbose_name = "Configuración de Notificación de Facturación"
-        verbose_name_plural = "Configuraciones de Notificaciones de Facturación"
+        verbose_name = "Configuración de Notificación de cliente"
+        verbose_name_plural = "Configuraciones de Notificaciones de cliente"

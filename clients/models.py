@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
@@ -719,6 +719,19 @@ class Client(TimeStampedModel):
             'payments': payments_created,
             'payment_breakdown': payment_result
         }
+    
+    def send_payment_reminder(self):
+        """Determine if a payment reminder should be sent based on max payment days"""
+        if self.max_payment_days is None or self.requires_billing is False:
+            return False
+        today = date.today()
+        last_payment_date = self.orders.filter(status='completed').order_by('-completed_at').first()
+        if not last_payment_date:
+            return True  # No payments made yet
+        due_date = last_payment_date.completed_at.date() + timedelta(days=self.max_payment_days)
+        client_notification_settings = self.notification_settings.all()
+        
+        # Logic to check if there are unpaid invoices past due_date would go here
     
     # Balance and Credit History Methods
     def get_balance_history(self, start_date=None, end_date=None, transaction_types=None):
