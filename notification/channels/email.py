@@ -19,10 +19,11 @@ class SendEmail(SendNotification):
         self.body = body
     def send_email(self):
         email_api_key = os.getenv('SEND_EMAIL_KEY', 'SEND_EMAIL_KEY')
+        from_domain = os.getenv('SEND_EMAIL_DOMAIN', 'SEND_EMAIL_DOMAIN')
         return requests.post(
-            "https://api.mailgun.net/v3/sandbox40fe3482053c4675b353e6270f32bbe5.mailgun.org/messages",
+            f"https://api.mailgun.net/v3/{from_domain}/messages",
             auth=("api", email_api_key),
-            data={"from": "Mailgun Sandbox <postmaster@sandbox40fe3482053c4675b353e6270f32bbe5.mailgun.org>",
+            data={"from": self.from_,
                 "to": self.to,
                 "subject": self.subject,
                 "text": self.body})

@@ -19,20 +19,21 @@ def create_notification(client, title, message, channel, type):
 
 def send_notification(notification):
     """
-    Simula el envío de una notificación a través del canal especificado.
+    Envia una notificación a través del canal especificado.
     Actualiza el estado de la notificación según el resultado del envío.
     """
     try:
         # Lógica simulada de envío
         if notification.channel == 'email':
             email_client = SendEmail(
-                to=notification.client.email,
+                #to=notification.client.email,
+                to="robert@puntoreica.com",
                 from_="Mailgun Sandbox <postmaster@sandbox40fe3482053c4675b353e6270f32bbe5.mailgun.org>",
                 subject=notification.title,
                 body=notification.message
             )
             email_client.send_email()
-            print(f"Enviando email a {notification.client.email}: {notification.message}")
+            print(f"Enviando email a {notification.client}: {notification.message}")
         elif notification.channel == 'sms':
             print(f"Enviando SMS a {notification.client.phone}: {notification.message}")
         elif notification.channel == 'whatsapp':
