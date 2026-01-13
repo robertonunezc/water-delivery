@@ -27,8 +27,8 @@ def send_notification(notification):
         if notification.channel == 'email':
             email_client = SendEmail(
                 #to=notification.client.email,
-                to="robert@puntoreica.com",
-                from_="Mailgun Sandbox <postmaster@sandbox40fe3482053c4675b353e6270f32bbe5.mailgun.org>",
+                to="rcorralesn@gmail.com",
+                from_="WaterDelivery<soporte@puntoreica.com>",
                 subject=notification.title,
                 body=notification.message
             )

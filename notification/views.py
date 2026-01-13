@@ -18,8 +18,8 @@ def send_notification_view(request, notification_id: int) -> JsonResponse:
         JsonResponse con el estado del envío
     """
     notification = get_object_or_404(Notification, id=notification_id)
-    
-    if notification.status == 'sent':
+    force = request.GET.get('force', 'false').lower() == 'true'
+    if notification.status == 'sent' and not force:
         return JsonResponse(
             {
                 'success': False,
