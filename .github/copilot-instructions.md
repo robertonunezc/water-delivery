@@ -14,13 +14,13 @@ Important project conventions & patterns
   - `SoftDeleteManager` (default) filters out soft-deleted rows; `all_objects` returns all.
   - Many app models inherit `TimeStampedModel`. Prefer `objects` (default) unless you explicitly need soft-deleted rows.
   - Use services (services.py) for domain logic that spans multiple models or requires complex operations (e.g., balance updates, order processing).
-  Try to create or add functions to services rather than putting complex logic in views or models. All service functions should be explicitly typed. All domain logic should be in models or services, not views.
-  All  domain logic functions should be unit-tested.
-- Create small functions with no more than 20-30 lines of code. Prefer helper functions over large monolithic functions.
-- Typing: use type hints for all function signatures. Use `from typing import Optional, List, Dict` as needed.
-- String formatting: use f-strings for all string interpolation.
-- Logging: use the standard `logging` module. Get loggers via `logging.getLogger(__name__)`.
-- Admin and user/employee handling:
+  - All service functions should be explicitly typed. All domain logic related to 1 model should be in models or services, not views.
+  - All  domain logic functions should be unit-tested.
+  - Create small functions with no more than 20-30 lines of code. Prefer helper functions over large monolithic functions.
+  - Typing: use type hints for all function signatures. Use `from typing import Optional, List, Dict` as needed.
+  - String formatting: use f-strings for all string interpolation.
+  - Logging: use the standard `logging` module. Get loggers via `logging.getLogger(__name__)`.
+  - Admin and user/employee handling:
   - `core.models.Employee.user` is nullable: employees can exist without a linked `User` account (they may not access the system).
   - `core/admin.py` intentionally does NOT inline `Employee` into the `User` admin: create/manage employees from the `Employee` admin only.
   - `EmployeeAdmin.save_model()` will create a `User` with an unusable password if saving an employee without a linked user — check `core/admin.py` for the logic.

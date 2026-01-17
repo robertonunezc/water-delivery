@@ -116,6 +116,10 @@ class Client(TimeStampedModel):
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
+    #Notification sent 
+    last_first_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    last_second_reminder_sent_at = models.DateTimeField(null=True, blank=True)
+    last_cancellation_sent_at = models.DateTimeField(null=True, blank=True)
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
