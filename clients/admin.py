@@ -60,6 +60,13 @@ class ClientCreditConfigInline(admin.StackedInline):
 		'overdue_notification_days'
 	)
 	
+class ClientBillingDataInline(admin.StackedInline):
+	model = models.BillingData
+	display_fields = ('rfc', 'razon_social', 'address', 'email', 'phone')
+	exclude = ('deleted_at',)
+	extra = 0
+	verbose_name = "Datos de Facturación"
+	verbose_name_plural = "Datos de Facturación"
 	
 
 @admin.register(models.Client)
@@ -67,20 +74,20 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ContactInline, AddressInline, ClientBillingFrecuencyInline]
+	inlines = [ClientBillingDataInline, ContactInline, AddressInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
 	
+	class Media:
+		js = ('clients/admin/toggle_billing_inline.js',)
+	
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('name', 'active'), 'type', 'corporate', 'requires_billing', 'note', 'address_link'),
+			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link'),
 			
 		}),
-		# ('Datos de Facturación', {
-		# 	'fields': ('get_billing_data_button',),
-		# 	'description': 'Configure los datos de facturación y frecuencia del cliente'
-		# }),
+		
 		('Balance y Crédito', {
 			'fields': (
 				('can_pay_with_credit', 'requires_note_for_credit'),	
@@ -93,16 +100,32 @@ class ClientAdmin(admin.ModelAdmin):
 			'classes': ('tab-balance-credit',),
 			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
-		('Información del Sistema', {
-			'fields': (('created_at', 'updated_at'),),
-			'classes': ('collapse',)
-		})
+		('Datos de Facturación', {
+		 	'fields': ('requires_billing',),
+		 	'description': 'Configure los datos de facturación y frecuencia del cliente'
+		}),
 	)
 	
 	def get_available_credit(self, obj):
 		"""Display available credit for the client"""
 		return f"${obj.get_available_credit():.2f}"
 	get_available_credit.short_description = 'Crédito Disponible'
+	
+	def get_inline_instances(self, request, obj=None):
+		"""Conditionally show billing inlines only if requires_billing is checked"""
+		inline_instances = []
+		inlines = self.get_inlines(request, obj)
+		
+		for inline_class in inlines:
+			# Skip billing-related inlines if requires_billing is not checked
+			if obj and not obj.requires_billing:
+				if inline_class in [ClientBillingDataInline, ClientBillingFrecuencyInline]:
+					continue
+			
+			inline = inline_class(self.model, self.admin_site)
+			inline_instances.append(inline)
+		
+		return inline_instances
 	
 	def get_billing_data_button(self, obj):
 		"""Display a button to manage billing data and frequency"""
