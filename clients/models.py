@@ -1157,7 +1157,11 @@ class ClientBillingFrecuency(models.Model):
     def clean(self):
         """Validate that the correct fields are filled based on billing_date type"""
         from django.core.exceptions import ValidationError
-        
+        # Validate a client can have only one active billing frequency
+        if self.is_active:
+            active_frequencies = ClientBillingFrecuency.objects.filter(client=self.client, is_active=True).exclude(id=self.id)
+            if active_frequencies.exists():
+                raise ValidationError({'is_active': 'El cliente ya tiene una frecuencia de facturación activa.'})
         if self.billing_date == 'specific_date':
             if not self.specific_day:
                 raise ValidationError({'specific_day': 'Specific day is required when billing date is "specific_date".'})

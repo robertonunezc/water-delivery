@@ -31,13 +31,13 @@ app.conf.update(
     accept_content=['json'],
     result_serializer='json',
     
-    # Result backend
-    result_backend=f'redis://localhost:{os.environ.get("REDIS_PORT", "6379")}/1',
-    result_expires=3600,  # 1 hour
-    
     # Broker configuration
-    broker_url=f'redis://localhost:{os.environ.get("REDIS_PORT", "6379")}/0',
+    broker_url=f'redis://:{os.environ.get("REDIS_PASSWORD", "")}@{os.environ.get("REDIS_HOST", "localhost")}:{os.environ.get("REDIS_PORT", "6379")}/0',
     broker_connection_retry_on_startup=True,
+    
+    # Result backend
+    result_backend=f'redis://:{os.environ.get("REDIS_PASSWORD", "")}@{os.environ.get("REDIS_HOST", "localhost")}:{os.environ.get("REDIS_PORT", "6379")}/1',
+    result_expires=3600,  # 1 hour
     
     # Task execution
     task_track_started=True,
