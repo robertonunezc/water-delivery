@@ -107,12 +107,11 @@ class Client(TimeStampedModel):
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='branch', verbose_name="Tipo de cliente")
-    corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True, verbose_name="Cliente corporativo")
+    corporate = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, null=True, blank=True, verbose_name="Cliente corporativo", limit_choices_to={'type': 'corporate'})
     balance = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Saldo a favor", help_text="Monto prepagado disponible para usar en pedidos")
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
-    max_payment_days = models.PositiveIntegerField(default=30, null=True, blank=True, verbose_name="Cantidad días para pagar")
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
@@ -960,6 +959,10 @@ class Client(TimeStampedModel):
         if not self.can_pay_with_credit and self.credit_limit > 0:
             raise ValidationError({
                 'can_pay_with_credit': 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
+            })
+        if not self.addresses.filter(type='billing').exists() and self.requires_billing:
+            raise ValidationError({
+                'requires_billing': 'El cliente requiere una dirección de facturación, pero no tiene ninguna asignada.'
             })
 
 

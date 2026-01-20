@@ -15,13 +15,13 @@ from .forms import (
 )
 
 
-class ContactInline(admin.TabularInline):
+class ContactInline(admin.StackedInline):
 	model = models.Contact
 	extra = 0
 	exclude = ('deleted_at',)
 
 
-class AddressInline(admin.TabularInline):
+class AddressInline(admin.StackedInline):
 	model = models.Address
 	extra = 0
 	exclude = ('deleted_at',)
@@ -74,7 +74,7 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ClientBillingDataInline, ContactInline, AddressInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
+	inlines = [ClientBillingDataInline, ContactInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
@@ -90,7 +90,7 @@ class ClientAdmin(admin.ModelAdmin):
 		('Balance y Crédito', {
 			'fields': (
 				('can_pay_with_credit', 'requires_note_for_credit'),	
-				('credit_limit', 'max_payment_days',),		
+				('credit_limit',),		
 					
 				('balance', 'current_debt', ), 
 				('get_available_credit'),
