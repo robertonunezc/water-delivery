@@ -10,7 +10,6 @@ from .forms import (
 	ManualBalanceTransactionForm, 
 	ManualCreditTransactionForm, 
 	BulkBalanceDepositForm,
-	ClientBillingDataForm,
 	ClientBillingFrequencyForm
 )
 
@@ -21,17 +20,15 @@ class ContactInline(admin.StackedInline):
 	exclude = ('deleted_at',)
 
 
+@admin.register(models.Address)
+class AddressAdmin(admin.ModelAdmin):
+	list_display = ('street', 'municipality', 'state', 'zip_code', 'client__name')
+	model = models.Address
+	exclude = ('deleted_at',)
 class AddressInline(admin.StackedInline):
 	model = models.Address
 	extra = 0
 	exclude = ('deleted_at',)
-
-
-class BillingDataInline(admin.StackedInline):
-	model = models.BillingData
-	extra = 0
-	exclude = ('deleted_at',)
-
 
 class ClientBillingFrecuencyInline(admin.StackedInline):
 	model = models.ClientBillingFrecuency
@@ -62,7 +59,7 @@ class ClientCreditConfigInline(admin.StackedInline):
 	
 class ClientBillingDataInline(admin.StackedInline):
 	model = models.BillingData
-	display_fields = ('rfc', 'razon_social', 'address', 'email', 'phone')
+	display_fields = ('rfc', 'razon_social', 'curp')
 	exclude = ('deleted_at',)
 	extra = 0
 	verbose_name = "Datos de Facturación"
@@ -74,7 +71,7 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ClientBillingDataInline, ContactInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
+	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
@@ -152,10 +149,8 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Add custom URLs for manual transactions"""
 		urls = super().get_urls()
 		custom_urls = [
-			path('add-balance/', self.admin_site.admin_view(self.add_balance_view), name='clients_client_add_balance'),
 			path('add-credit/', self.admin_site.admin_view(self.add_credit_view), name='clients_client_add_credit'),
 			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
-			path('<path:object_id>/manage-billing/', self.admin_site.admin_view(self.manage_billing_view), name='clients_client_manage_billing'),
 		]
 		return custom_urls + urls
 	
@@ -183,70 +178,6 @@ class ClientAdmin(admin.ModelAdmin):
 		)
 	
 	add_credit_action.short_description = "Gestionar crédito del cliente seleccionado"
-	
-	def manage_billing_action(self, request, queryset):
-		"""Admin action to manage billing data for selected client"""
-		if queryset.count() != 1:
-			messages.error(request, "Seleccione exactamente un cliente para gestionar facturación.")
-			return
-		
-		client = queryset.first()
-		return HttpResponseRedirect(
-			reverse('admin:clients_client_manage_billing', args=[client.id])
-		)
-	
-	manage_billing_action.short_description = "Gestionar datos de facturación del cliente"
-	
-	def add_balance_view(self, request):
-		"""View for manually adding balance to a client"""
-		client_id = request.GET.get('client_id')
-		initial_data = {}
-		
-		if client_id:
-			try:
-				client = models.Client.objects.get(id=client_id)
-				initial_data['client'] = client
-			except models.Client.DoesNotExist:
-				messages.error(request, "Cliente no encontrado.")
-				return redirect('admin:clients_client_changelist')
-		
-		if request.method == 'POST':
-			form = ManualBalanceTransactionForm(request.POST)
-			if form.is_valid():
-				client = form.cleaned_data['client']
-				amount = form.cleaned_data['amount']
-				transaction_type = form.cleaned_data['transaction_type']
-				description = form.cleaned_data['description']
-				notes = form.cleaned_data['notes']
-				
-				try:
-					# Add balance with transaction history
-					new_balance = client.add_balance(
-						amount=amount,
-						transaction_type=transaction_type,
-						user=request.user,
-						notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}"
-					)
-					
-					messages.success(
-						request,
-						f"Saldo agregado exitosamente. {client.name} ahora tiene ${new_balance:.2f} de saldo."
-					)
-					return redirect('admin:clients_client_changelist')
-					
-				except Exception as e:
-					messages.error(request, f"Error al agregar saldo: {str(e)}")
-		else:
-			form = ManualBalanceTransactionForm(initial=initial_data)
-		
-		context = {
-			'form': form,
-			'title': 'Agregar Saldo Manualmente',
-			'opts': self.model._meta,
-			'has_view_permission': True,
-		}
-		return render(request, 'admin/clients/add_balance.html', context)
-	
 	def add_credit_view(self, request):
 		"""View for manually managing client credit"""
 		client_id = request.GET.get('client_id')
@@ -349,7 +280,6 @@ class ClientAdmin(admin.ModelAdmin):
 			'client': models.Client.objects.get(id=client_id) if client_id else None,
 		}
 		return render(request, 'admin/clients/add_credit.html', context)
-	
 	def bulk_deposit_view(self, request):
 		"""View for bulk balance deposits to multiple clients"""
 		if request.method == 'POST':
@@ -399,59 +329,7 @@ class ClientAdmin(admin.ModelAdmin):
 		}
 		return render(request, 'admin/clients/bulk_deposit.html', context)
 	
-	def manage_billing_view(self, request, object_id):
-		"""View for managing billing data and frequency together"""
-		client = get_object_or_404(models.Client, pk=object_id)
-		
-		# Get or create billing data and frequency instances
-		try:
-			billing_data = client.billing_data.get()
-		except models.BillingData.DoesNotExist:
-			billing_data = None
-		
-		try:
-			frequency = client.billing_frecuency.get()
-		except models.ClientBillingFrecuency.DoesNotExist:
-			frequency = None
-		
-		if request.method == 'POST':
-			billing_form = ClientBillingDataForm(request.POST, instance=billing_data, client=client)
-			frequency_form = ClientBillingFrequencyForm(request.POST, instance=frequency)
-			
-			if billing_form.is_valid() and frequency_form.is_valid():
-				try:
-					# Save billing data
-					billing_instance = billing_form.save(commit=False)
-					billing_instance.client = client
-					billing_instance.save()
-					
-					# Save billing frequency
-					frequency_instance = frequency_form.save(commit=False)
-					frequency_instance.client = client
-					frequency_instance.save()
-					
-					messages.success(
-						request,
-						f"Datos de facturación actualizados exitosamente para {client.name}."
-					)
-					return redirect('admin:clients_client_change', object_id=client.id)
-					
-				except Exception as e:
-					messages.error(request, f"Error al guardar datos de facturación: {str(e)}")
-		else:
-			billing_form = ClientBillingDataForm(instance=billing_data, client=client)
-			frequency_form = ClientBillingFrequencyForm(instance=frequency)
-		
-		context = {
-			'billing_form': billing_form,
-			'frequency_form': frequency_form,
-			'client': client,
-			'title': f'Gestionar Datos de Facturación - {client.name}',
-			'opts': self.model._meta,
-			'has_view_permission': True,
-		}
-		return render(request, 'admin/clients/manage_billing.html', context)
-
+	
 
 class ContactAdmin(admin.ModelAdmin):
 	list_display = ('name', 'client', 'email', 'phone')

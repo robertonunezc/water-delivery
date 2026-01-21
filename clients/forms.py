@@ -252,50 +252,6 @@ class BulkBalanceDepositForm(forms.Form):
         return notes
 
 
-class ClientBillingDataForm(forms.ModelForm):
-    """Form for managing client billing data and billing frequency together"""
-    
-    class Meta:
-        from .models import BillingData
-        model = BillingData
-        fields = ['rfc', 'curp', 'razon_social', 'metodo_pago', 'address']
-        widgets = {
-            'rfc': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'RFC (13 caracteres)',
-                'maxlength': '13'
-            }),
-            'curp': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'CURP (18 caracteres)',
-                'maxlength': '18'
-            }),
-            'razon_social': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Razón social completa'
-            }),
-          
-            'metodo_pago': forms.Select(attrs={'class': 'form-control'}),
-            'address': forms.Select(attrs={'class': 'form-control'}),
-        }
-        labels = {
-            'rfc': 'RFC',
-            'curp': 'CURP',
-            'razon_social': 'Razón Social',
-                      'metodo_pago': 'Método de Pago',
-            'address': 'Dirección de Facturación',
-        }
-    
-    def __init__(self, *args, client=None, **kwargs):
-        super().__init__(*args, **kwargs)
-        if client:
-            # Filter addresses to only show those belonging to this client
-            self.fields['address'].queryset = client.addresses.filter(deleted_at__isnull=True)
-        else:
-            self.fields['address'].queryset = self.fields['address'].queryset.none()
-
-
 class ClientBillingFrequencyForm(forms.ModelForm):
     """Form for managing client billing frequency"""
     
