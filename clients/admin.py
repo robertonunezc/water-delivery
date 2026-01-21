@@ -75,9 +75,22 @@ class ClientAdmin(admin.ModelAdmin):
 	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
+	change_form_template = 'admin/clients/client_change_form.html'
+
 	class Media:
 		js = ('clients/admin/toggle_billing_inline.js',)
-	
+
+	def get_inline_instances(self, request, obj=None):
+		"""
+		Only show inlines when editing an existing client.
+		Hide all inlines when creating a new client.
+		"""
+		if obj is None:
+			# Creating a new client - hide all inlines
+			return []
+		# Editing existing client - show all inlines
+		return super().get_inline_instances(request, obj)
+
 	fieldsets = (
 		('Información Básica', {
 			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link'),

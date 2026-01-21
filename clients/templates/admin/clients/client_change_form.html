@@ -1,0 +1,40 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block content %}
+    {% if not original %}
+        {# Show message only when creating a new client #}
+        <div style="margin: 20px 0; padding: 15px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;">
+            <strong>📋 Instrucción:</strong>
+            <p style="margin: 10px 0 0 0;">
+                Primero guarde la información básica del cliente haciendo clic en
+                <strong>"Guardar y continuar editando"</strong>.
+                Después de guardar, podrá agregar direcciones, contactos, datos de facturación y otra información relacionada.
+            </p>
+        </div>
+    {% endif %}
+
+    {{ block.super }}
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+    {% if not original %}
+        {# Hide "Save" and "Save and add another" buttons when creating new client #}
+        <style>
+            /* Hide the plain "Save" button */
+            input[name="_save"] {
+                display: none !important;
+            }
+            /* Hide the "Save and add another" button */
+            input[name="_addanother"] {
+                display: none !important;
+            }
+            /* Keep "Save and continue editing" visible */
+            input[name="_continue"] {
+                display: inline-block !important;
+            }
+        </style>
+    {% endif %}
+
+    {{ block.super }}
+{% endblock %}
