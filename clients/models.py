@@ -939,30 +939,33 @@ class Client(TimeStampedModel):
     
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
+        super().clean()
+            
+        errors = {}
         from django.core.exceptions import ValidationError
         if self.type == 'branch' and not self.corporate:
-            raise ValidationError({'corporate': 'Cliente corporativo debe ser establecido.'})
+            errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
         if self.type == 'corporate' and self.corporate:
-            raise ValidationError({'corporate': 'Cliente corporativo no puede tener un padre corporativo.'})
+            errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
         
         # Validate credit payment constraints - both cannot be restrictive at the same time
         if not self.can_pay_with_credit and self.requires_note_for_credit:
-            raise ValidationError({
-                'can_pay_with_credit': 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.',
-                'requires_note_for_credit': 'No se puede requerir nota si el pago con crédito está deshabilitado.'
-            })
+            
+            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.'
+            errors['requires_note_for_credit'] = 'No se puede requerir nota si el pago con crédito está deshabilitado.'
         if not self.can_pay_with_credit and self.current_debt > 0:
-            raise ValidationError({
-                'can_pay_with_credit': 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
-            })
+            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'  
+            
         if self.current_debt > self.credit_limit:
+            errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
             raise ValidationError({
                 'current_debt': 'La deuda actual no puede exceder el límite de crédito.'
             })
         if not self.can_pay_with_credit and self.credit_limit > 0:
-            raise ValidationError({
-                'can_pay_with_credit': 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
-            })
+            errors['can_pay_with_credit'] = 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
+        
+        if errors:
+            raise ValidationError(errors)
 
 
 class BalanceTransaction(TimeStampedModel):
@@ -1330,7 +1333,8 @@ class Address(TimeStampedModel):
     def clean(self):
         """Validate that each client has only one address of type billing and one of type shipping"""
         from django.core.exceptions import ValidationError
-        
+        super().clean()
+        errors = {}
         # Only validate for billing and shipping types
         if self.type not in ['billing', 'shipping']:
             return
@@ -1349,9 +1353,11 @@ class Address(TimeStampedModel):
         if existing_query.exists():
             type_display = self.get_type_display()
             raise ValidationError({
-                'type': f'El cliente ya tiene una dirección de tipo "{type_display}". '
-                        f'Solo se permite una dirección por tipo (Fiscal/Ubicación física).'
-            })
+            '__all__': f'No se puede guardar: dirección duplicada de tipo "{type_display}"',
+            'type': f'El cliente ya tiene una dirección de tipo "{type_display}". '
+                    f'Solo se permite una dirección por tipo (Fiscal/Ubicación física).'
+        })
+
 
 
 class BillingData(TimeStampedModel):
