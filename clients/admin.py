@@ -78,7 +78,10 @@ class ClientAdmin(admin.ModelAdmin):
 	change_form_template = 'admin/clients/client_change_form.html'
 
 	class Media:
-		js = ('clients/admin/toggle_billing_inline.js',)
+		js = (
+			'clients/admin/toggle_billing_inline.js',
+			'clients/admin/toggle_corporate_field.js',
+		)
 
 	def get_inline_instances(self, request, obj=None):
 		"""
