@@ -933,6 +933,9 @@ class Client(TimeStampedModel):
             
         except Exception as e:
             return {'success': False, 'error': str(e)}
+    def has_billing_address(self):
+        """Check if client has at least one billing address"""
+        return self.addresses.filter(type='billing').exists()
     
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
@@ -960,25 +963,6 @@ class Client(TimeStampedModel):
             raise ValidationError({
                 'can_pay_with_credit': 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
             })
-
-        # Only validate billing address requirement on existing clients that already had requires_billing=True
-        # This allows users to save initially with requires_billing=True, then add the billing address
-        if self.pk:
-            try:
-                # Get the original instance from database
-                original = Client.objects.get(pk=self.pk)
-                # Only validate if requires_billing was already True in the database
-                # This means they've had a chance to add billing addresses
-                if original.requires_billing and self.requires_billing:
-                    if not self.addresses.filter(type='billing').exists():
-                        raise ValidationError({
-                            'requires_billing': 'El cliente requiere una dirección de facturación, pero no tiene ninguna asignada. '
-                                              'Por favor agregue una dirección de tipo "Fiscal" en la sección de Domicilios o '
-                                              'desactive "Requiere facturación".'
-                        })
-            except Client.DoesNotExist:
-                # Client doesn't exist in DB yet, skip validation
-                pass
 
 
 class BalanceTransaction(TimeStampedModel):

@@ -7,9 +7,22 @@
         <div style="margin: 20px 0; padding: 15px; background-color: #d1ecf1; border: 1px solid #bee5eb; border-radius: 4px; color: #0c5460;">
             <strong>📋 Instrucción:</strong>
             <p style="margin: 10px 0 0 0;">
-                Primero guarde la información básica del cliente haciendo clic en
-                <strong>"Guardar y continuar editando"</strong>.
-                Después de guardar, podrá agregar direcciones, contactos, datos de facturación y otra información relacionada.
+                1- Primero guarde la información básica del cliente.
+                <b>DESPUES</b> de guardar, podrá agregar direcciones, contactos, datos de facturación y otra información relacionada.
+            </p>
+             <p style="margin: 10px 0 0 0;">
+                2- Para agregar una sucursal debe asignarle un CORPORATIVO.
+                Si no existe debe agregar primero el CORPORATIVO y después la SUCURSAL
+            </p>
+        </div>
+    {% endif %}
+
+    {% if not original.has_billing_address %}
+        {# Show warning when client requires billing but has no billing address #}
+        <div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
+            <strong>⚠️ Advertencia:</strong>
+            <p style="margin: 10px 0 0 0;">
+                Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b>.
             </p>
         </div>
     {% endif %}
