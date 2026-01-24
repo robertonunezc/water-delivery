@@ -936,37 +936,152 @@ class Client(TimeStampedModel):
     def has_billing_address(self):
         """Check if client has at least one billing address"""
         return self.addresses.filter(type='billing').exists()
-    
+
+    def get_effective_billing_data(self):
+        """
+        Returns own BillingData or corporate's if branch without own billing data.
+
+        Returns:
+            BillingData instance or None
+        """
+        # First, check if this client has its own billing data
+        if self.billing_data.exists():
+            return self.billing_data.first()
+
+        # If this is a branch and no own billing data, check corporate
+        if self.type == 'branch' and self.corporate:
+            return self.corporate.get_effective_billing_data()
+
+        return None
+
+    def get_effective_billing_address(self):
+        """
+        Returns own billing address or corporate's if branch without own billing address.
+
+        Returns:
+            Address instance or None
+        """
+        # First, check if this client has its own billing address
+        own_billing = self.addresses.filter(type='billing', active=True).first()
+        if own_billing:
+            return own_billing
+
+        # If this is a branch and no own billing address, check corporate
+        if self.type == 'branch' and self.corporate:
+            return self.corporate.get_effective_billing_address()
+
+        return None
+
+    def has_complete_billing_setup(self):
+        """
+        Check if client has complete billing setup (both BillingData and billing Address).
+        For branches, checks inherited setup if own setup is incomplete.
+
+        Returns:
+            bool: True if complete billing setup exists
+        """
+        effective_billing_data = self.get_effective_billing_data()
+        effective_billing_address = self.get_effective_billing_address()
+
+        return effective_billing_data is not None and effective_billing_address is not None
+
+    def get_billing_source(self):
+        """
+        Determine where billing data comes from (useful for admin display).
+
+        Returns:
+            str: 'own', 'corporate', or 'none'
+        """
+        has_own_data = self.billing_data.exists()
+        has_own_address = self.addresses.filter(type='billing', active=True).exists()
+
+        if has_own_data and has_own_address:
+            return 'own'
+        elif self.type == 'branch' and self.corporate:
+            corporate_has_data = self.corporate.billing_data.exists()
+            corporate_has_address = self.corporate.addresses.filter(type='billing', active=True).exists()
+            if corporate_has_data or corporate_has_address:
+                return 'corporate'
+
+        return 'none'
+
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
         super().clean()
-            
+
         errors = {}
         from django.core.exceptions import ValidationError
+
+        # Existing validations
         if self.type == 'branch' and not self.corporate:
             errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
         if self.type == 'corporate' and self.corporate:
             errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
-        
-        # Validate credit payment constraints - both cannot be restrictive at the same time
+
+        # NEW: Validate billing setup for branches that require billing
+        if self.type == 'branch' and self.requires_billing and self.corporate:
+            # Check if branch or corporate has complete billing setup
+            has_own_billing = (
+                self.billing_data.exists() and
+                self.addresses.filter(type='billing', active=True).exists()
+            )
+
+            if not has_own_billing:
+                # Branch doesn't have own billing setup, check corporate
+                corporate_has_billing = (
+                    self.corporate.billing_data.exists() and
+                    self.corporate.addresses.filter(type='billing', active=True).exists()
+                )
+
+                if not corporate_has_billing:
+                    errors['requires_billing'] = (
+                        'No se puede requerir facturación: ni la sucursal ni el corporativo '
+                        'tienen datos de facturación completos (RFC/razón social y dirección fiscal). '
+                        'Configure primero el corporativo o agregue datos propios a esta sucursal.'
+                    )
+
+        # NEW: Validate shipping address for branches (branches must have own shipping address)
+        if self.type == 'branch' and self.pk:
+            # Only validate on update (pk exists), not on creation
+            has_shipping = self.addresses.filter(type='shipping', active=True).exists()
+            if not has_shipping:
+                errors['__all__'] = (
+                    'Cliente sucursal debe tener su propia dirección de envío (ubicación física). '
+                    'Las sucursales no heredan direcciones de envío del corporativo.'
+                )
+
+        # Existing credit payment constraints
         if not self.can_pay_with_credit and self.requires_note_for_credit:
-            
             errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.'
             errors['requires_note_for_credit'] = 'No se puede requerir nota si el pago con crédito está deshabilitado.'
+
         if not self.can_pay_with_credit and self.current_debt > 0:
-            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'  
-            
+            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
+
         if self.current_debt > self.credit_limit:
             errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
-            raise ValidationError({
-                'current_debt': 'La deuda actual no puede exceder el límite de crédito.'
-            })
+
         if not self.can_pay_with_credit and self.credit_limit > 0:
-            errors['can_pay_with_credit'] = 'No se habilitar el límite de crédito sin permitir el pago con crédito.'
-        
+            errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'
+
         if errors:
             raise ValidationError(errors)
 
+
+# NOTE: BranchClient model is deprecated - Client model handles branch/corporate relationships
+# through the 'type' and 'corporate' fields. Commented out due to model conflicts.
+# class BranchClient(TimeStampedModel):
+#     """
+#     Model to link branch clients to their corporate parent clients
+#     """
+#     corporate_client = models.ForeignKey('Client', related_name='branches', on_delete=models.CASCADE, verbose_name="Cliente Corporativo")
+#     class Meta:
+#         verbose_name = 'Cliente Sucursal'
+#         verbose_name_plural = 'Clientes Sucursales'
+#         unique_together = ('corporate_client', 'branch_client')
+#
+#     def __str__(self):
+#         return f"{self.branch_client.name} (Sucursal de {self.corporate_client.name})"
 
 class BalanceTransaction(TimeStampedModel):
     """

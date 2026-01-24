@@ -72,7 +72,13 @@ class ClientAdmin(admin.ModelAdmin):
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
-	readonly_fields = ('created_at', 'updated_at', 'balance', 'current_debt', 'get_available_credit', 'get_balance_status', 'get_billing_data_button')
+	readonly_fields = (
+		'created_at', 'updated_at',
+		'balance', 'current_debt', 'get_available_credit',
+		'get_balance_status', 'get_billing_data_button',
+		'get_effective_billing_info',
+		'get_billing_inheritance_status'
+	)
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
 	change_form_template = 'admin/clients/client_change_form.html'
@@ -114,7 +120,16 @@ class ClientAdmin(admin.ModelAdmin):
 		}),
 		('Datos de Facturación', {
 		 	'fields': ('requires_billing',),
-		 	'description': 'Configure los datos de facturación y frecuencia del cliente'
+		 	'description': (
+				'Configure los datos de facturación del cliente. '
+				'Las sucursales pueden heredar datos de facturación del corporativo '
+				'o tener sus propios datos de facturación.'
+			)
+		}),
+		('Información de Facturación Heredada', {
+			'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
+			'classes': ('collapse',),
+			'description': 'Información de facturación efectiva (propia o heredada del corporativo)'
 		}),
 	)
 	
@@ -160,7 +175,86 @@ class ClientAdmin(admin.ModelAdmin):
 			obj.get_available_credit()
 		)
 	get_balance_status.short_description = 'Estado Financiero'
-	
+
+	def get_effective_billing_info(self, obj):
+		"""Display effective billing data (own or inherited)"""
+		if not obj.pk:
+			return 'Guarde el cliente primero para ver información de facturación.'
+
+		effective_data = obj.get_effective_billing_data()
+		effective_address = obj.get_effective_billing_address()
+		source = obj.get_billing_source()
+
+		if not effective_data and not effective_address:
+			return format_html('<span style="color: red;">Sin datos de facturación</span>')
+
+		source_label = {
+			'own': '✓ Propios',
+			'corporate': '⬆ Heredados del corporativo',
+			'none': '✗ No disponible'
+		}.get(source, 'Desconocido')
+
+		source_color = {
+			'own': 'green',
+			'corporate': 'blue',
+			'none': 'red'
+		}.get(source, 'gray')
+
+		result = f'<div><strong>Origen:</strong> <span style="color: {source_color};">{source_label}</span></div>'
+
+		if effective_data:
+			result += f'<div><strong>RFC:</strong> {effective_data.rfc}</div>'
+			result += f'<div><strong>Razón Social:</strong> {effective_data.razon_social[:50]}...</div>'
+
+		if effective_address:
+			result += f'<div><strong>Dirección Fiscal:</strong> {str(effective_address)[:80]}...</div>'
+		else:
+			result += '<div style="color: orange;"><strong>⚠ Sin dirección fiscal</strong></div>'
+
+		return format_html(result)
+
+	get_effective_billing_info.short_description = 'Datos de Facturación Efectivos'
+
+	def get_billing_inheritance_status(self, obj):
+		"""Display billing inheritance status and warnings"""
+		if not obj.pk:
+			return ''
+
+		if obj.type != 'branch':
+			return format_html('<span style="color: gray;">N/A (cliente corporativo)</span>')
+
+		has_own_data = obj.billing_data.exists()
+		has_own_address = obj.addresses.filter(type='billing', active=True).exists()
+		has_complete_own = has_own_data and has_own_address
+
+		if has_complete_own:
+			return format_html('<span style="color: green;">✓ Usa sus propios datos de facturación</span>')
+
+		if not obj.corporate:
+			return format_html('<span style="color: red;">✗ Sin corporativo asociado</span>')
+
+		corporate_has_data = obj.corporate.billing_data.exists()
+		corporate_has_address = obj.corporate.addresses.filter(type='billing', active=True).exists()
+		corporate_complete = corporate_has_data and corporate_has_address
+
+		if corporate_complete:
+			missing = []
+			if not has_own_data:
+				missing.append('RFC/Razón Social')
+			if not has_own_address:
+				missing.append('Dirección Fiscal')
+
+			return format_html(
+				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>',
+				', '.join(missing)
+			)
+
+		return format_html(
+			'<span style="color: orange;">⚠ Corporativo sin datos completos de facturación</span>'
+		)
+
+	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
+
 	def get_urls(self):
 		"""Add custom URLs for manual transactions"""
 		urls = super().get_urls()
