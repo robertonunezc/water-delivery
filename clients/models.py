@@ -951,7 +951,7 @@ class Client(TimeStampedModel):
         """
         if self.type == 'branch':
             if not self.has_shipping_address():
-                return False, 'La sucursal debe tener una dirección de envío (ubicación física) antes de recibir pedidos.'
+                return False, 'La sucursal debe tener un domicilio de envío (ubicación física) antes de recibir pedidos.'
 
         # Add other validations as needed
         if not self.active:
@@ -966,9 +966,10 @@ class Client(TimeStampedModel):
         Returns:
             BillingData instance or None
         """
+
         # First, check if this client has its own billing data
-        if self.billing_data.exists():
-            return self.billing_data.first()
+        if hasattr(self, 'billing_data'):
+            return self.billing_data
 
         # If this is a branch and no own billing data, check corporate
         if self.type == 'branch' and self.corporate:
@@ -1014,13 +1015,12 @@ class Client(TimeStampedModel):
         Returns:
             str: 'own', 'corporate', or 'none'
         """
-        has_own_data = self.billing_data.exists()
+        has_own_data = hasattr(self, 'billing_data')
         has_own_address = self.addresses.filter(type='billing', active=True).exists()
-
         if has_own_data and has_own_address:
             return 'own'
         elif self.type == 'branch' and self.corporate:
-            corporate_has_data = self.corporate.billing_data.exists()
+            corporate_has_data = hasattr(self.corporate, 'billing_data')
             corporate_has_address = self.corporate.addresses.filter(type='billing', active=True).exists()
             if corporate_has_data or corporate_has_address:
                 return 'corporate'
@@ -1045,14 +1045,14 @@ class Client(TimeStampedModel):
         if self.type == 'branch' and self.requires_billing and self.corporate and self.pk:
             # Check if branch or corporate has complete billing setup
             has_own_billing = (
-                self.billing_data.exists() and
+                hasattr(self, 'billing_data') and
                 self.addresses.filter(type='billing', active=True).exists()
             )
 
             if not has_own_billing:
                 # Branch doesn't have own billing setup, check corporate
                 corporate_has_billing = (
-                    self.corporate.billing_data.exists() and
+                    hasattr(self.corporate, 'billing_data') and
                     self.corporate.addresses.filter(type='billing', active=True).exists()
                 )
 
@@ -1251,8 +1251,8 @@ class CreditTransaction(TimeStampedModel):
                 raise ValidationError({'amount': f'Excede límite de crédito. Límite: ${self.credit_limit_after:.2f}'})
 
 
-class ClientBillingFrecuency(models.Model):
-    client = models.ForeignKey('Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')
+class ClientBillingFrecuency(TimeStampedModel):
+    client = models.OneToOneField('Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')
     frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='monthly', verbose_name="Frecuencia de Facturación")
     billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, default='specific_date', verbose_name="Fecha de Facturación")
     
@@ -1494,7 +1494,7 @@ class Address(TimeStampedModel):
 
 
 class BillingData(TimeStampedModel):
-    client = models.ForeignKey('Client', related_name='billing_data', on_delete=models.CASCADE)
+    client = models.OneToOneField('Client', related_name='billing_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
     curp = models.CharField(max_length=255, blank=True, null=True, verbose_name="CURP")

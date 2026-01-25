@@ -128,7 +128,6 @@ class ClientAdmin(admin.ModelAdmin):
 		}),
 		('Información de Facturación Heredada', {
 			'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
-			'classes': ('collapse',),
 			'description': 'Información de facturación efectiva (propia o heredada del corporativo)'
 		}),
 	)
@@ -142,7 +141,7 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Display a button to manage billing data and frequency"""
 		if obj.pk:
 			url = reverse('admin:clients_client_manage_billing', args=[obj.pk])
-			has_billing = hasattr(obj, 'billing_data') and obj.billing_data.exists()
+			has_billing = hasattr(obj, 'billing_data')
 			has_frequency = hasattr(obj, 'billing_frecuency') and obj.billing_frecuency.exists()
 			
 			if has_billing and has_frequency:
@@ -180,11 +179,10 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Display effective billing data (own or inherited)"""
 		if not obj.pk:
 			return 'Guarde el cliente primero para ver información de facturación.'
-
 		effective_data = obj.get_effective_billing_data()
 		effective_address = obj.get_effective_billing_address()
 		source = obj.get_billing_source()
-
+		print("Effective billing data for", obj.name, ":", effective_data, effective_address, "Source:", source)
 		if not effective_data and not effective_address:
 			return format_html('<span style="color: red;">Sin datos de facturación</span>')
 
@@ -193,7 +191,6 @@ class ClientAdmin(admin.ModelAdmin):
 			'corporate': '⬆ Heredados del corporativo',
 			'none': '✗ No disponible'
 		}.get(source, 'Desconocido')
-
 		source_color = {
 			'own': 'green',
 			'corporate': 'blue',
@@ -219,21 +216,22 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Display billing inheritance status and warnings"""
 		if not obj.pk:
 			return ''
-
 		if obj.type != 'branch':
 			return format_html('<span style="color: gray;">N/A (cliente corporativo)</span>')
+		
+		has_own_data = hasattr(obj, 'billing_data')
 
-		has_own_data = obj.billing_data.exists()
 		has_own_address = obj.addresses.filter(type='billing', active=True).exists()
 		has_complete_own = has_own_data and has_own_address
 
+		print("Billing inheritance status for",has_own_data, has_own_address, has_complete_own)
 		if has_complete_own:
 			return format_html('<span style="color: green;">✓ Usa sus propios datos de facturación</span>')
 
 		if not obj.corporate:
 			return format_html('<span style="color: red;">✗ Sin corporativo asociado</span>')
 
-		corporate_has_data = obj.corporate.billing_data.exists()
+		corporate_has_data = hasattr(obj.corporate, 'billing_data')
 		corporate_has_address = obj.corporate.addresses.filter(type='billing', active=True).exists()
 		corporate_complete = corporate_has_data and corporate_has_address
 
@@ -249,9 +247,16 @@ class ClientAdmin(admin.ModelAdmin):
 				', '.join(missing)
 			)
 
-		return format_html(
+		missin_corporate_data = format_html(
 			'<span style="color: orange;">⚠ Corporativo sin datos completos de facturación</span>'
 		)
+		add_coportate_data_btn = format_html(
+			'<div style="margin-top: 5px;">'
+			'<a href="/admin/clients/client/{}/change/" class="button">Agregar Datos de Facturación del Corporativo</a>'
+			'</div>',
+			obj.corporate.id
+		)
+		return format_html('{}{}', missin_corporate_data, add_coportate_data_btn)
 
 	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
 
