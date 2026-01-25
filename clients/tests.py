@@ -399,6 +399,128 @@ class ClientValidationTestCase(TestCase):
             client.clean()
         self.assertIn('can_pay_with_credit', context.exception.message_dict)
 
+    def test_create_new_branch_with_requires_billing_succeeds(self):
+        """Test that creating a new branch with requires_billing=True works (validation deferred)"""
+        # This simulates what happens in the admin when creating a new client
+        branch = Client(
+            name="New Branch",
+            type="branch",
+            corporate=self.corporate,
+            requires_billing=True,
+            active=True
+        )
+
+        # Should not raise ValidationError on new instance (no pk yet)
+        try:
+            branch.clean()
+        except ValidationError as e:
+            # Should only complain about missing corporate, not billing setup
+            if 'requires_billing' in e.message_dict:
+                self.fail("Should not validate billing setup before instance is saved")
+
+    def test_create_new_corporate_succeeds(self):
+        """Test that creating a new corporate client works without issues"""
+        corporate = Client(
+            name="New Corporate",
+            type="corporate",
+            active=True
+        )
+
+        # Should not raise ValidationError
+        try:
+            corporate.clean()
+        except ValidationError:
+            self.fail("Creating new corporate should not raise validation errors")
+
+    def test_update_branch_requires_billing_validates(self):
+        """Test that updating an existing branch to require billing validates correctly"""
+        # Create and save a branch first
+        branch = Client.objects.create(
+            name="Branch Client",
+            type="branch",
+            corporate=self.corporate,
+            active=True
+        )
+
+        # Now try to update it to require billing without proper setup
+        branch.requires_billing = True
+
+        # Should raise ValidationError because branch is saved (has pk) and lacks billing
+        with self.assertRaises(ValidationError) as context:
+            branch.clean()
+        self.assertIn('requires_billing', context.exception.message_dict)
+
+    def test_branch_has_shipping_address(self):
+        """Test has_shipping_address method returns correct value"""
+        branch = Client.objects.create(
+            name="Branch Client",
+            type="branch",
+            corporate=self.corporate,
+            active=True
+        )
+
+        # Initially no shipping address
+        self.assertFalse(branch.has_shipping_address())
+
+        # Add shipping address
+        Address.objects.create(
+            client=branch,
+            type="shipping",
+            street="Branch Street",
+            municipality="Querétaro",
+            active=True
+        )
+
+        # Now should have shipping address
+        self.assertTrue(branch.has_shipping_address())
+
+    def test_branch_can_receive_orders_without_shipping_address(self):
+        """Test that branch cannot receive orders without shipping address"""
+        branch = Client.objects.create(
+            name="Branch Client",
+            type="branch",
+            corporate=self.corporate,
+            active=True
+        )
+
+        can_receive, error_msg = branch.can_receive_orders()
+        self.assertFalse(can_receive)
+        self.assertIn('dirección de envío', error_msg.lower())
+
+    def test_branch_can_receive_orders_with_shipping_address(self):
+        """Test that branch can receive orders with shipping address"""
+        branch = Client.objects.create(
+            name="Branch Client",
+            type="branch",
+            corporate=self.corporate,
+            active=True
+        )
+
+        # Add shipping address
+        Address.objects.create(
+            client=branch,
+            type="shipping",
+            street="Branch Street",
+            municipality="Querétaro",
+            active=True
+        )
+
+        can_receive, error_msg = branch.can_receive_orders()
+        self.assertTrue(can_receive)
+        self.assertEqual(error_msg, '')
+
+    def test_inactive_client_cannot_receive_orders(self):
+        """Test that inactive client cannot receive orders"""
+        client = Client.objects.create(
+            name="Inactive Client",
+            type="corporate",
+            active=False
+        )
+
+        can_receive, error_msg = client.can_receive_orders()
+        self.assertFalse(can_receive)
+        self.assertIn('activo', error_msg.lower())
+
 
 class ClientBalanceManagementTestCase(TestCase):
     """Test cases for client balance management"""

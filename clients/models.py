@@ -937,6 +937,28 @@ class Client(TimeStampedModel):
         """Check if client has at least one billing address"""
         return self.addresses.filter(type='billing').exists()
 
+    def has_shipping_address(self):
+        """Check if client has at least one active shipping address"""
+        return self.addresses.filter(type='shipping', active=True).exists()
+
+    def can_receive_orders(self):
+        """
+        Check if client is ready to receive orders.
+        Branches require their own shipping address (they don't inherit from corporate).
+
+        Returns:
+            tuple: (bool, str) - (can_receive, error_message)
+        """
+        if self.type == 'branch':
+            if not self.has_shipping_address():
+                return False, 'La sucursal debe tener una dirección de envío (ubicación física) antes de recibir pedidos.'
+
+        # Add other validations as needed
+        if not self.active:
+            return False, 'El cliente no está activo.'
+
+        return True, ''
+
     def get_effective_billing_data(self):
         """
         Returns own BillingData or corporate's if branch without own billing data.
@@ -1019,7 +1041,8 @@ class Client(TimeStampedModel):
             errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
 
         # NEW: Validate billing setup for branches that require billing
-        if self.type == 'branch' and self.requires_billing and self.corporate:
+        # Only validate if the client has been saved (has a pk)
+        if self.type == 'branch' and self.requires_billing and self.corporate and self.pk:
             # Check if branch or corporate has complete billing setup
             has_own_billing = (
                 self.billing_data.exists() and
@@ -1040,15 +1063,10 @@ class Client(TimeStampedModel):
                         'Configure primero el corporativo o agregue datos propios a esta sucursal.'
                     )
 
-        # NEW: Validate shipping address for branches (branches must have own shipping address)
-        if self.type == 'branch' and self.pk:
-            # Only validate on update (pk exists), not on creation
-            has_shipping = self.addresses.filter(type='shipping', active=True).exists()
-            if not has_shipping:
-                errors['__all__'] = (
-                    'Cliente sucursal debe tener su propia dirección de envío (ubicación física). '
-                    'Las sucursales no heredan direcciones de envío del corporativo.'
-                )
+        # NOTE: Shipping address validation removed - it was too strict for admin workflow.
+        # Branches must have their own shipping address (they don't inherit from corporate),
+        # but this should be validated at the business logic level (e.g., when creating orders)
+        # rather than at the model level, to allow proper admin inline workflow.
 
         # Existing credit payment constraints
         if not self.can_pay_with_credit and self.requires_note_for_credit:
