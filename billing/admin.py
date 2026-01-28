@@ -6,8 +6,13 @@ from django.forms.models import BaseInlineFormSet
 from django.http import JsonResponse
 from django.urls import path
 from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import render
+from django.core.paginator import Paginator, EmptyPage
+from datetime import date, timedelta, datetime
+from calendar import monthrange
 
-from billing.models import BillingOrder, BillingRecord
+from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport
+from clients.models import BILLING_FREQUENCY_CHOICES
 
 # Register your models here.
 class BillingRecordInlineAdmin(admin.StackedInline):
@@ -209,6 +214,116 @@ class BillingOrderAdmin(admin.ModelAdmin):
             'client_id': billing_record.client_id,
             'client_name': billing_record.client.name,
         })
+
+@admin.register(BillingFrequencyReport)
+class BillingFrequencyReportAdmin(admin.ModelAdmin):
+    """
+    Custom admin for billing frequency report.
+    Overrides changelist_view to show custom report instead of model list.
+    """
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        """Override changelist to show custom report"""
+        return self.billing_frequency_report_view(request)
+
+    def billing_frequency_report_view(self, request):
+        """Custom report view"""
+        from clients.models import ClientBillingFrecuency
+        from clients.services import get_clients_needing_billing
+
+        # Extract GET parameters
+        search_query = request.GET.get('search', '').strip()
+        frequency_filter = request.GET.get('frequency', '')
+        date_preset = request.GET.get('date_preset', '')
+
+        # Date range handling
+        today = date.today()
+
+        if date_preset == 'today':
+            start_date = today
+            end_date = today
+        elif date_preset == 'this_week':
+            start_date = today - timedelta(days=today.weekday())
+            end_date = start_date + timedelta(days=6)
+        elif date_preset == 'this_month':
+            start_date = today.replace(day=1)
+            last_day = monthrange(today.year, today.month)[1]
+            end_date = today.replace(day=last_day)
+        elif date_preset == 'next_7_days':
+            start_date = today
+            end_date = today + timedelta(days=7)
+        else:
+            # Custom date range
+            start_str = request.GET.get('start_date', '')
+            end_str = request.GET.get('end_date', '')
+
+            try:
+                start_date = datetime.strptime(start_str, '%Y-%m-%d').date() if start_str else today
+            except ValueError:
+                start_date = today
+
+            try:
+                end_date = datetime.strptime(end_str, '%Y-%m-%d').date() if end_str else today + timedelta(days=7)
+            except ValueError:
+                end_date = today + timedelta(days=7)
+
+        # Get results from service layer
+        results = get_clients_needing_billing(
+            start_date=start_date,
+            end_date=end_date,
+            frequency_filter=frequency_filter if frequency_filter else None,
+            search_query=search_query if search_query else None
+        )
+
+        # Pagination
+        page_number = request.GET.get('page', 1)
+        paginator = Paginator(results, 20)
+
+        try:
+            page_obj = paginator.get_page(page_number)
+        except EmptyPage:
+            page_obj = paginator.get_page(1)
+
+        # Statistics
+        total_clients = len(results)
+        total_amount = sum(r['total_amount'] for r in results)
+        total_orders = sum(r['orders_count'] for r in results)
+
+        # Frequency breakdown
+        from collections import Counter
+        frequency_breakdown = Counter(r['frequency_display'] for r in results)
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': 'Reporte de Frecuencia de Facturación',
+            'results': page_obj,
+            'page_obj': page_obj,
+            'search_query': search_query,
+            'frequency_filter': frequency_filter,
+            'date_preset': date_preset,
+            'start_date': start_date,
+            'end_date': end_date,
+            'total_clients': total_clients,
+            'total_amount': total_amount,
+            'total_orders': total_orders,
+            'frequency_breakdown': dict(frequency_breakdown),
+            'frequency_choices': BILLING_FREQUENCY_CHOICES,
+        }
+
+        return render(
+            request,
+            'billing/admin/billing_frequency_report.html',
+            context
+        )
 
 admin.site.register(BillingRecord, BillingRecordAdmin)
 admin.site.register(BillingOrder, BillingOrderAdmin)

@@ -1,0 +1,336 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    .stats-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .stat-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-value {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-bottom: 0.25rem;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+
+    .filter-form {
+        background: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+
+    .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+    }
+
+    .results-table {
+        width: 100%;
+        background: white;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .results-table th {
+        background: #f1f3f5;
+        font-weight: 600;
+        text-align: left;
+        padding: 0.75rem;
+    }
+
+    .results-table td {
+        padding: 0.75rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        margin-right: 0.25rem;
+    }
+
+    .badge-primary { background: #007bff; color: white; }
+    .badge-success { background: #28a745; color: white; }
+    .badge-warning { background: #ffc107; color: black; }
+    .badge-info { background: #17a2b8; color: white; }
+
+    .btn {
+        display: inline-block;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        border-radius: 4px;
+        text-decoration: none;
+        border: 1px solid transparent;
+        cursor: pointer;
+    }
+
+    .btn-primary {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+
+    .btn-secondary {
+        background: #6c757d;
+        color: white;
+        border-color: #6c757d;
+    }
+
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .btn-outline-primary {
+        color: #007bff;
+        border-color: #007bff;
+        background: white;
+    }
+
+    .btn-outline-primary:hover {
+        background: #007bff;
+        color: white;
+    }
+
+    .form-control {
+        display: block;
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 0.875rem;
+        line-height: 1.5;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+    }
+
+    label {
+        display: block;
+        margin-bottom: 0.25rem;
+        font-weight: 500;
+        font-size: 0.875rem;
+    }
+
+    .pagination {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .pagination a {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #007bff;
+    }
+
+    .pagination a:hover {
+        background: #e9ecef;
+    }
+
+    .pagination span {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .container-fluid {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 2rem;
+    }
+
+    h1 {
+        margin-bottom: 1.5rem;
+        color: #333;
+    }
+
+    .no-results {
+        text-align: center;
+        padding: 3rem;
+        background: #f8f9fa;
+        border-radius: 8px;
+    }
+
+    .no-results p {
+        font-size: 1.25rem;
+        color: #6c757d;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h1>{{ title }}</h1>
+
+    <!-- Statistics Card -->
+    <div class="stats-card">
+        <div class="stat-grid">
+            <div class="stat-item">
+                <div class="stat-value">{{ total_clients }}</div>
+                <div class="stat-label">Clientes a Facturar</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ total_orders }}</div>
+                <div class="stat-label">Órdenes Totales</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">${{ total_amount|floatformat:2 }}</div>
+                <div class="stat-label">Monto Total</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value">{{ frequency_breakdown|length }}</div>
+                <div class="stat-label">Tipos de Frecuencia</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+        <form method="get">
+            <div class="filter-grid">
+                <div>
+                    <label>Rango de Fechas:</label>
+                    <select name="date_preset" class="form-control" onchange="this.form.submit()">
+                        <option value="">Personalizado</option>
+                        <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Hoy</option>
+                        <option value="this_week" {% if date_preset == 'this_week' %}selected{% endif %}>Esta Semana</option>
+                        <option value="this_month" {% if date_preset == 'this_month' %}selected{% endif %}>Este Mes</option>
+                        <option value="next_7_days" {% if date_preset == 'next_7_days' %}selected{% endif %}>Próximos 7 Días</option>
+                    </select>
+                </div>
+
+                {% if not date_preset %}
+                <div>
+                    <label>Fecha Inicio:</label>
+                    <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+
+                <div>
+                    <label>Fecha Fin:</label>
+                    <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                </div>
+                {% endif %}
+
+                <div>
+                    <label>Frecuencia:</label>
+                    <select name="frequency" class="form-control">
+                        <option value="">Todas</option>
+                        {% for value, label in frequency_choices %}
+                        <option value="{{ value }}" {% if frequency_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Buscar Cliente:</label>
+                    <input type="text" name="search" value="{{ search_query }}" class="form-control" placeholder="Nombre, RFC...">
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <button type="submit" class="btn btn-primary">Filtrar</button>
+                <a href="{% url 'admin:billing_billingfrequencyreport_changelist' %}" class="btn btn-secondary">Limpiar</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Results -->
+    <p><strong>Mostrando {{ results|length }} de {{ total_clients }} clientes</strong></p>
+
+    {% if results %}
+    <table class="results-table">
+        <thead>
+            <tr>
+                <th>Cliente</th>
+                <th>Tipo</th>
+                <th>Frecuencia</th>
+                <th>Próxima(s) Factura(s)</th>
+                <th>Órdenes</th>
+                <th>Monto Total</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for result in results %}
+            <tr>
+                <td>
+                    <strong>{{ result.client.name }}</strong><br>
+                    <small>{{ result.client.rfc|default:"Sin RFC" }}</small>
+                </td>
+                <td>
+                    {% if result.client.is_corporate %}
+                    <span class="badge badge-primary">Corporativo</span>
+                    {% else %}
+                    <span class="badge badge-info">Sucursal</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <strong>{{ result.frequency_display }}</strong><br>
+                    <small>{{ result.billing_info }}</small>
+                </td>
+                <td>
+                    {% for billing_date in result.billing_dates %}
+                    <span class="badge badge-success">{{ billing_date|date:"d/m/Y" }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ result.orders_count }}</td>
+                <td>${{ result.total_amount|floatformat:2 }}</td>
+                <td>
+                    <a href="{% url 'admin:clients_client_change' result.client.id %}" class="btn btn-sm btn-outline-primary">Ver</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <div style="margin-top: 1.5rem; text-align: center;">
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+            <a href="?page=1{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">&laquo; Primera</a>
+            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Anterior</a>
+            {% endif %}
+
+            <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Siguiente</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Última &raquo;</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="no-results">
+        <p>No se encontraron clientes que requieran facturación en este período.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

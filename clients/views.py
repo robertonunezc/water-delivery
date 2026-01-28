@@ -191,10 +191,11 @@ def detail(request, pk):
     # Get client's contacts and addresses
     contacts = client.contacts.all()
     addresses = client.addresses.filter(active=True)
-    billing_data = client.billing_data.all()
+    billing_data = client.get_effective_billing_data()
     
     # Get billing frequency information
-    billing_frequencies = client.billing_frecuency.all()
+    print("aaaa,",client)
+    billing_frequencies = client.client_billing_frecuency_set.filter(is_active=True)
     billing_frequency_info = None
     next_billing_date = None
     

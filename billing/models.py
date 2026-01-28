@@ -38,3 +38,19 @@ class BillingOrder(TimeStampedModel):
         ordering = ['-created_at']
         verbose_name = 'Agregar venta a factura'
         verbose_name_plural = 'Agregar ventas a factura'
+
+class BillingFrequencyReport(models.Model):
+    """
+    Proxy model to create an admin menu entry for the billing frequency report.
+    This model has no database table - it's just for admin navigation.
+    """
+    class Meta:
+        managed = False  # No database table
+        verbose_name = "Reporte de Frecuencia de Facturación"
+        verbose_name_plural = "Reportes de Frecuencia de Facturación"
+        app_label = 'billing'
+        # Permissions for access control
+        default_permissions = ('view',)
+        permissions = [
+            ('view_billing_frequency_report', 'Can view billing frequency report'),
+        ]

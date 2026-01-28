@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from .models import Employee, Transport
+from .models import Employee, Transport, NonWorkingDay
 
 class UserAdmin(BaseUserAdmin):
     # Do not inline Employee here. We want Employee created/managed only from the Employee admin.
@@ -75,6 +75,24 @@ class TransportAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('assigned_driver__user')
+
+@admin.register(NonWorkingDay)
+class NonWorkingDayAdmin(admin.ModelAdmin):
+    list_display = ('date', 'name', 'is_active')
+    list_filter = ('is_active', 'date')
+    search_fields = ('name', 'notes')
+    ordering = ('-date',)
+    date_hierarchy = 'date'
+
+    fieldsets = (
+        ('Información', {
+            'fields': ('date', 'name', 'is_active')
+        }),
+        ('Notas', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+    )
 
 # Unregister the original User admin and register our (inline-free) UserAdmin
 admin.site.unregister(User)

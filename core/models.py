@@ -40,6 +40,24 @@ class Transport(models.Model):
         verbose_name = "Vehículo"
         verbose_name_plural = "Vehículos"
 
+class NonWorkingDay(models.Model):
+    date = models.DateField(unique=True, verbose_name="Fecha")
+    name = models.CharField(max_length=200, verbose_name="Nombre del Día Festivo")
+    is_active = models.BooleanField(default=True, verbose_name="Activo")
+    notes = models.TextField(blank=True, verbose_name="Notas")
+
+    class Meta:
+        verbose_name = "Día No Laborable"
+        verbose_name_plural = "Días No Laborables"
+        ordering = ['date']
+        indexes = [
+            models.Index(fields=['date']),
+            models.Index(fields=['is_active', 'date']),
+        ]
+
+    def __str__(self):
+        return f"{self.date.strftime('%d/%m/%Y')} - {self.name}"
+
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
         """By default, exclude soft-deleted records"""

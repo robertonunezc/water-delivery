@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from typing import Optional, List
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
@@ -132,6 +133,7 @@ class Client(TimeStampedModel):
         return self.name
     
     # Balance and Credit Management Methods
+    # TODO: review if this is a good idea or if we should handle transactions outside the model
     def add_balance(self, amount, transaction_type='deposit', user=None, reference_order=None, reference_payment=None, transfer_to_client=None, notes=None, source='automatic'):
         """
         Add money to client's balance with transaction history
@@ -1397,25 +1399,167 @@ class ClientBillingFrecuency(TimeStampedModel):
     def _get_weekday_occurrence_date(self, year, month, weekday, occurrence):
         """Find the nth occurrence of a weekday in a given month"""
         import calendar
-        
+
         # Get all dates in the month for the specified weekday
         dates = []
         first_day, last_day = monthrange(year, month)
-        
+
         for day in range(1, last_day + 1):
             date_obj = date(year, month, day)
             if date_obj.weekday() == weekday:
                 dates.append(date_obj)
-        
+
         if not dates:
             return None
-            
+
         if occurrence == -1:  # Last occurrence
             return dates[-1]
         elif 1 <= occurrence <= len(dates):
             return dates[occurrence - 1]
         else:
             return None
+
+    def should_bill_in_period(self, start_date: date, end_date: date) -> bool:
+        """
+        Determine if client should be billed within the date range.
+
+        Args:
+            start_date: Start of billing period
+            end_date: End of billing period
+
+        Returns:
+            True if client should be billed in this period
+        """
+        billing_dates = self.get_billing_dates_in_period(start_date, end_date)
+        return len(billing_dates) > 0
+
+    def get_billing_dates_in_period(self, start_date: date, end_date: date) -> List[date]:
+        """
+        Get all billing dates that fall within the specified period.
+
+        Args:
+            start_date: Start of billing period
+            end_date: End of billing period
+
+        Returns:
+            List of dates when client should be billed
+        """
+        from core.utils import is_business_day, adjust_to_business_day
+
+        billing_dates = []
+
+        if self.frequency == 'when_delivery':
+            # For contraentrega, check orders and add 1 business day
+            # This will be handled at the service layer since it requires order data
+            return []  # Service layer will handle this
+
+        elif self.frequency == 'weekly':
+            # Weekly: Check if configured weekday falls in the period
+            # weekday field: 0=Monday, 6=Sunday (but only 0-4 allowed)
+            if self.weekday is None or self.weekday > 4:
+                return []
+
+            current = start_date
+            while current <= end_date:
+                if current.weekday() == self.weekday and is_business_day(current):
+                    billing_dates.append(current)
+                current += timedelta(days=1)
+
+        elif self.frequency == 'biweekly':
+            # Quincenal: 15th and last day of each month
+            current_month_start = start_date.replace(day=1)
+            end_month = end_date.replace(day=1)
+
+            while current_month_start <= end_month:
+                # 15th of month (or next business day)
+                fifteenth = current_month_start.replace(day=15)
+                adjusted_15th = adjust_to_business_day(fifteenth)
+                if start_date <= adjusted_15th <= end_date:
+                    billing_dates.append(adjusted_15th)
+
+                # Last business day of month
+                last_day = monthrange(current_month_start.year, current_month_start.month)[1]
+                last_date = current_month_start.replace(day=last_day)
+
+                # Find last business day
+                while not is_business_day(last_date):
+                    last_date -= timedelta(days=1)
+
+                if start_date <= last_date <= end_date:
+                    billing_dates.append(last_date)
+
+                # Move to next month
+                if current_month_start.month == 12:
+                    current_month_start = current_month_start.replace(year=current_month_start.year + 1, month=1)
+                else:
+                    current_month_start = current_month_start.replace(month=current_month_start.month + 1)
+
+        elif self.frequency == 'monthly':
+            # Monthly with various subtypes
+            current_month_start = start_date.replace(day=1)
+            end_month = end_date.replace(day=1)
+
+            while current_month_start <= end_month:
+                billing_date = self._get_monthly_billing_date(current_month_start)
+
+                if billing_date and start_date <= billing_date <= end_date:
+                    billing_dates.append(billing_date)
+
+                # Move to next month
+                if current_month_start.month == 12:
+                    current_month_start = current_month_start.replace(year=current_month_start.year + 1, month=1)
+                else:
+                    current_month_start = current_month_start.replace(month=current_month_start.month + 1)
+
+        return sorted(set(billing_dates))  # Remove duplicates and sort
+
+    def _get_monthly_billing_date(self, month_start: date) -> Optional[date]:
+        """
+        Get the billing date for a specific month based on monthly billing configuration.
+
+        Args:
+            month_start: First day of the month to calculate for
+
+        Returns:
+            Billing date for that month, or None if invalid
+        """
+        from core.utils import is_business_day, adjust_to_business_day, next_business_day
+
+        if self.billing_date == 'specific_date':
+            # Specific day of month (e.g., 25th)
+            if not self.specific_day:
+                return None
+
+            last_day = monthrange(month_start.year, month_start.month)[1]
+            day = min(self.specific_day, last_day)  # Handle Feb 31 -> Feb 28
+            target = month_start.replace(day=day)
+            return adjust_to_business_day(target)
+
+        elif self.billing_date == 'first_day':
+            # First business day of month
+            first_day = month_start
+            return next_business_day(first_day)
+
+        elif self.billing_date == 'last_day':
+            # Last business day of month
+            last_day_num = monthrange(month_start.year, month_start.month)[1]
+            last_day = month_start.replace(day=last_day_num)
+
+            while not is_business_day(last_day):
+                last_day -= timedelta(days=1)
+
+            return last_day
+
+        elif self.billing_date == 'weekday_occurrence':
+            # Nth occurrence of weekday (e.g., 3rd Thursday)
+            return self._get_weekday_occurrence_date(
+                month_start.year,
+                month_start.month,
+                self.weekday,
+                self.occurrence
+            )
+
+        return None
 
 class Contact(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='contacts', on_delete=models.CASCADE)
