@@ -28,7 +28,6 @@ BILLING_DATE_CHOICES = [
     ('last_day', 'Último día del mes'),
     ('first_day', 'Primer día del mes'),
     ('weekday_occurrence', 'Día específico de la semana'),
-    ('other', 'Otro'),
 ]
 
 WEEKDAY_CHOICES = [

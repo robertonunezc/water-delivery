@@ -86,6 +86,7 @@ class ClientAdmin(admin.ModelAdmin):
 	class Media:
 		js = (
 			'clients/admin/toggle_billing_inline.js',
+			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
 		)
 
@@ -467,14 +468,17 @@ class BillingDataAdmin(admin.ModelAdmin):
 		return obj.client.name if obj.client else ''
 	client_name.short_description = 'client'
 
-
+@admin.register(models.ClientBillingFrecuency)
 class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
 	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description', 'is_active')
 	search_fields = ('client__name', 'frequency')
 	list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
 	autocomplete_fields = ('client',)
 	readonly_fields = ('get_billing_description',)
-	
+	class Media:
+		js = (
+			'clients/admin/toggle_billing_frequency_fields.js',
+		)
 	fieldsets = (
 		('Información Básica', {
 			'fields': (('client', 'is_active'), 'frequency', 'billing_date')
