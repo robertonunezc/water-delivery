@@ -222,14 +222,12 @@ Desde {{date_since}}</small>
             <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Datos Fiscales</h5>
           </div>
           <div class="card-body">
-            {% for billing in billing_data %}
               <div class="mb-3">
-                <div><strong>RFC:</strong> {{ billing.rfc }}</div>
-                <div><strong>Razón Social:</strong> {{ billing.razon_social }}</div>
-                <div><strong>Uso CFDI:</strong> {{ billing.uso_cfdi }}</div>
-                <div><strong>Método de Pago:</strong> {{ billing.get_metodo_pago_display }}</div>
+                <div><strong>RFC:</strong> {{ billing_data.rfc }}</div>
+                <div><strong>Razón Social:</strong> {{ billing_data.razon_social }}</div>
+                {% comment %} <div><strong>Uso CFDI:</strong> {{ billing_data.uso_cfdi }}</div>
+                <div><strong>Método de Pago:</strong> {{ billing_data.get_metodo_pago_display }}</div> {% endcomment %}
               </div>
-            {% endfor %}
           </div>
         </div>
       {% endif %}

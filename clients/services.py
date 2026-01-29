@@ -130,6 +130,10 @@ def get_clients_needing_billing(
     results = []
 
     for client in queryset:
+        # Skip if client doesn't have billing frequency (shouldn't happen due to filter, but defensive)
+        if not hasattr(client, 'client_billing_frecuency') or client.client_billing_frecuency is None:
+            continue
+            
         billing_freq = client.client_billing_frecuency
 
         # Special handling for contraentrega (when_delivery)

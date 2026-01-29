@@ -194,15 +194,18 @@ def detail(request, pk):
     billing_data = client.get_effective_billing_data()
     
     # Get billing frequency information
-    print("aaaa,",client)
-    billing_frequencies = client.client_billing_frecuency_set.filter(is_active=True)
     billing_frequency_info = None
     next_billing_date = None
     
-    if billing_frequencies.exists():
-        billing_frequency = billing_frequencies.first()  # Assuming one billing frequency per client
-        billing_frequency_info = billing_frequency
-        next_billing_date = calculate_next_billing_date(billing_frequency)
+    # OneToOneField: access directly, not as a queryset
+    try:
+        billing_frequency = client.billing_frecuency
+        if billing_frequency and billing_frequency.is_active:
+            billing_frequency_info = billing_frequency
+            next_billing_date = calculate_next_billing_date(billing_frequency)
+    except Client.billing_frecuency.RelatedObjectDoesNotExist:
+        # Client doesn't have billing frequency configured
+        pass
     
     # Get route information for the client
     route_clients = client.client_routes.filter(is_active=True).select_related(
