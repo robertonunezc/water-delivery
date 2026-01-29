@@ -280,10 +280,10 @@
             <tr>
                 <td>
                     <strong>{{ result.client.name }}</strong><br>
-                    <small>{{ result.client.rfc|default:"Sin RFC" }}</small>
+                    <small>{{ result.client.billing_data.rfc|default:"Sin RFC" }}</small>
                 </td>
                 <td>
-                    {% if result.client.is_corporate %}
+                    {% if result.client.type == 'corporate' %}
                     <span class="badge badge-primary">Corporativo</span>
                     {% else %}
                     <span class="badge badge-info">Sucursal</span>

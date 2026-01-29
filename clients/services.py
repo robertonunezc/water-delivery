@@ -90,11 +90,12 @@ def get_clients_needing_billing(
             ).order_by('-order_date')
         )
     )
-
+    print(queryset.count())
+    print('Frecuency filter:', frequency_filter)
     # Apply frequency filter
     if frequency_filter:
         queryset = queryset.filter(client_billing_frecuency__frequency=frequency_filter)
-
+    print('After frequency filter:', queryset.count())
     # Apply search filter
     if search_query:
         queryset = queryset.filter(
@@ -102,7 +103,7 @@ def get_clients_needing_billing(
             Q(billing_data__razon_social__icontains=search_query) |
             Q(rfc__icontains=search_query)
         )
-
+        print('After search filter:', queryset.count())
     # Annotate with order counts and amounts
     queryset = queryset.annotate(
         orders_in_period_count=Count(
@@ -122,7 +123,7 @@ def get_clients_needing_billing(
             )
         )
     )
-
+    print('After annotation:', queryset.count())
     # Filter: only clients with orders
     queryset = queryset.filter(orders_in_period_count__gt=0)
 
@@ -131,10 +132,10 @@ def get_clients_needing_billing(
 
     for client in queryset:
         # Skip if client doesn't have billing frequency (shouldn't happen due to filter, but defensive)
-        if not hasattr(client, 'client_billing_frecuency') or client.client_billing_frecuency is None:
+        if not hasattr(client, 'billing_frecuency') or client.billing_frecuency is None:
             continue
-            
-        billing_freq = client.client_billing_frecuency
+        print(f'Processing client: {client.name}')   
+        billing_freq = client.billing_frecuency
 
         # Special handling for contraentrega (when_delivery)
         if billing_freq.frequency == 'when_delivery':
@@ -166,5 +167,5 @@ def get_clients_needing_billing(
                     'frequency_display': billing_freq.get_frequency_display(),
                     'billing_info': billing_freq.get_billing_info()
                 })
-
+    print('Final results count:', len(results))
     return results
