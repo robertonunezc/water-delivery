@@ -11,50 +11,6 @@ from .forms import ManualCreditTransactionForm
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from orders.services import get_client_order_without_bill
 
-def calculate_next_billing_date(billing_frequency):
-    """Calculate the next billing date based on frequency settings"""
-    if not billing_frequency or not billing_frequency.is_active:
-        return None
-    
-    today = date.today()
-    
-    # Get all possible billing dates from the model
-    candidates = billing_frequency.get_next_billing_candidates(today)
-    
-    if not candidates:
-        return None
-    
-    # Find the first date that is in the future
-    for candidate_date in candidates:
-        if candidate_date > today:
-            # Check if this date matches the frequency pattern
-            if _is_valid_billing_date(candidate_date, billing_frequency, today):
-                return candidate_date
-    
-    return None
-
-
-def _is_valid_billing_date(candidate_date, billing_frequency, reference_date):
-    """Check if a candidate date matches the billing frequency pattern"""
-    
-    # For monthly frequency, any candidate from the model is valid
-    if billing_frequency.frequency == 'monthly':
-        return True
-    
-    # For other frequencies, we need to calculate the interval
-    interval_months = {
-        'bimonthly': 2,
-        'quarterly': 3,
-        'semiannual': 6,
-        'annual': 12,
-    }.get(billing_frequency.frequency, 1)
-    
-    # Check if the candidate date falls on the correct interval
-    # This is a simplified check - in a real system you might want to store the last billing date
-    month_diff = (candidate_date.year - reference_date.year) * 12 + candidate_date.month - reference_date.month
-    return month_diff % interval_months == 0 or month_diff == 1  # Allow next month for monthly
-
-
 @login_required
 def list(request):
     # Get search query from request
@@ -192,21 +148,7 @@ def detail(request, pk):
     contacts = client.contacts.all()
     addresses = client.addresses.filter(active=True)
     billing_data = client.get_effective_billing_data()
-    
-    # Get billing frequency information
-    billing_frequency_info = None
-    next_billing_date = None
-    
-    # OneToOneField: access directly, not as a queryset
-    try:
-        billing_frequency = client.billing_frecuency
-        if billing_frequency and billing_frequency.is_active:
-            billing_frequency_info = billing_frequency
-            next_billing_date = calculate_next_billing_date(billing_frequency)
-    except Client.billing_frecuency.RelatedObjectDoesNotExist:
-        # Client doesn't have billing frequency configured
-        pass
-    
+
     # Get route information for the client
     route_clients = client.client_routes.filter(is_active=True).select_related(
         'route__transportation__assigned_driver__user',
@@ -228,8 +170,7 @@ def detail(request, pk):
         'contacts': contacts,
         'addresses': addresses,
         'billing_data': billing_data,
-        'billing_frequency': billing_frequency_info,
-        'next_billing_date': next_billing_date,
+        'billing_frequency': client.billing_frecuency,
         'route_clients': route_clients,
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,

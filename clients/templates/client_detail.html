@@ -279,19 +279,19 @@ Desde {{date_since}}</small>
                 {% endif %}
               </div>
               
-              {% if next_billing_date and billing_frequency.is_active %}
+              {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
                 <div class="mt-3">
                   <div class="alert alert-info d-flex align-items-center">
                     <i class="fas fa-calendar-check me-2"></i>
                     <div>
                       <strong>Próxima Facturación:</strong><br>
-                      <span class="fs-5 text-primary">{{ next_billing_date|date:"d/m/Y" }}</span>
+                      <span class="fs-5 text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
                       <small class="text-muted d-block">
                         {% now "Y-m-d" as today %}
-                        {% if next_billing_date|date:"Y-m-d" == today %}
+                        {% if billing_frequency.next_billing_date|date:"Y-m-d" == today %}
                           ¡Hoy es día de facturación!
                         {% else %}
-                          En {{ next_billing_date|timeuntil }}
+                          En {{ billing_frequency.next_billing_date|timeuntil }}
                         {% endif %}
                       </small>
                     </div>

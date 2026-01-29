@@ -1267,6 +1267,7 @@ class ClientBillingFrecuency(TimeStampedModel):
     # Additional settings
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     notes = models.TextField(blank=True, null=True, help_text="Notas adicionales sobre el calendario de facturación", verbose_name="Notas")
+    next_billing_date = models.DateField(null=True, blank=True, verbose_name="Próxima Fecha de Facturación")
 
     class Meta:
         verbose_name = "Frecuencia de Facturación"
@@ -1276,8 +1277,8 @@ class ClientBillingFrecuency(TimeStampedModel):
             models.Index(fields=['billing_date'], name='clients_billing_date_idx'),
             models.Index(fields=['is_active'], name='clients_billing_active_idx'),
         ]
-        verbose_name = "Billing Frequency"
-        verbose_name_plural = "Billing Frequencies"
+        verbose_name = "Frecuencia de Facturación"
+        verbose_name_plural = "Frecuencias de Facturación"
     
     def __str__(self):
         if self.billing_date == 'specific_date' and self.specific_day:
@@ -1320,23 +1321,23 @@ class ClientBillingFrecuency(TimeStampedModel):
             self.weekday = None
             self.occurrence = None
     
+    def save(self, *args, **kwargs):
+        """Override save to ensure clean is called and calculate next billing date"""
+        self.clean()
+        
+        # Calculate next_billing_date before saving
+        first_day, last_day = get_first_last_day(date.today().year, date.today().month)
+        billing_dates = self.get_billing_dates_in_period(first_day, last_day)
+        if billing_dates:
+            self.next_billing_date = billing_dates[0]
+        
+        # Save once with all data
+        super().save(*args, **kwargs) 
+    
     def get_billing_info(self):
         """Return a human-readable description of the billing frequency"""
-        first_day, last_day = get_first_last_day(date.today().year, date.today().month)
-        frequency_display = self.get_frequency_display()
-        
-        if self.billing_date == 'specific_date' and self.specific_day:
-            return f"Facturación {frequency_display.lower()} el día {self.specific_day} de cada período."
-        elif self.billing_date == 'last_day':
-            return f"Facturación {frequency_display.lower()} el último día de cada período. Este mes sería el día {last_day.day}."
-        elif self.billing_date == 'first_day':
-            return f"Facturación {frequency_display.lower()} el primer día de cada período."
-        elif self.billing_date == 'weekday_occurrence' and self.weekday is not None and self.occurrence:
-            weekday_name = self.get_weekday_display()
-            occurrence_name = self.get_occurrence_display()
-            return f"Facturación {frequency_display.lower()} el {occurrence_name.lower()} {weekday_name.lower()} de cada período."
-        else:
-            return f"Facturación {frequency_display.lower()} - configuración personalizada."
+
+        return f"Facturación en la fecha  {self.next_billing_date} ."
     
     def get_next_billing_candidates(self, start_date=None):
         """Get potential billing dates for the current and next periods"""
@@ -1661,6 +1662,7 @@ class ClientCreditConfig(TimeStampedModel):
     first_notification_days = models.PositiveIntegerField(default=5, verbose_name="Días antes del vencimiento para la primera notificación")
     second_notification_days = models.PositiveIntegerField(default=2, verbose_name="Días antes del vencimiento para la segunda notificación")
     overdue_notification_days = models.PositiveIntegerField(default=1, verbose_name="Días después del vencimiento para notificación de morosidad")
+
 def get_first_last_day(year, month):
     # First day of the month
     first_day = date(year, month, 1)
