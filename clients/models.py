@@ -4,6 +4,7 @@ from typing import Optional, List
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
+from core.utils import get_first_last_day_of_month
 #Client types
 CLIENT_TYPE_CHOICES = [
     ('corporate', 'Corporativo'),
@@ -1326,7 +1327,7 @@ class ClientBillingFrecuency(TimeStampedModel):
         self.clean()
         
         # Calculate next_billing_date before saving
-        first_day, last_day = get_first_last_day(date.today().year, date.today().month)
+        first_day, last_day = get_first_last_day_of_month(date.today().year, date.today().month)
         billing_dates = self.get_billing_dates_in_period(first_day, last_day)
         if billing_dates:
             self.next_billing_date = billing_dates[0]
@@ -1663,11 +1664,3 @@ class ClientCreditConfig(TimeStampedModel):
     second_notification_days = models.PositiveIntegerField(default=2, verbose_name="Días antes del vencimiento para la segunda notificación")
     overdue_notification_days = models.PositiveIntegerField(default=1, verbose_name="Días después del vencimiento para notificación de morosidad")
 
-def get_first_last_day(year, month):
-    # First day of the month
-    first_day = date(year, month, 1)
-    
-    # Last day of the month
-    last_day = date(year, month, monthrange(year, month)[1])
-    
-    return first_day, last_day

@@ -1,7 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, List
 from django.db.models import QuerySet, Count, Sum, Q, Prefetch
 
+from core.utils import get_first_last_day_of_month
+from orders.models import Order
+from .models import Client, ClientBillingFrecuency
 
 def get_upcoming_route_orders(client, limit=10):
     """
@@ -69,7 +72,6 @@ def get_clients_needing_billing(
     Returns:
         List of dicts with client info and billing details
     """
-    from .models import Client, ClientBillingFrecuency
     from orders.models import Order
     from core.utils import next_business_day
 
@@ -95,7 +97,6 @@ def get_clients_needing_billing(
     # Apply frequency filter
     if frequency_filter:
         queryset = queryset.filter(client_billing_frecuency__frequency=frequency_filter)
-    print('After frequency filter:', queryset.count())
     # Apply search filter
     if search_query:
         queryset = queryset.filter(
@@ -103,7 +104,6 @@ def get_clients_needing_billing(
             Q(billing_data__razon_social__icontains=search_query) |
             Q(rfc__icontains=search_query)
         )
-        print('After search filter:', queryset.count())
     # Annotate with order counts and amounts
     queryset = queryset.annotate(
         orders_in_period_count=Count(
@@ -123,7 +123,6 @@ def get_clients_needing_billing(
             )
         )
     )
-    print('After annotation:', queryset.count())
     # Filter: only clients with orders
     queryset = queryset.filter(orders_in_period_count__gt=0)
 
@@ -134,7 +133,6 @@ def get_clients_needing_billing(
         # Skip if client doesn't have billing frequency (shouldn't happen due to filter, but defensive)
         if not hasattr(client, 'billing_frecuency') or client.billing_frecuency is None:
             continue
-        print(f'Processing client: {client.name}')   
         billing_freq = client.billing_frecuency
 
         # Special handling for contraentrega (when_delivery)
@@ -169,3 +167,17 @@ def get_clients_needing_billing(
                 })
     print('Final results count:', len(results))
     return results
+
+
+def set_billing_date_to_clients() -> Optional[date]:
+    first_day, last_day = get_first_last_day_of_month(date.today().year, date.today().month)
+    queryset = Client.objects.filter(
+        active=True,
+        client_billing_frecuency__is_active=True
+    ).select_related(
+        'client_billing_frecuency',
+        'billing_data'
+    )
+
+    for client in queryset:
+        client.billing_frecuency.save()  # Triggers save logic to update next_billing_date

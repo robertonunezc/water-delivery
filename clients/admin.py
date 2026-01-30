@@ -71,7 +71,7 @@ class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientBillingFrecuencyInline, ClientCreditConfigInline]
+	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
 		'balance', 'current_debt', 'get_available_credit',
@@ -470,7 +470,7 @@ class BillingDataAdmin(admin.ModelAdmin):
 
 @admin.register(models.ClientBillingFrecuency)
 class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
-	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description', 'is_active')
+	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
 	search_fields = ('client__name', 'frequency')
 	list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
 	autocomplete_fields = ('client',)

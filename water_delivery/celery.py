@@ -50,6 +50,17 @@ app.conf.update(
     
     # Beat scheduler (for periodic tasks)
     beat_scheduler='django_celery_beat.schedulers:DatabaseScheduler',
+    
+    # Periodic task schedule
+    beat_schedule={
+        'populate-billing-dates-monthly': {
+            'task': 'clients.populate_billing_dates',
+            'schedule': crontab(hour=0, minute=0, day_of_month=1),  # First day of month at midnight
+            'options': {
+                'expires': 3600,  # Task expires after 1 hour if not executed
+            }
+        },
+    },
 )
 
 # Load task modules from all registered Django apps.

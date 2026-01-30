@@ -1,3 +1,4 @@
+from calendar import monthrange
 from datetime import date, timedelta
 from typing import Optional
 
@@ -60,3 +61,12 @@ def adjust_to_business_day(target_date: date) -> date:
     if is_business_day(target_date):
         return target_date
     return next_business_day(target_date, skip_current=True)
+
+def get_first_last_day_of_month(year, month):
+    # First day of the month
+    first_day = date(year, month, 1)
+    
+    # Last day of the month
+    last_day = date(year, month, monthrange(year, month)[1])
+    
+    return first_day, last_day
