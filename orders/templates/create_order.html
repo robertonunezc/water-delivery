@@ -105,477 +105,479 @@
     </div>
     {% if has_shipping_address %}
     <!-- Client Financial Status -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="card border-info shadow-sm">
-          <div class="card-header bg-info text-white">
-            <h5 class="mb-0">
-              <i class="fas fa-wallet me-2"></i>Estado Financiero del Cliente
-            </h5>
-          </div>
-          <div class="card-body">
-            <div class="row g-3">
-              <!-- Balance Card -->
-              <div class="col-md-4">
-                <div class="d-flex align-items-center p-3 bg-light rounded">
-                  <div class="me-3">
-                    <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}"></i>
-                  </div>
-                  <div class="flex-grow-1">
-                    <h6 class="mb-1 text-muted">Saldo Disponible</h6>
-                    <h4 class="mb-0 {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
-                      ${{ client.balance|floatformat:2 }}
-                    </h4>
-                    {% if client.balance > 0 %}
-                      <small class="text-success"><i class="fas fa-check-circle"></i> Puede usar saldo</small>
-                    {% elif client.balance == 0 %}
-                      <small class="text-muted">Sin saldo disponible</small>
-                    {% else %}
-                      <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Debt/Credit Card -->
-              <div class="col-md-4">
-                <div class="d-flex align-items-center p-3 bg-light rounded">
-                  <div class="me-3">
-                    <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}"></i>
-                  </div>
-                  <div class="flex-grow-1">
-                    <h6 class="mb-1 text-muted">Deuda Actual</h6>
-                    <h4 class="mb-0 {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}">
-                      ${{ client.current_debt|floatformat:2 }}
-                    </h4>
-                    {% if client.current_debt > 0 %}
-                      <small class="text-warning"><i class="fas fa-exclamation-circle"></i> Debe dinero</small>
-                    {% else %}
-                      <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-
-              <!-- Available Credit Card -->
-              <div class="col-md-4">
-                <div class="d-flex align-items-center p-3 bg-light rounded">
-                  <div class="me-3">
-                    <i class="fas fa-hand-holding-usd fa-2x {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}"></i>
-                  </div>
-                  <div class="flex-grow-1">
-                    <h6 class="mb-1 text-muted">Crédito Disponible</h6>
-                    <h4 class="mb-0 {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}">
-                      ${{ client.get_available_credit|floatformat:2 }}
-                    </h4>
-                    {% if client.credit_limit > 0 %}
-                      {% if client.get_available_credit > 0 %}
-                        <small class="text-info"><i class="fas fa-check-circle"></i> Puede usar crédito</small>
-                      {% else %}
-                        <small class="text-danger"><i class="fas fa-times-circle"></i> Sin crédito disponible</small>
-                      {% endif %}
-                    {% else %}
-                      <small class="text-muted">Sin límite de crédito</small>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Total Purchasing Power -->
-            <div class="row mt-3">
-              <div class="col-12">
-                <div class="alert alert-primary d-flex align-items-center" role="alert">
-                  <i class="fas fa-calculator fa-lg me-3"></i>
-                  <div class="flex-grow-1">
-                    <strong>Poder de Compra Total: ${{ client.balance|add:client.get_available_credit|floatformat:2 }}</strong>
-                    <div class="mt-1">
-                      <small>
-                        Saldo (${{ client.balance|floatformat:2 }}) + Crédito Disponible (${{ client.get_available_credit|floatformat:2 }})
-                      </small>
-                    </div>
-                  </div>
-                  <div id="affordability-status" class="ms-3">
-                    <!-- Will be updated by JavaScript -->
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="row">
-      <!-- Main Content Area -->
-      <div class="col-12 col-lg-7 col-xl-8 main-content-mobile">
-        <form method="post">
-          {% csrf_token %}
-
-          <!-- Hidden Form Fields -->
-          <div class="d-none">
-            {{ form.client }}
-            {{ form.order_date }}
-            {{ form.status }}
-            {{ form.notes }}
-            {% if form.total_amount %}
-              {{ form.total_amount }}
-            {% endif %}
-          </div>
-
-          <!-- Products Section -->
-          <div class="card shadow-sm">
-            <div class="card-header bg-primary text-white">
-              <h4 class="mb-0">
-                <i class="fas fa-boxes me-2"></i>Productos Disponibles
-              </h4>
-            </div>
-            <div class="card-body p-0">
-              <div class="products-table-container">
-                <div class="table-responsive">
-                  <table class="table table-hover mb-0">
-                    <thead class="table-light sticky-top">
-                      <tr>
-                        <th>Producto</th>
-                        <th class="d-none d-md-table-cell">Presentación</th>
-                        <th>Precio</th>
-                        <th>Cantidad</th>
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for client_product in client_products %}
-                        <tr>
-                          <td>
-                            <div class="fw-bold">{{ client_product.product.name }}</div>
-                            <small class="text-muted d-md-none">{{ client_product.product.get_presentation_display }}</small>
-                          </td>
-                          <td class="d-none d-md-table-cell">{{ client_product.product.get_presentation_display }}</td>
-                          <td class="fw-bold text-success">${{ client_product.price }}</td>
-                          <td>
-                            <input type="number" 
-                                   name="qty_{{ client_product.product.id }}" 
-                                   min="0" 
-                                   value="0" 
-                                   class="form-control quantity-input" 
-                                   style="width:80px;" />
-                          </td>
-                          <td>
-                            <div class="btn-group" role="group">
-                              <button type="button" 
-                                      class="btn btn-success btn-sm btn-touch" 
-                                      data-order="{{ order.pk }}" 
-                                      data-product="{{ client_product.product.id }}"
-                                      title="Agregar producto">
-                                <i class="fas fa-plus"></i>
-                                <span class="d-none d-sm-inline ms-1">Agregar</span>
-                              </button>
-                              <button type="button" 
-                                      class="btn btn-danger btn-sm btn-touch" 
-                                      data-order="{{ order.pk }}" 
-                                      data-product="{{ client_product.product.id }}"
-                                      title="Quitar producto">
-                                <i class="fas fa-minus"></i>
-                                <span class="d-none d-sm-inline ms-1">Quitar</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <!-- Order Summary Sidebar -->
-      <div class="col-12 col-lg-5 col-xl-4 d-none d-lg-block">
-        <div class="order-summary-fixed">
-          <!-- Order Summary Card -->
-          <div class="card shadow-sm mb-4">
+      <div class="row mb-4">
+        <div class="col-12">
+          <div class="card border-info shadow-sm">
             <div class="card-header bg-info text-white">
-              <h4 class="mb-0">
-                <i class="fas fa-receipt me-2"></i>Resumen del Pedido
+              <h5 class="mb-0">
+                <i class="fas fa-wallet me-2"></i>Estado Financiero del Cliente
+              </h5>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <!-- Balance Card -->
+                <div class="col-md-4">
+                  <div class="d-flex align-items-center p-3 bg-light rounded">
+                    <div class="me-3">
+                      <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="mb-1 text-muted">Saldo Disponible</h6>
+                      <h4 class="mb-0 {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
+                        ${{ client.balance|floatformat:2 }}
+                      </h4>
+                      {% if client.balance > 0 %}
+                        <small class="text-success"><i class="fas fa-check-circle"></i> Puede usar saldo</small>
+                      {% elif client.balance == 0 %}
+                        <small class="text-muted">Sin saldo disponible</small>
+                      {% else %}
+                        <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Debt/Credit Card -->
+                <div class="col-md-4">
+                  <div class="d-flex align-items-center p-3 bg-light rounded">
+                    <div class="me-3">
+                      <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="mb-1 text-muted">Deuda Actual</h6>
+                      <h4 class="mb-0 {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}">
+                        ${{ client.current_debt|floatformat:2 }}
+                      </h4>
+                      {% if client.current_debt > 0 %}
+                        <small class="text-warning"><i class="fas fa-exclamation-circle"></i> Debe dinero</small>
+                      {% else %}
+                        <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Available Credit Card -->
+                <div class="col-md-4">
+                  <div class="d-flex align-items-center p-3 bg-light rounded">
+                    <div class="me-3">
+                      <i class="fas fa-hand-holding-usd fa-2x {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                      <h6 class="mb-1 text-muted">Crédito Disponible</h6>
+                      <h4 class="mb-0 {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}">
+                        ${{ client.get_available_credit|floatformat:2 }}
+                      </h4>
+                      {% if client.credit_limit > 0 %}
+                        {% if client.get_available_credit > 0 %}
+                          <small class="text-info"><i class="fas fa-check-circle"></i> Puede usar crédito</small>
+                        {% else %}
+                          <small class="text-danger"><i class="fas fa-times-circle"></i> Sin crédito disponible</small>
+                        {% endif %}
+                      {% else %}
+                        <small class="text-muted">Sin límite de crédito</small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Total Purchasing Power -->
+              <div class="row mt-3">
+                <div class="col-12">
+                  <div class="alert alert-primary d-flex align-items-center" role="alert">
+                    <i class="fas fa-calculator fa-lg me-3"></i>
+                    <div class="flex-grow-1">
+                      <strong>Poder de Compra Total: ${{ client.balance|add:client.get_available_credit|floatformat:2 }}</strong>
+                      <div class="mt-1">
+                        <small>
+                          Saldo (${{ client.balance|floatformat:2 }}) + Crédito Disponible (${{ client.get_available_credit|floatformat:2 }})
+                        </small>
+                      </div>
+                    </div>
+                    <div id="affordability-status" class="ms-3">
+                      <!-- Will be updated by JavaScript -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- Main Content Area -->
+        <div class="col-12 col-lg-7 col-xl-8 main-content-mobile">
+          <form method="post">
+            {% csrf_token %}
+
+            <!-- Hidden Form Fields -->
+            <div class="d-none">
+              {{ form.client }}
+              {{ form.order_date }}
+              {{ form.status }}
+              {{ form.notes }}
+              {% if form.total_amount %}
+                {{ form.total_amount }}
+              {% endif %}
+            </div>
+
+            <!-- Products Section -->
+            <div class="card shadow-sm">
+              <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                  <i class="fas fa-boxes me-2"></i>Productos Disponibles
+                </h4>
+              </div>
+              <div class="card-body p-0">
+                <div class="products-table-container">
+                  <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                      <thead class="table-light sticky-top">
+                        <tr>
+                          <th>Producto</th>
+                          <th class="d-none d-md-table-cell">Presentación</th>
+                          <th>Precio</th>
+                          <th>Cantidad</th>
+                          <th>Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for client_product in client_products %}
+                          <tr>
+                            <td>
+                              <div class="fw-bold">{{ client_product.product.name }}</div>
+                              <small class="text-muted d-md-none">{{ client_product.product.get_presentation_display }}</small>
+                            </td>
+                            <td class="d-none d-md-table-cell">{{ client_product.product.get_presentation_display }}</td>
+                            <td class="fw-bold text-success">${{ client_product.price }}</td>
+                            <td>
+                              <input type="number" 
+                                    name="qty_{{ client_product.product.id }}" 
+                                    min="0" 
+                                    value="0" 
+                                    class="form-control quantity-input" 
+                                    style="width:80px;" />
+                            </td>
+                            <td>
+                              <div class="btn-group" role="group">
+                                <button type="button" 
+                                        class="btn btn-success btn-sm btn-touch" 
+                                        data-order="{{ order.pk }}" 
+                                        data-product="{{ client_product.product.id }}"
+                                        title="Agregar producto">
+                                  <i class="fas fa-plus"></i>
+                                  <span class="d-none d-sm-inline ms-1">Agregar</span>
+                                </button>
+                                <button type="button" 
+                                        class="btn btn-danger btn-sm btn-touch" 
+                                        data-order="{{ order.pk }}" 
+                                        data-product="{{ client_product.product.id }}"
+                                        title="Quitar producto">
+                                  <i class="fas fa-minus"></i>
+                                  <span class="d-none d-sm-inline ms-1">Quitar</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <!-- Order Summary Sidebar -->
+        <div class="col-12 col-lg-5 col-xl-4 d-none d-lg-block">
+          <div class="order-summary-fixed">
+            <!-- Order Summary Card -->
+            <div class="card shadow-sm mb-4">
+              <div class="card-header bg-info text-white">
+                <h4 class="mb-0">
+                  <i class="fas fa-receipt me-2"></i>Resumen del Pedido
+                </h4>
+              </div>
+              <div class="card-body">
+                <ul class="list-group list-group-flush" id="order-summary-products">
+                  {% for item in order.items.all %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0" 
+                        data-product-id="{{ item.product.id }}" 
+                        data-order-id="{{ order.pk }}">
+                      <div class="flex-grow-1">
+                        <div class="fw-bold">{{ item.product.get_full_name }}</div>
+                        <small class="text-muted">Cantidad: {{ item.quantity }}</small>
+                      </div>
+                      <div class="d-flex align-items-center">
+                        <span class="badge bg-primary rounded-pill me-2">${{ item.get_total_price|default:"0.00" }}</span>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger remove-item-btn btn-touch" 
+                                data-product-id="{{ item.product.id }}" 
+                                data-order-id="{{ order.pk }}" 
+                                title="Remover producto">
+                          <i class="fas fa-times"></i>
+                        </button>
+                      </div>
+                    </li>
+                  {% empty %}
+                    <li class="list-group-item border-0 px-0 text-muted text-center py-4">
+                      <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+                      No hay productos en el pedido
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+
+            <!-- Payment Breakdown Card (Balance First) -->
+            <div class="card shadow-sm mb-4" id="payment-breakdown-card">
+              <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                  <i class="fas fa-calculator me-2"></i>Desglose de Pago
+                </h5>
+              </div>
+              <div class="card-body">
+                <div id="payment-breakdown-content">
+                  <!-- Balance Payment Section -->
+                  <div class="payment-breakdown-item mb-3" id="balance-payment-section" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-success">
+                      <div>
+                        <i class="fas fa-piggy-bank text-success me-2"></i>
+                        <strong>Pago con Saldo</strong>
+                      </div>
+                      <div class="text-end">
+                        <span class="badge bg-success fs-6" id="balance-payment-amount">$0.00</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Remaining Payment Section -->
+                  <div class="payment-breakdown-item mb-3" id="remaining-payment-section" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-warning">
+                      <div>
+                        <i class="fas fa-money-bill-wave text-warning me-2"></i>
+                        <strong>Restante a pagar</strong>
+                      </div>
+                      <div class="text-end">
+                        <span class="badge bg-warning text-dark fs-6" id="remaining-payment-amount">$0.00</span>
+                      </div>
+                    </div>
+                    
+                    <!-- Secondary Payment Method Select -->
+                    <div class="mt-2" id="secondary-payment-method-container">
+                      <label for="secondary-payment-method" class="form-label small text-muted">
+                        <i class="fas fa-credit-card me-1"></i>Método de pago para el restante:
+                      </label>
+                      <select class="form-select form-select-sm" id="secondary-payment-method">
+                        {% for value, label in payment_types %}
+                          {% if value != 'balance' %}
+                            <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
+                          {% endif %}
+                        {% endfor %}
+                      </select>
+                    </div>
+                    
+                    <!-- Credit Note for Secondary Payment -->
+                    <div class="mt-2" id="secondary-credit-note-field" style="display: none;">
+                      <label for="secondary_credit_note" class="form-label small">
+                        <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
+                      </label>
+                      <textarea class="form-control form-control-sm" 
+                              id="secondary_credit_note" 
+                              rows="2"
+                              placeholder="Nota requerida para crédito"></textarea>
+                    </div>
+                  </div>
+                  
+                  <!-- Full Payment Without Balance -->
+                  <div class="payment-breakdown-item mb-3" id="no-balance-payment-section" style="display: none;">
+                    <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-secondary">
+                      <div>
+                        <i class="fas fa-info-circle text-secondary me-2"></i>
+                        <span class="text-muted">Sin saldo disponible</span>
+                      </div>
+                      <div class="text-end">
+                        <span class="badge bg-secondary fs-6" id="full-payment-amount">$0.00</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Summary Message -->
+                  <div class="alert alert-light border mt-2" id="payment-breakdown-summary">
+                    <small class="text-muted" id="payment-breakdown-message">
+                      <i class="fas fa-info-circle me-1"></i>
+                      Agregue productos para ver el desglose de pago
+                    </small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Payment Method Card -->
+            <div class="card shadow-sm mb-4">
+              <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0">
+                  <i class="fas fa-credit-card me-2"></i>Método de Pago
+                </h5>
+              </div>
+              <div class="card-body">
+                <div class="mb-3">
+                  <select class="form-select" id="payment-method-select" name="payment_type">
+                    {% for value, label in payment_types %}
+                      <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                
+                <!-- Credit Note Field (Hidden by default) -->
+                <div class="mb-3" id="credit-note-field" style="display: none;">
+                  <label for="credit_note" class="form-label">
+                    <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
+                  </label>
+                  <textarea class="form-control" 
+                          id="credit_note" 
+                          name="credit_note"
+                          rows="3"
+                          placeholder="Ingrese una nota explicando el motivo del pago con crédito (requerido)"></textarea>
+                  <div class="form-text">
+                    Esta nota es obligatoria para pagos con crédito para este cliente
+                  </div>
+                  <div class="invalid-feedback">
+                    Por favor ingrese una nota para el pago con crédito
+                  </div>
+                </div>
+                
+                <!-- Cantidad Cobrada Field -->
+                <div class="mb-3">
+                  <label for="cantidad_cobrada" class="form-label">
+                    <i class="fas fa-dollar-sign me-1"></i>Cantidad Cobrada
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">$</span>
+                    <input type="number" 
+                          class="form-control" 
+                          id="cantidad_cobrada" 
+                          name="cantidad_cobrada"
+                          step="0.01" 
+                          min="0"
+                          placeholder="0.00">
+                  </div>
+                  <div class="form-text">
+                    Si cobra más del total, la diferencia se agregará al saldo del cliente
+                  </div>
+                  <!-- Alert for balance addition -->
+                  <div id="balance-addition-alert" class="alert alert-info mt-2" style="display: none;">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <span id="balance-addition-text"></span>
+                  </div>
+                </div>
+              </div>
+            </div>          <!-- Total Card -->
+            <div class="card shadow-sm mb-4">
+              <div class="card-body text-center">
+                <div class="row">
+                  <div class="col-6">
+                    <h3 class="text-muted mb-0">Total</h3>
+                  </div>
+                  <div class="col-6">
+                    <h2 class="text-success mb-0">
+                      $<span class="badge bg-success fs-4 p-2">{{ order.total_amount|default:"0.00" }}</span>
+                    </h2>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Finish Order Button -->
+            <div class="d-grid">
+              <button type="button" 
+                      id="finish-order-btn" 
+                      class="btn btn-success btn-lg btn-touch" 
+                      data-order-id="{{ order.pk }}">
+                <i class="fas fa-check-circle me-2"></i>Terminar Pedido
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mobile Order Summary (Fixed Bottom) -->
+        <div class="d-lg-none order-summary-mobile">
+          <div class="row mb-2">
+            <div class="col-6">
+              <select class="form-select" id="payment-method-select-mobile" name="payment_type">
+                <option value="">Método de pago</option>
+                {% for code, label in payment_types %}
+                  <option value="{{ code }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-6 text-end">
+              <h4 class="text-success mb-0">
+                Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
               </h4>
             </div>
-            <div class="card-body">
-              <ul class="list-group list-group-flush" id="order-summary-products">
-                {% for item in order.items.all %}
-                  <li class="list-group-item d-flex justify-content-between align-items-center border-0 px-0" 
-                      data-product-id="{{ item.product.id }}" 
+          </div>
+          
+          <!-- Mobile Credit Note Field (Hidden by default) -->
+          <div class="row mb-3" id="credit-note-field-mobile" style="display: none;">
+            <div class="col-12">
+              <label for="credit_note_mobile" class="form-label small">Nota para Crédito <span class="text-danger">*</span></label>
+              <textarea class="form-control form-control-sm" 
+                      id="credit_note_mobile" 
+                      name="credit_note_mobile"
+                      rows="2"
+                      placeholder="Nota requerida para crédito"></textarea>
+              <div class="invalid-feedback">
+                Nota requerida para crédito
+              </div>
+            </div>
+          </div>
+          
+          <!-- Mobile Cantidad Cobrada -->
+          <div class="row mb-3">
+            <div class="col-12">
+              <label for="cantidad_cobrada_mobile" class="form-label small">Cantidad Cobrada</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">$</span>
+                <input type="number" 
+                      class="form-control" 
+                      id="cantidad_cobrada_mobile" 
+                      name="cantidad_cobrada_mobile"
+                      step="0.01" 
+                      min="0"
+                      placeholder="0.00">
+              </div>
+              <div id="balance-addition-alert-mobile" class="alert alert-info alert-sm mt-1 p-2" style="display: none;">
+                <small id="balance-addition-text-mobile"></small>
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-6">
+              <button type="button" 
+                      class="btn btn-outline-info btn-lg w-100" 
+                      data-bs-toggle="modal" 
+                      data-bs-target="#orderSummaryModal">
+                <i class="fas fa-list me-2"></i>Ver Resumen
+              </button>
+            </div>
+            <div class="col-6">
+              <button type="button" 
+                      id="finish-order-btn-mobile" 
+                      class="btn btn-success btn-lg w-100" 
                       data-order-id="{{ order.pk }}">
-                    <div class="flex-grow-1">
-                      <div class="fw-bold">{{ item.product.get_full_name }}</div>
-                      <small class="text-muted">Cantidad: {{ item.quantity }}</small>
-                    </div>
-                    <div class="d-flex align-items-center">
-                      <span class="badge bg-primary rounded-pill me-2">${{ item.get_total_price|default:"0.00" }}</span>
-                      <button type="button" 
-                              class="btn btn-sm btn-outline-danger remove-item-btn btn-touch" 
-                              data-product-id="{{ item.product.id }}" 
-                              data-order-id="{{ order.pk }}" 
-                              title="Remover producto">
-                        <i class="fas fa-times"></i>
-                      </button>
-                    </div>
-                  </li>
-                {% empty %}
-                  <li class="list-group-item border-0 px-0 text-muted text-center py-4">
-                    <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
-                    No hay productos en el pedido
-                  </li>
-                {% endfor %}
-              </ul>
+                <i class="fas fa-check-circle me-2"></i>Terminar
+              </button>
             </div>
-          </div>
-
-          <!-- Payment Breakdown Card (Balance First) -->
-          <div class="card shadow-sm mb-4" id="payment-breakdown-card">
-            <div class="card-header bg-success text-white">
-              <h5 class="mb-0">
-                <i class="fas fa-calculator me-2"></i>Desglose de Pago
-              </h5>
-            </div>
-            <div class="card-body">
-              <div id="payment-breakdown-content">
-                <!-- Balance Payment Section -->
-                <div class="payment-breakdown-item mb-3" id="balance-payment-section" style="display: none;">
-                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-success">
-                    <div>
-                      <i class="fas fa-piggy-bank text-success me-2"></i>
-                      <strong>Pago con Saldo</strong>
-                    </div>
-                    <div class="text-end">
-                      <span class="badge bg-success fs-6" id="balance-payment-amount">$0.00</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Remaining Payment Section -->
-                <div class="payment-breakdown-item mb-3" id="remaining-payment-section" style="display: none;">
-                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-warning">
-                    <div>
-                      <i class="fas fa-money-bill-wave text-warning me-2"></i>
-                      <strong>Restante a pagar</strong>
-                    </div>
-                    <div class="text-end">
-                      <span class="badge bg-warning text-dark fs-6" id="remaining-payment-amount">$0.00</span>
-                    </div>
-                  </div>
-                  
-                  <!-- Secondary Payment Method Select -->
-                  <div class="mt-2" id="secondary-payment-method-container">
-                    <label for="secondary-payment-method" class="form-label small text-muted">
-                      <i class="fas fa-credit-card me-1"></i>Método de pago para el restante:
-                    </label>
-                    <select class="form-select form-select-sm" id="secondary-payment-method">
-                      {% for value, label in payment_types %}
-                        {% if value != 'balance' %}
-                          <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
-                        {% endif %}
-                      {% endfor %}
-                    </select>
-                  </div>
-                  
-                  <!-- Credit Note for Secondary Payment -->
-                  <div class="mt-2" id="secondary-credit-note-field" style="display: none;">
-                    <label for="secondary_credit_note" class="form-label small">
-                      <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
-                    </label>
-                    <textarea class="form-control form-control-sm" 
-                             id="secondary_credit_note" 
-                             rows="2"
-                             placeholder="Nota requerida para crédito"></textarea>
-                  </div>
-                </div>
-                
-                <!-- Full Payment Without Balance -->
-                <div class="payment-breakdown-item mb-3" id="no-balance-payment-section" style="display: none;">
-                  <div class="d-flex justify-content-between align-items-center p-2 bg-light rounded border-start border-4 border-secondary">
-                    <div>
-                      <i class="fas fa-info-circle text-secondary me-2"></i>
-                      <span class="text-muted">Sin saldo disponible</span>
-                    </div>
-                    <div class="text-end">
-                      <span class="badge bg-secondary fs-6" id="full-payment-amount">$0.00</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <!-- Summary Message -->
-                <div class="alert alert-light border mt-2" id="payment-breakdown-summary">
-                  <small class="text-muted" id="payment-breakdown-message">
-                    <i class="fas fa-info-circle me-1"></i>
-                    Agregue productos para ver el desglose de pago
-                  </small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Payment Method Card -->
-          <div class="card shadow-sm mb-4">
-            <div class="card-header bg-warning text-dark">
-              <h5 class="mb-0">
-                <i class="fas fa-credit-card me-2"></i>Método de Pago
-              </h5>
-            </div>
-            <div class="card-body">
-              <div class="mb-3">
-                <select class="form-select" id="payment-method-select" name="payment_type">
-                  {% for value, label in payment_types %}
-                    <option value="{{ value }}">{{ label }}</option>
-                  {% endfor %}
-                </select>
-              </div>
-              
-              <!-- Credit Note Field (Hidden by default) -->
-              <div class="mb-3" id="credit-note-field" style="display: none;">
-                <label for="credit_note" class="form-label">
-                  <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
-                </label>
-                <textarea class="form-control" 
-                         id="credit_note" 
-                         name="credit_note"
-                         rows="3"
-                         placeholder="Ingrese una nota explicando el motivo del pago con crédito (requerido)"></textarea>
-                <div class="form-text">
-                  Esta nota es obligatoria para pagos con crédito para este cliente
-                </div>
-                <div class="invalid-feedback">
-                  Por favor ingrese una nota para el pago con crédito
-                </div>
-              </div>
-              
-              <!-- Cantidad Cobrada Field -->
-              <div class="mb-3">
-                <label for="cantidad_cobrada" class="form-label">
-                  <i class="fas fa-dollar-sign me-1"></i>Cantidad Cobrada
-                </label>
-                <div class="input-group">
-                  <span class="input-group-text">$</span>
-                  <input type="number" 
-                         class="form-control" 
-                         id="cantidad_cobrada" 
-                         name="cantidad_cobrada"
-                         step="0.01" 
-                         min="0"
-                         placeholder="0.00">
-                </div>
-                <div class="form-text">
-                  Si cobra más del total, la diferencia se agregará al saldo del cliente
-                </div>
-                <!-- Alert for balance addition -->
-                <div id="balance-addition-alert" class="alert alert-info mt-2" style="display: none;">
-                  <i class="fas fa-info-circle me-2"></i>
-                  <span id="balance-addition-text"></span>
-                </div>
-              </div>
-            </div>
-          </div>          <!-- Total Card -->
-          <div class="card shadow-sm mb-4">
-            <div class="card-body text-center">
-              <div class="row">
-                <div class="col-6">
-                  <h3 class="text-muted mb-0">Total</h3>
-                </div>
-                <div class="col-6">
-                  <h2 class="text-success mb-0">
-                    $<span class="badge bg-success fs-4 p-2">{{ order.total_amount|default:"0.00" }}</span>
-                  </h2>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Finish Order Button -->
-          <div class="d-grid">
-            <button type="button" 
-                    id="finish-order-btn" 
-                    class="btn btn-success btn-lg btn-touch" 
-                    data-order-id="{{ order.pk }}">
-              <i class="fas fa-check-circle me-2"></i>Terminar Pedido
-            </button>
           </div>
         </div>
       </div>
-
-      <!-- Mobile Order Summary (Fixed Bottom) -->
-      <div class="d-lg-none order-summary-mobile">
-        <div class="row mb-2">
-          <div class="col-6">
-            <select class="form-select" id="payment-method-select-mobile" name="payment_type">
-              <option value="">Método de pago</option>
-              {% for code, label in payment_types %}
-                <option value="{{ code }}">{{ label }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="col-6 text-end">
-            <h4 class="text-success mb-0">
-              Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
-            </h4>
-          </div>
-        </div>
-        
-        <!-- Mobile Credit Note Field (Hidden by default) -->
-        <div class="row mb-3" id="credit-note-field-mobile" style="display: none;">
-          <div class="col-12">
-            <label for="credit_note_mobile" class="form-label small">Nota para Crédito <span class="text-danger">*</span></label>
-            <textarea class="form-control form-control-sm" 
-                     id="credit_note_mobile" 
-                     name="credit_note_mobile"
-                     rows="2"
-                     placeholder="Nota requerida para crédito"></textarea>
-            <div class="invalid-feedback">
-              Nota requerida para crédito
-            </div>
-          </div>
-        </div>
-        
-        <!-- Mobile Cantidad Cobrada -->
-        <div class="row mb-3">
-          <div class="col-12">
-            <label for="cantidad_cobrada_mobile" class="form-label small">Cantidad Cobrada</label>
-            <div class="input-group input-group-sm">
-              <span class="input-group-text">$</span>
-              <input type="number" 
-                     class="form-control" 
-                     id="cantidad_cobrada_mobile" 
-                     name="cantidad_cobrada_mobile"
-                     step="0.01" 
-                     min="0"
-                     placeholder="0.00">
-            </div>
-            <div id="balance-addition-alert-mobile" class="alert alert-info alert-sm mt-1 p-2" style="display: none;">
-              <small id="balance-addition-text-mobile"></small>
-            </div>
-          </div>
-        </div>
-        
-        <div class="row">
-          <div class="col-6">
-            <button type="button" 
-                    class="btn btn-outline-info btn-lg w-100" 
-                    data-bs-toggle="modal" 
-                    data-bs-target="#orderSummaryModal">
-              <i class="fas fa-list me-2"></i>Ver Resumen
-            </button>
-          </div>
-          <div class="col-6">
-            <button type="button" 
-                    id="finish-order-btn-mobile" 
-                    class="btn btn-success btn-lg w-100" 
-                    data-order-id="{{ order.pk }}">
-              <i class="fas fa-check-circle me-2"></i>Terminar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    {%else%}
+    <div class="alert alert-warning"> Debe agregar un domicilio de entrega para este cliente. Contacte al administrador</div>
     {% endif %}
     <!-- Mobile Order Summary Modal -->
     <div class="modal fade" id="orderSummaryModal" tabindex="-1">

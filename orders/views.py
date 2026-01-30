@@ -171,7 +171,6 @@ def create_order(request, client_pk):
     order = services.create_order(client, owner=owner)
     client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
     payment_types = PAYMENT_METHOD_CHOICES
-    
     # Calculate initial payment breakdown based on client balance and order total
     initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
     has_shipping_address = client.addresses.filter(type='shipping').exists()
