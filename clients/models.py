@@ -1303,6 +1303,8 @@ class ClientBillingFrecuency(TimeStampedModel):
             active_frequencies = ClientBillingFrecuency.objects.filter(client=self.client, is_active=True).exclude(id=self.id)
             if active_frequencies.exists():
                 raise ValidationError({'is_active': 'El cliente ya tiene una frecuencia de facturación activa.'})
+        if self.client.requires_billing is False:
+            raise ValidationError({'client': 'No se puede asignar una frecuencia de facturación a un cliente que no requiere facturación.'})
         if self.billing_date == 'specific_date':
             if not self.specific_day:
                 raise ValidationError({'specific_day': 'Specific day is required when billing date is "specific_date".'})

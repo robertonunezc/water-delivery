@@ -160,7 +160,10 @@ def detail(request, pk):
     
     # Get recent completed route orders for reference
     recent_completed_routes = get_recent_completed_route_orders(client, limit=5)
-    
+    billing_frequency = None
+    if hasattr(client, 'billing_frecuency'):
+        billing_frequency = client.billing_frecuency
+
     context = {
         'client': client,
         'date_since': first_day_of_month,
@@ -170,7 +173,7 @@ def detail(request, pk):
         'contacts': contacts,
         'addresses': addresses,
         'billing_data': billing_data,
-        'billing_frequency': client.billing_frecuency,
+        'billing_frequency': billing_frequency,
         'route_clients': route_clients,
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,
