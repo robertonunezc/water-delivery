@@ -318,9 +318,12 @@ class ClientAdmin(admin.ModelAdmin):
 				new_credit_limit = form.cleaned_data.get('new_credit_limit')
 				
 				try:
+					from clients.services import balance_service
+
 					if transaction_type == 'limit_change':
 						# Update credit limit
-						client.update_credit_limit(
+						balance_service.update_credit_limit(
+							client=client,
 							new_limit=new_credit_limit,
 							user=request.user,
 							notes=f"[MANUAL] {description}. Cambio manual realizado por {request.user.username}. {notes}"
@@ -329,10 +332,11 @@ class ClientAdmin(admin.ModelAdmin):
 							request,
 							f"Límite de crédito actualizado. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
 						)
-					
+
 					elif transaction_type in ['payment', 'forgiveness']:
 						# Pay down debt
-						paid_amount = client.pay_debt(
+						paid_amount = balance_service.pay_debt(
+							client=client,
 							amount=amount,
 							transaction_type=transaction_type,
 							user=request.user,
@@ -342,10 +346,11 @@ class ClientAdmin(admin.ModelAdmin):
 							request,
 							f"Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
 						)
-					
+
 					elif transaction_type == 'payment_from_balance':
 						# Pay debt using client's balance
-						result = client.pay_debt_from_balance(
+						result = balance_service.pay_debt_from_balance(
+							client=client,
 							amount=amount,
 							user=request.user,
 							notes=f"[MANUAL] {description}. Pago con saldo realizado por {request.user.username}. {notes}"
@@ -366,11 +371,12 @@ class ClientAdmin(admin.ModelAdmin):
 								'has_view_permission': True,
 								'client': client,
 							})
-					
+
 					elif transaction_type == 'adjustment':
 						# Manual debt adjustment (could increase or decrease)
 						# For simplicity, we'll treat as debt reduction
-						paid_amount = client.pay_debt(
+						paid_amount = balance_service.pay_debt(
+							client=client,
 							amount=amount,
 							transaction_type=transaction_type,
 							user=request.user,
@@ -406,12 +412,15 @@ class ClientAdmin(admin.ModelAdmin):
 				description = form.cleaned_data['description']
 				notes = form.cleaned_data['notes']
 				
+				from clients.services import balance_service
+
 				successful_count = 0
 				errors = []
-				
+
 				for client in clients:
 					try:
-						client.add_balance(
+						balance_service.add_balance(
+							client=client,
 							amount=amount,
 							transaction_type='deposit',
 							user=request.user,

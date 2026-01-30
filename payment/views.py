@@ -170,19 +170,21 @@ def process_multiple_payments(request, order, payments_data, cantidad_cobrada):
         
         # If cantidad_cobrada is greater than order total, add difference to client balance
         if cantidad_cobrada > order_total:
+            from clients.services import balance_service
             excess_amount = cantidad_cobrada - order_total
-            order.client.add_balance(
+            balance_service.add_balance(
+                client=order.client,
                 amount=excess_amount,
                 transaction_type='added_in_order',
                 user=request.user,
                 reference_order=order,
                 notes=f'Saldo agregado en venta - Orden #{order.id}. Diferencia entre cantidad cobrada (${cantidad_cobrada:.2f}) y total de orden (${order_total:.2f})'
             )
-    
+
     # Update order status
     order.status = OrderStatus.COMPLETED.value
     order.save()
-    
+
     # Build response
     response_data = {
         'success': True,
@@ -246,19 +248,21 @@ def process_legacy_payment(request, order, data):
         
         # If cantidad_cobrada is greater than order total, add difference to client balance
         if cantidad_cobrada > order_total:
+            from clients.services import balance_service
             excess_amount = cantidad_cobrada - order_total
-            order.client.add_balance(
+            balance_service.add_balance(
+                client=order.client,
                 amount=excess_amount,
                 transaction_type='added_in_order',
                 user=request.user,
                 reference_order=order,
                 notes=f'Saldo agregado en venta - Orden #{order.id}. Diferencia entre cantidad cobrada (${cantidad_cobrada:.2f}) y total de orden (${order_total:.2f})'
             )
-    
+
     # Update order status
     order.status = OrderStatus.COMPLETED.value
     order.save()
-    
+
     response_data = {
         'success': True,
         'payment_id': payment.id,

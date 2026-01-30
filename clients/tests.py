@@ -537,24 +537,28 @@ class ClientBalanceManagementTestCase(TestCase):
 
     def test_add_balance_increases_balance(self):
         """Test that add_balance increases client balance"""
+        from clients.services import balance_service
         initial_balance = self.client.balance
         amount = Decimal('500.00')
 
-        new_balance = self.client.add_balance(
+        transaction = balance_service.add_balance(
+            client=self.client,
             amount=amount,
             transaction_type='deposit',
             user=self.user,
             notes="Test deposit"
         )
 
-        self.assertEqual(new_balance, initial_balance + amount)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, initial_balance + amount)
 
     def test_add_balance_creates_transaction_record(self):
         """Test that add_balance creates a BalanceTransaction record"""
+        from clients.services import balance_service
         amount = Decimal('500.00')
 
-        self.client.add_balance(
+        balance_service.add_balance(
+            client=self.client,
             amount=amount,
             transaction_type='deposit',
             user=self.user,
@@ -569,8 +573,10 @@ class ClientBalanceManagementTestCase(TestCase):
 
     def test_add_balance_with_negative_amount_raises_error(self):
         """Test that add_balance raises error with negative amount"""
+        from clients.services import balance_service
         with self.assertRaises(ValueError):
-            self.client.add_balance(
+            balance_service.add_balance(
+                client=self.client,
                 amount=Decimal('-100.00'),
                 transaction_type='deposit',
                 user=self.user
@@ -578,37 +584,45 @@ class ClientBalanceManagementTestCase(TestCase):
 
     def test_deduct_balance_decreases_balance(self):
         """Test that deduct_balance decreases client balance"""
+        from clients.services import balance_service
         initial_balance = self.client.balance
         amount = Decimal('300.00')
 
-        success = self.client.deduct_balance(
+        result = balance_service.deduct_balance(
+            client=self.client,
             amount=amount,
             transaction_type='payment',
             user=self.user,
             notes="Test payment"
         )
 
-        self.assertTrue(success)
+        self.assertIsNotNone(result)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, initial_balance - amount)
 
     def test_deduct_balance_with_insufficient_funds_fails(self):
         """Test that deduct_balance fails with insufficient balance"""
+        from clients.services import balance_service
         amount = Decimal('2000.00')  # More than current balance
 
-        success = self.client.deduct_balance(
+        result = balance_service.deduct_balance(
+            client=self.client,
             amount=amount,
             transaction_type='payment',
             user=self.user
         )
 
-        self.assertFalse(success)
+        self.assertIsNone(result)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, Decimal('1000.00'))  # Unchanged
 
     def test_deduct_balance_creates_transaction_record(self):
         """Test that deduct_balance creates a BalanceTransaction record"""
+        from clients.services import balance_service
         amount = Decimal('200.00')
 
-        self.client.deduct_balance(
+        balance_service.deduct_balance(
+            client=self.client,
             amount=amount,
             transaction_type='payment',
             user=self.user
@@ -637,24 +651,29 @@ class ClientCreditManagementTestCase(TestCase):
 
     def test_add_debt_increases_debt(self):
         """Test that add_debt increases current debt"""
+        from clients.services import balance_service
         initial_debt = self.client.current_debt
         amount = Decimal('500.00')
 
-        success = self.client.add_debt(
+        result = balance_service.add_debt(
+            client=self.client,
             amount=amount,
             transaction_type='purchase',
             user=self.user,
             notes="Test purchase"
         )
 
-        self.assertTrue(success)
+        self.assertIsNotNone(result)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, initial_debt + amount)
 
     def test_add_debt_creates_transaction_record(self):
         """Test that add_debt creates a CreditTransaction record"""
+        from clients.services import balance_service
         amount = Decimal('500.00')
 
-        self.client.add_debt(
+        balance_service.add_debt(
+            client=self.client,
             amount=amount,
             transaction_type='purchase',
             user=self.user
@@ -667,58 +686,70 @@ class ClientCreditManagementTestCase(TestCase):
 
     def test_add_debt_exceeding_limit_with_can_pay_credit_true_succeeds(self):
         """Test that add_debt allows exceeding limit when can_pay_with_credit is True"""
+        from clients.services import balance_service
         amount = Decimal('6000.00')  # Exceeds available credit
 
-        success = self.client.add_debt(
+        result = balance_service.add_debt(
+            client=self.client,
             amount=amount,
             transaction_type='purchase',
             user=self.user
         )
 
-        self.assertTrue(success)
+        self.assertIsNotNone(result)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, Decimal('7000.00'))
 
     def test_add_debt_exceeding_limit_with_can_pay_credit_false_fails(self):
         """Test that add_debt blocks exceeding limit when can_pay_with_credit is False"""
+        from clients.services import balance_service
         self.client.can_pay_with_credit = False
         self.client.save()
 
         amount = Decimal('5000.00')  # Would exceed limit
 
-        success = self.client.add_debt(
+        result = balance_service.add_debt(
+            client=self.client,
             amount=amount,
             transaction_type='purchase',
             user=self.user
         )
 
-        self.assertFalse(success)
+        self.assertIsNone(result)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, Decimal('1000.00'))  # Unchanged
 
     def test_pay_debt_decreases_debt(self):
         """Test that pay_debt decreases current debt"""
+        from clients.services import balance_service
         initial_debt = self.client.current_debt
         amount = Decimal('500.00')
 
-        paid = self.client.pay_debt(
+        paid = balance_service.pay_debt(
+            client=self.client,
             amount=amount,
             transaction_type='payment',
             user=self.user
         )
 
         self.assertEqual(paid, amount)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, initial_debt - amount)
 
     def test_pay_debt_limited_by_current_debt(self):
         """Test that pay_debt is limited by current debt amount"""
+        from clients.services import balance_service
         amount = Decimal('2000.00')  # More than current debt
 
-        paid = self.client.pay_debt(
+        paid = balance_service.pay_debt(
+            client=self.client,
             amount=amount,
             transaction_type='payment',
             user=self.user
         )
 
         self.assertEqual(paid, Decimal('1000.00'))  # Only paid existing debt
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, Decimal('0.00'))
 
     def test_get_available_credit(self):
@@ -729,14 +760,17 @@ class ClientCreditManagementTestCase(TestCase):
 
     def test_update_credit_limit(self):
         """Test update_credit_limit changes limit and creates transaction"""
+        from clients.services import balance_service
         new_limit = Decimal('10000.00')
 
-        self.client.update_credit_limit(
+        balance_service.update_credit_limit(
+            client=self.client,
             new_limit=new_limit,
             user=self.user,
             notes="Increasing credit limit"
         )
 
+        self.client.refresh_from_db()
         self.assertEqual(self.client.credit_limit, new_limit)
 
         transaction = CreditTransaction.objects.filter(
@@ -747,27 +781,32 @@ class ClientCreditManagementTestCase(TestCase):
 
     def test_pay_debt_from_balance_success(self):
         """Test pay_debt_from_balance with sufficient balance"""
+        from clients.services import balance_service
         self.client.balance = Decimal('500.00')
         self.client.save()
 
         amount = Decimal('300.00')
-        result = self.client.pay_debt_from_balance(
+        result = balance_service.pay_debt_from_balance(
+            client=self.client,
             amount=amount,
             user=self.user
         )
 
         self.assertTrue(result['success'])
         self.assertEqual(result['amount_paid'], amount)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, Decimal('200.00'))
         self.assertEqual(self.client.current_debt, Decimal('700.00'))
 
     def test_pay_debt_from_balance_insufficient_balance(self):
         """Test pay_debt_from_balance fails with insufficient balance"""
+        from clients.services import balance_service
         self.client.balance = Decimal('100.00')
         self.client.save()
 
         amount = Decimal('300.00')
-        result = self.client.pay_debt_from_balance(
+        result = balance_service.pay_debt_from_balance(
+            client=self.client,
             amount=amount,
             user=self.user
         )
@@ -794,9 +833,11 @@ class ClientPaymentProcessingTestCase(TestCase):
 
     def test_process_order_payment_with_balance_only(self):
         """Test process_order_payment using only balance"""
+        from orders.services import process_order_payment
         order_amount = Decimal('300.00')
 
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='balance',
             user=self.user
@@ -804,29 +845,35 @@ class ClientPaymentProcessingTestCase(TestCase):
 
         self.assertTrue(result['success'])
         self.assertEqual(result['balance_used'], order_amount)
-        self.assertEqual(result['credit_used'], Decimal('0.00'))
+        self.assertEqual(result['credit_used'], Decimal('0'))
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, Decimal('200.00'))
 
     def test_process_order_payment_with_credit_only(self):
         """Test process_order_payment using only credit"""
+        from orders.services import process_order_payment
         order_amount = Decimal('1000.00')
 
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='credit',
             user=self.user
         )
 
         self.assertTrue(result['success'])
-        self.assertEqual(result['balance_used'], Decimal('0.00'))
+        self.assertEqual(result['balance_used'], Decimal('0'))
         self.assertEqual(result['credit_used'], order_amount)
+        self.client.refresh_from_db()
         self.assertEqual(self.client.current_debt, order_amount)
 
     def test_process_order_payment_auto_uses_balance_first(self):
         """Test process_order_payment auto mode uses balance first, then credit"""
+        from orders.services import process_order_payment
         order_amount = Decimal('1000.00')
 
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='auto',
             user=self.user
@@ -835,17 +882,20 @@ class ClientPaymentProcessingTestCase(TestCase):
         self.assertTrue(result['success'])
         self.assertEqual(result['balance_used'], Decimal('500.00'))
         self.assertEqual(result['credit_used'], Decimal('500.00'))
+        self.client.refresh_from_db()
         self.assertEqual(self.client.balance, Decimal('0.00'))
         self.assertEqual(self.client.current_debt, Decimal('500.00'))
 
     def test_process_order_payment_insufficient_balance_fails(self):
         """Test process_order_payment fails when balance insufficient and credit disabled"""
+        from orders.services import process_order_payment
         self.client.can_pay_with_credit = False
         self.client.save()
 
         order_amount = Decimal('1000.00')
 
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='balance',
             user=self.user
@@ -856,13 +906,15 @@ class ClientPaymentProcessingTestCase(TestCase):
 
     def test_process_order_payment_requires_note_for_credit(self):
         """Test process_order_payment requires note when configured"""
+        from orders.services import process_order_payment
         self.client.requires_note_for_credit = True
         self.client.save()
 
         order_amount = Decimal('1000.00')
 
         # Without note - should fail
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='credit',
             user=self.user
@@ -873,12 +925,14 @@ class ClientPaymentProcessingTestCase(TestCase):
 
     def test_process_order_payment_with_note_succeeds(self):
         """Test process_order_payment with note when required"""
+        from orders.services import process_order_payment
         self.client.requires_note_for_credit = True
         self.client.save()
 
         order_amount = Decimal('1000.00')
 
-        result = self.client.process_order_payment(
+        result = process_order_payment(
+            client=self.client,
             order_amount=order_amount,
             preferred_method='credit',
             user=self.user,
@@ -942,10 +996,12 @@ class ClientBalanceTransferTestCase(TestCase):
 
     def test_transfer_balance_success(self):
         """Test successful balance transfer between clients"""
+        from clients.services import balance_service
         amount = Decimal('300.00')
 
-        result = self.source_client.transfer_balance_to(
-            target_client=self.target_client,
+        result = balance_service.transfer_balance(
+            from_client=self.source_client,
+            to_client=self.target_client,
             amount=amount,
             user=self.user,
             notes="Test transfer"
@@ -963,10 +1019,12 @@ class ClientBalanceTransferTestCase(TestCase):
 
     def test_transfer_balance_insufficient_funds(self):
         """Test transfer fails with insufficient balance"""
+        from clients.services import balance_service
         amount = Decimal('2000.00')
 
-        result = self.source_client.transfer_balance_to(
-            target_client=self.target_client,
+        result = balance_service.transfer_balance(
+            from_client=self.source_client,
+            to_client=self.target_client,
             amount=amount,
             user=self.user
         )
@@ -976,10 +1034,12 @@ class ClientBalanceTransferTestCase(TestCase):
 
     def test_transfer_balance_creates_transactions(self):
         """Test transfer creates transactions for both clients"""
+        from clients.services import balance_service
         amount = Decimal('300.00')
 
-        self.source_client.transfer_balance_to(
-            target_client=self.target_client,
+        balance_service.transfer_balance(
+            from_client=self.source_client,
+            to_client=self.target_client,
             amount=amount,
             user=self.user
         )
@@ -1002,7 +1062,7 @@ class ClientBalanceTransferTestCase(TestCase):
 
 
 class ClientHistoryTestCase(TestCase):
-    """Test cases for client transaction history"""
+    """Test cases for client transaction history using managers"""
 
     def setUp(self):
         """Set up test data for history tests"""
@@ -1013,67 +1073,76 @@ class ClientHistoryTestCase(TestCase):
             balance=Decimal('1000.00'),
             credit_limit=Decimal('5000.00'),
             current_debt=Decimal('0.00'),
+            can_pay_with_credit=True,
             active=True
         )
 
     def test_get_balance_history(self):
-        """Test get_balance_history returns transactions"""
-        self.client.add_balance(Decimal('500.00'), user=self.user)
-        self.client.deduct_balance(Decimal('200.00'), user=self.user)
+        """Test BalanceTransaction manager returns transactions"""
+        from clients.services import balance_service
+        balance_service.add_balance(client=self.client, amount=Decimal('500.00'), user=self.user)
+        balance_service.deduct_balance(client=self.client, amount=Decimal('200.00'), user=self.user)
 
-        history = self.client.get_balance_history()
+        history = BalanceTransaction.objects.for_client(self.client)
         self.assertEqual(history.count(), 2)
 
     def test_get_balance_history_filtered_by_date(self):
-        """Test get_balance_history with date filtering"""
-        self.client.add_balance(Decimal('500.00'), user=self.user)
+        """Test BalanceTransaction manager with date filtering"""
+        from clients.services import balance_service
+        balance_service.add_balance(client=self.client, amount=Decimal('500.00'), user=self.user)
 
         # Filter by today onwards
         today = date.today()
-        history = self.client.get_balance_history(start_date=today)
+        history = BalanceTransaction.objects.for_client(self.client).in_date_range(start_date=today)
         self.assertEqual(history.count(), 1)
 
     def test_get_balance_history_filtered_by_type(self):
-        """Test get_balance_history with transaction type filtering"""
-        self.client.add_balance(Decimal('500.00'), transaction_type='deposit', user=self.user)
-        self.client.deduct_balance(Decimal('200.00'), transaction_type='payment', user=self.user)
+        """Test BalanceTransaction manager with transaction type filtering"""
+        from clients.services import balance_service
+        balance_service.add_balance(client=self.client, amount=Decimal('500.00'), transaction_type='deposit', user=self.user)
+        balance_service.deduct_balance(client=self.client, amount=Decimal('200.00'), transaction_type='payment', user=self.user)
 
-        history = self.client.get_balance_history(transaction_types=['deposit'])
+        history = BalanceTransaction.objects.for_client(self.client).by_types(['deposit'])
         self.assertEqual(history.count(), 1)
         self.assertEqual(history.first().transaction_type, 'deposit')
 
     def test_get_credit_history(self):
-        """Test get_credit_history returns transactions"""
-        self.client.add_debt(Decimal('1000.00'), user=self.user)
-        self.client.pay_debt(Decimal('500.00'), user=self.user)
+        """Test CreditTransaction manager returns transactions"""
+        from clients.services import balance_service
+        balance_service.add_debt(client=self.client, amount=Decimal('1000.00'), user=self.user)
+        balance_service.pay_debt(client=self.client, amount=Decimal('500.00'), user=self.user)
 
-        history = self.client.get_credit_history()
+        history = CreditTransaction.objects.for_client(self.client)
         self.assertEqual(history.count(), 2)
 
     def test_get_balance_at_date(self):
-        """Test get_balance_at_date returns correct historical balance"""
+        """Test BalanceTransaction manager balance_at returns correct historical balance"""
+        from clients.services import balance_service
         # Initial balance transaction
-        self.client.add_balance(Decimal('500.00'), user=self.user)
+        balance_service.add_balance(client=self.client, amount=Decimal('500.00'), user=self.user)
 
-        # Get balance at today
-        balance = self.client.get_balance_at_date(date.today() + timedelta(days=1))
+        # Get balance at tomorrow (to include today's transactions)
+        balance = BalanceTransaction.objects.for_client(self.client).balance_at(date.today() + timedelta(days=1))
         self.assertEqual(balance, Decimal('1500.00'))  # 1000 initial + 500 added
 
     def test_get_debt_at_date(self):
-        """Test get_debt_at_date returns correct historical debt"""
-        self.client.add_debt(Decimal('1000.00'), user=self.user)
+        """Test CreditTransaction manager debt_at returns correct historical debt"""
+        from clients.services import balance_service
+        balance_service.add_debt(client=self.client, amount=Decimal('1000.00'), user=self.user)
 
-        debt = self.client.get_debt_at_date(date.today() + timedelta(days=1))
+        debt = CreditTransaction.objects.for_client(self.client).debt_at(date.today() + timedelta(days=1))
         self.assertEqual(debt, Decimal('1000.00'))
 
     def test_get_financial_summary(self):
-        """Test get_financial_summary returns comprehensive data"""
-        self.client.add_balance(Decimal('500.00'), transaction_type='deposit', user=self.user)
-        self.client.deduct_balance(Decimal('200.00'), transaction_type='payment', user=self.user)
-        self.client.add_debt(Decimal('1000.00'), transaction_type='purchase', user=self.user)
+        """Test get_financial_summary service returns comprehensive data"""
+        from clients.services import balance_service
+        balance_service.add_balance(client=self.client, amount=Decimal('500.00'), transaction_type='deposit', user=self.user)
+        balance_service.deduct_balance(client=self.client, amount=Decimal('200.00'), transaction_type='payment', user=self.user)
+        balance_service.add_debt(client=self.client, amount=Decimal('1000.00'), transaction_type='purchase', user=self.user)
 
-        summary = self.client.get_financial_summary()
+        summary = balance_service.get_financial_summary(self.client)
 
+        self.client.refresh_from_db()
         self.assertEqual(summary['current_balance'], self.client.balance)
         self.assertEqual(summary['current_debt'], self.client.current_debt)
         self.assertIn('balance_summary', summary)

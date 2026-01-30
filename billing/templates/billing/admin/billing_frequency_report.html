@@ -185,30 +185,6 @@
 
 {% block content %}
 <div class="container-fluid">
-    <h1>{{ title }}</h1>
-
-    <!-- Statistics Card -->
-    <div class="stats-card">
-        <div class="stat-grid">
-            <div class="stat-item">
-                <div class="stat-value">{{ total_clients }}</div>
-                <div class="stat-label">Clientes a Facturar</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">{{ total_orders }}</div>
-                <div class="stat-label">Órdenes Totales</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">${{ total_amount|floatformat:2 }}</div>
-                <div class="stat-label">Monto Total</div>
-            </div>
-            <div class="stat-item">
-                <div class="stat-value">{{ frequency_breakdown|length }}</div>
-                <div class="stat-label">Tipos de Frecuencia</div>
-            </div>
-        </div>
-    </div>
-
     <!-- Filter Form -->
     <div class="filter-form">
         <form method="get">

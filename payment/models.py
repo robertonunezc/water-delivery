@@ -73,13 +73,16 @@ class Payment(models.Model):
     
     def save(self, *args, **kwargs):
         """Custom save method to handle balance and credit payments"""
+        from clients.services import balance_service
+
         is_new_payment = self.pk is None
-        
+
         if is_new_payment and self.status == 'completed':
             # Process payment based on method
             if self.method == 'balance':
                 # Deduct from client balance
-                success = self.client.deduct_balance(
+                result = balance_service.deduct_balance(
+                    client=self.client,
                     amount=self.amount,
                     transaction_type='payment',
                     user=self.created_by,
@@ -87,18 +90,19 @@ class Payment(models.Model):
                     reference_payment=None,  # Will be set after save
                     notes=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo'
                 )
-                if not success:
+                if not result:
                     from django.core.exceptions import ValidationError
                     raise ValidationError("NO cuenta con saldo suficiente para el pago")
                 self.balance_used = self.amount
-                
+
             elif self.method == 'credit':
                 # Add to client debt
                 credit_note = getattr(self, '_credit_note', None)
                 notes_text = f'Compra orden #{self.order.id if self.order else "N/A"} a crédito'
                 if credit_note:
                     notes_text += f'. {credit_note}'
-                success = self.client.add_debt(
+                result = balance_service.add_debt(
+                    client=self.client,
                     amount=self.amount,
                     transaction_type='purchase',
                     user=self.created_by,
@@ -106,7 +110,7 @@ class Payment(models.Model):
                     reference_payment=None,  # Will be set after save
                     notes=notes_text
                 )
-                if not success:
+                if not result:
                     from django.core.exceptions import ValidationError
                     # This should rarely happen now since add_debt allows exceeding limits for authorized clients
                     available_credit = self.client.get_available_credit()
@@ -118,7 +122,7 @@ class Payment(models.Model):
                         f"Monto requerido: ${self.amount:.2f}"
                     )
                 self.credit_used = self.amount
-        
+
         super().save(*args, **kwargs)
         
         # Update transaction records with payment reference after save
@@ -149,12 +153,15 @@ class Payment(models.Model):
     
     def reverse_payment(self, user=None, reason=''):
         """Reverse the payment by restoring balance or reducing debt"""
+        from clients.services import balance_service
+
         if self.status != 'completed':
             return False
-            
+
         if self.method == 'balance' and self.balance_used > 0:
             # Restore balance to client
-            self.client.add_balance(
+            balance_service.add_balance(
+                client=self.client,
                 amount=self.balance_used,
                 transaction_type='refund',
                 user=user,
@@ -163,10 +170,11 @@ class Payment(models.Model):
                 notes=f'Reversión de pago #{self.id} - {reason}'
             )
             self.balance_used = 0
-            
+
         elif self.method == 'credit' and self.credit_used > 0:
             # Reduce client debt
-            self.client.pay_debt(
+            balance_service.pay_debt(
+                client=self.client,
                 amount=self.credit_used,
                 transaction_type='adjustment',
                 user=user,
@@ -175,7 +183,7 @@ class Payment(models.Model):
                 notes=f'Reversión de compra a crédito #{self.id} - {reason}'
             )
             self.credit_used = 0
-        
+
         self.status = 'failed'
         self.save()
         return True

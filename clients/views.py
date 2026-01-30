@@ -208,9 +208,12 @@ def pay_credit(request, pk):
             new_credit_limit = form.cleaned_data.get('new_credit_limit')
             
             try:
+                from clients.services import balance_service
+
                 if transaction_type == 'limit_change':
                     # Update credit limit
-                    client.update_credit_limit(
+                    balance_service.update_credit_limit(
+                        client=client,
                         new_limit=new_credit_limit,
                         user=request.user,
                         notes=f"{description}. {notes}"
@@ -219,10 +222,11 @@ def pay_credit(request, pk):
                         request,
                         f"Límite de crédito actualizado exitosamente. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
                     )
-                
+
                 elif transaction_type in ['payment', 'forgiveness', 'adjustment', 'correction']:
                     # Pay down debt
-                    paid_amount = client.pay_debt(
+                    paid_amount = balance_service.pay_debt(
+                        client=client,
                         amount=amount,
                         transaction_type=transaction_type,
                         user=request.user,
@@ -232,10 +236,11 @@ def pay_credit(request, pk):
                         request,
                         f"Pago aplicado exitosamente. Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
                     )
-                
+
                 elif transaction_type == 'payment_from_balance':
                     # Pay debt using client's balance
-                    result = client.pay_debt_from_balance(
+                    result = balance_service.pay_debt_from_balance(
+                        client=client,
                         amount=amount,
                         user=request.user,
                         notes=f"{description}. {notes}"

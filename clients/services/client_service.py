@@ -4,7 +4,7 @@ from django.db.models import QuerySet, Count, Sum, Q, Prefetch
 
 from core.utils import get_first_last_day_of_month
 from orders.models import Order
-from .models import Client, ClientBillingFrecuency
+from clients.models import Client, ClientBillingFrecuency
 
 def get_upcoming_route_orders(client, limit=10):
     """

@@ -80,3 +80,232 @@ def get_logger(name: str):
     `services.get_logger(__name__)` without needing additional imports.
     """
     return logging.getLogger(name)
+
+
+# Payment Processing Functions
+# These functions coordinate payment between Client balance/credit and Order
+
+
+def process_order_payment(
+    client: Client,
+    order_amount: Decimal,
+    preferred_method: str = "auto",
+    order: Optional[Order] = None,
+    user=None,
+    credit_note: Optional[str] = None,
+) -> dict:
+    """
+    Process payment for an order using different strategies.
+
+    This function coordinates balance and credit usage but delegates
+    the actual mutations to the balance_service.
+
+    Args:
+        client: Client making the payment
+        order_amount: Amount to process
+        preferred_method: 'auto', 'balance', 'credit', 'mixed'
+        order: Order object for transaction reference
+        user: User performing the operation
+        credit_note: Required note when using credit if client requires it
+
+    Returns:
+        dict with success status and payment breakdown
+    """
+    from clients.services import balance_service
+
+    remaining_amount = order_amount
+    balance_used = Decimal("0")
+    credit_used = Decimal("0")
+
+    if preferred_method == "balance":
+        # Try to pay entirely with balance
+        if client.balance >= order_amount:
+            balance_used = order_amount
+            remaining_amount = Decimal("0")
+        else:
+            return {
+                "success": False,
+                "error": f"Insufficient balance. Available: ${client.balance:.2f}, "
+                f"Required: ${order_amount:.2f}",
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+            }
+
+    elif preferred_method == "credit":
+        # Check if client can use credit
+        if not client.can_use_credit_for_payment():
+            return {
+                "success": False,
+                "error": "Client is not allowed to pay with credit at this time.",
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+            }
+
+        # Check if note is required for credit payments
+        if client.requires_note_for_credit_payment() and not credit_note:
+            return {
+                "success": False,
+                "error": "A note is required for credit payments for this client.",
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+                "note_required": True,
+            }
+
+        # Try to pay entirely with credit
+        available_credit = client.get_available_credit()
+        if available_credit >= order_amount:
+            credit_used = order_amount
+            remaining_amount = Decimal("0")
+        else:
+            return {
+                "success": False,
+                "error": f"Insufficient credit. Available: ${available_credit:.2f}, "
+                f"Required: ${order_amount:.2f}",
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+            }
+
+    else:  # 'auto' or 'mixed'
+        # First, use available balance
+        balance_used = min(client.balance, remaining_amount)
+        remaining_amount -= balance_used
+
+        # Then, use credit if needed and available
+        if remaining_amount > 0:
+            # Check if client can use credit
+            if not client.can_use_credit_for_payment():
+                return {
+                    "success": False,
+                    "error": f"Client cannot use credit. Need additional "
+                    f"${remaining_amount:.2f} in balance.",
+                    "balance_used": Decimal("0"),
+                    "credit_used": Decimal("0"),
+                    "balance_available": client.balance,
+                    "credit_available": Decimal("0"),
+                }
+
+            # Check if note is required for credit payments
+            if client.requires_note_for_credit_payment() and not credit_note:
+                return {
+                    "success": False,
+                    "error": "A note is required for credit payments for this client.",
+                    "balance_used": Decimal("0"),
+                    "credit_used": Decimal("0"),
+                    "note_required": True,
+                }
+
+            available_credit = client.get_available_credit()
+            credit_used = min(available_credit, remaining_amount)
+            remaining_amount -= credit_used
+
+    # Check if we can cover the full amount
+    if remaining_amount > 0:
+        return {
+            "success": False,
+            "error": f"Insufficient funds. Need additional ${remaining_amount:.2f}",
+            "balance_used": Decimal("0"),
+            "credit_used": Decimal("0"),
+            "balance_available": client.balance,
+            "credit_available": client.get_available_credit(),
+        }
+
+    # Actually process the payment using balance_service
+    if balance_used > 0:
+        balance_service.deduct_balance(
+            client=client,
+            amount=balance_used,
+            transaction_type="payment",
+            user=user,
+            reference_order=order,
+            notes=f"Pago de orden con saldo - ${balance_used:.2f}",
+        )
+
+    if credit_used > 0:
+        notes = f"Compra a crédito - ${credit_used:.2f}"
+        if credit_note:
+            notes = f"{notes}. {credit_note}"
+        balance_service.add_debt(
+            client=client,
+            amount=credit_used,
+            transaction_type="purchase",
+            user=user,
+            reference_order=order,
+            notes=notes,
+        )
+
+    return {
+        "success": True,
+        "balance_used": balance_used,
+        "credit_used": credit_used,
+        "remaining_balance": client.balance,
+        "current_debt": client.current_debt,
+        "available_credit": client.get_available_credit(),
+    }
+
+
+def create_payment_for_order(
+    client: Client,
+    order: Order,
+    payment_method: str = "auto",
+    user=None,
+    credit_note: Optional[str] = None,
+) -> dict:
+    """
+    Create payment records for an order based on how the payment was processed.
+
+    Args:
+        client: Client making the payment
+        order: Order to create payment for
+        payment_method: 'auto', 'balance', 'credit', 'mixed'
+        user: User performing the operation
+        credit_note: Required note when using credit if client requires it
+
+    Returns:
+        dict with success status, payments created, and payment breakdown
+    """
+    from payment.models import Payment
+
+    order_amount = order.total_amount
+    payment_result = process_order_payment(
+        client=client,
+        order_amount=order_amount,
+        preferred_method=payment_method,
+        order=order,
+        user=user,
+        credit_note=credit_note,
+    )
+
+    if not payment_result["success"]:
+        return {"success": False, "error": payment_result.get("error", "Payment failed")}
+
+    payments_created = []
+
+    # Create balance payment if balance was used
+    if payment_result["balance_used"] > 0:
+        balance_payment = Payment.objects.create(
+            amount=payment_result["balance_used"],
+            method="balance",
+            client=client,
+            order=order,
+            status="completed",
+            balance_used=payment_result["balance_used"],
+        )
+        payments_created.append(balance_payment)
+
+    # Create credit payment if credit was used
+    if payment_result["credit_used"] > 0:
+        credit_payment = Payment.objects.create(
+            amount=payment_result["credit_used"],
+            method="credit",
+            client=client,
+            order=order,
+            status="completed",
+            credit_used=payment_result["credit_used"],
+        )
+        payments_created.append(credit_payment)
+
+    return {
+        "success": True,
+        "payments": payments_created,
+        "payment_breakdown": payment_result,
+    }
