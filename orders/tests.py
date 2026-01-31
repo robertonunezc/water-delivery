@@ -1,3 +1,716 @@
 from django.test import TestCase
+from decimal import Decimal
+from unittest.mock import patch, MagicMock
 
-# Create your tests here.
+from clients.models import Client
+from orders.models import Order, OrderProduct, OrderStatus
+from orders import services
+from product.models import Product, ProductClientPrice, ProductCategory
+
+
+class UpdateOrderTestCase(TestCase):
+    """Tests for the update_order service function."""
+
+    def setUp(self) -> None:
+        self.client = Client.objects.create(
+            name="Test Client",
+            balance=Decimal("100.00"),
+            credit_limit=Decimal("500.00"),
+        )
+        self.category = ProductCategory.objects.create(name="Water")
+        self.product = Product.objects.create(
+            name="Garrafon",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.order = Order.objects.create(
+            client=self.client,
+            total_amount=Decimal("0.00"),
+        )
+
+    def test_update_order_creates_order_product_with_client_price(self) -> None:
+        """Test that update_order creates an OrderProduct with client-specific price."""
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=25.00,
+        )
+
+        result = services.update_order(
+            order=self.order,
+            quantity=3,
+            product=self.product,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("75.00"))
+        order_product = OrderProduct.objects.get(order=self.order, product=self.product)
+        self.assertEqual(order_product.quantity, 3)
+        self.assertEqual(order_product.unit_price, Decimal("25.00"))
+
+    def test_update_order_uses_base_price_when_no_client_price(self) -> None:
+        """Test that update_order uses base_price when no client-specific price exists."""
+        self.product.base_price = 30.00
+        self.product.save()
+
+        result = services.update_order(
+            order=self.order,
+            quantity=2,
+            product=self.product,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("60.00"))
+        order_product = OrderProduct.objects.get(order=self.order, product=self.product)
+        self.assertEqual(order_product.unit_price, Decimal("30.00"))
+
+    def test_update_order_updates_existing_order_product(self) -> None:
+        """Test that update_order updates quantity when OrderProduct already exists."""
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=20.00,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=1,
+            unit_price=Decimal("20.00"),
+        )
+
+        result = services.update_order(
+            order=self.order,
+            quantity=5,
+            product=self.product,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("100.00"))
+        order_product = OrderProduct.objects.get(order=self.order, product=self.product)
+        self.assertEqual(order_product.quantity, 5)
+
+    def test_update_order_deletes_product_when_quantity_zero(self) -> None:
+        """Test that update_order removes OrderProduct when quantity is 0."""
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=20.00,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=3,
+            unit_price=Decimal("20.00"),
+        )
+        self.order.total_amount = Decimal("60.00")
+        self.order.save()
+
+        result = services.update_order(
+            order=self.order,
+            quantity=0,
+            product=self.product,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("0.00"))
+        self.assertFalse(
+            OrderProduct.objects.filter(order=self.order, product=self.product).exists()
+        )
+
+    def test_update_order_deletes_product_when_quantity_negative(self) -> None:
+        """Test that update_order removes OrderProduct when quantity is negative."""
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=20.00,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("20.00"),
+        )
+
+        result = services.update_order(
+            order=self.order,
+            quantity=-1,
+            product=self.product,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("0.00"))
+        self.assertFalse(
+            OrderProduct.objects.filter(order=self.order, product=self.product).exists()
+        )
+
+    def test_update_order_with_multiple_products(self) -> None:
+        """Test that update_order correctly calculates total with multiple products."""
+        product2 = Product.objects.create(
+            name="Botella",
+            presentation="1",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=25.00,
+        )
+        ProductClientPrice.objects.create(
+            product=product2,
+            client=self.client,
+            price=10.00,
+        )
+
+        services.update_order(
+            order=self.order,
+            quantity=2,
+            product=self.product,
+            client=self.client,
+        )
+        result = services.update_order(
+            order=self.order,
+            quantity=3,
+            product=product2,
+            client=self.client,
+        )
+
+        self.assertEqual(result.total_amount, Decimal("80.00"))
+
+
+class CalculateOrderTotalTestCase(TestCase):
+    """Tests for the calculate_order_total service function."""
+
+    def setUp(self) -> None:
+        self.client = Client.objects.create(name="Test Client")
+        self.category = ProductCategory.objects.create(name="Water")
+        self.product1 = Product.objects.create(
+            name="Garrafon",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.product2 = Product.objects.create(
+            name="Botella",
+            presentation="1",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.order = Order.objects.create(
+            client=self.client,
+            total_amount=Decimal("0.00"),
+        )
+
+    def test_calculate_order_total_empty_order(self) -> None:
+        """Test that calculate_order_total returns 0 for empty order."""
+        total = services.calculate_order_total(self.order)
+        self.assertEqual(total, Decimal("0.00"))
+
+    def test_calculate_order_total_single_item(self) -> None:
+        """Test calculate_order_total with a single item."""
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product1,
+            quantity=3,
+            unit_price=Decimal("25.00"),
+        )
+
+        total = services.calculate_order_total(self.order)
+        self.assertEqual(total, Decimal("75.00"))
+
+    def test_calculate_order_total_multiple_items(self) -> None:
+        """Test calculate_order_total with multiple items."""
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product1,
+            quantity=2,
+            unit_price=Decimal("25.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product2,
+            quantity=5,
+            unit_price=Decimal("10.00"),
+        )
+
+        total = services.calculate_order_total(self.order)
+        self.assertEqual(total, Decimal("100.00"))
+
+    def test_calculate_order_total_with_decimal_prices(self) -> None:
+        """Test calculate_order_total handles decimal prices correctly."""
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product1,
+            quantity=3,
+            unit_price=Decimal("15.50"),
+        )
+
+        total = services.calculate_order_total(self.order)
+        self.assertEqual(total, Decimal("46.50"))
+
+
+class ProcessOrderPaymentTestCase(TestCase):
+    """Tests for the process_order_payment service function."""
+
+    def setUp(self) -> None:
+        self.client = Client.objects.create(
+            name="Test Client",
+            balance=Decimal("100.00"),
+            credit_limit=Decimal("500.00"),
+            current_debt=Decimal("0.00"),
+            can_pay_with_credit=True,
+        )
+        self.order = Order.objects.create(
+            client=self.client,
+            total_amount=Decimal("50.00"),
+        )
+
+    @patch("clients.services.balance_service.deduct_balance")
+    def test_process_order_payment_balance_only_success(
+        self, mock_deduct_balance: MagicMock
+    ) -> None:
+        """Test payment using balance only when sufficient balance exists."""
+        mock_deduct_balance.return_value = MagicMock()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="balance",
+            order=self.order,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["balance_used"], Decimal("50.00"))
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_deduct_balance.assert_called_once()
+
+    def test_process_order_payment_balance_only_insufficient(self) -> None:
+        """Test payment fails when balance is insufficient and method is balance."""
+        self.client.balance = Decimal("30.00")
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="balance",
+            order=self.order,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("Insufficient balance", result["error"])
+        self.assertEqual(result["balance_used"], Decimal("0"))
+
+    @patch("clients.services.balance_service.add_debt")
+    def test_process_order_payment_credit_only_success(
+        self, mock_add_debt: MagicMock
+    ) -> None:
+        """Test payment using credit only when sufficient credit exists."""
+        mock_add_debt.return_value = MagicMock()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["credit_used"], Decimal("50.00"))
+        self.assertEqual(result["balance_used"], Decimal("0"))
+        mock_add_debt.assert_called_once()
+
+    def test_process_order_payment_credit_only_insufficient(self) -> None:
+        """Test payment fails when credit is insufficient and method is credit."""
+        self.client.current_debt = Decimal("480.00")
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("Insufficient credit", result["error"])
+
+    def test_process_order_payment_credit_disabled(self) -> None:
+        """Test payment fails when client cannot use credit and has no available credit."""
+        self.client.can_pay_with_credit = False
+        self.client.balance = Decimal("0.00")
+        self.client.credit_limit = Decimal("0.00")
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("not allowed to pay with credit", result["error"])
+
+    def test_process_order_payment_credit_requires_note_missing(self) -> None:
+        """Test payment fails when credit note is required but not provided."""
+        self.client.requires_note_for_credit = True
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+            credit_note=None,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("note is required", result["error"])
+        self.assertTrue(result.get("note_required", False))
+
+    @patch("clients.services.balance_service.add_debt")
+    def test_process_order_payment_credit_with_note(
+        self, mock_add_debt: MagicMock
+    ) -> None:
+        """Test payment succeeds when credit note is required and provided."""
+        self.client.requires_note_for_credit = True
+        self.client.save()
+        mock_add_debt.return_value = MagicMock()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+            credit_note="Authorized by manager",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["credit_used"], Decimal("50.00"))
+
+    @patch("clients.services.balance_service.deduct_balance")
+    def test_process_order_payment_auto_uses_balance_first(
+        self, mock_deduct_balance: MagicMock
+    ) -> None:
+        """Test auto method uses balance first before credit."""
+        mock_deduct_balance.return_value = MagicMock()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="auto",
+            order=self.order,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["balance_used"], Decimal("50.00"))
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_deduct_balance.assert_called_once()
+
+    @patch("clients.services.balance_service.add_debt")
+    @patch("clients.services.balance_service.deduct_balance")
+    def test_process_order_payment_auto_mixed_balance_and_credit(
+        self, mock_deduct_balance: MagicMock, mock_add_debt: MagicMock
+    ) -> None:
+        """Test auto method uses balance first then credit for remainder."""
+        self.client.balance = Decimal("30.00")
+        self.client.save()
+        mock_deduct_balance.return_value = MagicMock()
+        mock_add_debt.return_value = MagicMock()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="auto",
+            order=self.order,
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["balance_used"], Decimal("30.00"))
+        self.assertEqual(result["credit_used"], Decimal("20.00"))
+
+    def test_process_order_payment_auto_insufficient_total_funds(self) -> None:
+        """Test auto method fails when total funds are insufficient."""
+        self.client.balance = Decimal("30.00")
+        self.client.current_debt = Decimal("490.00")
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="auto",
+            order=self.order,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("Insufficient funds", result["error"])
+
+    def test_process_order_payment_auto_cannot_use_credit_insufficient_balance(
+        self,
+    ) -> None:
+        """Test auto fails when credit disabled, no available credit, and balance insufficient."""
+        self.client.balance = Decimal("30.00")
+        self.client.can_pay_with_credit = False
+        self.client.credit_limit = Decimal("0.00")
+        self.client.save()
+
+        result = services.process_order_payment(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="auto",
+            order=self.order,
+        )
+
+        self.assertFalse(result["success"])
+        self.assertIn("cannot use credit", result["error"])
+
+
+class CreatePaymentForOrderTestCase(TestCase):
+    """Tests for the create_payment_for_order service function."""
+
+    def setUp(self) -> None:
+        self.client = Client.objects.create(
+            name="Test Client",
+            balance=Decimal("100.00"),
+            credit_limit=Decimal("500.00"),
+            current_debt=Decimal("0.00"),
+            can_pay_with_credit=True,
+        )
+        self.category = ProductCategory.objects.create(name="Water")
+        self.product = Product.objects.create(
+            name="Garrafon",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.order = Order.objects.create(
+            client=self.client,
+            total_amount=Decimal("50.00"),
+            status=OrderStatus.PENDING.value,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("25.00"),
+        )
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_returns_error_on_failed_payment(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order returns error when payment processing fails."""
+        mock_process_payment.return_value = {
+            "success": False,
+            "error": "Insufficient balance",
+        }
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="balance",
+        )
+
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "Insufficient balance")
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_creates_balance_payment(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order creates Payment record for balance payment."""
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("50.00"),
+            "credit_used": Decimal("0"),
+            "remaining_balance": Decimal("50.00"),
+            "current_debt": Decimal("0"),
+            "available_credit": Decimal("500.00"),
+        }
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="balance",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(result["payments"]), 1)
+
+        payment = result["payments"][0]
+        self.assertEqual(payment.amount, Decimal("50.00"))
+        self.assertEqual(payment.method, "balance")
+        self.assertEqual(payment.client, self.client)
+        self.assertEqual(payment.order, self.order)
+        self.assertEqual(payment.status, "completed")
+        self.assertEqual(payment.balance_used, Decimal("50.00"))
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_creates_credit_payment(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order creates Payment record for credit payment."""
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("0"),
+            "credit_used": Decimal("50.00"),
+            "remaining_balance": Decimal("100.00"),
+            "current_debt": Decimal("50.00"),
+            "available_credit": Decimal("450.00"),
+        }
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="credit",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(result["payments"]), 1)
+
+        payment = result["payments"][0]
+        self.assertEqual(payment.amount, Decimal("50.00"))
+        self.assertEqual(payment.method, "credit")
+        self.assertEqual(payment.credit_used, Decimal("50.00"))
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_creates_mixed_payments(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order creates two Payment records for mixed payment."""
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("30.00"),
+            "credit_used": Decimal("20.00"),
+            "remaining_balance": Decimal("70.00"),
+            "current_debt": Decimal("20.00"),
+            "available_credit": Decimal("480.00"),
+        }
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="auto",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(result["payments"]), 2)
+
+        balance_payment = next(p for p in result["payments"] if p.method == "balance")
+        credit_payment = next(p for p in result["payments"] if p.method == "credit")
+
+        self.assertEqual(balance_payment.amount, Decimal("30.00"))
+        self.assertEqual(balance_payment.balance_used, Decimal("30.00"))
+        self.assertEqual(credit_payment.amount, Decimal("20.00"))
+        self.assertEqual(credit_payment.credit_used, Decimal("20.00"))
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_includes_payment_breakdown(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order includes payment breakdown in result."""
+        payment_result = {
+            "success": True,
+            "balance_used": Decimal("50.00"),
+            "credit_used": Decimal("0"),
+            "remaining_balance": Decimal("50.00"),
+            "current_debt": Decimal("0"),
+            "available_credit": Decimal("500.00"),
+        }
+        mock_process_payment.return_value = payment_result
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="balance",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["payment_breakdown"], payment_result)
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_with_credit_note(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order passes credit_note to process_order_payment."""
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("0"),
+            "credit_used": Decimal("50.00"),
+            "remaining_balance": Decimal("100.00"),
+            "current_debt": Decimal("50.00"),
+            "available_credit": Decimal("450.00"),
+        }
+
+        services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="credit",
+            credit_note="Approved by supervisor",
+        )
+
+        mock_process_payment.assert_called_once_with(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="credit",
+            order=self.order,
+            user=None,
+            credit_note="Approved by supervisor",
+        )
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_with_user(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order passes user to process_order_payment."""
+        from django.contrib.auth.models import User
+
+        user = User.objects.create_user(username="testuser", password="testpass")
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("50.00"),
+            "credit_used": Decimal("0"),
+            "remaining_balance": Decimal("50.00"),
+            "current_debt": Decimal("0"),
+            "available_credit": Decimal("500.00"),
+        }
+
+        services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="balance",
+            user=user,
+        )
+
+        mock_process_payment.assert_called_once_with(
+            client=self.client,
+            order_amount=Decimal("50.00"),
+            preferred_method="balance",
+            order=self.order,
+            user=user,
+            credit_note=None,
+        )
+
+    @patch("orders.services.process_order_payment")
+    def test_create_payment_for_order_no_payment_when_zero_amounts(
+        self, mock_process_payment: MagicMock
+    ) -> None:
+        """Test create_payment_for_order creates no payments when amounts are zero."""
+        mock_process_payment.return_value = {
+            "success": True,
+            "balance_used": Decimal("0"),
+            "credit_used": Decimal("0"),
+            "remaining_balance": Decimal("100.00"),
+            "current_debt": Decimal("0"),
+            "available_credit": Decimal("500.00"),
+        }
+
+        result = services.create_payment_for_order(
+            client=self.client,
+            order=self.order,
+            payment_method="auto",
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(len(result["payments"]), 0)

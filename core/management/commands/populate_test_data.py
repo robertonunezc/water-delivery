@@ -247,7 +247,6 @@ class Command(BaseCommand):
                     'credit_limit': Decimal(random.choice([1000, 2000, 5000, 10000])),
                     'current_debt': Decimal('0.00'),
                     'can_pay_with_credit': True,
-                    'max_payment_days': random.choice([15, 30, 45, 60]),
                     'note': f'Cliente de prueba #{i + 1}',
                     'address_link': f'https://maps.google.com/?q=Queretaro+{name.replace(" ", "+")}',
                 }
