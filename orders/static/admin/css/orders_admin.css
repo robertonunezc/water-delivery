@@ -1,0 +1,165 @@
+/* Custom CSS for Orders Admin */
+
+/* Order status styling */
+.status-pending {
+    background-color: #fff3cd !important;
+    color: #856404 !important;
+    border-left: 4px solid #ffc107 !important;
+}
+
+.status-completed {
+    background-color: #d1edda !important;
+    color: #155724 !important;
+    border-left: 4px solid #28a745 !important;
+}
+
+.status-cancelled {
+    background-color: #f8d7da !important;
+    color: #721c24 !important;
+    border-left: 4px solid #dc3545 !important;
+}
+
+/* Enhanced table styling */
+#result_list tbody tr:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Badge styling */
+.admin-badge {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+
+.admin-badge-primary {
+    color: #fff;
+    background-color: #007bff;
+}
+
+.admin-badge-success {
+    color: #fff;
+    background-color: #28a745;
+}
+
+.admin-badge-warning {
+    color: #212529;
+    background-color: #ffc107;
+}
+
+.admin-badge-danger {
+    color: #fff;
+    background-color: #dc3545;
+}
+
+/* Inline styling improvements */
+.inline-related {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    padding: 10px;
+}
+
+.inline-related h3 {
+    background-color: #f8f9fa;
+    margin: -10px -10px 10px -10px;
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
+/* Improved fieldset styling */
+.module h2, .module caption, .inline-group h2 {
+    background: linear-gradient(to right, #417690, #4a90a4);
+    color: white;
+    padding: 8px 10px;
+    margin: 0;
+    border-radius: 4px 4px 0 0;
+}
+
+/* Custom filter styling */
+#changelist-filter h3 {
+    background-color: #417690;
+    color: white;
+    padding: 8px;
+    margin: 0 0 5px 0;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .admin-badge {
+        font-size: 0.65rem;
+        padding: 0.2rem 0.4rem;
+    }
+    
+    #result_list th,
+    #result_list td {
+        font-size: 0.9rem;
+    }
+}
+
+/* Enhanced changelist styling */
+#changelist .results table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#changelist .results table th {
+    background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
+    border-bottom: 2px solid #417690;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+/* Action styling */
+.actions {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.actions select,
+.actions input[type="submit"] {
+    margin-right: 10px;
+}
+
+/* Custom info boxes */
+.order-info-box {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+.client-info-box {
+    background: #f3e5f5;
+    border-left: 4px solid #9c27b0;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Loading animation for dynamic content */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: "Cargando...";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #666;
+    font-style: italic;
+}

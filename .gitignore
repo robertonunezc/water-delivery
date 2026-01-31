@@ -113,10 +113,12 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Django specific
-media/
-staticfiles/
-static/
+# Django generated files
+/media/
+/staticfiles/
+
+# (optional) ignore only root-level static, not app static
+/static/
 .DS_Store
 */__init__.py
 

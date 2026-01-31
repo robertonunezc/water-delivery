@@ -1,0 +1,310 @@
+/* Route Client Admin Styles */
+
+.duplicate-assignment-warning {
+    background-color: #fff3cd !important;
+    border: 1px solid #ffeaa7 !important;
+    border-radius: 4px !important;
+    padding: 6px 8px !important;
+    margin: 3px 0 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    position: relative;
+    width: calc(100% - 40px); /* Leave space for delete button */
+}
+
+.duplicate-assignment-warning .help {
+    margin: 2px 0 !important;
+    font-weight: normal !important;
+    color: #856404 !important;
+    line-height: 1.3;
+}
+
+.route-client-inline .client-select {
+    border: 2px solid #ddd;
+    transition: border-color 0.3s ease;
+    border-radius: 4px;
+}
+
+.route-client-inline .client-select:focus {
+    border-color: #007cba;
+    box-shadow: 0 0 5px rgba(0, 124, 186, 0.3);
+    outline: none;
+}
+
+.has-conflict .client-select {
+    border-color: #e74c3c !important;
+    background-color: #fdf2f2 !important;
+}
+
+.confirm-duplicate-checkbox {
+    margin-right: 8px;
+    transform: scale(1.2);
+}
+
+.field-confirm_duplicate_assignment {
+    background-color: #f8f9fa;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #dee2e6;
+    margin: 5px 0;
+    grid-column: 1 / -2; /* Take all columns except the last one (delete button) */
+    clear: both;
+}
+
+.field-confirm_duplicate_assignment label {
+    font-weight: bold;
+    color: #495057;
+    margin-bottom: 3px;
+    display: inline-block;
+    font-size: 12px;
+}
+
+.confirm-duplicate-checkbox {
+    margin-right: 6px;
+    transform: scale(1.1);
+    vertical-align: middle;
+}
+
+.compact-warning {
+    font-size: 10px;
+    line-height: 1.2;
+    color: #856404;
+    margin: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.warning-icon {
+    font-size: 12px;
+    margin-right: 3px;
+}
+
+/* OVERRIDE: Always show checkbox if there are client errors in the row - DIRECT CSS APPROACH */
+.tabular .field-client:has(.errorlist) ~ .field-confirm_duplicate_assignment .confirm-duplicate-checkbox,
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+    display: inline-block !important;
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+    transform: scale(1.2);
+}
+
+.tabular .field-client:has(.errorlist) ~ .field-confirm_duplicate_assignment label,
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label {
+    display: inline-block !important;
+    font-size: 11px;
+    color: #856404;
+    font-weight: bold;
+}
+
+.tabular .field-client:has(.errorlist) ~ .field-confirm_duplicate_assignment label:empty::after {
+    content: "✓ Confirmar";
+}
+
+/* Responsive behavior for narrow screens */
+@media (max-width: 1200px) {
+    .tabular .field-confirm_duplicate_assignment {
+        font-size: 10px;
+        padding: 3px 5px;
+    }
+    
+    .compact-warning {
+        font-size: 9px;
+        white-space: normal;
+        text-overflow: initial;
+        overflow: visible;
+    }
+}
+
+/* Inline form styling improvements */
+.inline-related {
+    border: 1px solid #e1e5e9;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    background-color: #f8f9fa;
+}
+
+.inline-related h3 {
+    background-color: #e9ecef;
+    padding: 8px 12px;
+    margin: 0;
+    border-bottom: 1px solid #dee2e6;
+    border-radius: 6px 6px 0 0;
+}
+
+.inline-related .form-row {
+    padding: 10px 12px;
+}
+
+/* Tabular inline specific styles */
+.tabular.inline-related table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tabular.inline-related td {
+    position: relative;
+    vertical-align: top;
+    padding: 8px;
+}
+
+/* Show the confirmation field column header normally */
+.tabular .field-confirm_duplicate_assignment th {
+    width: 120px;
+    font-size: 11px;
+}
+
+/* Confirmation field in tabular inline - normal table cell */
+.tabular .field-confirm_duplicate_assignment {
+    text-align: center;
+    vertical-align: middle;
+    padding: 8px 4px;
+    font-size: 11px;
+}
+
+/* When there's a conflict, show the checkbox and make it more prominent */
+.tabular tr.has-duplicate-warning .field-confirm_duplicate_assignment {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 3px;
+}
+
+/* Ensure the table row accommodates the confirmation field */
+.tabular tr.has-duplicate-warning {
+    position: relative;
+}
+
+.tabular tr.has-duplicate-warning td {
+    padding-bottom: 30px; /* Extra space for confirmation field */
+}
+
+/* Show confirmation checkbox only when there's a conflict */
+.tabular .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+    display: none;
+}
+
+/* Show checkbox when there's a validation error in the same row */
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+    display: inline-block !important;
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+    transform: scale(1.2);
+}
+
+.tabular tr.has-duplicate-warning .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+    display: inline-block;
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+    transform: scale(1.2);
+}
+
+/* Show label when row has client errors */
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label {
+    display: inline-block !important;
+    font-size: 11px;
+    color: #856404;
+    font-weight: bold;
+}
+
+/* Fallback for browsers that don't support :has() */
+.form-row.has-client-error .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+    display: inline-block !important;
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+    transform: scale(1.2);
+}
+
+.form-row.has-client-error .field-confirm_duplicate_assignment label {
+    display: inline-block !important;
+    font-size: 11px;
+    color: #856404;
+    font-weight: bold;
+}
+
+.tabular .field-confirm_duplicate_assignment label {
+    display: block;
+    font-size: 10px;
+    font-weight: bold;
+    color: #856404;
+    line-height: 1.2;
+    margin: 0;
+}
+
+/* Hide label when no conflict */
+.tabular .field-confirm_duplicate_assignment:not(.has-conflict) label {
+    display: none;
+}
+
+/* Show label when there's a conflict */
+.tabular .field-confirm_duplicate_assignment.has-conflict label {
+    display: block !important;
+}
+
+/* Route form enhancements */
+.route-form .form-row {
+    margin-bottom: 15px;
+}
+
+.route-form .form-row label {
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 5px;
+    display: block;
+}
+
+.route-form input[type="text"],
+.route-form select,
+.route-form textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.route-form input[type="text"]:focus,
+.route-form select:focus,
+.route-form textarea:focus {
+    border-color: #007cba;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    outline: none;
+}
+
+/* Success and error styling */
+.messagelist {
+    border-radius: 4px;
+    margin: 10px 0;
+}
+
+.messagelist .success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.messagelist .warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+.messagelist .error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .route-client-inline .client-select,
+    .route-form input[type="text"],
+    .route-form select,
+    .route-form textarea {
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+    
+    .duplicate-assignment-warning {
+        padding: 8px;
+        font-size: 14px;
+    }
+}
