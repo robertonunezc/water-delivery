@@ -23,7 +23,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*j-f2^k5a5v8d3t9m+etkcvi2'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+if os.environ.get('ENV') == 'prod':
+    DEBUG = False
+else:
+    DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
@@ -54,6 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -78,6 +82,12 @@ TEMPLATES = [
         },
     },
 ]
+STORAGES = {
+    # ...
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 WSGI_APPLICATION = 'water_delivery.wsgi.application'
 
