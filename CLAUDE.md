@@ -54,7 +54,14 @@ not involve models.
 - Use fat models pattern
 - Create managers and querysets for features like, Entity.objects.list() (to get all elements)
 - First try to see if managers or querysets is a good option before creating a service.
+- Avoid these in the models, (call external services, schedule background jobs,reach into other aggregates,do permission logic, manage transactions)
+- Use services layer for orchestration, transactions, idempotency, calling external APIs, emitting domain events, background tasks
+- Djnago Admin actions should call your services, not implement logic inline.
+- If your orchestration touches multiple tables, or requires “all-or-nothing”, wrap it in:transaction.atomic()
+select_for_update() where needed explicit idempotency keys for external calls.
+- 
 
+Models should not start/commit transactions.
 **Balance/Credit system** (`clients/models.py`):
 - `Client` model has `balance`, `credit_limit`, `current_debt` fields
 - Transaction history via `BalanceTransaction` and `CreditTransaction` models

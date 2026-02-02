@@ -238,7 +238,7 @@ class BillingFrequencyReportAdmin(admin.ModelAdmin):
     def billing_frequency_report_view(self, request):
         """Custom report view"""
         from clients.models import ClientBillingFrecuency
-        from clients.services import get_clients_needing_billing
+        from billing.services import get_clients_needing_billing
 
         # Extract GET parameters
         search_query = request.GET.get('search', '').strip()

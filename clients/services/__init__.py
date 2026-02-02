@@ -14,8 +14,6 @@ from clients.services.balance_service import (
 from clients.services.client_service import (
     get_upcoming_route_orders,
     get_recent_completed_route_orders,
-    get_clients_needing_billing,
-    set_billing_date_to_clients,
 )
 
 __all__ = [
@@ -31,6 +29,4 @@ __all__ = [
     # Client service
     "get_upcoming_route_orders",
     "get_recent_completed_route_orders",
-    "get_clients_needing_billing",
-    "set_billing_date_to_clients",
 ]
