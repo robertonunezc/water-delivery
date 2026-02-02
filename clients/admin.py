@@ -3,7 +3,7 @@ from django.utils.html import format_html
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from . import models
 from .forms import (
@@ -77,7 +77,8 @@ class ClientAdmin(admin.ModelAdmin):
 		'balance', 'current_debt', 'get_available_credit',
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
-		'get_billing_inheritance_status'
+		'get_billing_inheritance_status',
+		'get_add_billing_frequency_button'
 	)
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
@@ -88,6 +89,7 @@ class ClientAdmin(admin.ModelAdmin):
 			'clients/admin/toggle_billing_inline.js',
 			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
+			'clients/admin/billing_frequency_popup.js',
 		)
 
 	def get_inline_instances(self, request, obj=None):
@@ -120,7 +122,7 @@ class ClientAdmin(admin.ModelAdmin):
 			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
 		('Datos de Facturación', {
-		 	'fields': ('requires_billing',),
+		 	'fields': (('requires_billing', 'get_add_billing_frequency_button'),),
 		 	'description': (
 				'Configure los datos de facturación del cliente. '
 				'Las sucursales pueden heredar datos de facturación del corporativo '
@@ -260,6 +262,25 @@ class ClientAdmin(admin.ModelAdmin):
 		return format_html('{}{}', missin_corporate_data, add_coportate_data_btn)
 
 	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
+
+	def get_add_billing_frequency_button(self, obj):
+		"""Display a button to add billing frequency in a popup window"""
+		if not obj.pk:
+			return 'Guarde el cliente primero para agregar frecuencia de facturación.'
+		if obj.has_billing_frequency():
+			return format_html(
+				'<span style="color: green;">✓ Frecuencia de facturación ya configurada.</span>'
+			)
+		add_url = f"/admin/clients/clientbillingfrecuency/add/?client={obj.pk}"
+		return format_html(
+			'<a href="{}" class="button add-billing-frequency-popup" '
+			'data-popup="true" '
+			'style="padding: 5px 10px; background-color: #417690; color: white; '
+			'text-decoration: none; border-radius: 4px; display: inline-block;">'
+			'+ Agregar Frecuencia de Facturación</a>',
+			add_url
+		)
+	get_add_billing_frequency_button.short_description = ''
 
 	def get_urls(self):
 		"""Add custom URLs for manual transactions"""
@@ -512,6 +533,71 @@ class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
 		"""Display a human-readable description of the billing schedule"""
 		return obj.__str__()
 	get_billing_description.short_description = 'Descripción de Facturación'
+
+	def response_add(self, request, obj, post_url_continue=None):
+		"""Custom response for popup mode - show success message"""
+		if "_popup" in request.GET or "_popup" in request.POST:
+			return HttpResponse('''
+				<!DOCTYPE html>
+				<html>
+				<head>
+					<title>Frecuencia de Facturación Agregada</title>
+					<style>
+						body {
+							font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+							display: flex;
+							justify-content: center;
+							align-items: center;
+							height: 100vh;
+							margin: 0;
+							background-color: #f5f5f5;
+						}
+						.success-container {
+							text-align: center;
+							padding: 40px;
+							background: white;
+							border-radius: 8px;
+							box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+							max-width: 400px;
+						}
+						.success-icon {
+							font-size: 64px;
+							color: #28a745;
+							margin-bottom: 20px;
+						}
+						h2 {
+							color: #333;
+							margin-bottom: 10px;
+						}
+						p {
+							color: #666;
+							margin-bottom: 25px;
+						}
+						.close-btn {
+							background-color: #417690;
+							color: white;
+							border: none;
+							padding: 12px 30px;
+							font-size: 16px;
+							border-radius: 4px;
+							cursor: pointer;
+						}
+						.close-btn:hover {
+							background-color: #205067;
+						}
+					</style>
+				</head>
+				<body>
+					<div class="success-container">
+						<div class="success-icon">&#10004;</div>
+						<h2>Frecuencia de Facturación Agregada</h2>
+						<p>La frecuencia de facturación ha sido guardada exitosamente. Puede cerrar esta ventana.</p>
+						<button class="close-btn" onclick="window.close();">Cerrar Ventana</button>
+					</div>
+				</body>
+				</html>
+			''')
+		return super().response_add(request, obj, post_url_continue)
 
 
 @admin.register(models.BalanceTransaction)

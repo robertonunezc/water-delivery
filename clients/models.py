@@ -202,7 +202,11 @@ class Client(TimeStampedModel):
             )
         
         return {'success': True}
-    
+    def has_billing_frequency(self):
+        """Check if client has an active billing frequency set"""
+        has_frequency = hasattr(self, 'billing_frecuency') and self.billing_frecuency.exists()
+        return has_frequency
+        
     def can_afford_order(self, order_amount):
         """Check if client can afford an order using balance + available credit"""
         available_balance = self.balance
