@@ -1,13 +1,16 @@
 from datetime import date
 from decimal import Decimal
+from django.db import transaction
 from clients.models import Client
 from core import models
 from orders.models import Order, OrderProduct, OrderStatus
 from product.models import ProductClientPrice
 from dataclasses import dataclass
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime
 import logging
+
+logger = logging.getLogger(__name__)
 @dataclass
 class OrderData:
     id: int
@@ -308,4 +311,138 @@ def create_payment_for_order(
         "success": True,
         "payments": payments_created,
         "payment_breakdown": payment_result,
+    }
+
+
+# Order Status Management Functions
+# These functions handle bulk order status transitions with proper audit trails
+
+
+@transaction.atomic
+def mark_orders_as_completed(queryset, user=None) -> Dict[str, int]:
+    """
+    Mark multiple orders as completed.
+
+    This function:
+    1. Validates each order can be completed
+    2. Updates status to COMPLETED
+    3. Logs the operation with user information
+
+    Args:
+        queryset: QuerySet of Order objects to mark as completed
+        user: User performing the operation (for audit trail)
+
+    Returns:
+        dict with 'updated' count and 'skipped' count
+    """
+    updated = 0
+    skipped = 0
+
+    for order in queryset:
+        # Skip if already completed
+        if order.status == OrderStatus.COMPLETED.value:
+            logger.info(f"Order #{order.id} already completed, skipping")
+            skipped += 1
+            continue
+
+        # Update status
+        order.status = OrderStatus.COMPLETED.value
+        order.save(update_fields=['status', 'updated_at'])
+
+        logger.info(
+            f"Order #{order.id} marked as COMPLETED by {user.username if user else 'system'}"
+        )
+        updated += 1
+
+    return {
+        'updated': updated,
+        'skipped': skipped,
+    }
+
+
+@transaction.atomic
+def cancel_orders(queryset, user=None) -> Dict[str, int]:
+    """
+    Cancel multiple orders.
+
+    This function:
+    1. Validates each order can be cancelled
+    2. Updates status to CANCELLED
+    3. Logs the operation with user information
+
+    Note: Does NOT automatically refund payments. Payment reversal should be
+    handled separately through the payment admin if needed.
+
+    Args:
+        queryset: QuerySet of Order objects to cancel
+        user: User performing the operation (for audit trail)
+
+    Returns:
+        dict with 'updated' count and 'skipped' count
+    """
+    updated = 0
+    skipped = 0
+
+    for order in queryset:
+        # Skip if already cancelled
+        if order.status == OrderStatus.CANCELLED.value:
+            logger.info(f"Order #{order.id} already cancelled, skipping")
+            skipped += 1
+            continue
+
+        # Update status
+        order.status = OrderStatus.CANCELLED.value
+        order.save(update_fields=['status', 'updated_at'])
+
+        logger.info(
+            f"Order #{order.id} marked as CANCELLED by {user.username if user else 'system'}"
+        )
+        updated += 1
+
+    return {
+        'updated': updated,
+        'skipped': skipped,
+    }
+
+
+@transaction.atomic
+def mark_orders_as_pending(queryset, user=None) -> Dict[str, int]:
+    """
+    Mark multiple orders as pending.
+
+    This function:
+    1. Updates status to PENDING
+    2. Logs the operation with user information
+
+    This is typically used to revert orders to pending status for corrections.
+
+    Args:
+        queryset: QuerySet of Order objects to mark as pending
+        user: User performing the operation (for audit trail)
+
+    Returns:
+        dict with 'updated' count and 'skipped' count
+    """
+    updated = 0
+    skipped = 0
+
+    for order in queryset:
+        # Skip if already pending
+        if order.status == OrderStatus.PENDING.value:
+            logger.info(f"Order #{order.id} already pending, skipping")
+            skipped += 1
+            continue
+
+        # Update status
+        order.status = OrderStatus.PENDING.value
+        order.save(update_fields=['status', 'updated_at'])
+
+        logger.info(
+            f"Order #{order.id} marked as PENDING by {user.username if user else 'system'}"
+        )
+        updated += 1
+
+    return {
+        'updated': updated,
+        'skipped': skipped,
     }

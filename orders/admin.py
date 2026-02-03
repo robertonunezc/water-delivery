@@ -544,18 +544,39 @@ class OrderAdmin(admin.ModelAdmin):
     
     # Custom actions
     def mark_as_completed(self, request, queryset):
-        updated = queryset.update(status='COMPLETED')
-        self.message_user(request, f'{updated} pedidos marcados como completados.')
+        from orders.services import mark_orders_as_completed
+
+        result = mark_orders_as_completed(queryset, user=request.user)
+
+        message = f"{result['updated']} pedidos marcados como completados."
+        if result['skipped'] > 0:
+            message += f" ({result['skipped']} ya estaban completados)"
+
+        self.message_user(request, message)
     mark_as_completed.short_description = 'Marcar como completado'
-    
+
     def mark_as_cancelled(self, request, queryset):
-        updated = queryset.update(status='CANCELLED')
-        self.message_user(request, f'{updated} pedidos marcados como cancelados.')
+        from orders.services import cancel_orders
+
+        result = cancel_orders(queryset, user=request.user)
+
+        message = f"{result['updated']} pedidos marcados como cancelados."
+        if result['skipped'] > 0:
+            message += f" ({result['skipped']} ya estaban cancelados)"
+
+        self.message_user(request, message)
     mark_as_cancelled.short_description = 'Marcar como cancelado'
-    
+
     def mark_as_pending(self, request, queryset):
-        updated = queryset.update(status='PENDING')
-        self.message_user(request, f'{updated} pedidos marcados como pendientes.')
+        from orders.services import mark_orders_as_pending
+
+        result = mark_orders_as_pending(queryset, user=request.user)
+
+        message = f"{result['updated']} pedidos marcados como pendientes."
+        if result['skipped'] > 0:
+            message += f" ({result['skipped']} ya estaban pendientes)"
+
+        self.message_user(request, message)
     mark_as_pending.short_description = 'Marcar como pendiente'
     
     def split_order_action(self, request, queryset):

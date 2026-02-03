@@ -81,7 +81,7 @@ class ClientAdmin(admin.ModelAdmin):
 		'get_add_billing_frequency_button'
 	)
 	exclude = ('deleted_at',)
-	actions = ['add_balance_action', 'add_credit_action', 'manage_billing_action']
+	actions = ['add_balance_action', 'add_credit_action']
 	change_form_template = 'admin/clients/client_change_form.html'
 
 	class Media:

@@ -7,7 +7,9 @@
       "Bash(git add:*)",
       "Bash(python manage.py test:*)",
       "Bash(git commit:*)",
-      "Bash(python3 manage.py test:*)"
+      "Bash(python3 manage.py test:*)",
+      "Bash(python manage.py check:*)",
+      "Bash(python:*)"
     ]
   }
 }
