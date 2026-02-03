@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from enum import Enum
 
 from core.models import TimeStampedModel
@@ -14,6 +15,70 @@ ORDER_STATUS_CHOICES = (
     (OrderStatus.CANCELLED.value, 'Cancelado'),
 )
 
+
+class OrderQuerySet(models.QuerySet):
+    """Custom queryset for Order model with common filters"""
+
+    def unbilled(self):
+        """
+        Get orders that haven't been added to any billing record.
+
+        Returns:
+            QuerySet of unbilled orders
+        """
+        return self.filter(billing_orders__isnull=True).distinct()
+
+    def for_client(self, client):
+        """
+        Filter orders for a specific client.
+
+        Args:
+            client: Client instance or client ID
+
+        Returns:
+            QuerySet filtered by client
+        """
+        if hasattr(client, 'pk'):
+            return self.filter(client=client)
+        return self.filter(client_id=client)
+
+    def unbilled_for_client(self, client, exclude_order_id=None):
+        """
+        Get unbilled orders for a specific client.
+
+        Args:
+            client: Client instance or client ID
+            exclude_order_id: Optional order ID to exclude (for editing existing records)
+
+        Returns:
+            QuerySet of unbilled orders for the client
+        """
+        qs = self.for_client(client).unbilled()
+
+        if exclude_order_id:
+            # Include the current order if we're editing an existing billing order
+            qs = qs | self.filter(pk=exclude_order_id)
+            qs = qs.distinct()
+
+        return qs.order_by('-order_date')
+
+
+class OrderManager(models.Manager):
+    """Custom manager for Order model"""
+
+    def get_queryset(self):
+        return OrderQuerySet(self.model, using=self._db)
+
+    def unbilled(self):
+        return self.get_queryset().unbilled()
+
+    def for_client(self, client):
+        return self.get_queryset().for_client(client)
+
+    def unbilled_for_client(self, client, exclude_order_id=None):
+        return self.get_queryset().unbilled_for_client(client, exclude_order_id)
+
+
 # Create your models here.
 class Order(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='orders')
@@ -23,6 +88,10 @@ class Order(TimeStampedModel):
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default=OrderStatus.PENDING.value, db_index=True)
     notes = models.TextField(blank=True, null=True)
     owner = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
+
+    # Custom manager
+    objects = OrderManager()
+
     class Meta:
         ordering = ['-order_date']
         verbose_name = 'Orden'

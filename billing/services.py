@@ -4,10 +4,15 @@ Billing service layer.
 Contains business logic for billing operations including:
 - Finding clients that need billing in a period
 - Updating billing dates for clients
+- Validating billing orders
+- Date range utilities
 """
-from datetime import date
-from typing import Optional, List
+from datetime import date, timedelta, datetime
+from typing import Optional, List, Dict, Tuple
+from decimal import Decimal
 from django.db.models import Count, Sum, Q, Prefetch
+from django.core.exceptions import ValidationError
+from calendar import monthrange
 
 from clients.models import Client
 from core.utils import get_first_last_day_of_month
@@ -88,8 +93,8 @@ def get_clients_needing_billing(
             )
         )
     )
-    # Filter: only clients with orders
-    queryset = queryset.filter(orders_in_period_count__gt=0)
+    # Don't filter by orders - show all clients whose billing date falls in the period
+    # They may have unbilled orders from previous periods or need billing preparation
 
     # Python-side filtering for date matching
     results = []
@@ -152,3 +157,121 @@ def set_billing_date_to_clients() -> Optional[date]:
 
     for client in queryset:
         client.billing_frecuency.save()  # Triggers save logic to update next_billing_date
+
+
+# Billing Order Validation Services
+
+
+def validate_billing_order_amount(billing_record, order, exclude_billing_order_id=None) -> None:
+    """
+    Validate that adding an order to a billing record won't exceed the billing amount.
+
+    Args:
+        billing_record: BillingRecord instance
+        order: Order instance to add
+        exclude_billing_order_id: Optional ID of billing order being edited
+
+    Raises:
+        ValidationError: If total would exceed billing record amount
+    """
+    from billing.models import BillingOrder
+
+    # Calculate sum of existing orders (excluding current if editing)
+    existing_orders = BillingOrder.objects.filter(
+        billing_record=billing_record
+    )
+
+    if exclude_billing_order_id:
+        existing_orders = existing_orders.exclude(pk=exclude_billing_order_id)
+
+    total_existing = existing_orders.aggregate(
+        total=Sum('order__total_amount')
+    )['total'] or Decimal('0')
+
+    new_amount = order.total_amount or Decimal('0')
+    max_amount = billing_record.amount
+
+    if total_existing + new_amount > max_amount:
+        raise ValidationError(
+            f"La suma de montos de las ventas asociadas ({total_existing}) más el monto "
+            f"de la venta actual ({new_amount}), ({total_existing + new_amount}) "
+            f"excede el monto de la factura ({max_amount})."
+        )
+
+
+def get_billable_orders_for_client(client, as_dict=False) -> List:
+    """
+    Get all unbilled orders for a specific client.
+
+    Args:
+        client: Client instance or client ID
+        as_dict: If True, return list of dicts for JSON serialization
+
+    Returns:
+        QuerySet or list of dicts with order information
+    """
+    orders = Order.objects.unbilled_for_client(client)
+
+    if not as_dict:
+        return orders
+
+    # Return as dict for JSON serialization
+    return [
+        {
+            'id': order.id,
+            'order_date': order.order_date.isoformat(),
+            'total_amount': str(order.total_amount),
+            'display': f"Order #{order.id} - {order.order_date.strftime('%Y-%m-%d')} - ${order.total_amount}"
+        }
+        for order in orders
+    ]
+
+
+# Date Range Utilities
+
+
+def get_date_range_from_preset(preset: str, custom_start: Optional[str] = None,
+                               custom_end: Optional[str] = None) -> Tuple[date, date]:
+    """
+    Get date range based on preset or custom dates.
+
+    Args:
+        preset: Date preset name ('today', 'this_week', 'this_month', 'next_7_days', or empty for custom)
+        custom_start: Custom start date string (YYYY-MM-DD format)
+        custom_end: Custom end date string (YYYY-MM-DD format)
+
+    Returns:
+        Tuple of (start_date, end_date)
+    """
+    today = date.today()
+
+    if preset == 'today':
+        return today, today
+
+    elif preset == 'this_week':
+        start_date = today - timedelta(days=today.weekday())
+        end_date = start_date + timedelta(days=6)
+        return start_date, end_date
+
+    elif preset == 'this_month':
+        start_date = today.replace(day=1)
+        last_day = monthrange(today.year, today.month)[1]
+        end_date = today.replace(day=last_day)
+        return start_date, end_date
+
+    elif preset == 'next_7_days':
+        return today, today + timedelta(days=7)
+
+    else:
+        # Custom date range
+        try:
+            start_date = datetime.strptime(custom_start, '%Y-%m-%d').date() if custom_start else today
+        except (ValueError, TypeError):
+            start_date = today
+
+        try:
+            end_date = datetime.strptime(custom_end, '%Y-%m-%d').date() if custom_end else today + timedelta(days=7)
+        except (ValueError, TypeError):
+            end_date = today + timedelta(days=7)
+
+        return start_date, end_date

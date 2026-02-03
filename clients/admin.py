@@ -271,7 +271,7 @@ class ClientAdmin(admin.ModelAdmin):
 			return format_html(
 				'<span style="color: green;">✓ Frecuencia de facturación ya configurada.</span>'
 			)
-		add_url = f"/admin/clients/clientbillingfrecuency/add/?client={obj.pk}"
+		add_url = f"/admin/billing/clientbillingfrecuency/add/?client={obj.pk}"
 		return format_html(
 			'<a href="{}" class="button add-billing-frequency-popup" '
 			'data-popup="true" '
@@ -497,108 +497,6 @@ class BillingDataAdmin(admin.ModelAdmin):
 	def client_name(self, obj):
 		return obj.client.name if obj.client else ''
 	client_name.short_description = 'client'
-
-@admin.register(models.ClientBillingFrecuency)
-class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
-	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
-	search_fields = ('client__name', 'frequency')
-	list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
-	autocomplete_fields = ('client',)
-	readonly_fields = ('get_billing_description',)
-	class Media:
-		js = (
-			'clients/admin/toggle_billing_frequency_fields.js',
-		)
-	fieldsets = (
-		('Información Básica', {
-			'fields': (('client', 'is_active'), 'frequency', 'billing_date')
-		}),
-		('Configuración de Fecha Específica', {
-			'fields': ('specific_day',),
-			'classes': ('collapse',),
-			'description': 'Usar solo cuando el tipo de fecha sea "Fecha específica del mes". Ejemplo: día 15 de cada mes.'
-		}),
-		('Configuración de Día de la Semana', {
-			'fields': (('weekday', 'occurrence'),),
-			'classes': ('collapse',),
-			'description': 'Usar solo cuando el tipo de fecha sea "Día específico de la semana". Ejemplo: tercer lunes de cada mes.'
-		}),
-		('Información Adicional', {
-			'fields': ('notes', 'get_billing_description'),
-			'classes': ('collapse',)
-		})
-	)
-	
-	def get_billing_description(self, obj):
-		"""Display a human-readable description of the billing schedule"""
-		return obj.__str__()
-	get_billing_description.short_description = 'Descripción de Facturación'
-
-	def response_add(self, request, obj, post_url_continue=None):
-		"""Custom response for popup mode - show success message"""
-		if "_popup" in request.GET or "_popup" in request.POST:
-			return HttpResponse('''
-				<!DOCTYPE html>
-				<html>
-				<head>
-					<title>Frecuencia de Facturación Agregada</title>
-					<style>
-						body {
-							font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-							display: flex;
-							justify-content: center;
-							align-items: center;
-							height: 100vh;
-							margin: 0;
-							background-color: #f5f5f5;
-						}
-						.success-container {
-							text-align: center;
-							padding: 40px;
-							background: white;
-							border-radius: 8px;
-							box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-							max-width: 400px;
-						}
-						.success-icon {
-							font-size: 64px;
-							color: #28a745;
-							margin-bottom: 20px;
-						}
-						h2 {
-							color: #333;
-							margin-bottom: 10px;
-						}
-						p {
-							color: #666;
-							margin-bottom: 25px;
-						}
-						.close-btn {
-							background-color: #417690;
-							color: white;
-							border: none;
-							padding: 12px 30px;
-							font-size: 16px;
-							border-radius: 4px;
-							cursor: pointer;
-						}
-						.close-btn:hover {
-							background-color: #205067;
-						}
-					</style>
-				</head>
-				<body>
-					<div class="success-container">
-						<div class="success-icon">&#10004;</div>
-						<h2>Frecuencia de Facturación Agregada</h2>
-						<p>La frecuencia de facturación ha sido guardada exitosamente. Puede cerrar esta ventana.</p>
-						<button class="close-btn" onclick="window.close();">Cerrar Ventana</button>
-					</div>
-				</body>
-				</html>
-			''')
-		return super().response_add(request, obj, post_url_continue)
-
 
 @admin.register(models.BalanceTransaction)
 class BalanceTransactionAdmin(admin.ModelAdmin):

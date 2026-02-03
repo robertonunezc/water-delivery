@@ -1,18 +1,14 @@
 from django.contrib import admin
 from django import forms
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Sum
 from django.forms.models import BaseInlineFormSet
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.urls import path
-from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
-from datetime import date, timedelta, datetime
-from calendar import monthrange
+from collections import Counter
 
-from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport
-from clients.models import BILLING_FREQUENCY_CHOICES
+from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
 
 # Register your models here.
 class BillingRecordInlineAdmin(admin.StackedInline):
@@ -56,27 +52,21 @@ class BillingOrderAdminForm(forms.ModelForm):
             if br_id:
                 billing_record = BillingRecord.objects.filter(pk=br_id).first()
 
-        # Apply queryset filtering to the order field
+        # Apply queryset filtering to the order field using manager
         if billing_record and 'order' in self.fields:
             # Resolve current order id (editing existing record)
             current_order_id = getattr(self.instance, 'order_id', None)
             from orders.models import Order
-            # Filter orders: same client, not already billed (or current order if editing)
-            # Note: Removed order_date__gte filter as it was too restrictive with datetime precision
-            qs = Order.objects.filter(
-                client=billing_record.client,
-            ).filter(
-                Q(billing_orders__isnull=True) | Q(pk=current_order_id)
-            ).distinct()
-            self.fields['order'].queryset = qs
+            # Use custom manager method to get unbilled orders for client
+            self.fields['order'].queryset = Order.objects.unbilled_for_client(
+                billing_record.client,
+                exclude_order_id=current_order_id
+            )
         elif 'order' in self.fields:
             # No billing_record available yet - show all unbilled orders
-            # This happens on initial form render before billing_record is selected
             from orders.models import Order
-            self.fields['order'].queryset = Order.objects.filter(
-                billing_orders__isnull=True
-            ).distinct()
-        
+            self.fields['order'].queryset = Order.objects.unbilled()
+
         # Add data-client-id to billing_record select for JavaScript
         if 'billing_record' in self.fields:
             self.fields['billing_record'].widget.attrs['class'] = 'billing-record-select'
@@ -85,6 +75,8 @@ class BillingOrderAdminForm(forms.ModelForm):
 
 
     def clean(self):
+        from billing.services import validate_billing_order_amount
+
         cleaned = super().clean()
 
         billing_record = (
@@ -95,22 +87,15 @@ class BillingOrderAdminForm(forms.ModelForm):
         order = cleaned.get('order') or getattr(self.instance, 'order', None)
 
         if billing_record and order:
-            # Sum of total_amount of already associated orders (excluding current instance)
-            total_existing = BillingOrder.objects.filter(
-                billing_record=billing_record
-            ).exclude(pk=self.instance.pk).aggregate(
-                total=Sum('order__total_amount')
-            )['total'] or 0
-
-            new_amount = order.total_amount or 0
-            max_amount = billing_record.amount
-
-            if total_existing + new_amount > max_amount:
-                raise ValidationError({
-                    'order': (
-                        f"La suma de montos de las ventas associadas ({total_existing}) más el monto de la venta actual ({new_amount}) , ({total_existing + new_amount})excede el monto de la factura ({max_amount})."
-                    )
-                })
+            # Use service layer for validation
+            try:
+                validate_billing_order_amount(
+                    billing_record=billing_record,
+                    order=order,
+                    exclude_billing_order_id=self.instance.pk
+                )
+            except ValidationError as e:
+                raise ValidationError({'order': str(e)})
 
         return cleaned
 
@@ -174,35 +159,14 @@ class BillingOrderAdmin(admin.ModelAdmin):
 
     def billable_orders_json(self, request, client_pk):
         """Return billable orders for a given client as JSON"""
-        from orders.models import Order
+        from billing.services import get_billable_orders_for_client
         from clients.models import Client
         from django.shortcuts import get_object_or_404
 
         client = get_object_or_404(Client, pk=client_pk)
-        
-        # Get billing_record_id from query params to filter by date
-        billing_record_id = request.GET.get('billing_record_id')
-        if billing_record_id:
-            try:
-                BillingRecord.objects.get(pk=billing_record_id)
-            except BillingRecord.DoesNotExist:
-                pass
-        
-        # Filter orders: same client, not billed, and optionally >= billing_record.date
-        orders_qs = Order.objects.filter(
-            client=client,
-            billing_orders__isnull=True
-        ).order_by('-order_date')
 
-        orders_data = [
-            {
-                'id': order.id,
-                'order_date': order.order_date.isoformat(),
-                'total_amount': str(order.total_amount),
-                'display': f"Order #{order.id} - {order.order_date.strftime('%Y-%m-%d')} - ${order.total_amount}"
-            }
-            for order in orders_qs
-        ]
+        # Use service layer to get billable orders
+        orders_data = get_billable_orders_for_client(client, as_dict=True)
 
         return JsonResponse({'orders': orders_data})
 
@@ -237,44 +201,19 @@ class BillingFrequencyReportAdmin(admin.ModelAdmin):
 
     def billing_frequency_report_view(self, request):
         """Custom report view"""
-        from clients.models import ClientBillingFrecuency
-        from billing.services import get_clients_needing_billing
+        from billing.services import get_clients_needing_billing, get_date_range_from_preset
 
         # Extract GET parameters
         search_query = request.GET.get('search', '').strip()
         frequency_filter = request.GET.get('frequency', '')
         date_preset = request.GET.get('date_preset', '')
 
-        # Date range handling
-        today = date.today()
-
-        if date_preset == 'today':
-            start_date = today
-            end_date = today
-        elif date_preset == 'this_week':
-            start_date = today - timedelta(days=today.weekday())
-            end_date = start_date + timedelta(days=6)
-        elif date_preset == 'this_month':
-            start_date = today.replace(day=1)
-            last_day = monthrange(today.year, today.month)[1]
-            end_date = today.replace(day=last_day)
-        elif date_preset == 'next_7_days':
-            start_date = today
-            end_date = today + timedelta(days=7)
-        else:
-            # Custom date range
-            start_str = request.GET.get('start_date', '')
-            end_str = request.GET.get('end_date', '')
-
-            try:
-                start_date = datetime.strptime(start_str, '%Y-%m-%d').date() if start_str else today
-            except ValueError:
-                start_date = today
-
-            try:
-                end_date = datetime.strptime(end_str, '%Y-%m-%d').date() if end_str else today + timedelta(days=7)
-            except ValueError:
-                end_date = today + timedelta(days=7)
+        # Use service layer for date range calculation
+        start_date, end_date = get_date_range_from_preset(
+            preset=date_preset,
+            custom_start=request.GET.get('start_date', ''),
+            custom_end=request.GET.get('end_date', '')
+        )
 
         # Get results from service layer
         results = get_clients_needing_billing(
@@ -299,7 +238,6 @@ class BillingFrequencyReportAdmin(admin.ModelAdmin):
         total_orders = sum(r['orders_count'] for r in results)
 
         # Frequency breakdown
-        from collections import Counter
         frequency_breakdown = Counter(r['frequency_display'] for r in results)
 
         context = {
@@ -324,6 +262,110 @@ class BillingFrequencyReportAdmin(admin.ModelAdmin):
             'billing/admin/billing_frequency_report.html',
             context
         )
+
+@admin.register(ClientBillingFrecuency)
+class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
+    list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
+    search_fields = ('client__name', 'frequency')
+    list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
+    autocomplete_fields = ('client',)
+    readonly_fields = ('get_billing_description',)
+
+    class Media:
+        js = (
+            'billing/admin/toggle_billing_frequency_fields.js',
+        )
+
+    fieldsets = (
+        ('Información Básica', {
+            'fields': (('client', 'is_active'), 'frequency', 'billing_date')
+        }),
+        ('Configuración de Fecha Específica', {
+            'fields': ('specific_day',),
+            'classes': ('collapse',),
+            'description': 'Usar solo cuando el tipo de fecha sea "Fecha específica del mes". Ejemplo: día 15 de cada mes.'
+        }),
+        ('Configuración de Día de la Semana', {
+            'fields': (('weekday', 'occurrence'),),
+            'classes': ('collapse',),
+            'description': 'Usar solo cuando el tipo de fecha sea "Día específico de la semana". Ejemplo: tercer lunes de cada mes.'
+        }),
+        ('Información Adicional', {
+            'fields': ('notes', 'get_billing_description'),
+            'classes': ('collapse',)
+        })
+    )
+
+    def get_billing_description(self, obj):
+        """Display a human-readable description of the billing schedule"""
+        return obj.__str__()
+    get_billing_description.short_description = 'Descripción de Facturación'
+
+    def response_add(self, request, obj, post_url_continue=None):
+        """Custom response for popup mode - show success message"""
+        if "_popup" in request.GET or "_popup" in request.POST:
+            return HttpResponse('''
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Frecuencia de Facturación Agregada</title>
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                            display: flex;
+                            justify-content: center;
+                            align-items: center;
+                            height: 100vh;
+                            margin: 0;
+                            background-color: #f5f5f5;
+                        }
+                        .success-container {
+                            text-align: center;
+                            padding: 40px;
+                            background: white;
+                            border-radius: 8px;
+                            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+                            max-width: 400px;
+                        }
+                        .success-icon {
+                            font-size: 64px;
+                            color: #28a745;
+                            margin-bottom: 20px;
+                        }
+                        h2 {
+                            color: #333;
+                            margin-bottom: 10px;
+                        }
+                        p {
+                            color: #666;
+                            margin-bottom: 25px;
+                        }
+                        .close-btn {
+                            background-color: #417690;
+                            color: white;
+                            border: none;
+                            padding: 12px 30px;
+                            font-size: 16px;
+                            border-radius: 4px;
+                            cursor: pointer;
+                        }
+                        .close-btn:hover {
+                            background-color: #205067;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="success-container">
+                        <div class="success-icon">&#10004;</div>
+                        <h2>Frecuencia de Facturación Agregada</h2>
+                        <p>La frecuencia de facturación ha sido guardada exitosamente. Puede cerrar esta ventana.</p>
+                        <button class="close-btn" onclick="window.close();">Cerrar Ventana</button>
+                    </div>
+                </body>
+                </html>
+            ''')
+        return super().response_add(request, obj, post_url_continue)
+
 
 admin.site.register(BillingRecord, BillingRecordAdmin)
 admin.site.register(BillingOrder, BillingOrderAdmin)
