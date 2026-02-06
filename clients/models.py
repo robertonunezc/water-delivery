@@ -131,6 +131,63 @@ class Client(TimeStampedModel):
     
     def __str__(self):
         return self.name
+    # Validate that if type is 'branch', corporate must be set
+    def clean(self):
+        super().clean()
+
+        errors = {}
+        from django.core.exceptions import ValidationError
+
+        # Existing validations
+        if self.type == 'branch' and not self.corporate:
+            errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
+        if self.type == 'corporate' and self.corporate:
+            errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
+
+        # NEW: Validate billing setup for branches that require billing
+        # Only validate if the client has been saved (has a pk)
+        if self.type == 'branch' and self.requires_billing and self.corporate and self.pk:
+            # Check if branch or corporate has complete billing setup
+            has_own_billing = (
+                hasattr(self, 'billing_data') and
+                self.addresses.filter(type='billing', active=True).exists()
+            )
+
+            if not has_own_billing:
+                # Branch doesn't have own billing setup, check corporate
+                corporate_has_billing = (
+                    hasattr(self.corporate, 'billing_data') and
+                    self.corporate.addresses.filter(type='billing', active=True).exists()
+                )
+
+                if not corporate_has_billing:
+                    errors['requires_billing'] = (
+                        'No se puede requerir facturación: ni la sucursal ni el corporativo '
+                        'tienen datos de facturación completos (RFC/razón social y dirección fiscal). '
+                        'Configure primero el corporativo o agregue datos propios a esta sucursal.'
+                    )
+
+        # NOTE: Shipping address validation removed - it was too strict for admin workflow.
+        # Branches must have their own shipping address (they don't inherit from corporate),
+        # but this should be validated at the business logic level (e.g., when creating orders)
+        # rather than at the model level, to allow proper admin inline workflow.
+
+        # Existing credit payment constraints
+        if not self.can_pay_with_credit and self.requires_note_for_credit:
+            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.'
+            errors['requires_note_for_credit'] = 'No se puede requerir nota si el pago con crédito está deshabilitado.'
+
+        if not self.can_pay_with_credit and self.current_debt > 0:
+            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
+
+        if self.current_debt > self.credit_limit:
+            errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
+
+        if not self.can_pay_with_credit and self.credit_limit > 0:
+            errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'
+
+        if errors:
+            raise ValidationError(errors)
 
     # Balance and Credit State Methods (pure state queries, no side effects)
     def get_available_credit(self):
@@ -313,63 +370,6 @@ class Client(TimeStampedModel):
 
         return 'none'
 
-    # Validate that if type is 'branch', corporate must be set
-    def clean(self):
-        super().clean()
-
-        errors = {}
-        from django.core.exceptions import ValidationError
-
-        # Existing validations
-        if self.type == 'branch' and not self.corporate:
-            errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
-        if self.type == 'corporate' and self.corporate:
-            errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
-
-        # NEW: Validate billing setup for branches that require billing
-        # Only validate if the client has been saved (has a pk)
-        if self.type == 'branch' and self.requires_billing and self.corporate and self.pk:
-            # Check if branch or corporate has complete billing setup
-            has_own_billing = (
-                hasattr(self, 'billing_data') and
-                self.addresses.filter(type='billing', active=True).exists()
-            )
-
-            if not has_own_billing:
-                # Branch doesn't have own billing setup, check corporate
-                corporate_has_billing = (
-                    hasattr(self.corporate, 'billing_data') and
-                    self.corporate.addresses.filter(type='billing', active=True).exists()
-                )
-
-                if not corporate_has_billing:
-                    errors['requires_billing'] = (
-                        'No se puede requerir facturación: ni la sucursal ni el corporativo '
-                        'tienen datos de facturación completos (RFC/razón social y dirección fiscal). '
-                        'Configure primero el corporativo o agregue datos propios a esta sucursal.'
-                    )
-
-        # NOTE: Shipping address validation removed - it was too strict for admin workflow.
-        # Branches must have their own shipping address (they don't inherit from corporate),
-        # but this should be validated at the business logic level (e.g., when creating orders)
-        # rather than at the model level, to allow proper admin inline workflow.
-
-        # Existing credit payment constraints
-        if not self.can_pay_with_credit and self.requires_note_for_credit:
-            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.'
-            errors['requires_note_for_credit'] = 'No se puede requerir nota si el pago con crédito está deshabilitado.'
-
-        if not self.can_pay_with_credit and self.current_debt > 0:
-            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
-
-        if self.current_debt > self.credit_limit:
-            errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
-
-        if not self.can_pay_with_credit and self.credit_limit > 0:
-            errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'
-
-        if errors:
-            raise ValidationError(errors)
 
 
 # NOTE: BranchClient model is deprecated - Client model handles branch/corporate relationships
