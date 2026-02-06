@@ -1297,3 +1297,143 @@ class BillingDataModelTestCase(TestCase):
         self.assertEqual(billing.client, self.client)
         self.assertEqual(billing.rfc, "TEST123456ABC")
         self.assertEqual(str(billing), f"Billing data for {self.client.name}")
+
+
+class ClientUpdateServiceTestCase(TestCase):
+    """Test cases for the update_client service method"""
+
+    def setUp(self):
+        """Set up test data for client update tests"""
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='testpass123'
+        )
+        
+        # Create a client with billing enabled
+        self.client = Client.objects.create(
+            name="Test Client with Billing",
+            type="corporate",
+            active=True,
+            requires_billing=True
+        )
+
+    def test_disable_requires_billing_removes_billing_data_and_frequency(self):
+        """
+        Test that when requires_billing is set to False,
+        the client's billing data and billing frequency are removed/deactivated
+        """
+        from clients.services.client_service import update_client, ClientUpdateData
+        
+        # Create billing data for the client
+        billing_data = BillingData.objects.create(
+            client=self.client,
+            rfc="TEST123456ABC",
+            razon_social="Test Company SA de CV"
+        )
+        
+        # Create billing address
+        billing_address = Address.objects.create(
+            client=self.client,
+            type="billing",
+            street="Av. Test 100",
+            municipality="Test City",
+            state="Test State",
+            zip_code="12345",
+            country="México",
+            active=True
+        )
+        
+        # Create billing frequency
+        billing_frequency = ClientBillingFrecuency.objects.create(
+            client=self.client,
+            frequency="monthly",
+            billing_date="last_day",
+            is_active=True
+        )
+        
+        # Verify initial setup
+        self.assertTrue(self.client.requires_billing)
+        self.assertTrue(hasattr(self.client, 'billing_data'))
+        self.assertTrue(hasattr(self.client, 'billing_frecuency'))
+        self.assertTrue(BillingData.objects.filter(client=self.client).exists())
+        self.assertTrue(ClientBillingFrecuency.objects.filter(client=self.client).exists())
+        
+        # Update client to disable billing
+        update_data = ClientUpdateData(requires_billing=False)
+        updated_client = update_client(self.client, update_data, self.user)
+        
+        # Refresh from database
+        updated_client.refresh_from_db()
+        
+        # Verify requires_billing is now False
+        self.assertFalse(updated_client.requires_billing)
+        
+        # Verify billing data has been deleted
+        self.assertFalse(
+            BillingData.objects.filter(client=updated_client).exists(),
+            "Billing data should be deleted when requires_billing is False"
+        )
+        
+        # Verify billing frequency has been deleted
+        self.assertFalse(
+            ClientBillingFrecuency.objects.filter(client=updated_client).exists(),
+            "Billing frequency should be deleted when requires_billing is False"
+        )
+    
+    def test_disable_requires_billing_without_existing_billing_data(self):
+        """
+        Test that disabling requires_billing works even when
+        the client doesn't have billing data or frequency
+        """
+        from clients.services.client_service import update_client, ClientUpdateData
+        
+        # Client already has requires_billing=True but no billing data/frequency
+        self.assertTrue(self.client.requires_billing)
+        self.assertFalse(hasattr(self.client, 'billing_data'))
+        self.assertFalse(hasattr(self.client, 'billing_frecuency'))
+        
+        # Update client to disable billing
+        update_data = ClientUpdateData(requires_billing=False)
+        updated_client = update_client(self.client, update_data, self.user)
+        
+        # Refresh from database
+        updated_client.refresh_from_db()
+        
+        # Verify requires_billing is now False
+        self.assertFalse(updated_client.requires_billing)
+        
+        # Verify no billing data exists
+        self.assertFalse(BillingData.objects.filter(client=updated_client).exists())
+        self.assertFalse(ClientBillingFrecuency.objects.filter(client=updated_client).exists())
+    
+    def test_disable_requires_billing_with_billing_frequency(self):
+        """
+        Test that billing frequency is removed when requires_billing is disabled
+        """
+        from clients.services.client_service import update_client, ClientUpdateData
+        
+        # Create billing frequency
+        billing_frequency = ClientBillingFrecuency.objects.create(
+            client=self.client,
+            frequency="monthly",
+            billing_date="last_day",
+            is_active=True
+        )
+        
+        # Verify initial setup
+        self.assertTrue(
+            ClientBillingFrecuency.objects.filter(client=self.client).exists()
+        )
+        
+        # Update client to disable billing
+        update_data = ClientUpdateData(requires_billing=False)
+        updated_client = update_client(self.client, update_data, self.user)
+        
+        # Refresh from database
+        updated_client.refresh_from_db()
+        
+        # Verify billing frequency is deleted
+        self.assertFalse(
+            ClientBillingFrecuency.objects.filter(client=updated_client).exists(),
+            "Billing frequency should be deleted when requires_billing is False"
+        )

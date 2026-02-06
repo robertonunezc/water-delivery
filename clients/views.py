@@ -194,6 +194,90 @@ def client_orders(request, client_pk):
     return JsonResponse({'orders': orders}, safe=False)
 
 @login_required
+def update_client(request, pk):
+    """
+    Update a client via PATCH request.
+    Only accessible to users with 'change_client' permission.
+    """
+    import json
+    from django.core.exceptions import ValidationError
+    from django.contrib.auth.decorators import permission_required
+    from clients.services.client_service import update_client as update_client_service, ClientUpdateData
+    
+    # Check permission
+    if not request.user.has_perm('clients.change_client'):
+        return JsonResponse(
+            {'success': False, 'error': 'No tiene permiso para actualizar clientes'},
+            status=403
+        )
+    
+    # Only allow PATCH requests
+    if request.method != 'PATCH':
+        return JsonResponse(
+            {'success': False, 'error': 'Método no permitido. Use PATCH'},
+            status=405
+        )
+    
+    client = get_object_or_404(Client, pk=pk)
+    
+    try:
+        # Parse JSON body
+        body_unicode = request.body.decode('utf-8')
+        body = json.loads(body_unicode)
+        
+        # Create update data from request body
+        update_data = ClientUpdateData(
+            name=body.get('name'),
+            active=body.get('active'),
+            note=body.get('note'),
+            type=body.get('type'),
+            corporate_id=body.get('corporate_id'),
+            credit_limit=body.get('credit_limit'),
+            can_pay_with_credit=body.get('can_pay_with_credit'),
+            requires_note_for_credit=body.get('requires_note_for_credit'),
+            address_link=body.get('address_link'),
+            requires_billing=body.get('requires_billing'),
+        )
+        
+        # Update the client using the service
+        updated_client = update_client_service(client, update_data, request.user)
+        
+        # Return success response with updated data
+        return JsonResponse({
+            'success': True,
+            'message': 'Cliente actualizado exitosamente',
+            'data': {
+                'id': updated_client.pk,
+                'name': updated_client.name,
+                'requires_billing': updated_client.requires_billing,
+                'active': updated_client.active,
+                'can_pay_with_credit': updated_client.can_pay_with_credit,
+                'requires_note_for_credit': updated_client.requires_note_for_credit,
+            }
+        })
+    
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {'success': False, 'error': 'JSON inválido'},
+            status=400
+        )
+    except ValidationError as e:
+        return JsonResponse(
+            {'success': False, 'error': str(e)},
+            status=400
+        )
+    except ValueError as e:
+        return JsonResponse(
+            {'success': False, 'error': str(e)},
+            status=400
+        )
+    except Exception as e:
+        return JsonResponse(
+            {'success': False, 'error': f'Error al actualizar cliente: {str(e)}'},
+            status=500
+        )
+
+@login_required
 def pay_credit(request, pk):
     """View for paying credit (reducing debt) for a client"""
     client = get_object_or_404(Client, pk=pk)

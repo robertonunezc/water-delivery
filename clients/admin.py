@@ -90,6 +90,7 @@ class ClientAdmin(admin.ModelAdmin):
 			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
 			'clients/admin/billing_frequency_popup.js',
+			'clients/admin/require_billing_update_client.js',
 		)
 
 	def get_inline_instances(self, request, obj=None):

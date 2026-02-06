@@ -14,7 +14,9 @@ from django.db.models import Count, Sum, Q, Prefetch
 from django.core.exceptions import ValidationError
 from calendar import monthrange
 
-from clients.models import Client
+from billing.models import ClientBillingFrecuency
+from clients.models import Client, BillingData
+from clients.services import client_service
 from core.utils import get_first_last_day_of_month
 from orders.models import Order
 
@@ -275,3 +277,37 @@ def get_date_range_from_preset(preset: str, custom_start: Optional[str] = None,
             end_date = today + timedelta(days=7)
 
         return start_date, end_date
+
+def delete_billing_frequency_for_client(client_id: int) -> None:
+    """
+    Disable billing frequency for a specific client.
+
+    Args:
+        client_id: ID of the client to update
+    """
+    try:
+        billing_frequency = ClientBillingFrecuency.objects.get(client_id=client_id)
+        billing_frequency.delete()
+    except ClientBillingFrecuency.DoesNotExist:
+        pass  # If no billing frequency exists, nothing to disable
+
+def delete_billing_data_for_client(client_id: int) -> None:
+    """
+    Disable billing data for a specific client by setting their billing data to inactive.
+
+    Args:
+        client_id: ID of the client to update
+    """
+    billing_data = BillingData.objects.filter(client_id=client_id).first()
+    if billing_data:
+        billing_data.delete() 
+
+def disable_billing_for_client(client_id: int) -> None:
+    """
+    Disable billing for a specific client by setting their billing frequency to inactive.
+
+    Args:
+        client_id: ID of the client to update
+    """
+    delete_billing_frequency_for_client(client_id)
+    delete_billing_data_for_client(client_id)
