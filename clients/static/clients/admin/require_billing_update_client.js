@@ -117,6 +117,7 @@
                                 response.message || 'Cliente actualizado exitosamente',
                                 'success'
                             );
+                            window.location.reload();
                         } else {
                             // Rollback on failure
                             requiresBillingCheckbox.checked = originalValue;
