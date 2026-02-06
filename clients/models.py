@@ -135,7 +135,7 @@ class Client(TimeStampedModel):
     # Balance and Credit State Methods (pure state queries, no side effects)
     def get_available_credit(self):
         """Get remaining credit available"""
-        return self.credit_limit - self.current_debt
+        return float(self.credit_limit) - float(self.current_debt)
     
     def can_use_credit_for_payment(self):
         """
