@@ -104,7 +104,7 @@ USO_CFDI_CHOICES = [
 ]
 
 class Client(TimeStampedModel):
-    name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente")
+    name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente", unique=True)
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='branch', verbose_name="Tipo de cliente")
