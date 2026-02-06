@@ -9,7 +9,9 @@
       "Bash(git commit:*)",
       "Bash(python3 manage.py test:*)",
       "Bash(python manage.py check:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(python3:*)"
     ]
   }
 }

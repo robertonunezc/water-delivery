@@ -1,0 +1,175 @@
+{% extends "tenant_client/base_tenant.html" %}
+
+{% block title %}Lista de Tenants{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="tenant-header">
+    <div class="container">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-building"></i> Gestión de Tenants
+        </h1>
+        <p class="lead mb-0">Administra todos los tenants del sistema multi-tenant</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    <!-- Statistics Card -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card">
+                <div class="card-body text-center">
+                    <h3 class="display-4 mb-0">{{ total_tenants }}</h3>
+                    <p class="mb-0"><i class="fas fa-database"></i> Total Tenants</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body text-center">
+                    <h3 class="display-4 mb-0">
+                        {{ tenant_data|length|add:"-1" }}
+                    </h3>
+                    <p class="mb-0"><i class="fas fa-check-circle"></i> Activos</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body text-center">
+                    <h3 class="display-4 mb-0">
+                        {% for tenant in tenant_data %}
+                            {% if tenant.tenant.on_trial %}1{% endif %}
+                        {% endfor %}
+                    </h3>
+                    <p class="mb-0"><i class="fas fa-vial"></i> En Prueba</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="row mb-4">
+        <div class="col">
+            <a href="{% url 'tenant_client:create' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-plus-circle"></i> Crear Nuevo Tenant
+            </a>
+            <a href="{% url 'admin:tenant_client_clienttenant_changelist' %}" class="btn btn-outline-secondary btn-lg">
+                <i class="fas fa-cog"></i> Administrar en Admin
+            </a>
+        </div>
+    </div>
+
+    <!-- Tenants List -->
+    {% if tenant_data %}
+        <div class="row">
+            {% for item in tenant_data %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card tenant-card h-100 {% if item.tenant.schema_name == 'public' %}border-warning{% endif %}">
+                        <div class="card-header {% if item.tenant.schema_name == 'public' %}bg-warning text-dark{% else %}bg-primary text-white{% endif %}">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-server"></i> {{ item.tenant.name }}
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <!-- Schema Name -->
+                            <p class="mb-2">
+                                <strong><i class="fas fa-database"></i> Schema:</strong>
+                                <code>{{ item.tenant.schema_name }}</code>
+                            </p>
+
+                            <!-- Primary Domain -->
+                            <p class="mb-2">
+                                <strong><i class="fas fa-globe"></i> Dominio:</strong><br>
+                                {% if item.primary_domain != 'N/A' %}
+                                    <a href="https://{{ item.primary_domain }}" target="_blank" class="text-decoration-none">
+                                        {{ item.primary_domain }}
+                                        <i class="fas fa-external-link-alt fa-xs"></i>
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">Sin dominio principal</span>
+                                {% endif %}
+                            </p>
+
+                            <!-- Domain Count -->
+                            {% if item.domain_count > 1 %}
+                                <p class="mb-2">
+                                    <span class="badge bg-info">
+                                        <i class="fas fa-link"></i> {{ item.domain_count }} dominios
+                                    </span>
+                                </p>
+                            {% endif %}
+
+                            <!-- Status Badges -->
+                            <div class="mb-3">
+                                {% if item.tenant.on_trial %}
+                                    <span class="badge badge-trial">
+                                        <i class="fas fa-vial"></i> Prueba
+                                    </span>
+                                {% else %}
+                                    <span class="badge badge-paid">
+                                        <i class="fas fa-check"></i> Pagado
+                                    </span>
+                                {% endif %}
+
+                                {% if item.tenant.schema_name == 'public' %}
+                                    <span class="badge bg-warning text-dark">
+                                        <i class="fas fa-star"></i> Público
+                                    </span>
+                                {% endif %}
+                            </div>
+
+                            <!-- Subscription Info -->
+                            <hr>
+                            <small class="text-muted">
+                                <i class="far fa-calendar-alt"></i>
+                                <strong>Pago hasta:</strong> {{ item.tenant.paid_until|date:"d/m/Y" }}
+                            </small>
+                            <br>
+                            <small class="text-muted">
+                                <i class="far fa-clock"></i>
+                                <strong>Creado:</strong> {{ item.tenant.created_on|date:"d/m/Y" }}
+                            </small>
+                        </div>
+                        <div class="card-footer bg-light">
+                            <div class="d-flex justify-content-between">
+                                <a href="{% url 'admin:tenant_client_clienttenant_change' item.tenant.id %}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-edit"></i> Editar
+                                </a>
+                                {% if item.primary_domain != 'N/A' and item.tenant.schema_name != 'public' %}
+                                    <a href="https://{{ item.primary_domain }}/admin"
+                                       target="_blank"
+                                       class="btn btn-sm btn-success">
+                                        <i class="fas fa-sign-in-alt"></i> Acceder
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            <i class="fas fa-info-circle"></i>
+            No hay tenants registrados. <a href="{% url 'tenant_client:create' %}" class="alert-link">Crear el primero</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-hide alerts after 5 seconds
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            });
+        }, 5000);
+    });
+</script>
+{% endblock %}

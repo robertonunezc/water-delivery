@@ -46,7 +46,32 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*
 default_debug = os.getenv('ENV') != 'prod'
 DEBUG = _get_bool_env('DEBUG', default=default_debug)
 
-ALLOWED_HOSTS = ['*']
+# Multi-tenant security settings
+# Parse ALLOWED_HOSTS from environment variable (comma-separated)
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+
+# CSRF protection for subdomains
+# Parse CSRF_TRUSTED_ORIGINS from environment variable (comma-separated)
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get('CSRF_TRUSTED_ORIGINS', '').split(',')
+    if origin.strip()
+]
+
+# Trust X-Forwarded-Proto header from nginx reverse proxy
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Production-only security settings
+if os.environ.get('ENV') == 'prod':
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+    X_FRAME_OPTIONS = 'DENY'
 
 CSRF_TRUSTED_ORIGINS = [
     "https://pabel.puntoreica.com",
@@ -135,6 +160,8 @@ if not DEBUG:
         # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
         send_default_pii=True,
     )
+ROOT_URLCONF = 'water_delivery.tenant_urls'
+PUBLIC_SCHEMA_URLCONF = 'water_delivery.public_urls'
 
 
 ROOT_URLCONF = 'water_delivery.urls'

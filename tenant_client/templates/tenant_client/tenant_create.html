@@ -1,0 +1,241 @@
+{% extends "tenant_client/base_tenant.html" %}
+
+{% block title %}Crear Nuevo Tenant{% endblock %}
+
+{% block content %}
+<!-- Header -->
+<div class="tenant-header">
+    <div class="container">
+        <h1 class="display-4 mb-3">
+            <i class="fas fa-plus-circle"></i> Crear Nuevo Tenant
+        </h1>
+        <p class="lead mb-0">Provisionar un nuevo tenant con dominio aislado</p>
+    </div>
+</div>
+
+<div class="container mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Info Card -->
+            <div class="card border-info mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-info-circle text-info"></i> Información Importante
+                    </h5>
+                    <ul class="mb-0">
+                        <li>Cada tenant tiene su propia base de datos aislada (schema PostgreSQL)</li>
+                        <li>El <strong>schema name</strong> debe ser único y alfanumérico (solo letras, números y guiones bajos)</li>
+                        <li>El <strong>dominio</strong> debe apuntar a este servidor vía DNS</li>
+                        <li>La creación del schema es automática y puede tardar unos segundos</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Create Form -->
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-building"></i> Detalles del Tenant
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <form method="post" id="tenantForm">
+                        {% csrf_token %}
+
+                        <!-- Tenant Name -->
+                        <div class="mb-3">
+                            <label for="name" class="form-label">
+                                <i class="fas fa-building"></i> Nombre del Tenant <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   id="name"
+                                   name="name"
+                                   placeholder="Ej: Agua Cristalina S.A."
+                                   required>
+                            <div class="form-text">
+                                Nombre descriptivo para identificar al tenant (puede contener espacios)
+                            </div>
+                        </div>
+
+                        <!-- Schema Name -->
+                        <div class="mb-3">
+                            <label for="schema_name" class="form-label">
+                                <i class="fas fa-database"></i> Schema Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control form-control-lg"
+                                   id="schema_name"
+                                   name="schema_name"
+                                   placeholder="Ej: agua_cristalina"
+                                   pattern="[a-z0-9_]+"
+                                   required>
+                            <div class="form-text">
+                                Identificador único del schema PostgreSQL (solo minúsculas, números y guiones bajos, sin espacios)
+                            </div>
+                            <div id="schemaNameError" class="text-danger" style="display: none;">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Schema name solo puede contener letras minúsculas, números y guiones bajos
+                            </div>
+                        </div>
+
+                        <!-- Domain Name -->
+                        <div class="mb-3">
+                            <label for="domain_name" class="form-label">
+                                <i class="fas fa-globe"></i> Dominio <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text">https://</span>
+                                <input type="text"
+                                       class="form-control"
+                                       id="domain_name"
+                                       name="domain_name"
+                                       placeholder="Ej: tenant1.yourdomain.com"
+                                       required>
+                            </div>
+                            <div class="form-text">
+                                Dominio completo donde se accederá al tenant (debe existir en DNS)
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Subscription Details -->
+                        <h6 class="mb-3">
+                            <i class="fas fa-calendar-alt"></i> Información de Suscripción
+                        </h6>
+
+                        <!-- Paid Until -->
+                        <div class="mb-3">
+                            <label for="paid_until" class="form-label">
+                                <i class="far fa-calendar-check"></i> Pagado Hasta <span class="text-danger">*</span>
+                            </label>
+                            <input type="date"
+                                   class="form-control form-control-lg"
+                                   id="paid_until"
+                                   name="paid_until"
+                                   value="{{ default_paid_until }}"
+                                   required>
+                            <div class="form-text">
+                                Fecha de expiración de la suscripción (por defecto 1 año desde hoy)
+                            </div>
+                        </div>
+
+                        <!-- On Trial -->
+                        <div class="mb-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       id="on_trial"
+                                       name="on_trial"
+                                       style="width: 3rem; height: 1.5rem;">
+                                <label class="form-check-label ms-2" for="on_trial">
+                                    <i class="fas fa-vial"></i> Tenant en Período de Prueba
+                                </label>
+                            </div>
+                            <div class="form-text ms-5">
+                                Marcar si el tenant está en período de evaluación
+                            </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <!-- Submit Buttons -->
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-between">
+                            <a href="{% url 'tenant_client:list' %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="fas fa-arrow-left"></i> Cancelar
+                            </a>
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="fas fa-check-circle"></i> Crear Tenant
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Warning Card -->
+            <div class="card border-warning mt-4">
+                <div class="card-body">
+                    <h6 class="card-title">
+                        <i class="fas fa-exclamation-triangle text-warning"></i> Advertencia
+                    </h6>
+                    <p class="card-text mb-0">
+                        La creación de un tenant es una operación irreversible que crea un schema PostgreSQL
+                        y ejecuta todas las migraciones. Asegúrate de que los datos sean correctos antes de proceder.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('tenantForm');
+        const schemaNameInput = document.getElementById('schema_name');
+        const nameInput = document.getElementById('name');
+        const domainInput = document.getElementById('domain_name');
+        const submitBtn = document.getElementById('submitBtn');
+        const schemaError = document.getElementById('schemaNameError');
+
+        // Auto-generate schema_name from name
+        nameInput.addEventListener('input', function() {
+            if (!schemaNameInput.value || schemaNameInput.dataset.autoGenerated === 'true') {
+                const generatedSchema = this.value
+                    .toLowerCase()
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '') // Remove accents
+                    .replace(/[^a-z0-9]+/g, '_')      // Replace non-alphanumeric with underscore
+                    .replace(/^_+|_+$/g, '')          // Remove leading/trailing underscores
+                    .substring(0, 50);                // Limit length
+
+                schemaNameInput.value = generatedSchema;
+                schemaNameInput.dataset.autoGenerated = 'true';
+            }
+        });
+
+        // Mark as manually edited if user types in schema_name
+        schemaNameInput.addEventListener('input', function() {
+            this.dataset.autoGenerated = 'false';
+            validateSchemaName();
+        });
+
+        // Validate schema_name format
+        function validateSchemaName() {
+            const pattern = /^[a-z0-9_]+$/;
+            const value = schemaNameInput.value;
+
+            if (value && !pattern.test(value)) {
+                schemaError.style.display = 'block';
+                schemaNameInput.classList.add('is-invalid');
+                submitBtn.disabled = true;
+            } else {
+                schemaError.style.display = 'none';
+                schemaNameInput.classList.remove('is-invalid');
+                submitBtn.disabled = false;
+            }
+        }
+
+        // Auto-generate domain suggestion from schema_name
+        schemaNameInput.addEventListener('blur', function() {
+            if (!domainInput.value && this.value) {
+                // Get current domain from URL
+                const currentDomain = window.location.hostname;
+                // Suggest subdomain format
+                domainInput.value = `${this.value}.${currentDomain}`;
+            }
+        });
+
+        // Show loading state on submit
+        form.addEventListener('submit', function(e) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creando tenant...';
+        });
+
+        // Initial validation
+        validateSchemaName();
+    });
+</script>
+{% endblock %}
