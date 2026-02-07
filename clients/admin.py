@@ -92,7 +92,8 @@ class ClientAdmin(admin.ModelAdmin):
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
 		'get_billing_inheritance_status',
-		'get_add_billing_frequency_button'
+		'get_add_billing_frequency_button',
+		'get_billing_requirement_warning'
 	)
 	exclude = ('deleted_at',)
 	actions = ['add_balance_action', 'add_credit_action']
@@ -145,7 +146,7 @@ class ClientAdmin(admin.ModelAdmin):
 		billing_fieldsets = (
 			(
 				'Requisito de Facturación',{
-					'fields': ('requires_billing',),
+					'fields': ('get_billing_requirement_warning', 'requires_billing',),
 					'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
 					'classes': ('tab-requires-billing',),
 				}
@@ -202,6 +203,25 @@ class ClientAdmin(admin.ModelAdmin):
 		"""Display available credit for the client"""
 		return f"${obj.get_available_credit():.2f}"
 	get_available_credit.short_description = 'Crédito Disponible'
+	
+	def get_billing_requirement_warning(self, obj):
+		"""Display warning about billing address requirement"""
+		if not obj.pk:
+			return ''
+		
+		has_billing_address = obj.addresses.filter(type='billing', active=True).exists()
+		
+		if not has_billing_address:
+			return format_html(
+				'<div style="background-color: #fff3cd; border: 1px solid #ffc107; '
+				'border-radius: 4px; color: #856404; margin-bottom: 10px;">'
+				'<strong>⚠️ Importante:</strong> '
+				'Para poder facturar debe agregar un domicilio de tipo <strong>FISCAL</strong>. '
+				'Use la sección "Direcciones" más abajo para agregar la dirección fiscal.'
+				'</div>'
+			)
+	
+	get_billing_requirement_warning.short_description = ''
 	
 	def get_billing_data_button(self, obj):
 		"""Display a button to manage billing data and frequency"""
@@ -293,7 +313,7 @@ class ClientAdmin(admin.ModelAdmin):
 			'<div style="margin-top: 10px;">'
 			'<label style="display: inline-flex; align-items: center; cursor: pointer;">'
 			'<input type="checkbox" id="toggle_billing_form" style="margin-right: 5px;">'
-			'<span>Agregar datos de facturación para sucursal</span>'
+			'<span>Agregar datos de facturación específicos para sucursal</span>'
 			'</label>'
 			'</div>'
 		)
