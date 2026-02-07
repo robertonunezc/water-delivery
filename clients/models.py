@@ -596,12 +596,13 @@ class Address(TimeStampedModel):
         return f"{self.street}, {self.municipality}, {self.state}, {self.zip_code}, {self.country}"
     
     def clean(self):
-        """Validate that each client has only one address of type billing and one of type shipping"""
+        """Validate that each client has only one address of type billing"""
         from django.core.exceptions import ValidationError
         super().clean()
         errors = {}
-        # Only validate for billing and shipping types
-        if self.type not in ['billing', 'shipping']:
+        # Only validate uniqueness for billing type
+        # Shipping and other types can have multiple addresses per client
+        if self.type != 'billing':
             return
         
         # Build query to find existing addresses of the same type for this client
@@ -620,7 +621,7 @@ class Address(TimeStampedModel):
             raise ValidationError({
             '__all__': f'No se puede guardar: dirección duplicada de tipo "{type_display}"',
             'type': f'El cliente ya tiene una dirección de tipo "{type_display}". '
-                    f'Solo se permite una dirección por tipo (Fiscal/Ubicación física).'
+                    f'Solo se permite una dirección fiscal por cliente.'
         })
 
 
