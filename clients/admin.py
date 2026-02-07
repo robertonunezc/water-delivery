@@ -68,7 +68,7 @@ class ClientBillingDataInline(admin.StackedInline):
 
 @admin.register(models.Client)
 class ClientAdmin(admin.ModelAdmin):
-	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt', 'get_available_credit', 'requires_billing')
+	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline]
@@ -104,9 +104,64 @@ class ClientAdmin(admin.ModelAdmin):
 		# Editing existing client - show all inlines
 		return super().get_inline_instances(request, obj)
 
+	def get_fieldsets(self, request, obj=None):
+		"""
+		Show only basic fieldsets when creating a new client.
+		Show all fieldsets when editing an existing client.
+		"""
+		# Base fieldsets for new clients
+		base_fieldsets = (
+			('Información Básica', {
+				'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link', ),
+			}),
+			('Balance y Crédito', {
+				'fields': (
+					('can_pay_with_credit', 'requires_note_for_credit'),	
+					('credit_limit',),		
+					('balance', 'current_debt', ), 
+					('get_available_credit'),
+					'get_balance_status',
+				),
+				'classes': ('tab-balance-credit',),
+				'description': 'Visualización de saldo prepagado y crédito del cliente.'
+			}),
+		)
+		
+		# Additional fieldsets for existing clients
+		billing_fieldsets = (
+			(
+				'Requisito de Facturación',{
+					'fields': ('requires_billing',),
+					'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
+					'classes': ('tab-requires-billing',),
+				}
+			),
+			('Facturación', {
+				'fields': (('get_add_billing_frequency_button'),),
+				'description': (
+					'Configure los datos de facturación del cliente. '
+					'Las sucursales pueden heredar datos de facturación del corporativo '
+					'o tener sus propios datos de facturación.'
+				),
+				'classes': ('tab-billing-data','tab-billing-frequency',),
+			}),
+			('Información de Facturación Heredada', {
+				'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
+				'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
+				'classes': ('tab-billing-data','tab-billing-inheritance',),
+			}),
+		)
+		
+		# If creating a new client, return only base fieldsets
+		if obj is None:
+			return base_fieldsets
+		
+		# If editing an existing client, return all fieldsets
+		return base_fieldsets + billing_fieldsets
+
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link'),
+			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link', ),
 			
 		}),
 		
@@ -122,17 +177,19 @@ class ClientAdmin(admin.ModelAdmin):
 			'classes': ('tab-balance-credit',),
 			'description': 'Visualización de saldo prepagado y crédito del cliente.'
 		}),
-		('Datos de Facturación', {
-		 	'fields': (('requires_billing', 'get_add_billing_frequency_button'),),
+		('Facturación', {
+		 	'fields': (('requires_billing','get_add_billing_frequency_button'),),
 		 	'description': (
 				'Configure los datos de facturación del cliente. '
 				'Las sucursales pueden heredar datos de facturación del corporativo '
 				'o tener sus propios datos de facturación.'
-			)
+			),
+			'classes': ('tab-billing-data','tab-billing-frequency',),
 		}),
 		('Información de Facturación Heredada', {
 			'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
-			'description': 'Información de facturación efectiva (propia o heredada del corporativo)'
+			'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
+			'classes': ('tab-billing-data','tab-billing-inheritance',),
 		}),
 	)
 	

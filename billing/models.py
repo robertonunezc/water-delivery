@@ -12,7 +12,7 @@ from core.utils import get_first_last_day_of_month
 BILLING_FREQUENCY_CHOICES = [
     ('when_delivery', 'Contra entrega'),
     ('weekly', 'Semanal'),
-    ('biweekly', 'Quincenal'),
+  #  ('biweekly', 'Quincenal'),
     ('monthly', 'Mensual'),
 ]
 BILLING_DATE_CHOICES = [

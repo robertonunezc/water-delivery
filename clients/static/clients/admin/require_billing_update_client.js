@@ -76,6 +76,7 @@
      * Initialize requires_billing checkbox handler
      */
     function initRequiresBillingHandler() {
+        console.log('Initializing requires_billing checkbox handler');
         // Wait for DOM to be ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', setupHandler);

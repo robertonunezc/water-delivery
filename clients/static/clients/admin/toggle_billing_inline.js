@@ -15,19 +15,14 @@
             var isChecked = requiresBillingCheckbox.is(':checked');
             
             // Find the billing data inline by looking for the inline with BillingData model
-            var billingDataInline = $('.inline-group').filter(function() {
-                return $(this).find('h2').text().includes('Datos de Facturación') || 
-                       $(this).attr('id') && $(this).attr('id').includes('billingdata');
-            });
+            var billingDataInline = $('.tab-billing-data');
             
             // Find the billing frequency inline
-            var billingFrequencyInline = $('.inline-group').filter(function() {
-                return $(this).find('h2').text().includes('Frecuencia de Facturación') || 
-                       $(this).find('h2').text().includes('Frecuencias de Facturación') ||
-                       $(this).attr('id') && $(this).attr('id').includes('clientbillingfrecuency');
-            });
-            
+            var billingFrequencyInline = $('.tab-billing-frequency');
+  
+
             // Toggle visibility with animation
+            console.log('Toggling billing inlines. requires_billing:', isChecked);
             if (isChecked) {
                 billingDataInline.slideDown(300);
                 billingFrequencyInline.slideDown(300);

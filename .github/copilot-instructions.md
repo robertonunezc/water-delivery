@@ -25,7 +25,8 @@ Important project conventions & patterns
   - `core/admin.py` intentionally does NOT inline `Employee` into the `User` admin: create/manage employees from the `Employee` admin only.
   - `EmployeeAdmin.save_model()` will create a `User` with an unusable password if saving an employee without a linked user — check `core/admin.py` for the logic.
   - There is a disabled `core/signals.py` file (used to auto-create Employees on User creation previously). Signals are not imported on app ready; employee creation is explicit.
-
+  - All Javascript code for frontend must be implemented in a Object Oriented Programming (OOP) style, using classes to encapsulate related functionality and state. Avoid global functions and variables; instead, create classes that manage their own state and behavior. This promotes modularity, reusability, and maintainability in the codebase.
+  
 - DB & infra conventions:
   - Uses PostgreSQL (see `requirements.txt`) and Redis. DB config is environment-variable driven (`POSTGRES_*`) in `water_delivery/settings.py`.
   - Docker Compose files exist: `docker-compose.dev.yml` and `docker-compose.prod.yml` for local/dev/prod orchestration.
