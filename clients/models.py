@@ -581,7 +581,7 @@ class Address(TimeStampedModel):
     reference = models.TextField(blank=True, null=True, verbose_name="Referencia")
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
-    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='other', verbose_name="Tipo")
+    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='shipping', verbose_name="Tipo")
     
     class Meta:
         verbose_name = 'Domicilio'
