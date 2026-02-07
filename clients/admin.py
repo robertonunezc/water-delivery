@@ -35,6 +35,7 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
 	verbose_name_plural = "Frecuencias de Facturación"
+	classes = ('tab-billing-frequency',)
 	fields = (
 		('frequency', 'is_active'),
 		'billing_date',
@@ -44,7 +45,19 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 	)
 	exclude = ('deleted_at',)
 
-
+class BillingFrecuencyInline(admin.StackedInline):
+	model = models.ClientBillingFrecuency
+	extra = 0
+	verbose_name = "Frecuencia de Facturación"
+	verbose_name_plural = "Frecuencias de Facturación"
+	fields = (
+		('frequency', 'is_active'),
+		'billing_date',
+		'specific_day',
+		('weekday', 'occurrence'),
+		'notes'
+	)
+	exclude = ('deleted_at',)
 class ClientCreditConfigInline(admin.StackedInline):
 	model = models.ClientCreditConfig
 	extra = 0
@@ -65,13 +78,14 @@ class ClientBillingDataInline(admin.StackedInline):
 	verbose_name = "Datos de Facturación"
 	verbose_name_plural = "Datos de Facturación"
 	
+	
 
 @admin.register(models.Client)
 class ClientAdmin(admin.ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline]
+	inlines = [BillingFrecuencyInline,ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
 		'balance', 'current_debt', 'get_available_credit',
@@ -136,15 +150,6 @@ class ClientAdmin(admin.ModelAdmin):
 					'classes': ('tab-requires-billing',),
 				}
 			),
-			('Facturación', {
-				'fields': (('get_add_billing_frequency_button'),),
-				'description': (
-					'Configure los datos de facturación del cliente. '
-					'Las sucursales pueden heredar datos de facturación del corporativo '
-					'o tener sus propios datos de facturación.'
-				),
-				'classes': ('tab-billing-data','tab-billing-frequency',),
-			}),
 			('Información de Facturación Heredada', {
 				'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
 				'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
@@ -268,7 +273,6 @@ class ClientAdmin(admin.ModelAdmin):
 			result += f'<div><strong>Dirección Fiscal:</strong> {str(effective_address)[:80]}...</div>'
 		else:
 			result += '<div style="color: orange;"><strong>⚠ Sin dirección fiscal</strong></div>'
-
 		return format_html(result)
 
 	get_effective_billing_info.short_description = 'Datos de Facturación Efectivos'
@@ -281,16 +285,29 @@ class ClientAdmin(admin.ModelAdmin):
 			return format_html('<span style="color: gray;">N/A (cliente corporativo)</span>')
 		
 		has_own_data = hasattr(obj, 'billing_data')
-
 		has_own_address = obj.addresses.filter(type='billing', active=True).exists()
 		has_complete_own = has_own_data and has_own_address
 
-		print("Billing inheritance status for",has_own_data, has_own_address, has_complete_own)
+		# Checkbox to add billing data for branch - shown when branch doesn't have complete own data
+		btn_show_billing_data_form = format_html(
+			'<div style="margin-top: 10px;">'
+			'<label style="display: inline-flex; align-items: center; cursor: pointer;">'
+			'<input type="checkbox" id="toggle_billing_form" style="margin-right: 5px;">'
+			'<span>Agregar datos de facturación para sucursal</span>'
+			'</label>'
+			'</div>'
+		)
+
 		if has_complete_own:
-			return format_html('<span style="color: green;">✓ Usa sus propios datos de facturación</span>')
+			return format_html(
+				'<span style="color: green;">✓ Usa sus propios datos de facturación</span>'
+			)
 
 		if not obj.corporate:
-			return format_html('<span style="color: red;">✗ Sin corporativo asociado</span>')
+			return format_html(
+				'<span style="color: red;">✗ Sin corporativo asociado</span>{}',
+				btn_show_billing_data_form
+			)
 
 		corporate_has_data = hasattr(obj.corporate, 'billing_data')
 		corporate_has_address = obj.corporate.addresses.filter(type='billing', active=True).exists()
@@ -304,8 +321,9 @@ class ClientAdmin(admin.ModelAdmin):
 				missing.append('Dirección Fiscal')
 
 			return format_html(
-				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>',
-				', '.join(missing)
+				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>{}',
+				', '.join(missing),
+				btn_show_billing_data_form
 			)
 
 		missin_corporate_data = format_html(
@@ -317,7 +335,8 @@ class ClientAdmin(admin.ModelAdmin):
 			'</div>',
 			obj.corporate.id
 		)
-		return format_html('{}{}', missin_corporate_data, add_coportate_data_btn)
+
+		return format_html('{}{}{}', missin_corporate_data, add_coportate_data_btn, btn_show_billing_data_form)
 
 	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
 

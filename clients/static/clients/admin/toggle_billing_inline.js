@@ -15,20 +15,21 @@
             var isChecked = requiresBillingCheckbox.is(':checked');
             
             // Find the billing data inline by looking for the inline with BillingData model
-            var billingDataInline = $('.tab-billing-data');
+            var billingDataInline = $('#billing_data-group');
             
             // Find the billing frequency inline
-            var billingFrequencyInline = $('.tab-billing-frequency');
-  
-
+            var billingFrequencyInline = $('#billing_frecuency-group');
+            const billingDataInfo = $('.tab-billing-inheritance')
             // Toggle visibility with animation
             console.log('Toggling billing inlines. requires_billing:', isChecked);
             if (isChecked) {
                 billingDataInline.slideDown(300);
                 billingFrequencyInline.slideDown(300);
+                billingDataInfo.slideDown(300);
             } else {
                 billingDataInline.slideUp(300);
                 billingFrequencyInline.slideUp(300);
+                billingDataInfo.slideUp(300);
             }
         }
         
