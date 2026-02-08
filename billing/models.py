@@ -78,7 +78,7 @@ class BillingOrder(TimeStampedModel):
 
 class ClientBillingFrecuency(TimeStampedModel):
     client = models.OneToOneField('clients.Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')
-    frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='monthly', verbose_name="Frecuencia de Facturación")
+    frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='other', verbose_name="Frecuencia de Facturación")
     billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, null=True, blank=True, verbose_name="Fecha de Facturación")
 
     # For specific_date billing

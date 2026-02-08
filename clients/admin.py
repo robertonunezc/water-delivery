@@ -105,7 +105,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 			'clients/admin/toggle_billing_inline.js',
 			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
-			'clients/admin/billing_frequency_popup.js',
+			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
 		)
 

@@ -18,18 +18,7 @@ PAYMENT_METHOD_CHOICES = [
     ('credit', 'Crédito'),
     ('other', 'Otro'),
 ]
-BILLING_FREQUENCY_CHOICES = [
-    ('when_delivery', 'Contra entrega'),
-    ('weekly', 'Semanal'),
-    ('biweekly', 'Quincenal'),
-    ('monthly', 'Mensual'),
-]
-BILLING_DATE_CHOICES = [
-    ('specific_date', 'Fecha específica del mes'),
-    ('last_day', 'Último día del mes'),
-    ('first_day', 'Primer día del mes'),
-    ('weekday_occurrence', 'Día específico de la semana'),
-]
+
 
 WEEKDAY_CHOICES = [
     (0, 'Lunes'),

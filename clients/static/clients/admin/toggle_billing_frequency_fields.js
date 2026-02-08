@@ -1,105 +1,315 @@
 (function() {
     'use strict';
     
-    // Wait for both Django admin and jQuery to be available
-    function initBillingFrequencyFieldToggle() {
-        var $ = django.jQuery;
-        
-        // Function to toggle billing frequency fieldsets based on frequency and billing_date selection
-        function toggleBillingFrequencyFieldsets() {
-            // Get the frequency and billing_date select elements
-            var frequencySelect = $('#id_frequency');
-            var billingDateSelect = $('#id_billing_date');
-            console.log('Frequency Select:', frequencySelect);
-            if (frequencySelect.length === 0 || billingDateSelect.length === 0) {
+    /**
+     * BillingFrequencyFieldToggler class
+     * Manages visibility and behavior of billing frequency fields in Django admin
+     */
+    class BillingFrequencyFieldToggler {
+        constructor() {
+            this.$ = null;
+            this.observer = null;
+            this.retryTimeouts = [];
+            this.selectors = {
+                frequency: '#id_billing_frecuency-0-frequency',
+                billingDate: '#id_billing_frecuency-0-billing_date',
+                specificDate: '.field-specific_day',
+                weekday: '.field-weekday',
+                billingDateField: '.field-billing_date',
+                frequencyField: '.field-frequency'
+            };
+            this.eventNamespace = 'billingFrequency';
+            this.logPrefix = '[BillingFrequency]';
+        }
+
+        /**
+         * Initialize the toggler
+         */
+        init() {
+            if (typeof django === 'undefined' || !django.jQuery) {
+                this.log('Django or jQuery not available');
                 return;
             }
-            console.log('Billing Date Select:', billingDateSelect);
-            var frequency = frequencySelect.val();
-            var billingDate = billingDateSelect.val();
-            console.log('Selected Frequency:', frequency);
-            console.log('Selected Billing Date:', billingDate);
-            // Find the fieldsets to toggle
-            var specificDateFieldset = $('.form-row').filter(function() {
-                return $(this).prev('h2').text().includes('Configuración de Fecha Específica') ||
-                       $(this).find('label[for*="specific_day"]').length > 0;
-            }).closest('.collapse');
-            
-            var weekdayFieldset = $('.form-row').filter(function() {
-                return $(this).prev('h2').text().includes('Configuración de Día de la Semana') ||
-                       $(this).find('label[for*="weekday"]').length > 0 ||
-                       $(this).find('label[for*="occurrence"]').length > 0;
-            }).closest('.collapse');
-            
-            // Alternative way to find fieldsets if the above doesn't work
-            if (specificDateFieldset.length === 0) {
-                specificDateFieldset = $('div.collapse').filter(function() {
-                    return $(this).find('label[for*="specific_day"]').length > 0;
-                });
-            }
-            
-            if (weekdayFieldset.length === 0) {
-                weekdayFieldset = $('div.collapse').filter(function() {
-                    return $(this).find('label[for*="weekday"]').length > 0 ||
-                           $(this).find('label[for*="occurrence"]').length > 0;
-                });
-            }
-            
-            // Logic: Hide both fieldsets if frequency is 'monthly' AND billing_date is 'last_day' or 'first_day'
-            var shouldHide = frequency === 'monthly' && (billingDate === 'last_day' || billingDate === 'first_day');
-            
-            if(frequency === 'biweekly'){
-                console.log('Biweekly selected - showing specific date drop box');
-                $('.field-billing_date').hide(300);
-                // reset the billingDate dropdown to first option, which is emtpy or non value
-                billingDateSelect.val('');
 
+            this.$ = django.jQuery;
+            this.log('Script initialized');
+
+            this.$(document).ready(() => {
+                this.log('Document ready');
+                this.setupEventDelegation();
+                this.attachEventListeners();
+                this.setupDjangoFormsetListeners();
+                this.setupDOMObserver();
+                this.scheduleRetries();
+            });
+        }
+
+        /**
+         * Log messages with consistent prefix
+         */
+        log(message, ...args) {
+            console.log(`${this.logPrefix} ${message}`, ...args);
+        }
+
+        /**
+         * Get form elements
+         */
+        getFormElements() {
+            return {
+                frequencySelect: this.$(this.selectors.frequency),
+                billingDateSelect: this.$(this.selectors.billingDate),
+                containerSpecificDate: this.$(this.selectors.specificDate),
+                containerWeekday: this.$(this.selectors.weekday)
+            };
+        }
+
+        /**
+         * Check if form elements are available
+         */
+        areElementsAvailable(elements) {
+            return elements.frequencySelect.length > 0 && elements.billingDateSelect.length > 0;
+        }
+
+        /**
+         * Toggle billing frequency fieldsets based on frequency and billing_date selection
+         */
+        toggleFieldsets() {
+            this.log('toggleFieldsets called');
+
+            const elements = this.getFormElements();
+            
+            this.log('Frequency select found:', elements.frequencySelect.length);
+            this.log('Billing date select found:', elements.billingDateSelect.length);
+
+            if (!this.areElementsAvailable(elements)) {
+                this.log('Elements not found, skipping...');
+                return;
+            }
+
+            const frequency = elements.frequencySelect.val();
+            const billingDate = elements.billingDateSelect.val();
+
+            this.log('Current values - Frequency:', frequency, 'Billing Date:', billingDate);
+
+            // Toggle billing_date field visibility based on frequency
+            this.toggleBillingDateFieldVisibility(frequency);
+
+            // Hide specific date and weekday occurrence fieldsets initially
+            elements.containerSpecificDate.hide();
+            elements.containerWeekday.hide();
+
+            this.handleFrequencyLogic(frequency, billingDate, elements);
+        }
+
+        /**
+         * Toggle billing_date field visibility based on frequency value
+         */
+        toggleBillingDateFieldVisibility(frequency) {
+            const billingDateFieldContainer = this.$(this.selectors.billingDateField);
+            
+            if (frequency === 'when_delivery') {
+                this.log('Frequency is "when_delivery" - hiding billing_date field');
+                billingDateFieldContainer.slideUp(300);
+            } else {
+                this.log('Frequency is not "when_delivery" - showing billing_date field');
+                billingDateFieldContainer.slideDown(300);
+            }
+        }
+
+        /**
+         * Handle frequency-specific logic
+         */
+        handleFrequencyLogic(frequency, billingDate, elements) {
+            let shouldHide = frequency === 'monthly' && 
+                           (billingDate === 'last_day' || billingDate === 'first_day');
+
+            if (frequency === 'biweekly') {
+                this.handleBiweeklyFrequency(elements);
                 shouldHide = true;
             }
 
-            if(frequency === 'monthly'){
-                console.log('Monthly selected - showing billing date drop box');
-                $('.field-billing_date').show(300);
+            if (frequency === 'monthly') {
+                this.handleMonthlyFrequency();
             }
 
+            this.applyFieldVisibility(shouldHide, billingDate, elements);
+        }
+
+        /**
+         * Handle biweekly frequency selection
+         */
+        handleBiweeklyFrequency(elements) {
+            this.log('Biweekly selected - hiding billing date field');
+            this.$(this.selectors.billingDateField).hide(300);
+            // Reset the billingDate dropdown to first option, which is empty or non value
+            elements.billingDateSelect.val('');
+        }
+
+        /**
+         * Handle monthly frequency selection
+         */
+        handleMonthlyFrequency() {
+            this.log('Monthly selected - showing billing date field');
+            this.$(this.selectors.billingDateField).show(300);
+        }
+
+        /**
+         * Apply field visibility based on billing date selection
+         */
+        applyFieldVisibility(shouldHide, billingDate, elements) {
             if (shouldHide) {
-                specificDateFieldset.slideUp(300);
-                weekdayFieldset.slideUp(300);
+                elements.containerSpecificDate.slideUp(300);
+                elements.containerWeekday.slideUp(300);
             } else {
                 // Show fieldsets based on billing_date selection
                 if (billingDate === 'specific_date') {
-                    specificDateFieldset.slideDown(300);
-                    weekdayFieldset.slideUp(300);
+                    elements.containerSpecificDate.slideDown(300);
+                    elements.containerWeekday.slideUp(300);
                 } else if (billingDate === 'weekday_occurrence') {
-                    specificDateFieldset.slideUp(300);
-                    weekdayFieldset.slideDown(300);
+                    elements.containerSpecificDate.slideUp(300);
+                    elements.containerWeekday.slideDown(300);
                 } else {
                     // For other billing_date options, hide both
-                    specificDateFieldset.slideUp(300);
-                    weekdayFieldset.slideUp(300);
+                    elements.containerSpecificDate.slideUp(300);
+                    elements.containerWeekday.slideUp(300);
                 }
             }
         }
-        
-        // Initial toggle on page load
-        $(document).ready(function() {
-            toggleBillingFrequencyFieldsets();
-            console.log('Initialized billing frequency field toggle.');
-            // Toggle fieldsets on frequency or billing_date change
-            $('#id_frequency, #id_billing_date').on('change', function() {
-                toggleBillingFrequencyFieldsets();
+
+        /**
+         * Attach event listeners to form elements
+         */
+        attachEventListeners() {
+            this.log('Attempting to attach event listeners...');
+
+            const elements = this.getFormElements();
+
+            if (!this.areElementsAvailable(elements)) {
+                this.log('Elements not found yet, will retry...');
+                return;
+            }
+
+            this.log('Elements found! Attaching listeners...');
+
+            // Remove any existing listeners to avoid duplicates
+            elements.frequencySelect.off(`change.${this.eventNamespace}`);
+            elements.billingDateSelect.off(`change.${this.eventNamespace}`);
+
+            // Attach new listeners with namespace
+            elements.frequencySelect.on(`change.${this.eventNamespace}`, (e) => {
+                this.log('Frequency changed to:', this.$(e.currentTarget).val());
+                this.toggleFieldsets();
             });
-        });
+
+            elements.billingDateSelect.on(`change.${this.eventNamespace}`, (e) => {
+                this.log('Billing date changed to:', this.$(e.currentTarget).val());
+                this.toggleFieldsets();
+            });
+
+            this.log('Event listeners attached successfully');
+
+            // Run initial toggle
+            this.toggleFieldsets();
+        }
+
+        /**
+         * Setup event delegation for dynamic forms
+         */
+        setupEventDelegation() {
+            this.$(document).on('change', 
+                `${this.selectors.frequency}, ${this.selectors.billingDate}`, 
+                (e) => {
+                    this.log('Change detected via delegation on:', e.target.id);
+                    this.toggleFieldsets();
+                }
+            );
+        }
+
+        /**
+         * Setup Django admin inline formset event listeners
+         */
+        setupDjangoFormsetListeners() {
+            // Watch for Django admin inline formset events
+            this.$(document).on('formset:added', (event, $row, formsetName) => {
+                this.log('Formset added:', formsetName);
+                if (formsetName && formsetName.includes('billing_frecuency')) {
+                    setTimeout(() => this.attachEventListeners(), 100);
+                }
+            });
+
+            // Watch for tab/fieldset visibility changes
+            this.$(document).on('click', '.tab, .collapse-toggle, .inline-group h2', () => {
+                this.log('Tab/collapse clicked, retrying attachment...');
+                setTimeout(() => this.attachEventListeners(), 200);
+            });
+        }
+
+        /**
+         * Setup MutationObserver to watch for DOM changes
+         */
+        setupDOMObserver() {
+            this.observer = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                    if (mutation.addedNodes.length > 0) {
+                        const frequencySelect = this.$(this.selectors.frequency);
+                        if (frequencySelect.length > 0 && !frequencySelect.data('listeners-attached')) {
+                            this.log('Elements detected via MutationObserver');
+                            frequencySelect.data('listeners-attached', true);
+                            this.attachEventListeners();
+                        }
+                    }
+                });
+            });
+
+            // Start observing the document body for changes
+            this.observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+        }
+
+        /**
+         * Schedule retry attempts to attach listeners
+         */
+        scheduleRetries() {
+            // Try after delays in case inline is initially hidden
+            this.retryTimeouts.push(setTimeout(() => this.attachEventListeners(), 500));
+            this.retryTimeouts.push(setTimeout(() => this.attachEventListeners(), 1000));
+        }
+
+        /**
+         * Cleanup method to remove observers and timeouts
+         */
+        destroy() {
+            if (this.observer) {
+                this.observer.disconnect();
+            }
+
+            this.retryTimeouts.forEach(timeout => clearTimeout(timeout));
+            this.retryTimeouts = [];
+
+            if (this.$) {
+                this.$(document).off(`.${this.eventNamespace}`);
+            }
+
+            this.log('Destroyed');
+        }
     }
-    
-    // Execute when Django admin is ready
+
+    // Initialize when Django admin is ready
     if (typeof django !== 'undefined' && django.jQuery) {
-        initBillingFrequencyFieldToggle();
+        const toggler = new BillingFrequencyFieldToggler();
+        toggler.init();
+        
+        // Expose to window for debugging purposes
+        window.billingFrequencyToggler = toggler;
     } else {
         // Fallback: wait for DOM and django to be available
         document.addEventListener('DOMContentLoaded', function() {
             if (typeof django !== 'undefined' && django.jQuery) {
-                initBillingFrequencyFieldToggle();
+                const toggler = new BillingFrequencyFieldToggler();
+                toggler.init();
+                window.billingFrequencyToggler = toggler;
             }
         });
     }
