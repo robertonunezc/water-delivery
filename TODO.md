@@ -11,6 +11,6 @@
 - Si el cliente marca requiere factura entonces mostrar el form de gestionar datos de facturacion[DONE]
 - Si require facturacion tienes q tener un domicilio fiscal.[DONE]
 - Todos los clientes deben tener una ubicacion fisica solo uno [DONE]
-  
+- Revisar si el cliente hereda info de facturacion, no pueda agregar una direccion fiscal si el check no esta marcado  
  
   

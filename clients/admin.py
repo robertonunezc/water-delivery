@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django_tabbed_changeform_admin.admin import DjangoTabbedChangeformAdmin
 from django.utils.html import format_html
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
@@ -15,7 +16,7 @@ from .forms import (
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 
 
-class ContactInline(admin.StackedInline):
+class ContactInline(admin.TabularInline):
 	model = models.Contact
 	extra = 0
 	exclude = ('deleted_at',)
@@ -46,7 +47,7 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 	)
 	exclude = ('deleted_at',)
 
-class BillingFrecuencyInline(admin.StackedInline):
+class BillingFrecuencyInline(admin.TabularInline):
 	model = models.ClientBillingFrecuency
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
@@ -108,6 +109,8 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
 		)
+	tabs = [('Facturación', ['tab-billing-frequency']),
+			]
 
 	def get_inline_instances(self, request, obj=None):
 		"""
