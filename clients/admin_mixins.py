@@ -40,17 +40,26 @@ class BillingDisplayMixin:
 		"""Display warning about billing address requirement"""
 		if not obj.pk:
 			return ''
-		
-		has_billing_address = obj.addresses.filter(type='billing', active=True).exists()
-		
-		if not has_billing_address:
+		missing_messages = {
+			'billing_data': 'Datos de Facturacion',
+			'billing_address': 'Dirección Fiscal',
+			'billing_frequency': 'Frecuencia de Facturación',
+		}
+		billing_status = obj.get_billing_setup_status()
+		if not billing_status.get('is_complete', False):
+			missing_data = billing_status.get('missing_components', [])
+			missing_errors = []
+			for m in missing_data:
+				missing_errors.append(missing_messages.get(m, m))			
 			return format_html(
 				'<div style="background-color: #fff3cd; border: 1px solid #ffc107; '
 				'border-radius: 4px; color: #856404; margin-bottom: 10px;">'
 				'<strong>⚠️ Importante:</strong> '
-				'Para poder facturar debe agregar un domicilio de tipo <strong>FISCAL</strong>. '
-				'Use la sección "Direcciones" más abajo para agregar la dirección fiscal.'
-				'</div>'
+				'Para poder facturar debe agregar los sugientes datos {}:'
+				'<ul>{}</ul>'
+				'</div>',
+				'en el corporativo' if obj.corporate else 'en el cliente si no se heredan del corporativo',
+				format_html(''.join(f'<li>{item}</li>' for item in missing_errors))
 			)
 	
 	get_billing_requirement_warning.short_description = ''
@@ -82,6 +91,7 @@ class BillingDisplayMixin:
 		"""Display effective billing data (own or inherited)"""
 		if not obj.pk:
 			return 'Guarde el cliente primero para ver información de facturación.'
+		
 		effective_data = obj.get_effective_billing_data()
 		effective_address = obj.get_effective_billing_address()
 		source = obj.get_billing_source()
@@ -125,15 +135,7 @@ class BillingDisplayMixin:
 		has_own_address = obj.addresses.filter(type='billing', active=True).exists()
 		has_complete_own = has_own_data and has_own_address
 
-		# Checkbox to add billing data for branch - shown when branch doesn't have complete own data
-		btn_show_billing_data_form = format_html(
-			'<div style="margin-top: 10px;">'
-			'<label style="display: inline-flex; align-items: center; cursor: pointer;">'
-			'<input type="checkbox" id="toggle_billing_form" style="margin-right: 5px;">'
-			'<span>Agregar datos de facturación específicos para sucursal</span>'
-			'</label>'
-			'</div>'
-		)
+	
 
 		if has_complete_own:
 			return format_html(
@@ -143,7 +145,6 @@ class BillingDisplayMixin:
 		if not obj.corporate:
 			return format_html(
 				'<span style="color: red;">✗ Sin corporativo asociado</span>{}',
-				btn_show_billing_data_form
 			)
 
 		corporate_has_data = hasattr(obj.corporate, 'billing_data')
@@ -158,9 +159,8 @@ class BillingDisplayMixin:
 				missing.append('Dirección Fiscal')
 
 			return format_html(
-				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>{}',
+				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>',
 				', '.join(missing),
-				btn_show_billing_data_form
 			)
 
 		missin_corporate_data = format_html(
@@ -173,7 +173,7 @@ class BillingDisplayMixin:
 			obj.corporate.id
 		)
 
-		return format_html('{}{}{}', missin_corporate_data, add_coportate_data_btn, btn_show_billing_data_form)
+		return format_html('{}{}', missin_corporate_data, add_coportate_data_btn)
 
 	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
 

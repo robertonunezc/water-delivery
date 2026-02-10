@@ -17,7 +17,7 @@
         </div>
     {% endif %}
 
-    {% if not original.has_billing_address %}
+    {% if not original.has_billing_address and original.requires_billing %}
         {# Show warning when client requires billing but has no billing address #}
         <div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
             <strong>⚠️ Advertencia:</strong>

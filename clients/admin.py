@@ -114,14 +114,30 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 
 	def get_inline_instances(self, request, obj=None):
 		"""
-		Only show inlines when editing an existing client.
-		Hide all inlines when creating a new client.
+		Conditionally show inlines based on client type and billing override settings.
+		- New clients: hide all inlines
+		- Corporate clients: show all inlines
+		- Branch clients with billing_override_enabled=False: hide billing inlines (they inherit)
+		- Branch clients with billing_override_enabled=True: show all inlines
 		"""
 		if obj is None:
 			# Creating a new client - hide all inlines
 			return []
-		# Editing existing client - show all inlines
-		return super().get_inline_instances(request, obj)
+		
+		# Get all inline instances
+		all_inlines = super().get_inline_instances(request, obj)
+		
+		# If it's a branch client without billing override, filter out billing-related inlines
+		if obj.type == 'branch' and not obj.billing_override_enabled:
+			# Filter out BillingFrecuencyInline and ClientBillingDataInline
+			filtered_inlines = [
+				inline for inline in all_inlines
+				if not isinstance(inline, (BillingFrecuencyInline, ClientBillingDataInline))
+			]
+			return filtered_inlines
+		
+		# For corporate clients or branches with override enabled, show all inlines
+		return all_inlines
 
 	def get_fieldsets(self, request, obj=None):
 		"""
@@ -147,15 +163,20 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 		)
 		
 		# Additional fieldsets for existing clients
+		# Only show billing_override_enabled for branch clients
+		billing_requirement_fields = ['get_billing_requirement_warning', 'requires_billing']
+		if obj and obj.type == 'branch':
+			billing_requirement_fields.append('billing_override_enabled')
+		
 		billing_fieldsets = (
 			(
 				'Requisito de Facturación',{
-					'fields': ('get_billing_requirement_warning', 'requires_billing',),
+					'fields': tuple(billing_requirement_fields),
 					'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
 					'classes': ('tab-requires-billing',),
 				}
 			),
-			('Información de Facturación Heredada', {
+			('Información de Facturación', {
 				'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
 				'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
 				'classes': ('tab-billing-data','tab-billing-inheritance',),

@@ -19,7 +19,7 @@
          */
         initializeElements() {
             this.requiresBillingCheckbox = this.$('#id_requires_billing');
-            this.toggleBillingFormCheckbox = this.$('#toggle_billing_form');
+            this.toggleBillingFormCheckbox = this.$('#id_billing_override_enabled');
             this.billingDataInline = this.$('#billing_data-group');
             this.billingFrequencyInline = this.$('#billing_frecuency-group');
             this.billingDataInfo = this.$('.tab-billing-inheritance');

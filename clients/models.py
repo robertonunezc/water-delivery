@@ -105,6 +105,11 @@ class Client(TimeStampedModel):
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
+    billing_override_enabled = models.BooleanField(
+        default=False,
+        verbose_name="Usar datos propios de facturación",
+        help_text="Si está habilitado, la sucursal usará sus propios datos de facturación en lugar de heredar del corporativo"
+    )
     #Notification sent 
     last_first_reminder_sent_at = models.DateTimeField(null=True, blank=True)
     last_second_reminder_sent_at = models.DateTimeField(null=True, blank=True)
@@ -133,28 +138,17 @@ class Client(TimeStampedModel):
         if self.type == 'corporate' and self.corporate:
             errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
 
-        # NEW: Validate billing setup for branches that require billing
-        # Only validate if the client has been saved (has a pk)
-        if self.type == 'branch' and self.requires_billing and self.corporate and self.pk:
-            # Check if branch or corporate has complete billing setup
-            has_own_billing = (
-                hasattr(self, 'billing_data') and
-                self.addresses.filter(type='billing', active=True).exists()
-            )
+        # NEW: Validate billing_override_enabled
+        if self.billing_override_enabled and self.type != 'branch':
+            errors['billing_override_enabled'] = 'Solo las sucursales pueden habilitar datos propios de facturación.'
+        
+        if self.billing_override_enabled and self.type == 'branch' and not self.corporate:
+            errors['billing_override_enabled'] = 'No se puede habilitar datos propios sin un corporativo asociado.'
 
-            if not has_own_billing:
-                # Branch doesn't have own billing setup, check corporate
-                corporate_has_billing = (
-                    hasattr(self.corporate, 'billing_data') and
-                    self.corporate.addresses.filter(type='billing', active=True).exists()
-                )
-
-                if not corporate_has_billing:
-                    errors['requires_billing'] = (
-                        'No se puede requerir facturación: ni la sucursal ni el corporativo '
-                        'tienen datos de facturación completos (RFC/razón social y dirección fiscal). '
-                        'Configure primero el corporativo o agregue datos propios a esta sucursal.'
-                    )
+        # NOTE: Removed hard validation for billing setup.
+        # Clients can now enable requires_billing without having complete billing data.
+        # Use get_missing_billing_components() and get_billing_setup_status() helper methods
+        # to check for missing components and display warnings in the admin interface.
 
         # NOTE: Shipping address validation removed - it was too strict for admin workflow.
         # Branches must have their own shipping address (they don't inherit from corporate),
@@ -265,6 +259,60 @@ class Client(TimeStampedModel):
         return (available_balance + available_credit) >= order_amount
 
     # Billing and Address Methods
+    def get_missing_billing_components(self) -> dict:
+        """
+        Check which billing components are missing for this client.
+        Does not check inheritance - only looks at own data.
+        
+        Returns:
+            dict: Dictionary with keys 'billing_data', 'billing_address', 'billing_frequency'
+                  Each value is True if the component is missing, False if present
+        """
+        return {
+            'billing_data':self.get_effective_billing_data(),
+            'billing_address': self.get_effective_billing_address(),
+            'billing_frequency': self.get_effective_billing_frequency()
+        }
+    
+    def get_billing_setup_status(self) -> dict:
+        """
+        Get comprehensive billing setup status including inheritance.
+        
+        Returns:
+            dict: {
+                'is_complete': bool,
+                'source': str ('own', 'corporate', or 'none'),
+                'missing_components': list of str (component names that are missing)
+            }
+        """
+        effective_data = self.get_effective_billing_data()
+        effective_address = self.get_effective_billing_address()
+        effective_frequency = self.get_effective_billing_frequency()
+        
+        is_complete = (
+            effective_data is not None and 
+            effective_address is not None and 
+            effective_frequency is not None
+        )
+        
+        # Determine source
+        source = self.get_billing_source()
+        
+        # Determine missing components based on effective data
+        missing = []
+        if effective_data is None:
+            missing.append('billing_data')
+        if effective_address is None:
+            missing.append('billing_address')
+        if effective_frequency is None:
+            missing.append('billing_frequency')
+        
+        return {
+            'is_complete': is_complete,
+            'source': source,
+            'missing_components': missing
+        }
+
     def has_billing_address(self):
         """Check if client has at least one billing address"""
         return self.addresses.filter(type='billing').exists()
@@ -294,6 +342,7 @@ class Client(TimeStampedModel):
     def get_effective_billing_data(self):
         """
         Returns own BillingData or corporate's if branch without own billing data.
+        Respects billing_override_enabled flag - if enabled, only returns own data.
 
         Returns:
             BillingData instance or None
@@ -303,8 +352,8 @@ class Client(TimeStampedModel):
         if hasattr(self, 'billing_data'):
             return self.billing_data
 
-        # If this is a branch and no own billing data, check corporate
-        if self.type == 'branch' and self.corporate:
+        # If this is a branch and no own billing data, check corporate (unless override is enabled)
+        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
             return self.corporate.get_effective_billing_data()
 
         return None
@@ -322,23 +371,46 @@ class Client(TimeStampedModel):
             return own_billing
 
         # If this is a branch and no own billing address, check corporate
-        if self.type == 'branch' and self.corporate:
+        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
             return self.corporate.get_effective_billing_address()
 
+        return None
+    
+    def get_effective_billing_frequency(self):
+        """
+        Returns own billing frequency or corporate's if branch without own billing frequency.
+        
+        Returns:
+            ClientBillingFrecuency instance or None
+        """
+        # First, check if this client has its own active billing frequency
+        own_frequency = self.billing_frecuency if hasattr(self, 'billing_frecuency') else None
+        print(f"Client {self.name} has own billing frequency: {own_frequency}")
+        if own_frequency:
+            return own_frequency
+        
+        # If this is a branch and no own billing frequency, check corporate
+        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
+            return self.corporate.get_effective_billing_frequency()
+        
         return None
 
     def has_complete_billing_setup(self):
         """
-        Check if client has complete billing setup (both BillingData and billing Address).
-        For branches, checks inherited setup if own setup is incomplete.
+        Check if client has complete billing setup (BillingData, billing Address, and billing Frequency).
+        For branches, checks inherited setup if own setup is incomplete (unless override is enabled).
 
         Returns:
             bool: True if complete billing setup exists
         """
         effective_billing_data = self.get_effective_billing_data()
         effective_billing_address = self.get_effective_billing_address()
-
-        return effective_billing_data is not None and effective_billing_address is not None
+        effective_billing_frequency = self.get_effective_billing_frequency()
+        return (
+            effective_billing_data is not None and 
+            effective_billing_address is not None and
+            effective_billing_frequency is not None
+        )
 
     def get_billing_source(self):
         """
@@ -347,14 +419,27 @@ class Client(TimeStampedModel):
         Returns:
             str: 'own', 'corporate', or 'none'
         """
+        # Check for OWN data (not effective/inherited)
         has_own_data = hasattr(self, 'billing_data')
         has_own_address = self.addresses.filter(type='billing', active=True).exists()
-        if has_own_data and has_own_address:
+        has_own_frequency = hasattr(self, 'billing_frecuency')
+        
+        # If has all three components of own data, it's own
+        if has_own_data and has_own_address and has_own_frequency:
             return 'own'
-        elif self.type == 'branch' and self.corporate:
+        
+        # If branch with override enabled but has some own data, still 'own' (not inheriting)
+        if self.type == 'branch' and self.billing_override_enabled:
+            if has_own_data or has_own_address or has_own_frequency:
+                return 'own'
+        
+        # Check if inheriting from corporate (only if override not enabled)
+        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
             corporate_has_data = hasattr(self.corporate, 'billing_data')
             corporate_has_address = self.corporate.addresses.filter(type='billing', active=True).exists()
-            if corporate_has_data or corporate_has_address:
+            corporate_has_frequency = hasattr(self.corporate, 'billing_frecuency')
+            
+            if corporate_has_data or corporate_has_address or corporate_has_frequency:
                 return 'corporate'
 
         return 'none'
