@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'django_celery_results',
     'django_static_jquery_ui',
-    'django_tabbed_changeform_admin',
     # Local apps
     'clients',
     'core',

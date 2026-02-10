@@ -3,52 +3,28 @@
     
     /**
      * Class to manage billing inline visibility based on checkbox states
+     * Note: Fieldset visibility is now handled server-side via get_fieldsets()
+     * This script only manages inline visibility (billing data and frequency inlines)
      */
     class BillingInlineManager {
         constructor() {
             this.$ = django.jQuery;
-            this.requiresBillingCheckbox = null;
             this.toggleBillingFormCheckbox = null;
             this.billingDataInline = null;
             this.billingFrequencyInline = null;
-            this.billingDataInfo = null;
         }
 
         /**
          * Initialize DOM element references
          */
         initializeElements() {
-            this.requiresBillingCheckbox = this.$('#id_requires_billing');
             this.toggleBillingFormCheckbox = this.$('#id_billing_override_enabled');
             this.billingDataInline = this.$('#billing_data-group');
             this.billingFrequencyInline = this.$('#billing_frecuency-group');
-            this.billingDataInfo = this.$('.tab-billing-inheritance');
         }
 
         /**
-         * Toggle billing inlines based on requires_billing checkbox
-         */
-        toggleBillingInlines() {
-            if (this.requiresBillingCheckbox.length === 0) {
-                return;
-            }
-            
-            const isChecked = this.requiresBillingCheckbox.is(':checked');
-            
-            console.log('Toggling billing inlines. requires_billing:', isChecked);
-            
-            if (isChecked) {
-                this.billingFrequencyInline.slideDown(300);
-                this.billingDataInfo.slideDown(300);
-            } else {
-                this.billingDataInline.slideUp(300);
-                this.billingFrequencyInline.slideUp(300);
-                this.billingDataInfo.slideUp(300);
-            }
-        }
-
-        /**
-         * Toggle billing data inline based on toggle_billing_form checkbox
+         * Toggle billing data inline based on billing_override_enabled checkbox
          */
         toggleBillingDataForm() {
             if (this.toggleBillingFormCheckbox.length === 0) {
@@ -57,12 +33,13 @@
             
             const isChecked = this.toggleBillingFormCheckbox.is(':checked');
             
-            console.log('Toggling billing data form. toggle_billing_form:', isChecked);
+            console.log('Toggling billing data form. billing_override_enabled:', isChecked);
             
+            // Use CSS display property to completely hide/show elements without leaving blank space
             if (isChecked) {
-                this.billingDataInline.slideDown(300);
+                this.billingDataInline.css('display', 'block');
             } else {
-                this.billingDataInline.slideUp(300);
+                this.billingDataInline.css('display', 'none');
             }
         }
 
@@ -70,12 +47,6 @@
          * Attach event listeners to checkboxes
          */
         attachEventListeners() {
-            if (this.requiresBillingCheckbox.length > 0) {
-                this.requiresBillingCheckbox.on('change', () => {
-                    this.toggleBillingInlines();
-                });
-            }
-
             if (this.toggleBillingFormCheckbox.length > 0) {
                 this.toggleBillingFormCheckbox.on('change', () => {
                     this.toggleBillingDataForm();
@@ -89,7 +60,6 @@
         init() {
             this.$(document).ready(() => {
                 this.initializeElements();
-                this.toggleBillingInlines();
                 this.toggleBillingDataForm();
                 this.attachEventListeners();
             });

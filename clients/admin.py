@@ -109,8 +109,8 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
 		)
-	tabs = [('Facturación', ['tab-billing-frequency']),
-			]
+	# Tabs are managed dynamically through get_fieldsets()
+	tabs = []
 
 	def get_inline_instances(self, request, obj=None):
 		"""
@@ -162,67 +162,40 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 			}),
 		)
 		
-		# Additional fieldsets for existing clients
-		# Only show billing_override_enabled for branch clients
-		billing_requirement_fields = ['get_billing_requirement_warning', 'requires_billing']
-		if obj and obj.type == 'branch':
-			billing_requirement_fields.append('billing_override_enabled')
-		
-		billing_fieldsets = (
-			(
-				'Requisito de Facturación',{
-					'fields': tuple(billing_requirement_fields),
-					'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
-					'classes': ('tab-requires-billing',),
-				}
-			),
-			('Información de Facturación', {
-				'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
-				'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
-				'classes': ('tab-billing-data','tab-billing-inheritance',),
-			}),
-		)
-		
 		# If creating a new client, return only base fieldsets
 		if obj is None:
 			return base_fieldsets
 		
-		# If editing an existing client, return all fieldsets
-		return base_fieldsets + billing_fieldsets
-
-	fieldsets = (
-		('Información Básica', {
-			'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link', ),
-			
-		}),
+		# Build billing fieldsets conditionally for existing clients
+		billing_fieldsets = []
 		
-		('Balance y Crédito', {
-			'fields': (
-				('can_pay_with_credit', 'requires_note_for_credit'),	
-				('credit_limit',),		
-					
-				('balance', 'current_debt', ), 
-				('get_available_credit'),
-				'get_balance_status',
-			),
-			'classes': ('tab-balance-credit',),
-			'description': 'Visualización de saldo prepagado y crédito del cliente.'
-		}),
-		('Facturación', {
-		 	'fields': (('requires_billing','get_add_billing_frequency_button'),),
-		 	'description': (
-				'Configure los datos de facturación del cliente. '
-				'Las sucursales pueden heredar datos de facturación del corporativo '
-				'o tener sus propios datos de facturación.'
-			),
-			'classes': ('tab-billing-data','tab-billing-frequency',),
-		}),
-		('Información de Facturación Heredada', {
-			'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
-			'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
-			'classes': ('tab-billing-data','tab-billing-inheritance',),
-		}),
-	)
+		# Only show billing_override_enabled for branch clients
+		billing_requirement_fields = ['get_billing_requirement_warning', 'requires_billing']
+		if obj.type == 'branch':
+			billing_requirement_fields.append('billing_override_enabled')
+		
+		# Always show billing requirement fieldset for existing clients
+		billing_fieldsets.append(
+			('Requisito de Facturación', {
+				'fields': tuple(billing_requirement_fields),
+				'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
+			})
+		)
+		
+		# Only show billing inheritance info if client requires billing
+		if obj.requires_billing:
+			billing_fieldsets.append(
+				('Información de Facturación', {
+					'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
+					'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
+				})
+			)
+		
+		# Return base fieldsets plus conditional billing fieldsets
+		return base_fieldsets + tuple(billing_fieldsets)
+
+	# fieldsets are managed dynamically via get_fieldsets() method
+	# This ensures only relevant fieldsets are rendered based on client state
 
 
 # ============================================================
