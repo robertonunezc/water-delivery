@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django_tabbed_changeform_admin.admin import DjangoTabbedChangeformAdmin
 from django.utils.html import format_html
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
@@ -109,8 +108,6 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, a
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
 		)
-	# Tabs are managed dynamically through get_fieldsets()
-	tabs = []
 
 	def get_inline_instances(self, request, obj=None):
 		"""
