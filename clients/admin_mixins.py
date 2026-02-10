@@ -45,12 +45,9 @@ class BillingDisplayMixin:
 			'billing_address': 'Dirección Fiscal',
 			'billing_frequency': 'Frecuencia de Facturación',
 		}
-		billing_status = obj.get_billing_setup_status()
-		if not billing_status.get('is_complete', False):
-			missing_data = billing_status.get('missing_components', [])
-			missing_errors = []
-			for m in missing_data:
-				missing_errors.append(missing_messages.get(m, m))			
+		billing = obj.billing_info
+		if not billing.is_complete:
+			missing_errors = [missing_messages.get(m, m) for m in billing.missing_components]
 			return format_html(
 				'<div style="background-color: #fff3cd; border: 1px solid #ffc107; '
 				'border-radius: 4px; color: #856404; margin-bottom: 10px;">'
@@ -92,32 +89,30 @@ class BillingDisplayMixin:
 		if not obj.pk:
 			return 'Guarde el cliente primero para ver información de facturación.'
 		
-		effective_data = obj.get_effective_billing_data()
-		effective_address = obj.get_effective_billing_address()
-		source = obj.get_billing_source()
+		billing = obj.billing_info
 		
-		if not effective_data and not effective_address:
+		if not billing.effective.has_any:
 			return format_html('<span style="color: red;">Sin datos de facturación</span>')
 
 		source_label = {
 			'own': '✓ Propios',
 			'corporate': '⬆ Heredados del corporativo',
 			'none': '✗ No disponible'
-		}.get(source, 'Desconocido')
+		}.get(billing.source, 'Desconocido')
 		source_color = {
 			'own': 'green',
 			'corporate': 'blue',
 			'none': 'red'
-		}.get(source, 'gray')
+		}.get(billing.source, 'gray')
 
 		result = f'<div><strong>Origen:</strong> <span style="color: {source_color};">{source_label}</span></div>'
 
-		if effective_data:
-			result += f'<div><strong>RFC:</strong> {effective_data.rfc}</div>'
-			result += f'<div><strong>Razón Social:</strong> {effective_data.razon_social[:50]}...</div>'
+		if billing.effective.data:
+			result += f'<div><strong>RFC:</strong> {billing.effective.data.rfc}</div>'
+			result += f'<div><strong>Razón Social:</strong> {billing.effective.data.razon_social[:50]}...</div>'
 
-		if effective_address:
-			result += f'<div><strong>Dirección Fiscal:</strong> {str(effective_address)[:80]}...</div>'
+		if billing.effective.address:
+			result += f'<div><strong>Dirección Fiscal:</strong> {str(billing.effective.address)[:80]}...</div>'
 		else:
 			result += '<div style="color: orange;"><strong>⚠ Sin dirección fiscal</strong></div>'
 		return format_html(result)
@@ -131,49 +126,45 @@ class BillingDisplayMixin:
 		if obj.type != 'branch':
 			return format_html('<span style="color: gray;">N/A (cliente corporativo)</span>')
 		
-		has_own_data = hasattr(obj, 'billing_data')
-		has_own_address = obj.addresses.filter(type='billing', active=True).exists()
-		has_complete_own = has_own_data and has_own_address
-
-	
-
-		if has_complete_own:
+		billing = obj.billing_info
+		
+		if billing.own.is_complete:
 			return format_html(
 				'<span style="color: green;">✓ Usa sus propios datos de facturación</span>'
 			)
 
 		if not obj.corporate:
 			return format_html(
-				'<span style="color: red;">✗ Sin corporativo asociado</span>{}',
+				'<span style="color: red;">✗ Sin corporativo asociado</span>',
 			)
 
-		corporate_has_data = hasattr(obj.corporate, 'billing_data')
-		corporate_has_address = obj.corporate.addresses.filter(type='billing', active=True).exists()
-		corporate_complete = corporate_has_data and corporate_has_address
-
-		if corporate_complete:
+		corporate_billing = obj.corporate.billing_info
+		
+		if corporate_billing.own.has_any:
 			missing = []
-			if not has_own_data:
+			if not billing.own.has_data:
 				missing.append('RFC/Razón Social')
-			if not has_own_address:
+			if not billing.own.has_address:
 				missing.append('Dirección Fiscal')
+			if not billing.own.has_frequency:
+				missing.append('Frecuencia')
 
 			return format_html(
 				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>',
-				', '.join(missing),
+				', '.join(missing) if missing else 'Todo',
 			)
 
-		missin_corporate_data = format_html(
+		missing_corporate_data = format_html(
 			'<span style="color: orange;">⚠ Corporativo sin datos completos de facturación</span>'
 		)
-		add_coportate_data_btn = format_html(
+		add_corporate_data_btn = format_html(
 			'<div style="margin-top: 5px;">'
 			'<a href="/admin/clients/client/{}/change/" class="button">Agregar Datos de Facturación del Corporativo</a>'
 			'</div>',
 			obj.corporate.id
 		)
 
-		return format_html('{}{}', missin_corporate_data, add_coportate_data_btn)
+		return format_html('{}{}', missing_corporate_data, add_corporate_data_btn)
 
 	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
 

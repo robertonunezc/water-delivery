@@ -147,7 +147,7 @@ def detail(request, pk):
     # Get client's contacts and addresses
     contacts = client.contacts.all()
     addresses = client.addresses.filter(active=True)
-    billing_data = client.get_effective_billing_data()
+    billing_data = client.billing_info.effective.data
 
     # Get route information for the client
     route_clients = client.client_routes.filter(is_active=True).select_related(

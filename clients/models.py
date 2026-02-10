@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from functools import cached_property
 from typing import Optional, List
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
@@ -258,24 +259,43 @@ class Client(TimeStampedModel):
         
         return (available_balance + available_credit) >= order_amount
 
-    # Billing and Address Methods
+    # Billing Information - Centralized API
+    @cached_property
+    def billing_info(self):
+        """
+        Get centralized billing information for this client.
+        
+        Returns BillingInfo object with:
+        - own: Client's own billing components (OwnBillingData)
+        - effective: Effective billing components, with inheritance (EffectiveBillingData)
+        - Properties: source, is_complete, can_create_invoice, missing_components, etc.
+        
+        Cached per-request to avoid repeated database queries.
+        """
+        from clients.billing_info import BillingInfo
+        return BillingInfo(self)
+
+    # Billing and Address Methods (delegate to billing_info)
     def get_missing_billing_components(self) -> dict:
         """
+        DEPRECATED: Use client.billing_info.missing_components instead.
+        
         Check which billing components are missing for this client.
-        Does not check inheritance - only looks at own data.
         
         Returns:
             dict: Dictionary with keys 'billing_data', 'billing_address', 'billing_frequency'
-                  Each value is True if the component is missing, False if present
+                  Each value is the effective component instance or None
         """
         return {
-            'billing_data':self.get_effective_billing_data(),
-            'billing_address': self.get_effective_billing_address(),
-            'billing_frequency': self.get_effective_billing_frequency()
+            'billing_data': self.billing_info.effective.data,
+            'billing_address': self.billing_info.effective.address,
+            'billing_frequency': self.billing_info.effective.frequency
         }
     
     def get_billing_setup_status(self) -> dict:
         """
+        DEPRECATED: Use client.billing_info.get_setup_status() or access properties directly.
+        
         Get comprehensive billing setup status including inheritance.
         
         Returns:
@@ -285,33 +305,7 @@ class Client(TimeStampedModel):
                 'missing_components': list of str (component names that are missing)
             }
         """
-        effective_data = self.get_effective_billing_data()
-        effective_address = self.get_effective_billing_address()
-        effective_frequency = self.get_effective_billing_frequency()
-        
-        is_complete = (
-            effective_data is not None and 
-            effective_address is not None and 
-            effective_frequency is not None
-        )
-        
-        # Determine source
-        source = self.get_billing_source()
-        
-        # Determine missing components based on effective data
-        missing = []
-        if effective_data is None:
-            missing.append('billing_data')
-        if effective_address is None:
-            missing.append('billing_address')
-        if effective_frequency is None:
-            missing.append('billing_frequency')
-        
-        return {
-            'is_complete': is_complete,
-            'source': source,
-            'missing_components': missing
-        }
+        return self.billing_info.get_setup_status()
 
     def has_billing_address(self):
         """Check if client has at least one billing address"""
@@ -341,108 +335,60 @@ class Client(TimeStampedModel):
 
     def get_effective_billing_data(self):
         """
+        DEPRECATED: Use client.billing_info.effective.data instead.
+        
         Returns own BillingData or corporate's if branch without own billing data.
         Respects billing_override_enabled flag - if enabled, only returns own data.
 
         Returns:
             BillingData instance or None
         """
-
-        # First, check if this client has its own billing data
-        if hasattr(self, 'billing_data'):
-            return self.billing_data
-
-        # If this is a branch and no own billing data, check corporate (unless override is enabled)
-        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
-            return self.corporate.get_effective_billing_data()
-
-        return None
+        return self.billing_info.effective.data
 
     def get_effective_billing_address(self):
         """
+        DEPRECATED: Use client.billing_info.effective.address instead.
+        
         Returns own billing address or corporate's if branch without own billing address.
 
         Returns:
             Address instance or None
         """
-        # First, check if this client has its own billing address
-        own_billing = self.addresses.filter(type='billing', active=True).first()
-        if own_billing:
-            return own_billing
-
-        # If this is a branch and no own billing address, check corporate
-        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
-            return self.corporate.get_effective_billing_address()
-
-        return None
+        return self.billing_info.effective.address
     
     def get_effective_billing_frequency(self):
         """
+        DEPRECATED: Use client.billing_info.effective.frequency instead.
+        
         Returns own billing frequency or corporate's if branch without own billing frequency.
         
         Returns:
             ClientBillingFrecuency instance or None
         """
-        # First, check if this client has its own active billing frequency
-        own_frequency = self.billing_frecuency if hasattr(self, 'billing_frecuency') else None
-        print(f"Client {self.name} has own billing frequency: {own_frequency}")
-        if own_frequency:
-            return own_frequency
-        
-        # If this is a branch and no own billing frequency, check corporate
-        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
-            return self.corporate.get_effective_billing_frequency()
-        
-        return None
+        return self.billing_info.effective.frequency
 
     def has_complete_billing_setup(self):
         """
+        DEPRECATED: Use client.billing_info.is_complete instead.
+        
         Check if client has complete billing setup (BillingData, billing Address, and billing Frequency).
         For branches, checks inherited setup if own setup is incomplete (unless override is enabled).
 
         Returns:
             bool: True if complete billing setup exists
         """
-        effective_billing_data = self.get_effective_billing_data()
-        effective_billing_address = self.get_effective_billing_address()
-        effective_billing_frequency = self.get_effective_billing_frequency()
-        return (
-            effective_billing_data is not None and 
-            effective_billing_address is not None and
-            effective_billing_frequency is not None
-        )
+        return self.billing_info.is_complete
 
     def get_billing_source(self):
         """
+        DEPRECATED: Use client.billing_info.source instead.
+        
         Determine where billing data comes from (useful for admin display).
 
         Returns:
             str: 'own', 'corporate', or 'none'
         """
-        # Check for OWN data (not effective/inherited)
-        has_own_data = hasattr(self, 'billing_data')
-        has_own_address = self.addresses.filter(type='billing', active=True).exists()
-        has_own_frequency = hasattr(self, 'billing_frecuency')
-        
-        # If has all three components of own data, it's own
-        if has_own_data and has_own_address and has_own_frequency:
-            return 'own'
-        
-        # If branch with override enabled but has some own data, still 'own' (not inheriting)
-        if self.type == 'branch' and self.billing_override_enabled:
-            if has_own_data or has_own_address or has_own_frequency:
-                return 'own'
-        
-        # Check if inheriting from corporate (only if override not enabled)
-        if self.type == 'branch' and self.corporate and not self.billing_override_enabled:
-            corporate_has_data = hasattr(self.corporate, 'billing_data')
-            corporate_has_address = self.corporate.addresses.filter(type='billing', active=True).exists()
-            corporate_has_frequency = hasattr(self.corporate, 'billing_frecuency')
-            
-            if corporate_has_data or corporate_has_address or corporate_has_frequency:
-                return 'corporate'
-
-        return 'none'
+        return self.billing_info.source
 
 
 

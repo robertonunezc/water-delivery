@@ -1437,3 +1437,341 @@ class ClientUpdateServiceTestCase(TestCase):
             ClientBillingFrecuency.objects.filter(client=updated_client).exists(),
             "Billing frequency should be deleted when requires_billing is False"
         )
+
+
+class BillingInfoTestCase(TestCase):
+    """Comprehensive test cases for the new centralized BillingInfo class"""
+
+    def setUp(self):
+        """Set up test data for billing info tests"""
+        # Create corporate client with complete billing setup
+        self.corporate = Client.objects.create(
+            name="Corporate Client",
+            type="corporate",
+            active=True
+        )
+        
+        self.corporate_billing_data = BillingData.objects.create(
+            client=self.corporate,
+            rfc="CORP123456ABC",
+            razon_social="Corporativo SA de CV"
+        )
+        
+        self.corporate_billing_address = Address.objects.create(
+            client=self.corporate,
+            type="billing",
+            street="Av. Corporativa 100",
+            municipality="Querétaro",
+            state="Querétaro",
+            zip_code="76000",
+            country="México",
+            active=True
+        )
+        
+        self.corporate_billing_frequency = ClientBillingFrecuency.objects.create(
+            client=self.corporate,
+            frequency="monthly",
+            billing_date="first_day",
+            is_active=True
+        )
+        
+        # Create branch client (no own billing data initially)
+        self.branch = Client.objects.create(
+            name="Branch Client",
+            type="branch",
+            corporate=self.corporate,
+            active=True
+        )
+
+    def test_billing_info_property_is_cached(self):
+        """Test that billing_info is cached using @cached_property"""
+        billing1 = self.corporate.billing_info
+        billing2 = self.corporate.billing_info
+        # Should be the same object instance (cached)
+        self.assertIs(billing1, billing2)
+
+    def test_own_billing_data_detects_all_components(self):
+        """Test OwnBillingData correctly detects all billing components"""
+        billing = self.corporate.billing_info
+        
+        self.assertTrue(billing.own.has_data)
+        self.assertTrue(billing.own.has_address)
+        self.assertTrue(billing.own.has_frequency)
+        self.assertTrue(billing.own.is_complete)
+        self.assertTrue(billing.own.has_any)
+
+    def test_own_billing_data_detects_missing_components(self):
+        """Test OwnBillingData correctly identifies missing components"""
+        client_no_billing = Client.objects.create(
+            name="Client No Billing",
+            type="corporate",
+            active=True
+        )
+        
+        billing = client_no_billing.billing_info
+        
+        self.assertFalse(billing.own.has_data)
+        self.assertFalse(billing.own.has_address)
+        self.assertFalse(billing.own.has_frequency)
+        self.assertFalse(billing.own.is_complete)
+        self.assertFalse(billing.own.has_any)
+
+    def test_effective_billing_inherits_from_corporate(self):
+        """Test EffectiveBillingData correctly inherits from corporate for branch"""
+        billing = self.branch.billing_info
+        
+        # Branch has no own data
+        self.assertFalse(billing.own.has_data)
+        self.assertFalse(billing.own.has_address)
+        self.assertFalse(billing.own.has_frequency)
+        
+        # But effective data should come from corporate
+        self.assertTrue(billing.effective.has_data)
+        self.assertTrue(billing.effective.has_address)
+        self.assertTrue(billing.effective.has_frequency)
+        self.assertTrue(billing.effective.is_complete)
+        
+        # Verify actual data
+        self.assertEqual(billing.effective.data.rfc, "CORP123456ABC")
+        self.assertEqual(billing.effective.address.street, "Av. Corporativa 100")
+        self.assertEqual(billing.effective.frequency.frequency, "monthly")
+
+    def test_effective_billing_uses_own_when_available(self):
+        """Test EffectiveBillingData uses own data when branch has it"""
+        # Add branch-specific billing data
+        branch_billing_data = BillingData.objects.create(
+            client=self.branch,
+            rfc="BRANCH123456XYZ",
+            razon_social="Sucursal SA de CV"
+        )
+        
+        branch_billing_address = Address.objects.create(
+            client=self.branch,
+            type="billing",
+            street="Av. Sucursal 200",
+            municipality="Querétaro",
+            active=True
+        )
+        
+        branch_billing_frequency = ClientBillingFrecuency.objects.create(
+            client=self.branch,
+            frequency="weekly",
+            is_active=True
+        )
+        
+        # Clear cache to get fresh billing_info
+        if hasattr(self.branch, '_billing_info'):
+            del self.branch._billing_info
+        if hasattr(self.branch, 'billing_info'):
+            del self.branch.__dict__['billing_info']
+        
+        billing = self.branch.billing_info
+        
+        # Should use own data, not inherited
+        self.assertTrue(billing.own.is_complete)
+        self.assertEqual(billing.effective.data.rfc, "BRANCH123456XYZ")
+        self.assertEqual(billing.effective.address.street, "Av. Sucursal 200")
+        self.assertEqual(billing.effective.frequency.frequency, "weekly")
+
+    def test_billing_source_own_for_complete_setup(self):
+        """Test source is 'own' when client has complete own billing"""
+        billing = self.corporate.billing_info
+        self.assertEqual(billing.source, 'own')
+        self.assertFalse(billing.uses_inheritance)
+
+    def test_billing_source_corporate_for_inheriting_branch(self):
+        """Test source is 'corporate' when branch inherits from corporate"""
+        billing = self.branch.billing_info
+        self.assertEqual(billing.source, 'corporate')
+        self.assertTrue(billing.uses_inheritance)
+
+    def test_billing_source_none_without_data(self):
+        """Test source is 'none' when no billing data available"""
+        client_no_billing = Client.objects.create(
+            name="Client No Billing",
+            type="corporate",
+            active=True
+        )
+        
+        billing = client_no_billing.billing_info
+        self.assertEqual(billing.source, 'none')
+        self.assertFalse(billing.uses_inheritance)
+
+    def test_billing_source_own_with_override_enabled(self):
+        """Test source is 'own' when branch has override enabled with partial data"""
+        # Enable override but only add partial data
+        self.branch.billing_override_enabled = True
+        self.branch.save()
+        
+        BillingData.objects.create(
+            client=self.branch,
+            rfc="BRANCH123456XYZ",
+            razon_social="Sucursal SA de CV"
+        )
+        
+        # Clear cache
+        if hasattr(self.branch, 'billing_info'):
+            del self.branch.__dict__['billing_info']
+        
+        billing = self.branch.billing_info
+        
+        # Should be 'own' even though incomplete
+        self.assertEqual(billing.source, 'own')
+        self.assertTrue(billing.own.has_any)
+        self.assertFalse(billing.own.is_complete)
+
+    def test_is_complete_property(self):
+        """Test is_complete property accurately reflects completeness"""
+        # Complete setup
+        self.assertTrue(self.corporate.billing_info.is_complete)
+        
+        # Incomplete setup
+        client_partial = Client.objects.create(
+            name="Client Partial",
+            type="corporate",
+            active=True
+        )
+        BillingData.objects.create(
+            client=client_partial,
+            rfc="PARTIAL123ABC",
+            razon_social="Partial SA"
+        )
+        
+        self.assertFalse(client_partial.billing_info.is_complete)
+
+    def test_can_create_invoice_property(self):
+        """Test can_create_invoice property matches is_complete"""
+        billing_complete = self.corporate.billing_info
+        self.assertTrue(billing_complete.can_create_invoice)
+        self.assertEqual(billing_complete.can_create_invoice, billing_complete.is_complete)
+        
+        client_incomplete = Client.objects.create(
+            name="Client Incomplete",
+            type="corporate",
+            active=True
+        )
+        billing_incomplete = client_incomplete.billing_info
+        self.assertFalse(billing_incomplete.can_create_invoice)
+
+    def test_missing_components_list(self):
+        """Test missing_components returns correct list of missing items"""
+        # No missing components
+        self.assertEqual(self.corporate.billing_info.missing_components, [])
+        
+        # Missing all components
+        client_empty = Client.objects.create(
+            name="Client Empty",
+            type="corporate",
+            active=True
+        )
+        self.assertEqual(
+            set(client_empty.billing_info.missing_components),
+            {'billing_data', 'billing_address', 'billing_frequency'}
+        )
+        
+        # Missing only frequency
+        client_partial = Client.objects.create(
+            name="Client Partial",
+            type="corporate",
+            active=True
+        )
+        BillingData.objects.create(
+            client=client_partial,
+            rfc="PARTIAL123ABC",
+            razon_social="Partial SA"
+        )
+        Address.objects.create(
+            client=client_partial,
+            type="billing",
+            street="Partial Street",
+            municipality="Querétaro",
+            active=True
+        )
+        
+        self.assertEqual(
+            client_partial.billing_info.missing_components,
+            ['billing_frequency']
+        )
+
+    def test_get_setup_status_backward_compatibility(self):
+        """Test get_setup_status() maintains backward compatibility"""
+        status = self.corporate.billing_info.get_setup_status()
+        
+        self.assertIsInstance(status, dict)
+        self.assertIn('is_complete', status)
+        self.assertIn('source', status)
+        self.assertIn('missing_components', status)
+        
+        self.assertTrue(status['is_complete'])
+        self.assertEqual(status['source'], 'own')
+        self.assertEqual(status['missing_components'], [])
+
+    def test_get_override_validation_warnings_with_incomplete_data(self):
+        """Test override validation warnings when branch has incomplete own data"""
+        self.branch.billing_override_enabled = True
+        self.branch.save()
+        
+        # Clear cache
+        if hasattr(self.branch, 'billing_info'):
+            del self.branch.__dict__['billing_info']
+        
+        warnings = self.branch.billing_info.get_override_validation_warnings()
+        
+        self.assertEqual(len(warnings), 3)  # Missing all 3 components
+        self.assertTrue(any('RFC' in w for w in warnings))
+        self.assertTrue(any('Dirección fiscal' in w for w in warnings))
+        self.assertTrue(any('Frecuencia' in w for w in warnings))
+
+    def test_get_override_validation_warnings_with_complete_data(self):
+        """Test no warnings when branch with override has complete data"""
+        self.branch.billing_override_enabled = True
+        self.branch.save()
+        
+        # Add complete billing data
+        BillingData.objects.create(
+            client=self.branch,
+            rfc="BRANCH123456XYZ",
+            razon_social="Sucursal SA de CV"
+        )
+        Address.objects.create(
+            client=self.branch,
+            type="billing",
+            street="Branch Street",
+            municipality="Querétaro",
+            active=True
+        )
+        ClientBillingFrecuency.objects.create(
+            client=self.branch,
+            frequency="monthly",
+            is_active=True
+        )
+        
+        # Clear cache
+        if hasattr(self.branch, 'billing_info'):
+            del self.branch.__dict__['billing_info']
+        
+        warnings = self.branch.billing_info.get_override_validation_warnings()
+        self.assertEqual(len(warnings), 0)
+
+    def test_get_override_validation_warnings_without_override(self):
+        """Test no warnings when override is disabled"""
+        warnings = self.branch.billing_info.get_override_validation_warnings()
+        self.assertEqual(len(warnings), 0)
+
+    def test_override_prevents_inheritance(self):
+        """Test that billing_override_enabled prevents inheritance"""
+        self.branch.billing_override_enabled = True
+        self.branch.save()
+        
+        # Clear cache
+        if hasattr(self.branch, 'billing_info'):
+            del self.branch.__dict__['billing_info']
+        
+        billing = self.branch.billing_info
+        
+        # Should NOT inherit from corporate
+        self.assertIsNone(billing.effective.data)
+        self.assertIsNone(billing.effective.address)
+        self.assertIsNone(billing.effective.frequency)
+        self.assertFalse(billing.effective.is_complete)
+

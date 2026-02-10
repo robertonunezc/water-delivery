@@ -38,6 +38,7 @@ Dev workflows & commands (copy-paste)
   source .venv/bin/activate
   pip install -r requirements.txt
   ```
+- run source .venv/bin/activate to activate the virtual environment before running any commands.
 - Migrations / DB:
   ```bash
   make migrate
