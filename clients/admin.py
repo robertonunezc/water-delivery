@@ -5,6 +5,7 @@ from django.urls import path
 from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
 from . import models
 from .forms import (
 	ManualBalanceTransactionForm, 
@@ -19,6 +20,7 @@ class ContactInline(admin.TabularInline):
 	model = models.Contact
 	extra = 0
 	exclude = ('deleted_at',)
+	tab = True
 
 
 @admin.register(models.Address)
@@ -26,12 +28,13 @@ class AddressAdmin(admin.ModelAdmin):
 	list_display = ('street', 'municipality', 'state', 'zip_code', 'client__name')
 	model = models.Address
 	exclude = ('deleted_at',)
-class AddressInline(admin.StackedInline):
+class AddressInline(StackedInline):
 	model = models.Address
 	extra = 0
 	exclude = ('deleted_at',)
+	tab = True
 
-class ClientBillingFrecuencyInline(admin.StackedInline):
+class ClientBillingFrecuencyInline(StackedInline):
 	model = models.ClientBillingFrecuency
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
@@ -45,8 +48,9 @@ class ClientBillingFrecuencyInline(admin.StackedInline):
 		'notes'
 	)
 	exclude = ('deleted_at',)
+	tab = True
 
-class BillingFrecuencyInline(admin.TabularInline):
+class BillingFrecuencyInline(StackedInline):
 	model = models.ClientBillingFrecuency
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
@@ -59,7 +63,8 @@ class BillingFrecuencyInline(admin.TabularInline):
 		'notes'
 	)
 	exclude = ('deleted_at',)
-class ClientCreditConfigInline(admin.StackedInline):
+	tab = True
+class ClientCreditConfigInline(StackedInline):
 	model = models.ClientCreditConfig
 	extra = 0
 	verbose_name = "Configuración de Crédito"
@@ -70,19 +75,20 @@ class ClientCreditConfigInline(admin.StackedInline):
 		('first_notification_days', 'second_notification_days'),
 		'overdue_notification_days'
 	)
+	tab = True
 	
-class ClientBillingDataInline(admin.StackedInline):
+class ClientBillingDataInline(StackedInline):
 	model = models.BillingData
 	display_fields = ('rfc', 'razon_social', 'curp')
 	exclude = ('deleted_at',)
 	extra = 0
 	verbose_name = "Datos de Facturación"
 	verbose_name_plural = "Datos de Facturación"
-	
+	tab = True
 	
 
 @admin.register(models.Client)
-class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, admin.ModelAdmin):
+class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
