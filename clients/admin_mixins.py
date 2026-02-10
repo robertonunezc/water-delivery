@@ -58,6 +58,7 @@ class BillingDisplayMixin:
 				'en el corporativo' if obj.corporate else 'en el cliente si no se heredan del corporativo',
 				format_html(''.join(f'<li>{item}</li>' for item in missing_errors))
 			)
+		return 'Toda la información de facturación está completa.'
 	
 	get_billing_requirement_warning.short_description = ''
 	

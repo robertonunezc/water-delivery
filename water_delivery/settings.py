@@ -77,7 +77,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = 'water_delivery.urls'
+CRISPY_TEMPLATE_PACK = "unfold_crispy"
 
+CRISPY_ALLOWED_TEMPLATE_PACKS = ["unfold_crispy"]
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

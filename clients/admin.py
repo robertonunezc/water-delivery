@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.http import HttpResponseRedirect, HttpResponse
 from django.urls import reverse
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from unfold.contrib.inlines.admin import NonrelatedTabularInline
 from . import models
 from .forms import (
 	ManualBalanceTransactionForm, 
@@ -14,9 +15,7 @@ from .forms import (
 	ClientBillingFrequencyForm
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
-
-
-class ContactInline(admin.TabularInline):
+class ContactInline(TabularInline):
 	model = models.Contact
 	extra = 0
 	exclude = ('deleted_at',)
@@ -130,9 +129,16 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		# Get all inline instances
 		all_inlines = super().get_inline_instances(request, obj)
 		
+		# Hide billing-related inlines when billing is not required
+		if not obj.requires_billing:
+			filtered_inlines = [
+				inline for inline in all_inlines
+				if not isinstance(inline, (BillingFrecuencyInline, ClientBillingDataInline))
+			]
+			return filtered_inlines
+
 		# If it's a branch client without billing override, filter out billing-related inlines
 		if obj.type == 'branch' and not obj.billing_override_enabled:
-			# Filter out BillingFrecuencyInline and ClientBillingDataInline
 			filtered_inlines = [
 				inline for inline in all_inlines
 				if not isinstance(inline, (BillingFrecuencyInline, ClientBillingDataInline))
@@ -150,7 +156,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		# Base fieldsets for new clients
 		base_fieldsets = (
 			('Información Básica', {
-				'fields': (('name', 'active'), 'type', 'corporate', 'note', 'address_link', ),
+				'fields': (('name', 'active'), ('type', 'corporate'), ('note', 'address_link'), ),
 			}),
 			('Balance y Crédito', {
 				'fields': (
@@ -160,7 +166,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 					('get_available_credit'),
 					'get_balance_status',
 				),
-				'classes': ('tab-balance-credit',),
+				'classes': ["tab"],
 				'description': 'Visualización de saldo prepagado y crédito del cliente.'
 			}),
 		)
@@ -177,22 +183,16 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		if obj.type == 'branch':
 			billing_requirement_fields.append('billing_override_enabled')
 		
-		# Always show billing requirement fieldset for existing clients
+		# Build a single billing fieldset, optionally adding billing info fields
+		billing_fields = list(billing_requirement_fields)
+		if obj.requires_billing:
+			billing_fields.extend(['get_effective_billing_info', 'get_billing_inheritance_status'])
+		
 		billing_fieldsets.append(
-			('Requisito de Facturación', {
-				'fields': tuple(billing_requirement_fields),
-				'description': 'Indica si el cliente requiere datos de facturación. Si se activa, se mostrarán los campos para configurar los datos de facturación y frecuencia de facturación.',
+			('Información de Facturación', {
+				'fields': tuple(billing_fields),
 			})
 		)
-		
-		# Only show billing inheritance info if client requires billing
-		if obj.requires_billing:
-			billing_fieldsets.append(
-				('Información de Facturación', {
-					'fields': ('get_effective_billing_info', 'get_billing_inheritance_status'),
-					'description': 'Información de facturación efectiva (propia o heredada del corporativo)',
-				})
-			)
 		
 		# Return base fieldsets plus conditional billing fieldsets
 		return base_fieldsets + tuple(billing_fieldsets)
