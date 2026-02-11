@@ -1,155 +1,133 @@
 (function() {
     'use strict';
-    
-    /**
-     * Update client via AJAX PATCH request
-     * @param {number} clientId - The client ID
-     * @param {object} data - The data to update
-     * @returns {Promise} - Promise that resolves with the response
-     */
-    function updateClient(clientId, data) {
-        console.log('Updating client with ID:', clientId, 'Data:', data);
-        const url = `/clients/${clientId}/update/`;
-        
-        return fetch(url, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCookie('csrftoken'),
-            },
-            body: JSON.stringify(data),
-        })
-        .then(response => {
-            if (!response.ok) {
-                return response.json().then(err => Promise.reject(err));
+
+    class ClientAdminUpdater {
+        constructor() {
+            this.clientId = this.extractClientId();
+            this.init();
+        }
+
+        extractClientId() {
+            const match = window.location.pathname.match(/\/clients\/client\/(\d+)\/change\//);
+            if (!match) {
+                console.warn('Could not extract client ID from URL');
+                return null;
             }
-            return response.json();
-        });
-    }
-    
-    /**
-     * Get CSRF token from cookies
-     * @param {string} name - Cookie name
-     * @returns {string|null} - Cookie value or null
-     */
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
+            return match[1];
+        }
+
+        getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === name + '=') {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
                 }
             }
+            return cookieValue;
         }
-        return cookieValue;
-    }
-    
-    /**
-     * Show notification message
-     * @param {string} message - Message to display
-     * @param {string} type - Message type (success, error, warning, info)
-     */
-    function showNotification(message, type = 'info') {
-        // Try to use Django messages framework
-        const messagesContainer = document.querySelector('.messagelist, .messages');
-        
-        if (messagesContainer) {
-            const messageDiv = document.createElement('li');
-            messageDiv.className = type;
-            messageDiv.textContent = message;
-            messagesContainer.appendChild(messageDiv);
-            
-            // Auto-remove after 5 seconds
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 5000);
-        } else {
-            // Fallback to alert if messages container not found
-            alert(message);
+
+        updateClient(data) {
+            if (!this.clientId) {
+                return Promise.reject(new Error('Client ID not available'));
+            }
+
+            const url = `/clients/${this.clientId}/update/`;
+            return fetch(url, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCookie('csrftoken'),
+                },
+                body: JSON.stringify(data),
+            }).then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            });
         }
-    }
-    
-    /**
-     * Initialize requires_billing checkbox handler
-     */
-    function initRequiresBillingHandler() {
-        console.log('Initializing requires_billing checkbox handler');
-        // Wait for DOM to be ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', setupHandler);
-        } else {
-            setupHandler();
+
+        showNotification(message, type = 'info') {
+            const messagesContainer = document.querySelector('.messagelist, .messages');
+
+            if (messagesContainer) {
+                const messageItem = document.createElement('li');
+                messageItem.className = type;
+                messageItem.textContent = message;
+                messagesContainer.appendChild(messageItem);
+                setTimeout(() => messageItem.remove(), 5000);
+            } else {
+                alert(message);
+            }
         }
-        
-        function setupHandler() {
-            // Find the requires_billing checkbox
-            const requiresBillingCheckbox = document.querySelector('#id_requires_billing');
-            
-            if (!requiresBillingCheckbox) {
-                console.warn('requires_billing checkbox not found');
+
+        bindCheckbox(selector, payloadBuilder) {
+            const checkbox = document.querySelector(selector);
+            if (!checkbox) {
+                console.warn(`${selector} checkbox not found`);
                 return;
             }
-            
-            // Get client ID from URL (assuming admin change form URL pattern)
-            const urlMatch = window.location.pathname.match(/\/clients\/client\/(\d+)\/change\//);
-            if (!urlMatch) {
-                console.warn('Could not extract client ID from URL');
-                return;
-            }
-            
-            const clientId = urlMatch[1];
-            
-            // Add change event listener
-            requiresBillingCheckbox.addEventListener('change', function(e) {
+
+            checkbox.addEventListener('change', e => {
                 const isChecked = e.target.checked;
-                const originalValue = !isChecked; // Store original value for rollback
-                
-                // Disable checkbox during update
-                requiresBillingCheckbox.disabled = true;
-                
-                // Update client
-                updateClient(clientId, { requires_billing: isChecked })
+                const originalValue = !isChecked;
+                checkbox.disabled = true;
+
+                this.updateClient(payloadBuilder(isChecked))
                     .then(response => {
                         if (response.success) {
-                            showNotification(
+                            this.showNotification(
                                 response.message || 'Cliente actualizado exitosamente',
                                 'success'
                             );
                             window.location.reload();
                         } else {
-                            // Rollback on failure
-                            requiresBillingCheckbox.checked = originalValue;
-                            showNotification(
+                            checkbox.checked = originalValue;
+                            this.showNotification(
                                 response.error || 'Error al actualizar cliente',
                                 'error'
                             );
                         }
                     })
                     .catch(error => {
-                        // Rollback on error
-                        requiresBillingCheckbox.checked = originalValue;
+                        checkbox.checked = originalValue;
                         const errorMessage = error.error || error.message || 'Error al actualizar cliente';
-                        showNotification(errorMessage, 'error');
+                        this.showNotification(errorMessage, 'error');
                         console.error('Error updating client:', error);
                     })
                     .finally(() => {
-                        // Re-enable checkbox
-                        requiresBillingCheckbox.disabled = false;
+                        checkbox.disabled = false;
                     });
             });
         }
+
+        initHandlers() {
+            this.bindCheckbox('#id_requires_billing', isChecked => ({ requires_billing: isChecked }));
+            this.bindCheckbox('#id_billing_override_enabled', isChecked => ({ billing_override_enabled: isChecked }));
+        }
+
+        init() {
+            if (!this.clientId) {
+                return;
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', () => this.initHandlers());
+            } else {
+                this.initHandlers();
+            }
+        }
     }
-    
-    // Initialize when script loads
-    initRequiresBillingHandler();
-    
-    // Export for potential external use
+
+    const updater = new ClientAdminUpdater();
+
     window.clientUpdateUtils = {
-        updateClient: updateClient,
-        showNotification: showNotification,
+        updateClient: data => updater.updateClient(data),
+        showNotification: (message, type) => updater.showNotification(message, type),
     };
-    
 })();
