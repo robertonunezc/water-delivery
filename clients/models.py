@@ -173,6 +173,12 @@ class Client(TimeStampedModel):
         if errors:
             raise ValidationError(errors)
 
+    def save(self, *args, **kwargs):
+        """Auto-enable billing on new branches when the corporate requires it."""
+        if self.type == 'branch' and self.corporate and self.corporate.requires_billing:
+            self.requires_billing = True
+        return super().save(*args, **kwargs)
+
     # Balance and Credit State Methods (pure state queries, no side effects)
     def get_available_credit(self):
         """Get remaining credit available"""
