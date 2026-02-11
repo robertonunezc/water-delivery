@@ -16,5 +16,5 @@ botocore==1.31.45
 Pillow==10.4.0
 django-storages==1.14.0
 whitenoise==6.11.0
-unfold==0.78.1
+unfold==1.2.4
 django-crispy-forms==2.5
