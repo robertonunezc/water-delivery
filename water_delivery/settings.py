@@ -39,7 +39,6 @@ ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
     #'jazzmin',
-    #'grappelli',
     'unfold',
     "unfold.contrib.filters",  # optional, if special filters are needed
     "unfold.contrib.forms",  # optional, if special form elements are needed
