@@ -485,7 +485,7 @@ class ClientValidationTestCase(TestCase):
 
         can_receive, error_msg = branch.can_receive_orders()
         self.assertFalse(can_receive)
-        self.assertIn('dirección de envío', error_msg.lower())
+        self.assertIn('domicilio de envío', error_msg.lower())
 
     def test_branch_can_receive_orders_with_shipping_address(self):
         """Test that branch can receive orders with shipping address"""

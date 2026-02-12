@@ -178,6 +178,23 @@ class UpdateOrderTestCase(TestCase):
 
         self.assertEqual(result.total_amount, Decimal("80.00"))
 
+    def test_update_order_with_discount(self) -> None:
+        """Test that update_order applies discount correctly."""
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=25.00,
+        )
+
+        result = services.update_order(
+            order=self.order,
+            quantity=4,
+            product=self.product,
+            client=self.client,
+            discount=Decimal("10.00"),
+        )
+
+        self.assertEqual(result.total_amount, Decimal("90.00"))
 
 class CalculateOrderTotalTestCase(TestCase):
     """Tests for the calculate_order_total service function."""
