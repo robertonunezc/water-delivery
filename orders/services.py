@@ -41,7 +41,7 @@ def get_product_price_for_client(product, client):
     except ProductClientPrice.DoesNotExist:
         return Decimal(str(getattr(product, 'base_price', 0.0)))
     
-def update_order(order:Order, quantity:int, product, client:Client, discount: Decimal) -> Order:
+def update_order(order: Order, quantity: int, product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
     unit_price = get_product_price_for_client(product, client)
     if not isinstance(unit_price, Decimal):
         unit_price = Decimal(str(unit_price))
@@ -57,7 +57,8 @@ def update_order(order:Order, quantity:int, product, client:Client, discount: De
     order_product.total_price = unit_price * Decimal(order_product.quantity)
     order_product.save()
     # update order total and return the order
-    order.discount = discount
+    order_discount = discount
+    order.discount = order_discount
     order.total_amount = calculate_order_total(order)
     order.save()
     return order
