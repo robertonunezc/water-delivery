@@ -127,7 +127,7 @@ class OrderProductInline(admin.TabularInline):
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
     list_display = (
-        'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted',
+        'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted', 'discount',
         'total_amount_display', 'items_count', 'payment_status', 'billing_status', 'created_display'
     )
     

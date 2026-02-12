@@ -83,6 +83,7 @@ class OrderManager(models.Manager):
 class Order(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='orders')
     order_date = models.DateTimeField(auto_now_add=True, db_index=True)
+    subtotal_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Subtotal", help_text="Suma de los productos antes de descuentos")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cantidad_cobrada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Cantidad Cobrada", help_text="Cantidad realmente cobrada al cliente (puede ser mayor al total para agregar saldo)")
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default=OrderStatus.PENDING.value, db_index=True)

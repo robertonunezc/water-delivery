@@ -49,18 +49,17 @@ def update_order(order: Order, quantity: int, product, client: Client, discount:
     if quantity <= 0:
         order_product.delete()
         order.total_amount = calculate_order_total(order)
-        order.save()
+        order.save(update_fields=['subtotal_amount', 'total_amount'])
         return order
 
     order_product.quantity = int(quantity)
     order_product.unit_price = unit_price
     order_product.total_price = unit_price * Decimal(order_product.quantity)
     order_product.save()
-    # update order total and return the order
-    order_discount = discount
-    order.discount = order_discount
+    # update order totals and return the order
+    order.discount = discount
     order.total_amount = calculate_order_total(order)
-    order.save()
+    order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
     return order
 
 def calculate_order_total(order) -> Decimal:
@@ -70,7 +69,10 @@ def calculate_order_total(order) -> Decimal:
         qty = Decimal(str(item.quantity))
         subtotal += unit * qty
     discount = Decimal(str(order.discount or 0))
-    return max(Decimal("0"), subtotal - discount)
+    total = max(Decimal("0"), subtotal - discount)
+    if hasattr(order, 'subtotal_amount'):
+        order.subtotal_amount = subtotal
+    return total
 
 def get_client_order_without_bill(client: Client, no_limit: Optional[int] = None) -> List[OrderData]:
     if no_limit:

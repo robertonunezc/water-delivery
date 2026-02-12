@@ -202,20 +202,31 @@ def update_order(request, order_pk):
         except json.JSONDecodeError:
             return HttpResponseBadRequest('Invalid JSON')
 
-        product_id = data.get('product_id')
         try:
             quantity = int(data.get('quantity', 0))
+            discount = Decimal(str(data.get('discount', '0')))  # Ensure discount is treated as Decimal
         except (TypeError, ValueError):
-            return HttpResponseBadRequest('Invalid quantity')
+            return HttpResponseBadRequest('Invalid quantity or discount format')
 
-        product = get_object_or_404(Product, pk=product_id)
-        # Clients should only have one pending order per day
-        pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
-        if quantity <= 0:
-            pending_client_order.deleted_at = date.today()
-            pending_client_order.save()
+        product_id = data.get('product_id')
+        # If no product_id is provided, only update the discount on the existing pending order.
+        if not product_id:
+            pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
+            if not pending_client_order:
+                return HttpResponseBadRequest('No pending order found')
+            pending_client_order.discount = discount
+            pending_client_order.total_amount = services.calculate_order_total(pending_client_order)
+            pending_client_order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
+            order = pending_client_order
         else:
-           order = services.update_order(pending_client_order, quantity, product, order.client)
+            product = get_object_or_404(Product, pk=product_id)
+            # Clients should only have one pending order per day
+            pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
+            if quantity <= 0:
+                pending_client_order.deleted_at = date.today()
+                pending_client_order.save()
+            else:
+               order = services.update_order(pending_client_order, quantity, product, order.client, discount)
 
         # Calculate payment breakdown based on client's available balance
         client = order.client
@@ -228,7 +239,9 @@ def update_order(request, order_pk):
         return JsonResponse({
             'status': 'success', 
             'order_total': str(order.total_amount),
+            'subtotal': str(order.subtotal_amount),
             'client_balance': str(client_balance),
+            'discount': str(discount),
             'payment_breakdown': payment_breakdown
         })
 
