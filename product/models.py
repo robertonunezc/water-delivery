@@ -40,6 +40,8 @@ class Product(models.Model):
     min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity', verbose_name="Cantidad mínima en inventario")
     max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity', verbose_name="Cantidad máxima en inventario")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    price = models.FloatField(default=0.0, verbose_name="Precio")
+    
     def __str__(self):
         return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
 

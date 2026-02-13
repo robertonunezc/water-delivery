@@ -186,7 +186,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		# Build a single billing fieldset, optionally adding billing info fields
 		billing_fields = list(billing_requirement_fields)
 		if obj.requires_billing:
-			billing_fields.extend(['get_effective_billing_info', 'get_billing_inheritance_status'])
+			billing_fields.extend([('get_effective_billing_info', 'get_billing_inheritance_status')])
 		
 		billing_fieldsets.append(
 			('Información de Facturación', {

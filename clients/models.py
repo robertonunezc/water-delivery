@@ -599,14 +599,14 @@ class Address(TimeStampedModel):
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
-    locality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Localidad")
-    municipality = models.CharField(max_length=100, blank=True, null=True, verbose_name="Delegación o Municipio")
-    state = models.CharField(max_length=100, default='Queretaro', verbose_name="Estado")
+    locality = models.CharField(max_length=100, verbose_name="Localidad", default='Querétaro')
+    municipality = models.CharField(max_length=100,default='Querétaro', verbose_name="Delegación o Municipio")
+    state = models.CharField(max_length=100, default='Querétaro', verbose_name="Estado")
     zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
     country = models.CharField(max_length=100, default='Mexico', verbose_name="País")
     reference = models.TextField(blank=True, null=True, verbose_name="Referencia")
     active = models.BooleanField(default=True, verbose_name="Activo")
-    note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    # note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='shipping', verbose_name="Tipo")
     
     class Meta:
