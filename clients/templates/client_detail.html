@@ -156,7 +156,7 @@ Desde {{date_since}}</small>
 
   <div class="row">
     <!-- Client Information Column -->
-    <div class="col-md-4">
+    <div class="col-md-3">
       <!-- Contact Information -->
       <div class="card mb-4">
         <div class="card-header section-header">
@@ -533,7 +533,7 @@ Desde {{date_since}}</small>
     </div>
 
     <!-- Orders and Payments Column -->
-    <div class="col-md-8">
+    <div class="col-md-9">
       <!-- Recent Orders -->
       <div class="card mb-4">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
@@ -549,7 +549,9 @@ Desde {{date_since}}</small>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Estado</th>
-                    <th>Total</th>
+                    <th>Subtotal</th>
+                    <th>Descuento</th>
+                    <th>Pagado</th>
                     <th>Productos</th>
                     <th>Pago</th>
                     {% comment %} <th>Acciones</th> {% endcomment %}
@@ -565,7 +567,12 @@ Desde {{date_since}}</small>
                           {{ order.get_status_display_fixed }}
                         </span>
                       </td>
+                      <td>${{ order.subtotal_amount|floatformat:2 }}</td>
+                      <td>
+                        ${{order.discount|floatformat:2}}
+                      </td>
                       <td>${{ order.total_amount|floatformat:2 }}</td>
+
                       <td>
                         <small>
                           {% for item in order.items.all %}
@@ -635,8 +642,6 @@ Desde {{date_since}}</small>
                     <th>Pedido</th>
                     <th>Método/Tipo</th>
                     <th>Estado</th>
-                    <th>Subtotal</th>
-                    <th>Descuento</th>
                     <th>Pagado</th>
                     <th>Descripción</th>
                   </tr>
@@ -679,27 +684,8 @@ Desde {{date_since}}</small>
                           {% endif %}
                         {% endif %}
                       </td>
-                           <td>  
-                        {% if payment_data.subtotal_amount > 0 %}
-                          <span class="text-success">${{ payment_data.subtotal_amount|floatformat:2 }}</span>
-                        {% else %}
-                          <span class="text-muted">-</span>
-                        {% endif %}
-                      </td>
-                      <td>
-                        {% if payment_data.discount > 0 %}
-                          <span class="text-danger">-${{ payment_data.discount|floatformat:2 }}</span>
-                        {% else %}
-                          <span class="text-muted">-</span>
-                        {% endif %}
-                      </td>
-                      <td>
-                        {% if payment_data.total_amount > 0 %}
-                          <span class="text-success">${{ payment_data.total_amount|floatformat:2 }}</span>
-                        {% else %}
-                          <span class="text-muted">-</span>
-                        {% endif %}
-                      </td>
+                         
+                
                       <td>
                         <small class="text-muted">{{ payment_data.description|truncatechars:50 }}</small>
                       </td>
