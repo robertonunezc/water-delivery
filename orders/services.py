@@ -39,7 +39,7 @@ def get_product_price_for_client(product, client):
         price_entry = ProductClientPrice.objects.get(product=product, client=client)
         return Decimal(str(price_entry.price))
     except ProductClientPrice.DoesNotExist:
-        return Decimal(str(getattr(product, 'base_price', 0.0)))
+        return Decimal(str(getattr(product, 'price', 0.0)))
     
 def update_order(order: Order, quantity: int, product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
     unit_price = get_product_price_for_client(product, client)

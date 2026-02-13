@@ -1,6 +1,7 @@
 from .models import ProductCategory, Product, ProductClientPrice
 from django.contrib import admin
 
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
 
 class ProductClientPriceInline(admin.TabularInline):
     model = ProductClientPrice
@@ -9,14 +10,14 @@ class ProductClientPriceInline(admin.TabularInline):
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(admin.ModelAdmin):
+class ProductCategoryAdmin(ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'presentation', 'unit_of_measure', 'quantity', 'category', 'min_inventory', 'max_inventory')
+class ProductAdmin(ModelAdmin):
+    list_display = ('name', 'presentation', 'unit_of_measure', 'quantity','price', 'category', 'min_inventory', 'max_inventory')
     list_filter = ('category', 'unit_of_measure')
     search_fields = ('name', 'presentation')
     inlines = [ProductClientPriceInline]
@@ -24,7 +25,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductClientPrice)
-class ProductClientPriceAdmin(admin.ModelAdmin):
+class ProductClientPriceAdmin(ModelAdmin):
     list_display = ('product', 'client', 'price', 'until_date')
     search_fields = ('product__name', 'client__name')
     list_filter = ('until_date',)

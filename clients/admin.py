@@ -1,3 +1,4 @@
+import logging
 from django.contrib import admin
 from django.utils.html import format_html
 from django.shortcuts import render, redirect, get_object_or_404
@@ -15,6 +16,9 @@ from .forms import (
 	ClientBillingFrequencyForm
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
+from product.services import ensure_client_product_prices
+
+logger = logging.getLogger(__name__)
 class ContactInline(TabularInline):
 	model = models.Contact
 	extra = 0
@@ -112,6 +116,29 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 			'clients/admin/toggle_corporate_field.js',
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
+		)
+
+	def save_model(self, request, obj, form, change):
+		super().save_model(request, obj, form, change)
+		if change:
+			return
+
+		pricing_summary = ensure_client_product_prices(obj)
+		if pricing_summary["created_count"]:
+			messages.info(
+				request,
+				f"Se crearon {pricing_summary['created_count']} precios de producto para el cliente.",
+			)
+
+		logger.info(
+			"Initialized product prices for client",
+			extra={
+				"client_id": obj.id,
+				"client_name": obj.name,
+				"created_count": pricing_summary["created_count"],
+				"existing_count": pricing_summary["existing_count"],
+				"created_products": pricing_summary["created_products"],
+			},
 		)
 
 	def get_inline_instances(self, request, obj=None):

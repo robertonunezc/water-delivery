@@ -635,7 +635,9 @@ Desde {{date_since}}</small>
                     <th>Pedido</th>
                     <th>Método/Tipo</th>
                     <th>Estado</th>
-                    <th>Monto</th>
+                    <th>Subtotal</th>
+                    <th>Descuento</th>
+                    <th>Pagado</th>
                     <th>Descripción</th>
                   </tr>
                 </thead>
@@ -675,6 +677,27 @@ Desde {{date_since}}</small>
                           {% else %}
                             <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
                           {% endif %}
+                        {% endif %}
+                      </td>
+                           <td>  
+                        {% if payment_data.subtotal_amount > 0 %}
+                          <span class="text-success">${{ payment_data.subtotal_amount|floatformat:2 }}</span>
+                        {% else %}
+                          <span class="text-muted">-</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if payment_data.discount > 0 %}
+                          <span class="text-danger">-${{ payment_data.discount|floatformat:2 }}</span>
+                        {% else %}
+                          <span class="text-muted">-</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if payment_data.total_amount > 0 %}
+                          <span class="text-success">${{ payment_data.total_amount|floatformat:2 }}</span>
+                        {% else %}
+                          <span class="text-muted">-</span>
                         {% endif %}
                       </td>
                       <td>
