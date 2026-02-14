@@ -30,12 +30,12 @@ class Product(models.Model):
             ("min_max_inventory", "Can control min max inventory quantity"),
         ]
 
-    name = models.CharField(max_length=200, verbose_name="Nombre")
+    name = models.CharField(max_length=200, verbose_name="Nombre", unique=True)
     presentation = models.CharField(max_length=200, help_text="20, 1, 500", verbose_name="Presentación")
     unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0, verbose_name="Unidad de Medida")
     image = models.FileField(null=True, blank=True, upload_to='product_images/', verbose_name="Imagen")
-    order = models.IntegerField(default=0, verbose_name="Orden")
-    quantity = models.IntegerField(default=0, verbose_name="Cantidad")
+    #order = models.IntegerField(default=0, verbose_name="Orden")
+    #quantity = models.IntegerField(default=0, verbose_name="Cantidad")
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Categoría")
     min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity', verbose_name="Cantidad mínima en inventario")
     max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity', verbose_name="Cantidad máxima en inventario")
