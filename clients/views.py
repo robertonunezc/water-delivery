@@ -237,6 +237,7 @@ def update_client(request, pk):
             requires_note_for_credit=body.get('requires_note_for_credit'),
             address_link=body.get('address_link'),
             requires_billing=body.get('requires_billing'),
+            billing_override_enabled=body.get('billing_override_enabled'),
         )
         
         # Update the client using the service
@@ -253,6 +254,7 @@ def update_client(request, pk):
                 'active': updated_client.active,
                 'can_pay_with_credit': updated_client.can_pay_with_credit,
                 'requires_note_for_credit': updated_client.requires_note_for_credit,
+                'billing_override_enabled': updated_client.billing_override_enabled,
             }
         })
     

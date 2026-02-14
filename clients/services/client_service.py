@@ -65,6 +65,7 @@ class ClientUpdateData:
     requires_note_for_credit: Optional[bool] = None
     address_link: Optional[str] = None
     requires_billing: Optional[bool] = None
+    billing_override_enabled: Optional[bool] = None
 
 
 def update_client(client: Client, update_data: ClientUpdateData, user: User) -> Client:
@@ -137,6 +138,10 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
             billing_service.disable_billing_for_client(client.id)
         
         client.requires_billing = update_data.requires_billing
+        updated = True
+
+    if update_data.billing_override_enabled is not None:
+        client.billing_override_enabled = update_data.billing_override_enabled
         updated = True
     
     # Note: balance and current_debt should be updated through transaction services
