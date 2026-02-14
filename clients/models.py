@@ -1,6 +1,5 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
-from functools import cached_property
 from typing import Optional, List
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
@@ -265,21 +264,28 @@ class Client(TimeStampedModel):
         
         return (available_balance + available_credit) >= order_amount
 
-    # Billing Information - Centralized API
-    @cached_property
+    # Billing Information - Centralized API (no caching to avoid stale data)
+    @property
     def billing_info(self):
-        """
-        Get centralized billing information for this client.
-        
-        Returns BillingInfo object with:
-        - own: Client's own billing components (OwnBillingData)
-        - effective: Effective billing components, with inheritance (EffectiveBillingData)
-        - Properties: source, is_complete, can_create_invoice, missing_components, etc.
-        
-        Cached per-request to avoid repeated database queries.
-        """
+        """Build billing info on demand to reflect latest state."""
         from clients.billing_info import BillingInfo
         return BillingInfo(self)
+
+    # Backwards-compatible helpers
+    def get_effective_billing_data(self):
+        return self.billing_info.effective.data
+
+    def get_effective_billing_address(self):
+        return self.billing_info.effective.address
+
+    def get_effective_billing_frequency(self):
+        return self.billing_info.effective.frequency
+
+    def get_billing_source(self):
+        return self.billing_info.source
+
+    def has_complete_billing_setup(self):
+        return self.billing_info.is_complete
 
     def has_billing_address(self):
         """Check if client has at least one billing address"""
