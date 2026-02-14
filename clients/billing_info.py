@@ -4,6 +4,7 @@ Centralized billing information logic for Client model.
 This module provides a clean, single-entry-point API for all billing-related
 queries, separating "what exists" (own data) from "what's effective" (inherited or own).
 """
+from clients.models import Client
 from typing import Optional, List
 from django.db import models
 
@@ -52,7 +53,7 @@ class EffectiveBillingData:
     
     __slots__ = ('data', 'address', 'frequency', '_client')
     
-    def __init__(self, client: 'Client', own: OwnBillingData):
+    def __init__(self, client: Client, own: OwnBillingData):
         """
         Resolve effective billing data considering inheritance.
         
@@ -67,44 +68,34 @@ class EffectiveBillingData:
         self.address = self._resolve_address(client, own)
         self.frequency = self._resolve_frequency(client, own)
     
-    def _resolve_data(self, client: 'Client', own: OwnBillingData):
+    def _resolve_data(self, client: Client, own: OwnBillingData):
         """Resolve effective billing data."""
-        if own.has_data:
+        # Branches can only use their own data if override is enabled
+        if own.has_data and (client.type != 'branch' or client.billing_override_enabled):
             return own.data
         
-        # Check inheritance (branch without override enabled)
-        if (client.type == 'branch' and 
-            client.corporate and 
-            not client.billing_override_enabled):
-            # Recursive call to get corporate's effective data
+        # Inherit from corporate when applicable
+        if client.type == 'branch' and client.corporate:
             return client.corporate.billing_info.effective.data
         
         return None
     
-    def _resolve_address(self, client: 'Client', own: OwnBillingData):
+    def _resolve_address(self, client: Client, own: OwnBillingData):
         """Resolve effective billing address."""
-        if own.has_address:
+        if own.has_address and (client.type != 'branch' or client.billing_override_enabled):
             return own.address
         
-        # Check inheritance (branch without override enabled)
-        if (client.type == 'branch' and 
-            client.corporate and 
-            not client.billing_override_enabled):
-            # Recursive call to get corporate's effective address
+        if client.type == 'branch' and client.corporate:
             return client.corporate.billing_info.effective.address
         
         return None
     
-    def _resolve_frequency(self, client: 'Client', own: OwnBillingData):
+    def _resolve_frequency(self, client: Client, own: OwnBillingData):
         """Resolve effective billing frequency."""
-        if own.has_frequency:
+        if own.has_frequency and (client.type != 'branch' or client.billing_override_enabled):
             return own.frequency
         
-        # Check inheritance (branch without override enabled)
-        if (client.type == 'branch' and 
-            client.corporate and 
-            not client.billing_override_enabled):
-            # Recursive call to get corporate's effective frequency
+        if client.type == 'branch' and client.corporate:
             return client.corporate.billing_info.effective.frequency
         
         return None
@@ -185,25 +176,26 @@ class BillingInfo:
             'corporate': Branch inherits from corporate
             'none': No billing data available
         """
-        # If client has all three components of own data, it's 'own'
-        if self.own.is_complete:
-            return 'own'
-        
-        # If branch with override enabled and has ANY own data, it's 'own' (not inheriting)
-        if (self._client.type == 'branch' and 
-            self._client.billing_override_enabled and 
-            self.own.has_any):
-            return 'own'
-        
-        # Check if inheriting from corporate (only if override not enabled)
-        if (self._client.type == 'branch' and 
-            self._client.corporate and 
-            not self._client.billing_override_enabled):
-            
+        # Corporates (or non-branches) rely solely on their own setup
+        if self._client.type != 'branch':
+            return 'own' if self.own.is_complete else 'none'
+
+        # Branch with override enabled uses its own data when present
+        if self._client.billing_override_enabled:
+            if self.own.has_any:
+                return 'own'
+            if self._client.corporate:
+                corporate_billing = self._client.corporate.billing_info
+                if corporate_billing.own.has_any:
+                    return 'corporate'
+            return 'none'
+
+        # Branch with override disabled inherits when corporate has data
+        if self._client.corporate:
             corporate_billing = self._client.corporate.billing_info
             if corporate_billing.own.has_any:
                 return 'corporate'
-        
+
         return 'none'
     
     @property

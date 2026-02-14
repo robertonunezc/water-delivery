@@ -17,7 +17,7 @@ class ProductCategoryAdmin(ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ('name', 'presentation', 'unit_of_measure', 'quantity','price', 'category', 'min_inventory', 'max_inventory')
+    list_display = ('name', 'presentation', 'unit_of_measure', 'price', 'category', 'min_inventory', 'max_inventory')
     list_filter = ('category', 'unit_of_measure')
     search_fields = ('name', 'presentation')
     inlines = [ProductClientPriceInline]

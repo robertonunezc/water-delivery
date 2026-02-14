@@ -23,7 +23,7 @@ class ProductCategory(models.Model):
 
 class Product(models.Model):
     class Meta:
-        ordering = ['order']
+        ordering = ['name']
         verbose_name = 'Producto'
         verbose_name_plural = 'Productos'
         permissions = [

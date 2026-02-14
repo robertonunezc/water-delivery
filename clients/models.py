@@ -281,38 +281,6 @@ class Client(TimeStampedModel):
         from clients.billing_info import BillingInfo
         return BillingInfo(self)
 
-    # Billing and Address Methods (delegate to billing_info)
-    def get_missing_billing_components(self) -> dict:
-        """
-        DEPRECATED: Use client.billing_info.missing_components instead.
-        
-        Check which billing components are missing for this client.
-        
-        Returns:
-            dict: Dictionary with keys 'billing_data', 'billing_address', 'billing_frequency'
-                  Each value is the effective component instance or None
-        """
-        return {
-            'billing_data': self.billing_info.effective.data,
-            'billing_address': self.billing_info.effective.address,
-            'billing_frequency': self.billing_info.effective.frequency
-        }
-    
-    def get_billing_setup_status(self) -> dict:
-        """
-        DEPRECATED: Use client.billing_info.get_setup_status() or access properties directly.
-        
-        Get comprehensive billing setup status including inheritance.
-        
-        Returns:
-            dict: {
-                'is_complete': bool,
-                'source': str ('own', 'corporate', or 'none'),
-                'missing_components': list of str (component names that are missing)
-            }
-        """
-        return self.billing_info.get_setup_status()
-
     def has_billing_address(self):
         """Check if client has at least one billing address"""
         return self.addresses.filter(type='billing').exists()
@@ -338,64 +306,6 @@ class Client(TimeStampedModel):
             return False, 'El cliente no está activo.'
 
         return True, ''
-
-    def get_effective_billing_data(self):
-        """
-        DEPRECATED: Use client.billing_info.effective.data instead.
-        
-        Returns own BillingData or corporate's if branch without own billing data.
-        Respects billing_override_enabled flag - if enabled, only returns own data.
-
-        Returns:
-            BillingData instance or None
-        """
-        return self.billing_info.effective.data
-
-    def get_effective_billing_address(self):
-        """
-        DEPRECATED: Use client.billing_info.effective.address instead.
-        
-        Returns own billing address or corporate's if branch without own billing address.
-
-        Returns:
-            Address instance or None
-        """
-        return self.billing_info.effective.address
-    
-    def get_effective_billing_frequency(self):
-        """
-        DEPRECATED: Use client.billing_info.effective.frequency instead.
-        
-        Returns own billing frequency or corporate's if branch without own billing frequency.
-        
-        Returns:
-            ClientBillingFrecuency instance or None
-        """
-        return self.billing_info.effective.frequency
-
-    def has_complete_billing_setup(self):
-        """
-        DEPRECATED: Use client.billing_info.is_complete instead.
-        
-        Check if client has complete billing setup (BillingData, billing Address, and billing Frequency).
-        For branches, checks inherited setup if own setup is incomplete (unless override is enabled).
-
-        Returns:
-            bool: True if complete billing setup exists
-        """
-        return self.billing_info.is_complete
-
-    def get_billing_source(self):
-        """
-        DEPRECATED: Use client.billing_info.source instead.
-        
-        Determine where billing data comes from (useful for admin display).
-
-        Returns:
-            str: 'own', 'corporate', or 'none'
-        """
-        return self.billing_info.source
-
 
 
 # NOTE: BranchClient model is deprecated - Client model handles branch/corporate relationships
