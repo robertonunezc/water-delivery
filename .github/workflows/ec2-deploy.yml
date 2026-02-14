@@ -12,7 +12,7 @@ jobs:
         env:
           POSTGRES_DB: water_delivery
           POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
         ports:
           - 5432:5432
         options: >-
@@ -28,7 +28,7 @@ jobs:
       SECRET_KEY: dummy-ci-secret-key
       POSTGRES_DB: water_delivery
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       REDIS_HOST: redis
