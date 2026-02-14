@@ -1,4 +1,4 @@
-name: Deploy to AWS EC2
+name: Deploy to VPS
 on:
   push:
     branches: [ main ]
@@ -29,9 +29,9 @@ jobs:
       POSTGRES_DB: water_delivery
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
-      POSTGRES_HOST: postgres
+      POSTGRES_HOST: localhost
       POSTGRES_PORT: "5432"
-      REDIS_HOST: redis
+      REDIS_HOST: localhost
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ""
     steps:
