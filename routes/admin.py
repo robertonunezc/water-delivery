@@ -56,7 +56,7 @@ class RouteAdmin(ModelAdmin):
         return form
 
 
-@admin.register(RouteClient)
+
 class RouteClientAdmin(ModelAdmin):
     form = RouteClientForm
     list_display = ('client', 'route', 'sequence', 'frequency', 'is_active')
@@ -80,7 +80,7 @@ class RouteClientAdmin(ModelAdmin):
         verbose_name_plural = 'Route Client Assignments'
 
 
-@admin.register(RouteClientOrder)
+
 class RouteClientOrderAdmin(admin.ModelAdmin):
     list_display = ('client', 'route', 'order', 'visit_date', 'sequence', 'is_completed')
     list_filter = ('is_completed', 'visit_date', 'route__weekday', 'route__transportation')

@@ -32,7 +32,9 @@ class ProductManager(models.Manager):
 
 class ProductCategory(models.Model):
     name = models.CharField(max_length=50, default="General")
-
+    class Meta:
+        verbose_name = 'Categoría de producto'
+        verbose_name_plural = 'Categorías de productos'
     def __str__(self):
         return self.name
 

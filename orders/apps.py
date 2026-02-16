@@ -4,4 +4,4 @@ from django.apps import AppConfig
 class OrdersConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'orders'
-    verbose_name = 'Gestión de pedidos'
+    verbose_name = 'GESTIÓN DE PEDIDOS'
