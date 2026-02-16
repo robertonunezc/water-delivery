@@ -2,16 +2,17 @@
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-from clients.models import Client
+from clients.models import Client, BillingData, Address
+from billing.models import ClientBillingFrecuency
 
 
 @dataclass
 class BillingComponents:
     """Simple container for billing parts."""
 
-    data: Optional[object]
-    address: Optional[object]
-    frequency: Optional[object]
+    data: Optional[BillingData]  # Assuming BillingData is defined elsewhere
+    address: Optional[Address]
+    frequency: Optional[ClientBillingFrecuency]  # Assuming ClientBillingFrecuency is defined elsewhere
 
     @property
     def has_data(self) -> bool:
