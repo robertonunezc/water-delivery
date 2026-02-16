@@ -42,11 +42,12 @@ class Product(models.Model):
         ordering = ['name']
         verbose_name = 'Producto'
         verbose_name_plural = 'Productos'
+        unique_together = ('name', 'presentation', 'unit_of_measure')
         permissions = [
             ("min_max_inventory", "Can control min max inventory quantity"),
         ]
 
-    name = models.CharField(max_length=200, verbose_name="Nombre", unique=True)
+    name = models.CharField(max_length=200, verbose_name="Nombre")
     presentation = models.CharField(max_length=200, help_text="20, 1, 500", verbose_name="Presentación")
     unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0, verbose_name="Unidad de Medida")
     price = models.FloatField(default=0.0, verbose_name="Precio base", help_text="Precio base del producto, se puede sobreescribir por cliente en la sección de clientes")
