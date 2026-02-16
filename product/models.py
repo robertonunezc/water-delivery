@@ -87,6 +87,7 @@ class ProductClientPrice(models.Model):
     price = models.FloatField(default=0.0, verbose_name="Precio")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido", verbose_name="Fecha de Validez")
+    active = models.BooleanField(default=True, verbose_name="Activo")
     def __str__(self):
         return "{} {} - ${}".format(self.product, self.client, self.price)
     def get_price_display(self):

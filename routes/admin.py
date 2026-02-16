@@ -3,8 +3,8 @@ from django.contrib.admin import widgets
 from django.forms import Media
 from .models import Route, RouteClient, RouteClientOrder
 from .forms import RouteClientForm, RouteClientInlineForm, RouteForm
-
-class RouteClientInline(admin.TabularInline):
+from unfold.admin import ModelAdmin, StackedInline, TabularInline
+class RouteClientInline(TabularInline):
     model = RouteClient
     form = RouteClientInlineForm
     extra = 1
@@ -32,7 +32,7 @@ class RouteClientOrderInline(admin.TabularInline):
     ordering = ('sequence',)
 
 @admin.register(Route)
-class RouteAdmin(admin.ModelAdmin):
+class RouteAdmin(ModelAdmin):
     form = RouteForm
     list_display = ('name', 'transportation', 'weekday', 'is_active', 'client_count', 'created_at')
     list_filter = ('weekday', 'is_active', 'transportation', 'created_at')
@@ -57,7 +57,7 @@ class RouteAdmin(admin.ModelAdmin):
 
 
 @admin.register(RouteClient)
-class RouteClientAdmin(admin.ModelAdmin):
+class RouteClientAdmin(ModelAdmin):
     form = RouteClientForm
     list_display = ('client', 'route', 'sequence', 'frequency', 'is_active')
     list_filter = ('frequency', 'is_active', 'route__weekday', 'route__transportation')
