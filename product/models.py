@@ -14,6 +14,22 @@ UNIT_CHOICES = (
 )
 
 # Create your models here.
+class ProductQuerySet(models.QuerySet):
+    def active(self):
+        return self.filter(active=True)
+
+    def include_inactive(self):
+        return self.all()
+
+
+class ProductManager(models.Manager):
+    def get_queryset(self):
+        return ProductQuerySet(self.model, using=self._db).active()
+
+    def include_inactive(self):
+        return ProductQuerySet(self.model, using=self._db)
+
+
 class ProductCategory(models.Model):
     name = models.CharField(max_length=50, default="General")
 
@@ -33,14 +49,19 @@ class Product(models.Model):
     name = models.CharField(max_length=200, verbose_name="Nombre", unique=True)
     presentation = models.CharField(max_length=200, help_text="20, 1, 500", verbose_name="Presentación")
     unit_of_measure = models.IntegerField(choices=UNIT_CHOICES, default=0, verbose_name="Unidad de Medida")
-    image = models.FileField(null=True, blank=True, upload_to='product_images/', verbose_name="Imagen")
+    price = models.FloatField(default=0.0, verbose_name="Precio base", help_text="Precio base del producto, se puede sobreescribir por cliente en la sección de clientes")
+    category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Categoría")
+    note = models.TextField(blank=True, null=True, verbose_name="Notas")
+    active = models.BooleanField(default=True, verbose_name="Activo")
     #order = models.IntegerField(default=0, verbose_name="Orden")
     #quantity = models.IntegerField(default=0, verbose_name="Cantidad")
-    category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Categoría")
-    min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity', verbose_name="Cantidad mínima en inventario")
-    max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity', verbose_name="Cantidad máxima en inventario")
-    note = models.TextField(blank=True, null=True, verbose_name="Notas")
-    price = models.FloatField(default=0.0, verbose_name="Precio base", help_text="Precio base del producto, se puede sobreescribir por cliente en la sección de clientes")
+
+    #image = models.FileField(null=True, blank=True, upload_to='product_images/', verbose_name="Imagen")
+    #min_inventory = models.IntegerField(default=0, help_text='Minimum inventory quantity', verbose_name="Cantidad mínima en inventario")
+    #max_inventory = models.IntegerField(default=0, help_text='Maximum inventory quantity', verbose_name="Cantidad máxima en inventario")
+
+    objects = ProductManager()
+    all_objects = ProductQuerySet.as_manager()
     
     def __str__(self):
         return "{} {} {}".format(self.name, self.presentation, self.get_unit_of_measure_display())
