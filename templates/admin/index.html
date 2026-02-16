@@ -1,0 +1,125 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static admin_urls %}
+
+{% block extrastyle %}{{ block.super }}
+<style>
+  :root { --accent: #4f46e5; --accent-soft: #eef2ff; --ink: #0f172a; --muted: #475569; --border: #e5e7eb; }
+  .dashboard-shell { display: grid; gap: 20px; }
+  .hero { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; background: #fff; border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .hero h1 { margin: 0; font-size: 20px; font-weight: 700; color: var(--ink); }
+  .hero p { margin: 2px 0 0 0; color: var(--muted); }
+  .hero-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 999px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.08); transition: transform 120ms ease, box-shadow 120ms ease; }
+  .pill-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.12); }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .feature-card { background: var(--accent); color: #fff; border-radius: 12px; padding: 16px; text-decoration: none; box-shadow: 0 6px 18px rgba(79,70,229,0.25); transition: transform 140ms ease, box-shadow 140ms ease; display: grid; gap: 6px; }
+  .feature-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(79,70,229,0.25); }
+  .feature-meta { color: #e0e7ff; font-size: 13px; margin: 0; }
+  .feature-title { font-size: 16px; font-weight: 700; margin: 0; }
+  .feature-note { color: #e0e7ff; margin: 0; font-size: 14px; }
+  .reports { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: grid; gap: 10px; }
+  .reports h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .report-links { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+  .report-tile { background: var(--accent-soft); border: 1px solid #e0e7ff; border-radius: 10px; padding: 10px 12px; text-decoration: none; color: #312e81; font-weight: 600; transition: transform 120ms ease, box-shadow 120ms ease; }
+  .report-tile:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+  .apps { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: grid; gap: 12px; }
+  .apps h2 { margin: 0; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .app-group { display: grid; gap: 10px; }
+  .app-title { margin: 0; color: var(--muted); font-weight: 700; font-size: 14px; }
+  .model-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 8px; padding: 9px 11px; border-radius: 10px; background: var(--accent-soft); border: 1px solid #e0e7ff; color: #312e81; font-weight: 600; text-decoration: none; transition: transform 120ms ease, box-shadow 120ms ease; }
+  .chip:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0,0,0,0.08); }
+  .chip span { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; }
+  @media (max-width: 600px) {
+    .hero { flex-direction: column; align-items: flex-start; }
+    .card-grid { grid-template-columns: 1fr; }
+    .report-links { grid-template-columns: 1fr; }
+    .model-chips { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div id="content" class="dashboard-shell">
+  <div class="hero">
+    <div>
+      <h1>{% trans "Panel de Administración" %}</h1>
+      <p>{% trans "Accesos rápidos para las tareas diarias." %}</p>
+    </div>
+    <div class="hero-actions">
+      {% if perms.clients.add_client %}
+        <a class="pill-btn" href="{% url 'admin:clients_client_add' %}">+ {% trans "Nuevo cliente" %}</a>
+      {% endif %}
+      {% if perms.orders.add_order %}
+        <a class="pill-btn" href="{% url 'admin:orders_order_add' %}">+ {% trans "Crear pedido" %}</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card-grid">
+    {% if perms.clients.view_client %}
+      <a class="feature-card" href="{% url 'admin:clients_client_changelist' %}">
+        <p class="feature-meta">{% trans "Clientes" %}</p>
+        <p class="feature-title">{% trans "Gestionar clientes" %}</p>
+        <p class="feature-note">{% trans "Altas, ediciones y vistas rápidas." %}</p>
+      </a>
+    {% endif %}
+    {% if perms.orders.view_order %}
+      <a class="feature-card" href="{% url 'admin:orders_order_changelist' %}">
+        <p class="feature-meta">{% trans "Pedidos" %}</p>
+        <p class="feature-title">{% trans "Ordenes abiertas" %}</p>
+        <p class="feature-note">{% trans "Consulta y gestiona pedidos." %}</p>
+      </a>
+    {% endif %}
+    {% if perms.billing.view_billingfrequencyreport %}
+      <a class="feature-card" href="{% url 'admin:billing_billingfrequencyreport_changelist' %}">
+        <p class="feature-meta">{% trans "Reportes" %}</p>
+        <p class="feature-title">{% trans "Frecuencia de facturación" %}</p>
+        <p class="feature-note">{% trans "Revisa clientes listos para facturar." %}</p>
+      </a>
+    {% endif %}
+    {% if perms.payment.view_payment %}
+      <a class="feature-card" href="{% url 'admin:payment_payment_changelist' %}">
+        <p class="feature-meta">{% trans "Pagos" %}</p>
+        <p class="feature-title">{% trans "Cobros y conciliación" %}</p>
+        <p class="feature-note">{% trans "Monitorea y registra pagos." %}</p>
+      </a>
+    {% endif %}
+  </div>
+
+  {% if perms.billing.view_billingfrequencyreport %}
+    <div class="reports">
+      <h2>{% trans "Reportes comunes" %}</h2>
+      <div class="report-links">
+        <a class="report-tile" href="{% url 'admin:billing_billingfrequencyreport_changelist' %}">{% trans "Reporte de frecuencia de facturación" %}</a>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if app_list %}
+    <div class="apps">
+      <h2>{% trans "Todos los módulos" %}</h2>
+      <div class="app-group">
+        {% for app in app_list %}
+          <div>
+            <p class="app-title">{{ app.name }}</p>
+            {% if app.models %}
+              <div class="model-chips">
+                {% for model in app.models %}
+                  {% if model.admin_url %}
+                    <a class="chip" href="{{ model.admin_url }}"><span>{{ model.name|slice:":1" }}</span>{{ model.name }}</a>
+                  {% else %}
+                    <span class="chip"><span>{{ model.name|slice:":1" }}</span>{{ model.name }}</span>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="feature-note" style="color: var(--muted); margin-top: 4px;">{% trans "Sin acceso a modelos en esta aplicación." %}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
