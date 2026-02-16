@@ -15,6 +15,7 @@
                 billingDate: '#id_billing_frecuency-0-billing_date',
                 specificDate: '.field-specific_day',
                 weekday: '.field-weekday',
+                occurrence: '.field-occurrence',
                 billingDateField: '.field-billing_date',
                 frequencyField: '.field-frequency'
             };
@@ -59,7 +60,8 @@
                 frequencySelect: this.$(this.selectors.frequency),
                 billingDateSelect: this.$(this.selectors.billingDate),
                 containerSpecificDate: this.$(this.selectors.specificDate),
-                containerWeekday: this.$(this.selectors.weekday)
+                containerWeekday: this.$(this.selectors.weekday),
+                containerOccurrence: this.$(this.selectors.occurrence)
             };
         }
 
@@ -97,6 +99,7 @@
             // Hide specific date and weekday occurrence fieldsets initially
             elements.containerSpecificDate.hide();
             elements.containerWeekday.hide();
+            elements.containerOccurrence.hide();
 
             this.handleFrequencyLogic(frequency, billingDate, elements);
         }
@@ -107,8 +110,8 @@
         toggleBillingDateFieldVisibility(frequency) {
             const billingDateFieldContainer = this.$(this.selectors.billingDateField);
             
-            if (frequency === 'when_delivery') {
-                this.log('Frequency is "when_delivery" - hiding billing_date field');
+            if (frequency === 'when_delivery' || frequency === 'weekly') {
+                this.log('Frequency hides billing_date field');
                 billingDateFieldContainer.slideUp(300);
             } else {
                 this.log('Frequency is not "when_delivery" - showing billing_date field');
@@ -123,6 +126,15 @@
             let shouldHide = frequency === 'monthly' && 
                            (billingDate === 'last_day' || billingDate === 'first_day');
 
+            if (frequency === 'when_delivery') {
+                shouldHide = true;
+            }
+
+            if (frequency === 'weekly') {
+                this.handleWeeklyFrequency(elements);
+                shouldHide = true;
+            }
+
             if (frequency === 'biweekly') {
                 this.handleBiweeklyFrequency(elements);
                 shouldHide = true;
@@ -132,7 +144,16 @@
                 this.handleMonthlyFrequency();
             }
 
-            this.applyFieldVisibility(shouldHide, billingDate, elements);
+            this.applyFieldVisibility(shouldHide, frequency, billingDate, elements);
+        }
+
+        /**
+         * Handle weekly frequency selection
+         */
+        handleWeeklyFrequency(elements) {
+            this.log('Weekly selected - hiding billing date field');
+            this.$(this.selectors.billingDateField).hide(300);
+            elements.billingDateSelect.val('');
         }
 
         /**
@@ -156,24 +177,35 @@
         /**
          * Apply field visibility based on billing date selection
          */
-        applyFieldVisibility(shouldHide, billingDate, elements) {
-            if (shouldHide) {
+        applyFieldVisibility(shouldHide, frequency, billingDate, elements) {
+            const hideAll = () => {
                 elements.containerSpecificDate.slideUp(300);
                 elements.containerWeekday.slideUp(300);
-            } else {
-                // Show fieldsets based on billing_date selection
-                if (billingDate === 'specific_date') {
-                    elements.containerSpecificDate.slideDown(300);
-                    elements.containerWeekday.slideUp(300);
-                } else if (billingDate === 'weekday_occurrence') {
-                    elements.containerSpecificDate.slideUp(300);
-                    elements.containerWeekday.slideDown(300);
-                } else {
-                    // For other billing_date options, hide both
-                    elements.containerSpecificDate.slideUp(300);
-                    elements.containerWeekday.slideUp(300);
-                }
+                elements.containerOccurrence.slideUp(300);
+            };
+
+            if (shouldHide) {
+                hideAll();
+                return;
             }
+
+            // Show fieldsets based on billing_date selection
+            if (billingDate === 'specific_date') {
+                elements.containerSpecificDate.slideDown(300);
+                elements.containerWeekday.slideUp(300);
+                elements.containerOccurrence.slideUp(300);
+                return;
+            }
+
+            if (billingDate === 'weekday_occurrence' && frequency === 'monthly') {
+                elements.containerSpecificDate.slideUp(300);
+                elements.containerWeekday.slideDown(300);
+                elements.containerOccurrence.slideDown(300);
+                return;
+            }
+
+            // For weekly, when_delivery, and any other billing_date, hide all dependent fields
+            hideAll();
         }
 
         /**
