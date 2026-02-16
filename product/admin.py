@@ -17,8 +17,8 @@ class ProductCategoryAdmin(ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(ModelAdmin):
-    list_display = ('name', 'presentation', 'unit_of_measure', 'price', 'category', 'min_inventory', 'max_inventory')
-    list_filter = ('category', 'unit_of_measure')
+    list_display = ('name', 'presentation', 'unit_of_measure', 'price', 'category','active')
+    list_filter = ('category', 'unit_of_measure', 'active')
     search_fields = ('name', 'presentation')
     inlines = [ProductClientPriceInline]
     readonly_fields = ('created_at', 'updated_at') if hasattr(Product, 'created_at') else ()

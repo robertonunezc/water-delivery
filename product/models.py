@@ -77,7 +77,7 @@ class Product(models.Model):
 
 class ProductClientPrice(models.Model):
     class Meta: 
-        verbose_name_plural = 'Precios de productos'
+        verbose_name_plural = 'Precios de productos por cliente'
         unique_together = ('product', 'client',)
 
 
