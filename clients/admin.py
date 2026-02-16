@@ -101,7 +101,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		'balance', 'current_debt', 'get_available_credit',
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
-		'get_billing_inheritance_status',
+		'get_billing_frequency_and_address',
 		'get_add_billing_frequency_button',
 		'get_billing_requirement_warning'
 	)
@@ -213,7 +213,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 		# Build a single billing fieldset, optionally adding billing info fields
 		billing_fields = list(billing_requirement_fields)
 		if obj.requires_billing:
-			billing_fields.extend([('get_effective_billing_info', 'get_billing_inheritance_status')])
+			billing_fields.extend([('get_effective_billing_info', 'get_billing_frequency_and_address')])
 		
 		billing_fieldsets.append(
 			('Información de Facturación', {

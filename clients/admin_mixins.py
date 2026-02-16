@@ -120,54 +120,61 @@ class BillingDisplayMixin:
 
 	get_effective_billing_info.short_description = 'Datos de Facturación Efectivos'
 
-	def get_billing_inheritance_status(self, obj):
-		"""Display billing inheritance status and warnings"""
+	def get_billing_frequency_and_address(self, obj):
+		"""Display effective billing frequency and fiscal address (own or inherited)."""
 		if not obj.pk:
 			return ''
-		if obj.type != 'branch':
-			return format_html('<span style="color: gray;">N/A (cliente corporativo)</span>')
-		
+
 		billing = obj.billing_info
-		
-		if billing.own.is_complete:
-			return format_html(
-				'<span style="color: green;">✓ Usa sus propios datos de facturación</span>'
+		effective = billing.effective
+
+		source_label = {
+			'own': '✓ Propios',
+			'corporate': '⬆ Heredados del corporativo',
+			'none': '✗ No disponible'
+		}.get(billing.source, 'Desconocido')
+		source_color = {
+			'own': 'green',
+			'corporate': 'blue',
+			'none': 'red'
+		}.get(billing.source, 'gray')
+
+		sections = [
+			f'<div><strong>Origen:</strong> <span style="color: {source_color};">{source_label}</span></div>'
+		]
+
+		if effective.frequency:
+			frequency = effective.frequency
+			frequency_status = 'Activo' if getattr(frequency, 'is_active', False) else 'Inactivo'
+			frequency_label = frequency.get_frequency_display() if hasattr(frequency, 'get_frequency_display') else frequency.frequency
+			billing_date_label = frequency.get_billing_date_display() if hasattr(frequency, 'get_billing_date_display') and frequency.billing_date else None
+			specifics = ''
+			if frequency.billing_date == 'specific_date' and frequency.specific_day:
+				specifics = f" (día {frequency.specific_day})"
+			elif frequency.billing_date == 'weekday_occurrence' and frequency.weekday is not None and frequency.occurrence is not None:
+				weekday = frequency.get_weekday_display()
+				occurrence = frequency.get_occurrence_display()
+				specifics = f" ({occurrence} {weekday})"
+			next_date = ''
+			if getattr(frequency, 'next_billing_date', None):
+				next_date = f" · Próxima: {frequency.next_billing_date:%d/%m/%Y}"
+			date_label = f" · {billing_date_label}" if billing_date_label else ''
+			frequency_color = 'green' if getattr(frequency, 'is_active', False) else 'orange'
+			sections.append(
+				f'<div><strong>Frecuencia:</strong> {frequency_label}{date_label}{specifics} '
+				f'<span style="color: {frequency_color};">({frequency_status})</span>{next_date}</div>'
 			)
+		else:
+			sections.append('<div style="color: red;"><strong>✗ Sin frecuencia de facturación configurada.</strong></div>')
 
-		if not obj.corporate:
-			return format_html(
-				'<span style="color: red;">✗ Sin corporativo asociado</span>',
-			)
+		if effective.address:
+			sections.append(f'<div><strong>Dirección Fiscal:</strong> {str(effective.address)}</div>')
+		else:
+			sections.append('<div style="color: orange;"><strong>⚠ Sin dirección fiscal disponible.</strong></div>')
 
-		corporate_billing = obj.corporate.billing_info
-		
-		if corporate_billing.own.has_any:
-			missing = []
-			if not billing.own.has_data:
-				missing.append('RFC/Razón Social')
-			if not billing.own.has_address:
-				missing.append('Dirección Fiscal')
-			if not billing.own.has_frequency:
-				missing.append('Frecuencia')
+		return format_html(''.join(sections))
 
-			return format_html(
-				'<span style="color: blue;">⬆ Hereda del corporativo: {}</span>',
-				', '.join(missing) if missing else 'Todo',
-			)
-
-		missing_corporate_data = format_html(
-			'<span style="color: orange;">⚠ Corporativo sin datos completos de facturación</span>'
-		)
-		add_corporate_data_btn = format_html(
-			'<div style="margin-top: 5px;">'
-			'<a href="/admin/clients/client/{}/change/" class="button">Agregar Datos de Facturación del Corporativo</a>'
-			'</div>',
-			obj.corporate.id
-		)
-
-		return format_html('{}{}', missing_corporate_data, add_corporate_data_btn)
-
-	get_billing_inheritance_status.short_description = 'Estado de Herencia de Facturación'
+	get_billing_frequency_and_address.short_description = 'Frecuencia y Dirección de Facturación'
 
 	def get_add_billing_frequency_button(self, obj):
 		"""Display a button to add billing frequency in a popup window"""
