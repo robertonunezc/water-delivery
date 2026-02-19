@@ -4,10 +4,14 @@
 {% block content %}
   <div class="unfold-container" style="max-width: 720px; margin: 0 auto;">
     <div class="unfold-card" style="padding: 20px; background: var(--uf-surface, #fff); border: 1px solid var(--uf-border, #e5e7eb); border-radius: 10px; box-shadow: var(--uf-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));">
-      <h1 style="margin-top: 0; margin-bottom: 16px;">{{ title }}</h1>
+      <!-- Create an alert to display messages -->
+            <div class="unfold-alert" style="padding: 12px; border-radius: 6px; margin-bottom: 8px; background: var(--uf-error-bg, #fef2f2); color: var(--uf-error-text, #b91c1c); border: 1px solid var(--uf-error-border, #fca5a5);">
+                <strong style="font-weight: 600;">¡Atención!</strong> Esta acción actualizará los precios de los productos seleccionados para todos los clientes. Asegúrate de revisar los cambios antes de aplicar el incremento.
+            </div>
+      <div class="unfold-divider" style="height: 1px; background: var(--uf-border, #e5e7eb); margin: 16px 0;"></div>
 
       {% if product %}
-        <p style="margin-bottom: 12px;"><strong>Producto:</strong> {{ product.name }} ({{ product.presentation }}) ${{ product.price }}</p>
+        <p style="margin-bottom: 12px;"><strong>Producto:</strong> {{ product.name }} ({{ product.presentation }}) Precio Actual:<strong>${{ product.price }}</strong></p>
       {% else %}
         <p style="color: #b91c1c; margin-bottom: 12px;">Debe seleccionar un producto.</p>
       {% endif %}
@@ -17,7 +21,9 @@
         <div class="unfold-form" style="display: grid; gap: 12px;">
           {{ form.as_p }}
         </div>
-        <div style="margin-top: 12px; display: flex; gap: 8px;">
+      <div class="unfold-divider" style="height: 1px; background: var(--uf-border, #e5e7eb); margin: 16px 0;"></div>
+
+        <div style="margin-top: 25px; display: flex; gap: 8px;">
           <button type="submit" class="bg-primary-600 block border border-transparent cursor-pointer font-medium px-3 py-2 rounded-default text-white w-full lg:w-auto" style="padding: 8px 14px;">Aplicar incremento</button>
         </div>
       </form>

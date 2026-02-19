@@ -9,9 +9,9 @@ from django.core.paginator import Paginator, EmptyPage
 from collections import Counter
 
 from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
-
+from unfold.admin import ModelAdmin, StackedInline
 # Register your models here.
-class BillingRecordInlineAdmin(admin.StackedInline):
+class BillingRecordInlineAdmin(StackedInline):
     model = BillingOrder
     extra = 0
     fields = ('order', 'is_paid', 'partially_paid')
@@ -109,7 +109,7 @@ class BillingOrderInlineFormSet(BaseInlineFormSet):
 BillingRecordInlineAdmin.form = BillingOrderAdminForm
 BillingRecordInlineAdmin.formset = BillingOrderInlineFormSet
 
-class BillingRecordAdmin(admin.ModelAdmin):
+class BillingRecordAdmin(ModelAdmin):
     list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
     list_filter = ('date', 'client')
     search_fields = ('client__name', 'description', 'identifier')
@@ -117,7 +117,7 @@ class BillingRecordAdmin(admin.ModelAdmin):
     inlines = [BillingRecordInlineAdmin]
 
 
-class BillingOrderAdmin(admin.ModelAdmin):
+class BillingOrderAdmin(ModelAdmin):
     list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid')
     list_filter = ('is_paid', 'partially_paid', 'billing_record__client', 'billing_record')
     search_fields = ('billing_record__client__name', 'order__id')
@@ -180,7 +180,7 @@ class BillingOrderAdmin(admin.ModelAdmin):
         })
 
 @admin.register(BillingFrequencyReport)
-class BillingFrequencyReportAdmin(admin.ModelAdmin):
+class BillingFrequencyReportAdmin(ModelAdmin):
     """
     Custom admin for billing frequency report.
     Overrides changelist_view to show custom report instead of model list.
@@ -264,7 +264,7 @@ class BillingFrequencyReportAdmin(admin.ModelAdmin):
         )
 
 @admin.register(ClientBillingFrecuency)
-class ClientBillingFrecuencyAdmin(admin.ModelAdmin):
+class ClientBillingFrecuencyAdmin(ModelAdmin):
     list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
     search_fields = ('client__name', 'frequency')
     list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
