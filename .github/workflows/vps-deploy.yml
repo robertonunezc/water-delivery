@@ -59,9 +59,31 @@ jobs:
         working-directory: .
         run: |
           python -m pytest clients
-  deploy:
+  build_and_push:
     runs-on: ubuntu-latest
     needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: |
+            ${{ secrets.DOCKER_REGISTRY_USERNAME }}/development:water
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_and_push
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -89,8 +111,8 @@ jobs:
           # Verify key still exists
           ls -la ~/.ssh/id_rsa
           ssh -p "$PORT" -o StrictHostKeyChecking=yes -vvv -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}"@"$HOST" "echo 'SSH connection successful'"
-      
-      - name: Deploy to EC2
+          
+      - name: Deploy to VPS
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
             set -e
@@ -100,19 +122,24 @@ jobs:
             echo "Creating static and media directories..."
             mkdir -p staticfiles media
             
-            echo "Pulling latest code from main branch..."
-            git pull origin main
+            # Pull immutable image
+            docker compose -f docker-compose.prod.yml pull web
             
             echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
             
             echo "Building and starting containers..."
-            docker-compose -f docker-compose.prod.yml up -d --build
+            docker-compose -f docker-compose.prod.yml up -d
             
             echo "Collecting static files..."
             docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
             
             echo "Running database migrations..."
             docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            
+            # Optional: show running image
+            docker compose -f docker-compose.prod.yml ps
+            
             echo "Deployment completed successfully!"
+
           EOF
