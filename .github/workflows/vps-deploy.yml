@@ -123,7 +123,7 @@ jobs:
             mkdir -p staticfiles media
             
             # Pull immutable image
-            docker compose -f docker-compose.prod.yml pull web
+            docker-compose -f docker-compose.prod.yml pull web
             
             echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
