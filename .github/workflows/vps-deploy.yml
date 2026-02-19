@@ -138,7 +138,7 @@ jobs:
             docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
             
             # Optional: show running image
-            docker compose -f docker-compose.prod.yml ps
+            docker-compose -f docker-compose.prod.yml ps
             
             echo "Deployment completed successfully!"
 
