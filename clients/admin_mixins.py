@@ -50,13 +50,13 @@ class BillingDisplayMixin:
 			missing_errors = [missing_messages.get(m, m) for m in billing.missing_components]
 			return format_html(
 				'<div style="background-color: #fff3cd; border: 1px solid #ffc107; '
-				'border-radius: 4px; color: #856404; margin-bottom: 10px;">'
+				'border-radius: 4px; color: #856404; margin-bottom: 10px; padding: 10px;">'
 				'<strong>⚠️ Importante:</strong> '
 				'Para poder facturar debe agregar los sugientes datos {}:'
 				'<ul>{}</ul>'
 				'</div>',
 				'en el corporativo' if obj.corporate else 'en el cliente si no se heredan del corporativo',
-				format_html(''.join(f'<li>{item}</li>' for item in missing_errors))
+				format_html(''.join(f'<li><strong>- {item}</strong></li>' for item in missing_errors))
 			)
 		return 'Toda la información de facturación está completa.'
 	

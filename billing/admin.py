@@ -263,7 +263,7 @@ class BillingFrequencyReportAdmin(ModelAdmin):
             context
         )
 
-@admin.register(ClientBillingFrecuency)
+#@admin.register(ClientBillingFrecuency)
 class ClientBillingFrecuencyAdmin(ModelAdmin):
     list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
     search_fields = ('client__name', 'frequency')

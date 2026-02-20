@@ -26,7 +26,7 @@ class ContactInline(TabularInline):
 	tab = True
 
 
-@admin.register(models.Address)
+#@admin.register(models.Address)
 class AddressAdmin(admin.ModelAdmin):
 	list_display = ('street', 'municipality', 'state', 'zip_code', 'client__name')
 	model = models.Address
@@ -235,12 +235,6 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 class ContactAdmin(admin.ModelAdmin):
 	list_display = ('name', 'client', 'email', 'phone')
 	search_fields = ('name', 'client__name', 'email', 'phone')
-	exclude = ('deleted_at',)
-
-
-class AddressAdmin(admin.ModelAdmin):
-	list_display = ('street', 'municipality', 'state', 'zip_code', 'client')
-	search_fields = ('street', 'municipality', 'client__name')
 	exclude = ('deleted_at',)
 
 

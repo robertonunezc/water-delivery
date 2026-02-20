@@ -512,6 +512,7 @@ class Contact(TimeStampedModel):
 
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.PROTECT, verbose_name="Cliente")
+    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='shipping', verbose_name="Tipo")
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
@@ -523,7 +524,6 @@ class Address(TimeStampedModel):
     reference = models.TextField(blank=True, null=True, verbose_name="Referencia")
     active = models.BooleanField(default=True, verbose_name="Activo")
     # note = models.TextField(blank=True, null=True, verbose_name="Notas")
-    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='shipping', verbose_name="Tipo")
     
     class Meta:
         verbose_name = 'Domicilio'

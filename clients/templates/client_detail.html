@@ -142,8 +142,10 @@ Desde {{date_since}}</small>
                   <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite cercano</span>
                 {% elif debt_percentage > 60 %}
                   <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Uso moderado</span>
-                {% else %}
+                {% elif debt_percentage <= 60 %}
                   <span class="text-success"><i class="fas fa-check-circle"></i> Uso saludable</span>
+                {% elif debt_percentage > 100 %}
+                  <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite excedido</span>
                 {% endif %}
               </small>
             </div>
