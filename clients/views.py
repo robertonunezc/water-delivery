@@ -175,6 +175,7 @@ def detail(request, pk):
         'route_clients': route_clients,
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,
+        'debt_percentage': int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0, 
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,
