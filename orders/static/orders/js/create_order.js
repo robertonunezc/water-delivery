@@ -1093,10 +1093,12 @@ class OrderPageApp {
 
     const subtotalEl = document.getElementById('summary-subtotal');
     const discountEl = document.getElementById('summary-discount');
+    const discountMobileEl = document.getElementById('summary-discount-mobile');
     const totalEl = document.getElementById('summary-total');
 
     if (subtotalEl) subtotalEl.textContent = format(subtotal);
     if (discountEl) discountEl.textContent = format(discountAmount);
+    if (discountMobileEl) discountMobileEl.textContent = format(discountAmount);
     if (totalEl) totalEl.textContent = orderTotalNumber.toFixed(2);
   }
 

@@ -22,14 +22,53 @@
     .search-form {
       max-width: 500px;
     }
+
+    .client-mobile-card {
+      border-radius: 0.5rem;
+      border: 1px solid var(--bs-border-color);
+      box-shadow: none;
+    }
+
+    .new-client-btn {
+      width: 100%;
+    }
+
+    @media (max-width: 767.98px) {
+      .search-form {
+        max-width: 100%;
+      }
+
+      .search-form .input-group {
+        flex-wrap: nowrap;
+      }
+
+      .search-form .form-control {
+        font-size: 1rem;
+      }
+
+      .search-form .btn {
+        white-space: nowrap;
+      }
+
+      .pagination {
+        flex-wrap: wrap;
+        gap: 0.25rem;
+      }
+    }
+
+    @media (min-width: 768px) {
+      .new-client-btn {
+        width: auto;
+      }
+    }
   </style>
 {% endblock %}
 
 {% block content %}
   <div class="container mt-4">
     <!-- Header Section -->
-    <div class="row mb-4">
-      <div class="col-md-3">
+    <div class="row mb-4 g-3 align-items-center">
+      <div class="col-12 col-md-3">
         <h1><i class="fas fa-users me-2"></i>Clientes</h1>
         {% if has_search %}
           <p class="text-muted mb-0">
@@ -37,7 +76,7 @@
           </p>
         {% endif %}
       </div>
-      <div class="col-md-7">
+      <div class="col-12 col-md-7">
         <form method="get" action="{% url 'clients:list' %}" class="search-form mx-auto">
           <div class="input-group">
             <input type="search" 
@@ -57,8 +96,8 @@
           </div>
         </form>
       </div>
-      <div class="col-md-2 text-md-end">
-        <a href="#" class="btn btn-primary">
+      <div class="col-12 col-md-2 text-md-end d-grid d-md-block">
+        <a href="#" class="btn btn-primary new-client-btn">
           <i class="fas fa-plus"></i> Nuevo Cliente
         </a>
       </div>
