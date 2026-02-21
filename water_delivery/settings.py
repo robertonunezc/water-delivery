@@ -19,9 +19,9 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-ADMIN_SITE_HEADER = "Water Delivery Admin"
-ADMIN_SITE_TITLE = "Water Delivery Admin Portal"
-ADMIN_INDEX_TITLE = "Welcome to Water Delivery Admin Portal"
+ADMIN_SITE_HEADER = "PuriGest Admin"
+ADMIN_SITE_TITLE = "PuriGest Admin Portal"
+ADMIN_INDEX_TITLE = "Welcome to PuriGest Admin Portal"
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
