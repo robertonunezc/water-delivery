@@ -231,6 +231,22 @@ def update_order(request, order_pk):
 
 
 @login_required
+@require_http_methods(["POST"])
+def cancel_order(request, order_pk):
+    order = get_object_or_404(Order, pk=order_pk)
+    result = services.cancel_pending_order(order=order, user=request.user)
+
+    if not result.get('success'):
+        return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo cancelar el pedido.')}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'message': result.get('message', 'Pedido cancelado correctamente.'),
+        'redirect_url': reverse('clients:list'),
+    })
+
+
+@login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
 def split_order(request, order_id):

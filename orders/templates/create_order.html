@@ -94,6 +94,7 @@
 {% block content %}
     <div class="container-fluid mt-4" id="order-page"
       data-order-id="{{ order.pk }}"
+      data-cancel-order-url="{% url 'orders:cancel_order' order.pk %}"
       data-client-balance="{{ client.balance|floatformat:2 }}"
       data-client-available-credit="{{ client.get_available_credit|floatformat:2 }}"
       data-can-use-credit="{{ can_use_credit|yesno:"true,false" }}"
@@ -118,6 +119,9 @@
             <a href="{% url 'clients:list' %}" class="btn btn-secondary btn-touch">
               <i class="fas fa-arrow-left me-2"></i>Volver
             </a>
+            <button type="button" id="cancel-order-btn" class="btn btn-outline-danger btn-touch">
+              <i class="fas fa-ban me-2"></i>Cancelar Pedido
+            </button>
           </div>
         </div>
       </div>

@@ -8,6 +8,7 @@ import json
 from clients.models import Client
 from orders.models import Order, OrderProduct, OrderStatus
 from orders import services
+from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 
 
@@ -315,6 +316,122 @@ class UpdateOrderViewTestCase(TestCase):
         self.assertEqual(self.order.discount, Decimal("12.00"))
         self.assertEqual(self.order.subtotal_amount, Decimal("50.00"))
         self.assertEqual(self.order.total_amount, Decimal("38.00"))
+
+
+class CancelOrderServiceTestCase(TestCase):
+    """Tests for cancel_pending_order service function."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="cancel_service_user", password="testpass")
+        self.customer = Client.objects.create(name="Cliente Cancelación Servicio")
+        self.category = ProductCategory.objects.create(name="Water Service")
+        self.product = Product.objects.create(
+            name="Garrafón Servicio",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.PENDING.value,
+            total_amount=Decimal("50.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("25.00"),
+        )
+
+    def test_cancel_pending_order_deletes_order_and_items(self) -> None:
+        result = services.cancel_pending_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+        self.assertFalse(OrderProduct.objects.filter(order_id=self.order.pk).exists())
+
+    def test_cancel_pending_order_rejects_non_pending_status(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=['status'])
+
+        result = services.cancel_pending_order(order=self.order, user=self.user)
+
+        self.assertFalse(result["success"])
+        self.assertIn("pendiente", result["error"])
+        self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
+
+    def test_cancel_pending_order_rejects_order_with_payments(self) -> None:
+        Payment.objects.create(
+            amount=Decimal("50.00"),
+            method='cash',
+            client=self.customer,
+            order=self.order,
+            status='pending',
+            created_by=self.user,
+        )
+
+        result = services.cancel_pending_order(order=self.order, user=self.user)
+
+        self.assertFalse(result["success"])
+        self.assertIn("pagos", result["error"])
+        self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
+
+
+class CancelOrderViewTestCase(TestCase):
+    """Integration tests for cancel_order endpoint behavior."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="cancel_view_user", password="testpass")
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(name="Cliente Cancelación Vista")
+        self.category = ProductCategory.objects.create(name="Water View")
+        self.product = Product.objects.create(
+            name="Garrafón Vista",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.PENDING.value,
+            total_amount=Decimal("50.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("25.00"),
+        )
+
+    def test_cancel_order_endpoint_deletes_order(self) -> None:
+        response = self.client.post(
+            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
+            data=json.dumps({}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload.get('success'))
+        self.assertIn('redirect_url', payload)
+        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+
+    def test_cancel_order_endpoint_returns_400_for_non_pending(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=['status'])
+
+        response = self.client.post(
+            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
+            data=json.dumps({}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertFalse(payload.get('success'))
+        self.assertIn('error', payload)
 
 class CalculateOrderTotalTestCase(TestCase):
     """Tests for the calculate_order_total service function."""

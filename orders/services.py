@@ -1,6 +1,7 @@
 from datetime import date
 from decimal import Decimal
 from django.db import transaction
+from django.db.models import ProtectedError
 from clients.models import Client
 from core import models
 from orders.models import Order, OrderProduct, OrderStatus
@@ -89,6 +90,53 @@ def get_logger(name: str):
     `services.get_logger(__name__)` without needing additional imports.
     """
     return logging.getLogger(name)
+
+
+@transaction.atomic
+def cancel_pending_order(order: Order, user=None) -> Dict[str, object]:
+    """Cancel a pending order by deleting it and its related items.
+
+    Returns:
+        dict with success status and message/error details.
+    """
+    if order.status != OrderStatus.PENDING.value:
+        return {
+            'success': False,
+            'error': 'Solo se pueden cancelar pedidos en estado pendiente.',
+        }
+
+    if order.payments.exists():
+        return {
+            'success': False,
+            'error': 'No se puede cancelar este pedido porque ya tiene pagos registrados.',
+        }
+
+    order_id = order.id
+    client_id = order.client_id
+    item_count = order.items.count()
+
+    try:
+        order.items.all().delete()
+        deleted_count, _ = Order.all_objects.filter(pk=order_id).delete()
+        if deleted_count == 0:
+            return {
+                'success': False,
+                'error': 'No se pudo eliminar el pedido.',
+            }
+    except ProtectedError:
+        return {
+            'success': False,
+            'error': 'No se pudo cancelar el pedido porque tiene registros protegidos relacionados.',
+        }
+
+    logger.info(
+        f"Order #{order_id} cancelled and deleted by "
+        f"{user.username if user else 'system'} - client_id={client_id}, items={item_count}"
+    )
+    return {
+        'success': True,
+        'message': f'Pedido #{order_id} cancelado correctamente.',
+    }
 
 
 # Payment Processing Functions

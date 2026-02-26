@@ -2,6 +2,7 @@ class PageConfig {
   constructor(root) {
     this.root = root;
     this.orderId = root.dataset.orderId;
+    this.cancelOrderUrl = root.dataset.cancelOrderUrl || '';
     this.clientBalance = parseFloat(root.dataset.clientBalance) || 0;
     this.clientAvailableCredit = parseFloat(root.dataset.clientAvailableCredit) || 0;
     this.canUseCredit = root.dataset.canUseCredit === 'true';
@@ -699,6 +700,53 @@ class OrderApi {
     });
     return response.json();
   }
+
+  async cancelOrder() {
+    const response = await fetch(this.config.cancelOrderUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': this.config.csrfToken
+      },
+      body: JSON.stringify({})
+    });
+    return response.json();
+  }
+}
+
+class NavigationController {
+  constructor(api, alertManager) {
+    this.api = api;
+    this.alertManager = alertManager;
+    this.cancelButton = document.getElementById('cancel-order-btn');
+    this.fallbackRedirectUrl = '/clients/';
+  }
+
+  init() {
+    this.cancelButton?.addEventListener('click', event => this.handleCancel(event));
+  }
+
+  async handleCancel(event) {
+    event.preventDefault();
+
+    const confirmed = window.confirm('¿Desea cancelar este pedido? Se eliminarán el pedido y sus productos asociados.');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const data = await this.api.cancelOrder();
+      if (!data.success) {
+        throw new Error(data.error || 'No se pudo cancelar el pedido.');
+      }
+
+      this.alertManager.show('success', 'Pedido cancelado', data.message || 'Pedido cancelado correctamente.', 2000);
+      window.location.href = data.redirect_url || this.fallbackRedirectUrl;
+    } catch (error) {
+      this.alertManager.show('danger', 'Error', error.message || 'No se pudo cancelar el pedido.', 5000);
+      console.error('Cancel order error', error);
+    }
+  }
 }
 
 class QuantityController {
@@ -1012,6 +1060,7 @@ class OrderPageApp {
     this.summaryManager = new OrderSummaryManager();
     this.amountFieldManager = new AmountFieldManager();
     this.api = new OrderApi(this.config);
+    this.navigationController = new NavigationController(this.api, this.alertManager);
     this.discountManager = new DiscountManager(() => this.getCurrentOrderTotal(), amount => this.handleDiscountChange(amount));
     this.quantityController = new QuantityController(
       this.config,
@@ -1036,6 +1085,7 @@ class OrderPageApp {
   }
 
   init() {
+    this.navigationController.init();
     this.discountManager.init();
     if (this.config.initialDiscount) {
       this.discountManager.setAmount(this.config.initialDiscount);
