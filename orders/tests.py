@@ -1,6 +1,9 @@
 from django.test import TestCase
+from django.urls import reverse
+from django.contrib.auth.models import User
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
+import json
 
 from clients.models import Client
 from orders.models import Order, OrderProduct, OrderStatus
@@ -195,6 +198,123 @@ class UpdateOrderTestCase(TestCase):
         )
 
         self.assertEqual(result.total_amount, Decimal("90.00"))
+
+
+class UpdateOrderViewTestCase(TestCase):
+    """Integration tests for update_order endpoint behavior."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="order_user", password="testpass")
+        self.client.force_login(self.user)
+
+        self.customer = Client.objects.create(
+            name="Client Endpoint",
+            balance=Decimal("200.00"),
+            credit_limit=Decimal("500.00"),
+        )
+        self.category = ProductCategory.objects.create(name="Water")
+        self.product_1 = Product.objects.create(
+            name="Garrafon",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+            price=20.0,
+        )
+        self.product_2 = Product.objects.create(
+            name="Botella",
+            presentation="1",
+            unit_of_measure=1,
+            category=self.category,
+            price=10.0,
+        )
+
+        ProductClientPrice.objects.create(
+            product=self.product_1,
+            client=self.customer,
+            price=20.0,
+        )
+        ProductClientPrice.objects.create(
+            product=self.product_2,
+            client=self.customer,
+            price=10.0,
+        )
+
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.PENDING.value,
+            discount=Decimal("0.00"),
+            subtotal_amount=Decimal("0.00"),
+            total_amount=Decimal("0.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product_1,
+            quantity=2,
+            unit_price=Decimal("20.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product_2,
+            quantity=1,
+            unit_price=Decimal("10.00"),
+        )
+        self.order.total_amount = services.calculate_order_total(self.order)
+        self.order.save(update_fields=['subtotal_amount', 'total_amount'])
+
+    def _post_update(self, payload: dict):
+        return self.client.post(
+            reverse('orders:update_order', kwargs={'order_pk': self.order.pk}),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+    def test_update_endpoint_removes_product_and_recalculates_totals(self) -> None:
+        response = self._post_update(
+            {
+                "quantity": 0,
+                "product_id": str(self.product_1.pk),
+                "discount": 0,
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertFalse(
+            OrderProduct.objects.filter(order=self.order, product=self.product_1).exists()
+        )
+        self.assertEqual(self.order.subtotal_amount, Decimal("10.00"))
+        self.assertEqual(self.order.total_amount, Decimal("10.00"))
+
+    def test_update_endpoint_changes_quantity_and_discount(self) -> None:
+        response = self._post_update(
+            {
+                "quantity": 3,
+                "product_id": str(self.product_2.pk),
+                "discount": "5.00",
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        item = OrderProduct.objects.get(order=self.order, product=self.product_2)
+        self.assertEqual(item.quantity, 3)
+        self.assertEqual(self.order.subtotal_amount, Decimal("70.00"))
+        self.assertEqual(self.order.total_amount, Decimal("65.00"))
+
+    def test_update_endpoint_discount_only_recalculates_total(self) -> None:
+        response = self._post_update(
+            {
+                "quantity": 0,
+                "discount": "12.00",
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.discount, Decimal("12.00"))
+        self.assertEqual(self.order.subtotal_amount, Decimal("50.00"))
+        self.assertEqual(self.order.total_amount, Decimal("38.00"))
 
 class CalculateOrderTotalTestCase(TestCase):
     """Tests for the calculate_order_total service function."""

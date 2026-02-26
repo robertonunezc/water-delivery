@@ -476,12 +476,11 @@ class OrderSummaryManager {
 
     if (parseInt(quantity, 10) > 0) {
       const productRow = document.querySelector(`[data-product="${productId}"]`)?.closest('tr');
-      const productName = productRow?.querySelector('td:first-child .fw-bold, td:first-child')?.textContent?.trim() || '';
-      const productPresentationCell = productRow?.querySelector('td:nth-child(2)');
-      const productPresentation = productPresentationCell ? productPresentationCell.textContent : productRow?.querySelector('.text-muted')?.textContent || '';
-      const productPrice = productRow?.querySelector('td:nth-child(3), td:nth-child(2)')?.textContent?.replace('$', '') || '0';
-      const fullProductName = `${productName} - ${productPresentation}`;
-      const itemTotal = (parseFloat(productPrice) * parseInt(quantity, 10)).toFixed(2);
+      const productName = productRow?.dataset.productName?.trim() || '';
+      const productPresentation = productRow?.dataset.productPresentation?.trim() || '';
+      const unitPrice = parseFloat(productRow?.dataset.unitPrice || '0') || 0;
+      const fullProductName = productPresentation ? `${productName} - ${productPresentation}` : productName;
+      const itemTotal = (unitPrice * parseInt(quantity, 10)).toFixed(2);
       const orderId = document.querySelector('[data-order]')?.getAttribute('data-order');
 
       if (existingItem) {

@@ -191,59 +191,43 @@ def create_order(request, client_pk):
 
 
 @login_required
-@require_http_methods(["GET", "POST"])
+@require_http_methods(["POST"])
 @transaction.atomic
 def update_order(request, order_pk):
     order = get_object_or_404(Order, pk=order_pk)
-    # get data from request in json format and POST method
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.body.decode('utf-8') or '{}')
-        except json.JSONDecodeError:
-            return HttpResponseBadRequest('Invalid JSON')
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}')
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('Invalid JSON')
 
-        try:
-            quantity = int(data.get('quantity', 0))
-            discount = Decimal(str(data.get('discount', '0')))  # Ensure discount is treated as Decimal
-        except (TypeError, ValueError):
-            return HttpResponseBadRequest('Invalid quantity or discount format')
+    try:
+        quantity = int(data.get('quantity', 0))
+        discount = Decimal(str(data.get('discount', '0')))
+    except (TypeError, ValueError):
+        return HttpResponseBadRequest('Invalid quantity or discount format')
 
-        product_id = data.get('product_id')
-        # If no product_id is provided, only update the discount on the existing pending order.
-        if not product_id:
-            pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
-            if not pending_client_order:
-                return HttpResponseBadRequest('No pending order found')
-            pending_client_order.discount = discount
-            pending_client_order.total_amount = services.calculate_order_total(pending_client_order)
-            pending_client_order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
-            order = pending_client_order
-        else:
-            product = get_object_or_404(Product, pk=product_id)
-            # Clients should only have one pending order per day
-            pending_client_order = services.get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=order.client).first()
-            if quantity <= 0:
-                pending_client_order.deleted_at = date.today()
-                pending_client_order.save()
-            else:
-               order = services.update_order(pending_client_order, quantity, product, order.client, discount)
+    product_id = data.get('product_id')
+    if not product_id:
+        order.discount = discount
+        order.total_amount = services.calculate_order_total(order)
+        order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
+    else:
+        product = get_object_or_404(Product, pk=product_id)
+        order = services.update_order(order, quantity, product, order.client, discount)
 
-        # Calculate payment breakdown based on client's available balance
-        client = order.client
-        order_total = order.total_amount
-        client_balance = client.balance
-        
-        # Calculate how much can be paid with balance and how much needs other payment method
-        payment_breakdown = calculate_payment_breakdown(order_total, client_balance)
-        
-        return JsonResponse({
-            'status': 'success', 
-            'order_total': str(order.total_amount),
-            'subtotal': str(order.subtotal_amount),
-            'client_balance': str(client_balance),
-            'discount': str(discount),
-            'payment_breakdown': payment_breakdown
-        })
+    client = order.client
+    order_total = order.total_amount
+    client_balance = client.balance
+    payment_breakdown = calculate_payment_breakdown(order_total, client_balance)
+
+    return JsonResponse({
+        'status': 'success',
+        'order_total': str(order.total_amount),
+        'subtotal': str(order.subtotal_amount),
+        'client_balance': str(client_balance),
+        'discount': str(order.discount),
+        'payment_breakdown': payment_breakdown
+    })
 
 
 @login_required

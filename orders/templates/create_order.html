@@ -284,7 +284,10 @@
                       </thead>
                       <tbody>
                         {% for client_product in client_products %}
-                          <tr>
+                          <tr data-product-id="{{ client_product.product.id }}"
+                              data-product-name="{{ client_product.product.name|escape }}"
+                              data-product-presentation="{{ client_product.product.get_presentation_display|escape }}"
+                              data-unit-price="{{ client_product.price }}">
                             <td>
                               <div class="fw-bold">{{ client_product.product.name }}</div>
                               <small class="text-muted d-md-none">{{ client_product.product.get_presentation_display }}</small>

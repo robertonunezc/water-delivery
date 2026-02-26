@@ -45,19 +45,20 @@ def update_order(order: Order, quantity: int, product, client: Client, discount:
     unit_price = get_product_price_for_client(product, client)
     if not isinstance(unit_price, Decimal):
         unit_price = Decimal(str(unit_price))
-    order_product, created = OrderProduct.objects.get_or_create(order=order, product=product, defaults={'quantity': 0, 'unit_price': unit_price})
+    order.discount = discount
+
     if quantity <= 0:
-        order_product.delete()
+        OrderProduct.objects.filter(order=order, product=product).delete()
         order.total_amount = calculate_order_total(order)
-        order.save(update_fields=['subtotal_amount', 'total_amount'])
+        order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
         return order
+
+    order_product, created = OrderProduct.objects.get_or_create(order=order, product=product, defaults={'quantity': 0, 'unit_price': unit_price})
 
     order_product.quantity = int(quantity)
     order_product.unit_price = unit_price
-    order_product.total_price = unit_price * Decimal(order_product.quantity)
     order_product.save()
     # update order totals and return the order
-    order.discount = discount
     order.total_amount = calculate_order_total(order)
     order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
     return order
