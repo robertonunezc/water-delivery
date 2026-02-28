@@ -19,14 +19,3 @@ python manage.py collectstatic --noinput
 
 echo "Starting Gunicorn server..."
 exec gunicorn --bind 0.0.0.0:8000 water_delivery.wsgi:application
-
-echo "Test health check endpoint..."
-for i in {1..30}; do
-  if curl -fsS http://agua.puntoreica.com/health/ >/dev/null; then
-    echo "✅ Ready"
-    exit 0
-  fi
-  sleep 2
-done
-echo "❌ Not ready"
-exit 1
