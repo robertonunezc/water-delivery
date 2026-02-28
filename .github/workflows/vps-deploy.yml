@@ -59,9 +59,79 @@ jobs:
         working-directory: .
         run: |
           python -m pytest clients
-  build_and_push:
+  container_healthcheck:
     runs-on: ubuntu-latest
     needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image for health check
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: water-delivery:ci-health
+
+      - name: Start dependencies and app container
+        run: |
+          set -euxo pipefail
+          docker network create water-ci-net
+
+          docker run -d --name postgres-ci --network water-ci-net \
+            -e POSTGRES_DB=water_delivery \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD="${{ secrets.CI_POSTGRES_PASSWORD }}" \
+            postgres:16
+
+          docker run -d --name redis-ci --network water-ci-net redis:7-alpine
+
+          docker run -d --name web-ci --network water-ci-net -p 8000:8000 \
+            -e DJANGO_SETTINGS_MODULE=water_delivery.settings \
+            -e SECRET_KEY=dummy-ci-secret-key \
+            -e POSTGRES_DB=water_delivery \
+            -e POSTGRES_USER=postgres \
+            -e POSTGRES_PASSWORD="${{ secrets.CI_POSTGRES_PASSWORD }}" \
+            -e POSTGRES_HOST=postgres-ci \
+            -e POSTGRES_PORT=5432 \
+            -e REDIS_HOST=redis-ci \
+            -e REDIS_PORT=6379 \
+            -e REDIS_PASSWORD= \
+            water-delivery:ci-health
+
+      - name: Verify /health/ endpoint in container
+        run: |
+          set -euxo pipefail
+          ATTEMPTS=30
+          SLEEP_SECONDS=3
+
+          for i in $(seq 1 "$ATTEMPTS"); do
+            if RESPONSE=$(curl -fsS http://localhost:8000/health/); then
+              echo "Container health check passed on attempt $i"
+              echo "Response: $RESPONSE"
+              exit 0
+            fi
+
+            echo "Attempt $i/$ATTEMPTS failed, waiting ${SLEEP_SECONDS}s..."
+            docker logs web-ci --tail 30 || true
+            sleep "$SLEEP_SECONDS"
+          done
+
+          echo "Container health check failed after $ATTEMPTS attempts"
+          docker logs web-ci || true
+          exit 1
+
+      - name: Cleanup containers
+        if: always()
+        run: |
+          set -euxo pipefail
+          docker rm -f web-ci redis-ci postgres-ci || true
+          docker network rm water-ci-net || true
+  build_and_push:
+    runs-on: ubuntu-latest
+    needs: container_healthcheck
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,6 +154,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build_and_push
+    env:
+      SSH_PORT: ${{ secrets['SSH_PORT'] }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,7 +168,7 @@ jobs:
           printf "%s" "${{ secrets.EC2_SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           HOST="${{ secrets.EC2_HOST }}"
-          PORT="${{ secrets.EC2_SSH_PORT || '22' }}"
+          PORT="${SSH_PORT:-22}"
           ssh-keyscan -p "$PORT" -T 10 -H "$HOST" >> ~/.ssh/known_hosts || { echo "keyscan failed"; cat ~/.ssh/known_hosts; exit 1; }
           chmod 644 ~/.ssh/known_hosts
           # Verify the key was created
@@ -107,15 +179,17 @@ jobs:
         run: |
           set -euxo pipefail
           HOST="${{ secrets.EC2_HOST }}"
-          PORT="${{ secrets.EC2_SSH_PORT || '22' }}"
+          PORT="${SSH_PORT:-22}"
           # Verify key still exists
           ls -la ~/.ssh/id_rsa
           ssh -p "$PORT" -o StrictHostKeyChecking=yes -vvv -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}"@"$HOST" "echo 'SSH connection successful'"
           
       - name: Deploy to VPS
         run: |
-          ssh -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-            set -e
+          HOST="${{ secrets.EC2_HOST }}"
+          PORT="${SSH_PORT:-22}"
+          ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" << 'EOF'
+            set -euo pipefail
             echo "Deploying water-delivery application..."
             cd projects/water-delivery
             
@@ -139,6 +213,27 @@ jobs:
             
             # Optional: show running image
             docker-compose -f docker-compose.prod.yml ps
+
+            echo "Running post-deploy health check..."
+            HEALTHCHECK_URL="http://localhost:8001/health/"
+            ATTEMPTS=12
+            SLEEP_SECONDS=5
+
+            for i in $(seq 1 "$ATTEMPTS"); do
+              if RESPONSE=$(curl -fsS "$HEALTHCHECK_URL"); then
+                echo "Health check passed on attempt $i"
+                echo "Response: $RESPONSE"
+                break
+              fi
+
+              if [ "$i" -eq "$ATTEMPTS" ]; then
+                echo "Health check failed after $ATTEMPTS attempts"
+                exit 1
+              fi
+
+              echo "Health check attempt $i/$ATTEMPTS failed. Retrying in ${SLEEP_SECONDS}s..."
+              sleep "$SLEEP_SECONDS"
+            done
             
             echo "Deployment completed successfully!"
 
