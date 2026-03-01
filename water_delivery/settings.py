@@ -68,6 +68,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "core.middleware.request_id.RequestIdMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -166,12 +167,17 @@ except Exception:
     LOG_DIR = BASE_DIR
 
 
-JSON_FMT_PROD = "%(asctime)s %(levelname)s %(name)s %(message)s"
+JSON_FMT_PROD = "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s"
 JSON_FMT_DEV = "%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d"
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "core.logging.RequestIdFilter",
+        },
+    },
     "formatters": {
         "json": {
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
