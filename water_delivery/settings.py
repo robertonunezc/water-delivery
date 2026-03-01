@@ -198,6 +198,7 @@ LOGGING = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "filters": ["request_id"],   # ← THIS LINE IS REQUIRED
             "formatter": "json",
         },
     },
