@@ -16,6 +16,19 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
+
+def _get_bool_env(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    return default
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -26,13 +39,11 @@ ADMIN_INDEX_TITLE = "Welcome to PuriGest Admin Portal"
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*j-f2^k5a5v8d3t9m+etkcvi2'
+SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*j-f2^k5a5v8d3t9m+etkcvi2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-if os.environ.get('ENV') == 'prod':
-    DEBUG = False
-else:
-    DEBUG = True
+default_debug = os.getenv('ENV') != 'prod'
+DEBUG = _get_bool_env('DEBUG', default=default_debug)
 
 ALLOWED_HOSTS = ['*']
 
