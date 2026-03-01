@@ -185,7 +185,7 @@ def create_order(request, client_pk):
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_shipping_address': has_shipping_address,
     }
-    log.info(f"Created new order #{order.id} for client {client.name} by user {owner.username}")
+    log.info(f"Created new order id:{order.id} for client {client.id} by user {owner.username}")
     
     return render(request, 'create_order.html', context)
 

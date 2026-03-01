@@ -165,34 +165,30 @@ except Exception:
     # If directory creation fails for any reason, fall back to BASE_DIR
     LOG_DIR = BASE_DIR
 
+
+JSON_FMT_PROD = "%(asctime)s %(levelname)s %(name)s %(message)s"
+JSON_FMT_DEV = "%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d"
+
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'json': {
-        '()': 'pythonjsonlogger.jsonlogger.JsonFormatter',
-        'fmt': '%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
+            "fmt": JSON_FMT_DEV if DEBUG else JSON_FMT_PROD,
         },
     },
-    'handlers': {
-        'file': {
-        'class': 'logging.handlers.RotatingFileHandler',
-        'filename': str(LOG_DIR / 'app.log'),
-        'maxBytes': 10*1024*1024,
-        'backupCount': 5,
-        'formatter': 'json',
-        },
-        'console': {
-        'class': 'logging.StreamHandler',
-        'formatter': 'json',
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
         },
     },
-    'root': {
-        'handlers': ['file','console'],
-        'level': 'INFO',
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("LOG_LEVEL", "INFO"),
     },
 }
-
 
 
 # Static files (CSS, JavaScript, Images)
