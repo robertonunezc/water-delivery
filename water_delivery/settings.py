@@ -47,6 +47,19 @@ DEBUG = _get_bool_env('DEBUG', default=default_debug)
 
 ALLOWED_HOSTS = ['*']
 
+ALLOWED_HOSTS = [
+    "pabel.puntoreica.com",
+    "agua.puntoreica.com",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://pabel.puntoreica.com",
+    "https://agua.puntoreica.com",
+]
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
 
 # Application definition
 
