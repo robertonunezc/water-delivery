@@ -7,6 +7,7 @@ from .models import (
     Client, BillingData, Address, BalanceTransaction, CreditTransaction,
     Contact, ClientBillingFrecuency, ClientCreditConfig
 )
+from .forms import AddressInlineForm
 
 User = get_user_model()
 
@@ -158,5 +159,72 @@ class ClientBillingInheritanceTestCase(TestCase):
         billing = self.branch_override.billing_info
         self.assertFalse(billing.is_complete)
         self.assertEqual(billing.source, 'own')
+
+
+class AddressInlineFormTests(TestCase):
+    """Tests for AddressInlineForm and its same_as_previous helper field."""
+
+    def setUp(self) -> None:
+        self.client_obj = Client.objects.create(
+            name="Test Address Client",
+            type="corporate",
+            requires_billing=True,
+            active=True,
+        )
+
+    def test_form_has_same_as_previous_field(self) -> None:
+        """The inline form must expose the non-model boolean field."""
+        form = AddressInlineForm()
+        self.assertIn('same_as_previous', form.fields)
+
+    def test_same_as_previous_is_not_required(self) -> None:
+        """The checkbox must be optional."""
+        field = AddressInlineForm().fields['same_as_previous']
+        self.assertFalse(field.required)
+
+    def test_same_as_previous_label(self) -> None:
+        """The checkbox label must match the spec."""
+        field = AddressInlineForm().fields['same_as_previous']
+        self.assertEqual(field.label, "Misma dirección que la anterior")
+
+    def test_form_valid_without_same_as_previous(self) -> None:
+        """Submitting without the helper field must not cause validation errors."""
+        data = {
+            'client': self.client_obj.pk,
+            'type': 'shipping',
+            'street': 'Av. Test 1',
+            'locality': 'Querétaro',
+            'municipality': 'Querétaro',
+            'state': 'Querétaro',
+            'zip_code': '76000',
+            'country': 'Mexico',
+        }
+        form = AddressInlineForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_billing_uniqueness_still_enforced(self) -> None:
+        """Existing billing uniqueness via Address.clean() must remain intact."""
+        Address.objects.create(
+            client=self.client_obj,
+            type='billing',
+            street='Av. First 1',
+            locality='Querétaro',
+            municipality='Querétaro',
+            state='Querétaro',
+            zip_code='76000',
+            country='Mexico',
+        )
+        duplicate = Address(
+            client=self.client_obj,
+            type='billing',
+            street='Av. Second 2',
+            locality='Querétaro',
+            municipality='Querétaro',
+            state='Querétaro',
+            zip_code='76000',
+            country='Mexico',
+        )
+        with self.assertRaises(ValidationError):
+            duplicate.full_clean()
 
 

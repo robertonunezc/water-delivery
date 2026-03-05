@@ -13,7 +13,8 @@ from .forms import (
 	ManualBalanceTransactionForm, 
 	ManualCreditTransactionForm, 
 	BulkBalanceDepositForm,
-	ClientBillingFrequencyForm
+	ClientBillingFrequencyForm,
+	AddressInlineForm,
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
@@ -33,6 +34,7 @@ class AddressAdmin(admin.ModelAdmin):
 	exclude = ('deleted_at',)
 class AddressInline(StackedInline):
 	model = models.Address
+	form = AddressInlineForm
 	extra = 0
 	exclude = ('deleted_at',)
 	tab = True
@@ -116,6 +118,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 			'clients/admin/toggle_corporate_field.js',
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
+			'clients/admin/address_inline_copy_previous.js',
 		)
 
 	def save_model(self, request, obj, form, change):

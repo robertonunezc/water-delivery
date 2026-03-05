@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-from .models import Client, BalanceTransaction, CreditTransaction
+from .models import Client, Address, BalanceTransaction, CreditTransaction
 
 
 class ManualBalanceTransactionForm(forms.Form):
@@ -312,3 +312,17 @@ class ClientBillingFrequencyForm(forms.ModelForm):
                 })
         
         return cleaned_data
+
+
+class AddressInlineForm(forms.ModelForm):
+    """Inline form for Address with a helper checkbox to copy from opposite type."""
+
+    same_as_previous = forms.BooleanField(
+        required=False,
+        label="Misma dirección que la anterior",
+        help_text="Copiar datos de la dirección del tipo opuesto",
+    )
+
+    class Meta:
+        model = Address
+        exclude = ('deleted_at',)
