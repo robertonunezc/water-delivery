@@ -150,8 +150,8 @@ class Client(TimeStampedModel):
         # Use get_missing_billing_components() and get_billing_setup_status() helper methods
         # to check for missing components and display warnings in the admin interface.
 
-        # NOTE: Shipping address validation removed - it was too strict for admin workflow.
-        # Branches must have their own shipping address (they don't inherit from corporate),
+        # NOTE: delivery address validation removed - it was too strict for admin workflow.
+        # Branches must have their own delivery address (they don't inherit from corporate),
         # but this should be validated at the business logic level (e.g., when creating orders)
         # rather than at the model level, to allow proper admin inline workflow.
 
@@ -291,20 +291,20 @@ class Client(TimeStampedModel):
         """Check if client has at least one billing address"""
         return self.addresses.filter(type='billing').exists()
 
-    def has_shipping_address(self):
-        """Check if client has at least one active shipping address"""
-        return self.addresses.filter(type='shipping', active=True).exists()
+    def has_delivery_address(self):
+        """Check if client has at least one active delivery address"""
+        return self.addresses.filter(type='delivery', active=True).exists()
 
     def can_receive_orders(self):
         """
         Check if client is ready to receive orders.
-        Branches require their own shipping address (they don't inherit from corporate).
+        Branches require their own delivery address (they don't inherit from corporate).
 
         Returns:
             tuple: (bool, str) - (can_receive, error_message)
         """
         if self.type == 'branch':
-            if not self.has_shipping_address():
+            if not self.has_delivery_address():
                 return False, 'La sucursal debe tener un domicilio de envío (ubicación física) antes de recibir pedidos.'
 
         # Add other validations as needed
@@ -512,7 +512,7 @@ class Contact(TimeStampedModel):
 
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.PROTECT, verbose_name="Cliente")
-    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='shipping', verbose_name="Tipo")
+    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('delivery', 'Ubicacion fisica'), ('other', 'Otro')], default='delivery', verbose_name="Tipo")
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
@@ -543,7 +543,7 @@ class Address(TimeStampedModel):
         super().clean()
         errors = {}
         # Only validate uniqueness for billing type
-        # Shipping and other types can have multiple addresses per client
+        # delivery and other types can have multiple addresses per client
         if self.type != 'billing':
             return
         

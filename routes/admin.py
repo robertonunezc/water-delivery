@@ -37,6 +37,7 @@ class RouteAdmin(ModelAdmin):
     list_display = ('name', 'transportation', 'weekday', 'is_active', 'client_count')
     list_filter = ('weekday', 'is_active', 'transportation')
     search_fields = ('name', 'description', 'transportation__license_plate')
+
     inlines = [RouteClientInline,]
     
     class Media:

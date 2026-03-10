@@ -173,7 +173,7 @@ def create_order(request, client_pk):
     payment_types = PAYMENT_METHOD_CHOICES
     # Calculate initial payment breakdown based on client balance and order total
     initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
-    has_shipping_address = client.addresses.filter(type='shipping').exists()
+    has_delivery_address = client.addresses.filter(type='delivery').exists()
     # Add client credit payment settings for frontend validation
     context = {
         'client': client, 
@@ -183,7 +183,7 @@ def create_order(request, client_pk):
         'can_use_credit': client.can_use_credit_for_payment(),
         'requires_credit_note': client.requires_note_for_credit_payment(),
         'initial_payment_breakdown': json.dumps(initial_breakdown),
-        'has_shipping_address': has_shipping_address,
+        'has_delivery_address': has_delivery_address,
     }
     log.info(f"Created new order id:{order.id} for client {client.id} by user {owner.username}")
     
