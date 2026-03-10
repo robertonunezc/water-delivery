@@ -24,7 +24,7 @@ class RouteClientInline(TabularInline):
         form.request = request
         return form
 
-class RouteClientOrderInline(admin.TabularInline):
+class RouteClientOrderInline(TabularInline):
     model = RouteClientOrder
     extra = 0
     fields = ('client', 'order', 'sequence', 'visit_date', 'is_completed', 'notes')
@@ -34,10 +34,9 @@ class RouteClientOrderInline(admin.TabularInline):
 @admin.register(Route)
 class RouteAdmin(ModelAdmin):
     form = RouteForm
-    list_display = ('name', 'transportation', 'weekday', 'is_active', 'client_count', 'created_at')
-    list_filter = ('weekday', 'is_active', 'transportation', 'created_at')
+    list_display = ('name', 'transportation', 'weekday', 'is_active', 'client_count')
+    list_filter = ('weekday', 'is_active', 'transportation')
     search_fields = ('name', 'description', 'transportation__license_plate')
-    readonly_fields = ('created_at', 'updated_at')
     inlines = [RouteClientInline,]
     
     class Media:
@@ -81,7 +80,7 @@ class RouteClientAdmin(ModelAdmin):
 
 
 
-class RouteClientOrderAdmin(admin.ModelAdmin):
+class RouteClientOrderAdmin(ModelAdmin):
     list_display = ('client', 'route', 'order', 'visit_date', 'sequence', 'is_completed')
     list_filter = ('is_completed', 'visit_date', 'route__weekday', 'route__transportation')
     search_fields = ('client__name', 'route__name', 'order__id')

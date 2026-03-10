@@ -81,8 +81,12 @@
 }
 
 /* OVERRIDE: Always show checkbox if there are client errors in the row - DIRECT CSS APPROACH */
+/* Standard Django admin selectors */
 .tabular .field-client:has(.errorlist) ~ .field-confirm_duplicate_assignment .confirm-duplicate-checkbox,
-.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox,
+/* Unfold admin selectors — errors rendered in td.field-client.errors with .text-red-600 */
+.tabular td.field-client.errors ~ td.field-confirm_duplicate_assignment .confirm-duplicate-checkbox,
+.tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
     display: inline-block !important;
     margin: 0 4px 0 0;
     vertical-align: middle;
@@ -90,7 +94,9 @@
 }
 
 .tabular .field-client:has(.errorlist) ~ .field-confirm_duplicate_assignment label,
-.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label {
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label,
+.tabular td.field-client.errors ~ td.field-confirm_duplicate_assignment label,
+.tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment label {
     display: inline-block !important;
     font-size: 11px;
     color: #856404;
@@ -184,7 +190,8 @@
 }
 
 /* Show checkbox when there's a validation error in the same row */
-.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment .confirm-duplicate-checkbox,
+.tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment .confirm-duplicate-checkbox {
     display: inline-block !important;
     margin: 0 4px 0 0;
     vertical-align: middle;
@@ -199,7 +206,8 @@
 }
 
 /* Show label when row has client errors */
-.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label {
+.tabular tr:has(.field-client .errorlist) .field-confirm_duplicate_assignment label,
+.tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment label {
     display: inline-block !important;
     font-size: 11px;
     color: #856404;

@@ -11,15 +11,20 @@
     
     // Run immediately when script loads
     function runImmediately() {
-        // Add CSS class to rows with client errors for CSS fallback
-        $('.field-client .errorlist').each(function() {
-            var $formRow = $(this).closest('.form-row');
+        // Find error containers — works with both standard Django (.errorlist) and Unfold (.text-red-600)
+        var errorSelectors = '.field-client .errorlist, td.field-client.errors, .field-client .text-red-600, .field-client .text-red-500';
+        $(errorSelectors).each(function() {
+            var $el = $(this);
+            var $formRow = $el.closest('tr.form-row').length ? $el.closest('tr.form-row') : $el.closest('tr');
+            if (!$formRow.length) $formRow = $el.closest('.form-row');
+            if (!$formRow.length) return;
+
             $formRow.addClass('has-client-error');
-            
-            var errorText = $(this).text();
+
+            var errorText = $el.text();
             if (errorText.includes('CONFLICTO DE ASIGNACIÓN') || errorText.includes('ya está asignado')) {
                 $formRow.addClass('has-duplicate-warning');
-                var $confirmContainer = $formRow.find('.field-confirm_duplicate_assignment');
+                var $confirmContainer = $formRow.find('td.field-confirm_duplicate_assignment, .field-confirm_duplicate_assignment').first();
                 $confirmContainer.addClass('has-conflict');
             }
         });
@@ -208,44 +213,43 @@
     }
     
     function checkExistingValidationErrors() {
-        // Look for rows that have client validation errors with more specific targeting
-        $('.field-client .errorlist li').each(function() {
+        // Collect error elements — standard Django (.errorlist li) and Unfold (.text-red-600 inside td.field-client)
+        var $errorItems = $('.field-client .errorlist li, td.field-client.errors .text-red-600, td.field-client.errors .text-red-500');
+
+        $errorItems.each(function() {
             var $errorItem = $(this);
-            var $formRow = $errorItem.closest('.form-row');
-            var errorText = $errorItem.html(); // Use html() to catch HTML content
-            
-            console.log('Found error in row:', $formRow.attr('id'), 'Error:', errorText); // Debug log
-            
-            // Check if this is a duplicate assignment error
+            var $formRow = $errorItem.closest('tr.form-row').length ? $errorItem.closest('tr.form-row') : $errorItem.closest('tr');
+            if (!$formRow.length) $formRow = $errorItem.closest('.form-row');
+            if (!$formRow.length) return;
+
+            var errorText = $errorItem.html();
+
             if (errorText.includes('CONFLICTO DE ASIGNACIÓN') || errorText.includes('ya está asignado')) {
-                var $confirmContainer = $formRow.find('.field-confirm_duplicate_assignment');
+                var $confirmContainer = $formRow.find('td.field-confirm_duplicate_assignment, .field-confirm_duplicate_assignment').first();
                 var $confirmCheckbox = $formRow.find('.confirm-duplicate-checkbox');
-                
-                console.log('Found duplicate error, checkbox container:', $confirmContainer.length, 'checkbox:', $confirmCheckbox.length);
-                
+
                 if ($confirmContainer.length && $confirmCheckbox.length) {
-                    // Show the confirmation checkbox and make it prominent
                     $formRow.addClass('has-duplicate-warning');
                     $confirmContainer.addClass('has-conflict');
-                    
-                    // Remove the display:none style and make checkbox visible
+
+                    // Remove the inline display:none and make checkbox visible
                     $confirmCheckbox.removeAttr('style');
                     $confirmCheckbox.css('display', 'inline-block');
                     $confirmCheckbox.show();
-                    
+
+                    // Show the container itself (may be hidden)
+                    $confirmContainer.show();
+
                     // Create or update label
                     var $existingLabel = $confirmContainer.find('label');
                     if ($existingLabel.length) {
                         $existingLabel.html('').append($confirmCheckbox).append(' ✓ Confirmar duplicado');
                         $existingLabel.show();
                     } else {
-                        // Create new label
                         var $newLabel = $('<label style="display: inline-block; font-size: 12px; color: #856404; font-weight: bold;"></label>');
                         $newLabel.append($confirmCheckbox).append(' ✓ Confirmar duplicado');
                         $confirmContainer.prepend($newLabel);
                     }
-                    
-                    console.log('Checkbox should now be visible');
                 }
             }
         });

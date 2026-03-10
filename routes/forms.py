@@ -14,14 +14,14 @@ class RouteClientForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
     
-    def __init__(self, *args, **kwargs):
-        self.request = kwargs.pop('request', None)
-        super().__init__(*args, **kwargs)
+    # def __init__(self, *args, **kwargs):
+    #     self.request = kwargs.pop('request', None)
+    #     super().__init__(*args, **kwargs)
         
-        # Add CSS classes for better styling
-        self.fields['client'].widget.attrs.update({'class': 'client-select'})
-        self.fields['sequence'].widget.attrs.update({'class': 'form-control'})
-        self.fields['frequency'].widget.attrs.update({'class': 'form-select'})
+    #     # Add CSS classes for better styling
+    #     self.fields['client'].widget.attrs.update({'class': 'client-select'})
+    #     self.fields['sequence'].widget.attrs.update({'class': 'form-control'})
+    #     self.fields['frequency'].widget.attrs.update({'class': 'form-select'})
         
     def clean(self):
         cleaned_data = super().clean()
