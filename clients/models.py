@@ -163,8 +163,8 @@ class Client(TimeStampedModel):
         if not self.can_pay_with_credit and self.current_debt > 0:
             errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
 
-        if self.current_debt > self.credit_limit:
-            errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
+        # if self.current_debt > self.credit_limit:
+        #     errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
 
         if not self.can_pay_with_credit and self.credit_limit > 0:
             errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'

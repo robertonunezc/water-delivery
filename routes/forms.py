@@ -131,19 +131,4 @@ class RouteForm(forms.ModelForm):
         cleaned_data = super().clean()
         transportation = cleaned_data.get('transportation')
         weekday = cleaned_data.get('weekday')
-        
-        if transportation and weekday:
-            # Check for existing route with same transportation and weekday
-            existing_route = Route.objects.filter(
-                transportation=transportation,
-                weekday=weekday,
-                is_active=True
-            ).exclude(pk=self.instance.pk if self.instance else None)
-            
-            if existing_route.exists():
-                raise ValidationError({
-                    'transportation': f"Ya existe una ruta activa para {transportation} los {dict(Route.WEEKDAY_CHOICES)[weekday]}.",
-                    'weekday': f"Ya existe una ruta activa para {transportation} los {dict(Route.WEEKDAY_CHOICES)[weekday]}."
-                })
-        
         return cleaned_data

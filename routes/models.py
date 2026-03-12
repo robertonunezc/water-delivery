@@ -4,7 +4,10 @@ from datetime import date
 from django.forms import ValidationError
 
 # Create your models here.
-WEEKDAY_CHOICES = [
+
+
+class Route(models.Model):
+    WEEKDAY_CHOICES = [
     ('monday', 'Lunes'),
     ('tuesday', 'Martes'),
     ('wednesday', 'Miércoles'),
@@ -13,8 +16,6 @@ WEEKDAY_CHOICES = [
     ('saturday', 'Sábado'),
     ('sunday', 'Domingo'),
 ]
-
-class Route(models.Model):
     name = models.CharField(max_length=100, verbose_name="Nombre de la Ruta")
     description = models.TextField(blank=True, null=True, verbose_name="Descripción")
     transportation = models.ForeignKey('core.Transport', related_name='routes', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Vehículo")
@@ -26,7 +27,6 @@ class Route(models.Model):
     class Meta:
         verbose_name = 'Ruta'
         verbose_name_plural = 'Rutas'
-        unique_together = ('transportation', 'weekday')
         indexes = [
             models.Index(fields=['weekday'], name='routes_route_weekday_idx'),
             models.Index(fields=['is_active'], name='routes_route_active_idx'),
@@ -71,6 +71,9 @@ class RouteClientOrder(models.Model):
 
     def clean(self):
         super().clean()
+        if not self.client_id:
+            return
+
         # Validate the client has an address of type delivery
         if not self.client.has_delivery_address():
             raise ValidationError({
@@ -108,11 +111,21 @@ class RouteClient(models.Model):
 
     def __str__(self):
         return f"{self.client} in {self.route.name} (sequence: {self.sequence})"
-    def clean(self):
-        super().clean()
-        # Validate the client has an address of type delivery
+
+    def _validate_client_delivery_address(self):
+        if not self.client_id:
+            return
+
         if not self.client.has_delivery_address():
             raise ValidationError({
                 'client': f"El cliente '{self.client.name}' no tiene una dirección de envío válida. Por favor, agregue una dirección de tipo 'Ubicacion Fisica' para este cliente."
             })
+    
+    def clean(self):
+        super().clean()
+        self._validate_client_delivery_address()
+
+    def save(self, *args, **kwargs):
+        self._validate_client_delivery_address()
+        return super().save(*args, **kwargs)
         
