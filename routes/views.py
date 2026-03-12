@@ -74,9 +74,8 @@ def today_route(request):
     ).select_related('client', 'order').order_by('sequence')
     
     # Get regular clients for this route (for manual order creation)
-    regular_clients = RouteClient.objects.filter(
-        route=today_route,
-        is_active=True
+    regular_clients = RouteClient.objects.due_on(date.today()).filter(
+        route=today_route
     ).select_related('client').order_by('sequence')
     
     context = {
@@ -84,6 +83,7 @@ def today_route(request):
         'transportation': transportation,
         'employee': employee,
         'today_orders': today_orders,
+        'route_clients': regular_clients,
         'regular_clients': regular_clients,
         'today': date.today(),
         'is_today_view': True,

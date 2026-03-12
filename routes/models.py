@@ -1,7 +1,27 @@
+from datetime import date, timedelta
+
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from datetime import date
 
 from django.forms import ValidationError
+WEEKDAY_TO_INDEX = {
+    'monday': 0,
+    'tuesday': 1,
+    'wednesday': 2,
+    'thursday': 3,
+    'friday': 4,
+    'saturday': 5,
+    'sunday': 6,
+}
+
+
+class RouteClientQuerySet(models.QuerySet):
+    def due_on(self, target_date: date):
+        weekday = target_date.strftime('%A').lower()
+        candidates = self.filter(is_active=True, route__weekday=weekday).select_related('route')
+        due_ids = [route_client.pk for route_client in candidates if route_client.is_due_on(target_date)]
+        return self.filter(pk__in=due_ids)
+
 
 # Create your models here.
 
@@ -95,22 +115,54 @@ class RouteClient(models.Model):
     sequence = models.PositiveIntegerField(help_text="Default sequence order for this client", verbose_name="Ordinal")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas")
-    frequency = models.CharField(max_length=50, choices=[
-        ('weekly', 'Semanal'),
-        ('biweekly', 'Quincenal'),
-        ('monthly', 'Mensual'),
-    ], default='weekly')
+    interval_weeks = models.PositiveSmallIntegerField(
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(4)],
+        verbose_name='Intervalo (semanas)',
+        help_text='Frecuencia de visita expresada en semanas (1 a 4).',
+    )
+    anchor_date = models.DateField(
+        default=date.today,
+        verbose_name='Fecha de inicio de ciclo',
+        help_text='Fecha base para calcular cada cuántas semanas corresponde la visita.',
+    )
+
+    objects = RouteClientQuerySet.as_manager()
     
     class Meta:
         unique_together = ('route', 'client')
         ordering = ['sequence']
         indexes = [
             models.Index(fields=['is_active'], name='routes_client_active_idx'),
-            models.Index(fields=['frequency'], name='routes_client_frequency_idx'),
+            models.Index(fields=['interval_weeks'], name='routes_client_interval_idx'),
         ]
 
     def __str__(self):
         return f"{self.client} in {self.route.name} (sequence: {self.sequence})"
+
+    def _align_anchor_date_to_route_weekday(self):
+        if not self.route_id or not self.anchor_date:
+            return
+
+        route_weekday_index = WEEKDAY_TO_INDEX.get(self.route.weekday)
+        if route_weekday_index is None:
+            return
+
+        weekday_delta = (self.anchor_date.weekday() - route_weekday_index) % 7
+        self.anchor_date = self.anchor_date - timedelta(days=weekday_delta)
+
+    def is_due_on(self, target_date: date) -> bool:
+        if not self.route_id or not self.is_active:
+            return False
+
+        if self.route.weekday != target_date.strftime('%A').lower():
+            return False
+
+        if target_date < self.anchor_date:
+            return False
+
+        weeks_since_anchor = (target_date - self.anchor_date).days // 7
+        return weeks_since_anchor % self.interval_weeks == 0
 
     def _validate_client_delivery_address(self):
         if not self.client_id:
@@ -126,6 +178,6 @@ class RouteClient(models.Model):
         self._validate_client_delivery_address()
 
     def save(self, *args, **kwargs):
+        self._align_anchor_date_to_route_weekday()
         self._validate_client_delivery_address()
         return super().save(*args, **kwargs)
-        

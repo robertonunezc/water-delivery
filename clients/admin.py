@@ -18,12 +18,24 @@ from .forms import (
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
+from routes.models import RouteClient
 
 logger = logging.getLogger(__name__)
 class ContactInline(TabularInline):
 	model = models.Contact
 	extra = 0
 	exclude = ('deleted_at',)
+	tab = True
+
+
+class ClientRouteInline(TabularInline):
+	model = RouteClient
+	extra = 0
+	verbose_name = "Asignación de Ruta"
+	verbose_name_plural = "Asignaciones de Ruta"
+	classes = ('tab-routes',)
+	fields = ('route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes')
+	ordering = ('route', 'sequence')
 	tab = True
 
 
@@ -97,7 +109,7 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
-	inlines = [BillingFrecuencyInline,ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline]
+	inlines = [BillingFrecuencyInline,ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
 		'balance', 'current_debt', 'get_available_credit',

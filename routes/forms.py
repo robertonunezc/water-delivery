@@ -9,9 +9,10 @@ class RouteClientForm(forms.ModelForm):
     
     class Meta:
         model = RouteClient
-        fields = ['client', 'sequence', 'frequency', 'is_active', 'notes']
+        fields = ['client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
         widgets = {
             'notes': forms.Textarea(attrs={'rows': 3}),
+            'anchor_date': forms.DateInput(attrs={'type': 'date'}),
         }
     
     # def __init__(self, *args, **kwargs):
@@ -82,7 +83,7 @@ class RouteClientForm(forms.ModelForm):
                     })
                 
                 # If we reach here, user has confirmed the duplicate assignment
-                if self.request:
+                if getattr(self, 'request', None):
                     messages.warning(
                         self.request, 
                         f"Cliente '{client.name}' asignado a múltiples rutas. "
@@ -126,6 +127,25 @@ class RouteForm(forms.ModelForm):
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        transportation_field = self.fields.get('transportation')
+        if not transportation_field:
+            return
+
+        widget = transportation_field.widget
+
+        # Keep only the "view" related-object action for vehicle selection.
+        for attr_name, attr_value in (
+            ('can_add_related', False),
+            ('can_change_related', False),
+            ('can_delete_related', False),
+            ('can_view_related', True),
+        ):
+            if hasattr(widget, attr_name):
+                setattr(widget, attr_name, attr_value)
     
     def clean(self):
         cleaned_data = super().clean()

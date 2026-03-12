@@ -5,7 +5,7 @@ from django.urls import reverse
 from datetime import date
 from .models import Route, RouteClient
 from .forms import RouteClientForm, RouteClientInlineForm
-from clients.models import Client
+from clients.models import Address, Client
 from core.models import Transport
 
 
@@ -25,11 +25,15 @@ class RouteClientValidationTest(TestCase):
         # Create test clients
         self.client1 = Client.objects.create(name='Test Client 1')
         self.client2 = Client.objects.create(name='Test Client 2')
+
+        Address.objects.create(client=self.client1, type='delivery', street='Calle 1')
+        Address.objects.create(client=self.client2, type='delivery', street='Calle 2')
         
         # Create test transport
         self.transport = Transport.objects.create(
             license_plate='ABC-123',
             model='Test Vehicle',
+            capacity_liters=1000,
             is_active=True
         )
         
@@ -61,7 +65,8 @@ class RouteClientValidationTest(TestCase):
         form_data = {
             'client': self.client1.id,
             'sequence': 1,
-            'frequency': 'weekly',
+            'interval_weeks': 1,
+            'anchor_date': date.today(),
             'is_active': True,
             'notes': 'Test assignment'
         }
@@ -72,14 +77,15 @@ class RouteClientValidationTest(TestCase):
         
         self.assertFalse(form.is_valid())
         self.assertIn('client', form.errors)
-        self.assertIn('ya está asignado', str(form.errors['client']))
+        self.assertIn('CONFLICTO DE ASIGNACIÓN', str(form.errors['client']))
     
     def test_duplicate_client_assignment_with_confirmation(self):
         """Test that form accepts duplicate assignment with confirmation"""
         form_data = {
             'client': self.client1.id,
             'sequence': 1,
-            'frequency': 'weekly',
+            'interval_weeks': 1,
+            'anchor_date': date.today(),
             'is_active': True,
             'notes': 'Test assignment',
             'confirm_duplicate_assignment': True
@@ -96,7 +102,8 @@ class RouteClientValidationTest(TestCase):
         form_data = {
             'client': self.client1.id,
             'sequence': 1,
-            'frequency': 'weekly',
+            'interval_weeks': 1,
+            'anchor_date': date.today(),
             'is_active': True,
             'notes': 'Updated notes'
         }
@@ -111,7 +118,8 @@ class RouteClientValidationTest(TestCase):
         form_data = {
             'client': self.client2.id,
             'sequence': 2,
-            'frequency': 'weekly',
+            'interval_weeks': 1,
+            'anchor_date': date.today(),
             'is_active': True,
             'notes': 'New client assignment'
         }
@@ -177,3 +185,62 @@ class RouteClientValidationTest(TestCase):
         
         # Should redirect to login or return 403
         self.assertIn(response.status_code, [302, 403])
+
+
+class RouteClientFrequencyIntervalTest(TestCase):
+    def setUp(self):
+        self.client = Client.objects.create(name='Frequency Client')
+        Address.objects.create(client=self.client, type='delivery', street='Calle Frecuencia')
+        self.transport = Transport.objects.create(
+            license_plate='XYZ-999',
+            model='Test Vehicle',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Route Monday',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+
+    def test_is_due_on_every_two_weeks(self):
+        route_client = RouteClient.objects.create(
+            route=self.route,
+            client=self.client,
+            sequence=1,
+            interval_weeks=2,
+            anchor_date=date(2026, 3, 2),  # Monday
+            is_active=True,
+        )
+
+        self.assertTrue(route_client.is_due_on(date(2026, 3, 2)))
+        self.assertFalse(route_client.is_due_on(date(2026, 3, 9)))
+        self.assertTrue(route_client.is_due_on(date(2026, 3, 16)))
+
+    def test_due_on_queryset_filters_clients(self):
+        RouteClient.objects.create(
+            route=self.route,
+            client=self.client,
+            sequence=1,
+            interval_weeks=1,
+            anchor_date=date(2026, 3, 2),
+            is_active=True,
+        )
+
+        second_client = Client.objects.create(name='Every 2 Weeks')
+        Address.objects.create(client=second_client, type='delivery', street='Calle 2 semanas')
+        RouteClient.objects.create(
+            route=self.route,
+            client=second_client,
+            sequence=2,
+            interval_weeks=2,
+            anchor_date=date(2026, 3, 2),
+            is_active=True,
+        )
+
+        due_first_week = RouteClient.objects.due_on(date(2026, 3, 2))
+        due_second_week = RouteClient.objects.due_on(date(2026, 3, 9))
+
+        self.assertEqual(due_first_week.count(), 2)
+        self.assertEqual(due_second_week.count(), 1)

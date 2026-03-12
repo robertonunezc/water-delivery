@@ -8,7 +8,7 @@ class RouteClientInline(TabularInline):
     model = RouteClient
     form = RouteClientInlineForm
     extra = 1
-    fields = ('client', 'sequence', 'frequency', 'is_active', 'notes', 'confirm_duplicate_assignment')
+    fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes', 'confirm_duplicate_assignment')
     ordering = ('sequence',)
     verbose_name = "Cliente de la Ruta"
     verbose_name_plural = "Clientes de la Ruta"
@@ -59,8 +59,8 @@ class RouteAdmin(ModelAdmin):
 
 class RouteClientAdmin(ModelAdmin):
     form = RouteClientForm
-    list_display = ('client', 'route', 'sequence', 'frequency', 'is_active')
-    list_filter = ('frequency', 'is_active', 'route__weekday', 'route__transportation')
+    list_display = ('client', 'route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active')
+    list_filter = ('interval_weeks', 'is_active', 'route__weekday', 'route__transportation')
     search_fields = ('client__name', 'route__name', 'route__transportation__license_plate')
     ordering = ('route', 'sequence')
     
