@@ -317,6 +317,15 @@ class ClientBillingFrequencyForm(forms.ModelForm):
 class AddressInlineForm(forms.ModelForm):
     """Inline form for Address with a helper checkbox to copy from opposite type."""
 
+    TYPE_CHOICES_WITH_SHIPPING = [
+        ('billing', 'Fiscal'),
+        ('delivery', 'Ubicacion fisica'),
+        ('shipping', 'Ubicacion fisica'),
+        ('other', 'Otro'),
+    ]
+
+    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING)
+
     same_as_previous = forms.BooleanField(
         required=False,
         label="Misma dirección que la anterior",
@@ -326,3 +335,10 @@ class AddressInlineForm(forms.ModelForm):
     class Meta:
         model = Address
         exclude = ('deleted_at',)
+
+    def clean_type(self):
+        """Keep backwards compatibility with legacy shipping value from old forms/tests."""
+        address_type = self.cleaned_data['type']
+        if address_type == 'shipping':
+            return 'delivery'
+        return address_type
