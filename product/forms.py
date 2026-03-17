@@ -21,3 +21,18 @@ class BulkProductPriceUpdateForm(forms.Form):
         if value is None or value <= 0:
             raise forms.ValidationError('El valor debe ser mayor que cero.')
         return cleaned
+
+
+class ProductsCSVImportForm(forms.Form):
+    """Upload form for bulk importing products and client prices from CSV."""
+
+    csv_file = forms.FileField(
+        label='Archivo CSV de productos y precios',
+        help_text='Sube un archivo .csv con la plantilla de productos y precios por cliente.',
+    )
+
+    def clean_csv_file(self):
+        csv_file = self.cleaned_data['csv_file']
+        if not csv_file.name.lower().endswith('.csv'):
+            raise forms.ValidationError('El archivo debe tener extensión .csv')
+        return csv_file

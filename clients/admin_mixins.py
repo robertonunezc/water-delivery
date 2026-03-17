@@ -6,7 +6,7 @@ from django.utils.html import format_html
 from django.urls import reverse, path
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponse
 
 
 class BalanceDisplayMixin:
@@ -205,6 +205,8 @@ class AdminActionsMixin:
 		custom_urls = [
 			path('add-credit/', self.admin_site.admin_view(self.add_credit_view), name='clients_client_add_credit'),
 			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
+			path('import-csv/', self.admin_site.admin_view(self.import_clients_csv_view), name='clients_client_import_csv'),
+			path('download-csv-template/', self.admin_site.admin_view(self.download_clients_csv_template_view), name='clients_client_download_csv_template'),
 		]
 		return custom_urls + urls
 	
@@ -399,4 +401,54 @@ class AdminActionsMixin:
 			'has_view_permission': True,
 		}
 		return render(request, 'admin/clients/bulk_deposit.html', context)
+
+	def import_clients_csv_view(self, request):
+		"""View for importing clients from a CSV file."""
+		from .forms import ClientsCSVImportForm
+		from clients.services.csv_import_service import import_clients_from_csv
+
+		if request.method == 'POST':
+			form = ClientsCSVImportForm(request.POST, request.FILES)
+			if form.is_valid():
+				csv_file = form.cleaned_data['csv_file']
+				summary = import_clients_from_csv(csv_file.read())
+
+				messages.success(
+					request,
+					(
+						f"Clientes importados. Nuevos: {summary.created_clients}, "
+						f"Actualizados: {summary.updated_clients}, "
+						f"Domicilios nuevos: {summary.created_addresses}, "
+						f"Domicilios actualizados: {summary.updated_addresses}, "
+						f"Contactos nuevos: {summary.created_contacts}, "
+						f"Contactos actualizados: {summary.updated_contacts}."
+					)
+				)
+
+				for error in summary.errors[:20]:
+					messages.error(request, error)
+
+				if len(summary.errors) > 20:
+					messages.warning(request, f"Se omitieron {len(summary.errors) - 20} errores adicionales.")
+
+				return redirect('admin:clients_client_import_csv')
+		else:
+			form = ClientsCSVImportForm()
+
+		context = {
+			**self.admin_site.each_context(request),
+			'form': form,
+			'title': 'Importar clientes desde CSV',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+		}
+		return render(request, 'admin/clients/import_clients_csv.html', context)
+
+	def download_clients_csv_template_view(self, request):
+		"""Download the clients CSV template file."""
+		from clients.services.csv_import_service import get_clients_csv_template
+
+		response = HttpResponse(get_clients_csv_template(), content_type='text/csv; charset=utf-8')
+		response['Content-Disposition'] = 'attachment; filename="clients_import_template.csv"'
+		return response
         

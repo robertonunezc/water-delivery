@@ -1,0 +1,3 @@
+client_name,type,corporate_name,active,note,address_street,address_exterior_number,address_interior_number,address_locality,address_municipality,address_state,address_zip_code,address_country,address_reference,contact_name,contact_phone,contact_email
+Corporativo Agua Norte,corporate,,true,Cliente corporativo,Av. Constituyentes 100,100,,Centro,Queretaro,Queretaro,76000,Mexico,Frente a plaza principal,Ana Lopez,4421234567,ana@agua-norte.com
+Sucursal Agua Norte Juriquilla,branch,Corporativo Agua Norte,true,Sucursal principal,Blvd. Juriquilla 250,250,B,Juriquilla,Queretaro,Queretaro,76230,Mexico,A un lado del parque,Luis Perez,4427654321,luis@agua-norte.com

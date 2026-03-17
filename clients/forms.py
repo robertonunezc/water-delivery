@@ -342,3 +342,18 @@ class AddressInlineForm(forms.ModelForm):
         if address_type == 'shipping':
             return 'delivery'
         return address_type
+
+
+class ClientsCSVImportForm(forms.Form):
+    """Upload form for bulk importing clients from CSV."""
+
+    csv_file = forms.FileField(
+        label="Archivo CSV de clientes",
+        help_text="Sube un archivo .csv con la plantilla de clientes.",
+    )
+
+    def clean_csv_file(self):
+        csv_file = self.cleaned_data["csv_file"]
+        if not csv_file.name.lower().endswith(".csv"):
+            raise ValidationError("El archivo debe tener extensión .csv")
+        return csv_file

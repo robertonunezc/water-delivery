@@ -1,0 +1,195 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static admin_modify %}
+
+{% block title %}{{ title }} | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:clients_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .import-container {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .import-card {
+    background: var(--uf-surface, #fff);
+    border: 1px solid var(--uf-border, #e5e7eb);
+    border-radius: 8px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+  }
+  .import-alert {
+    background: var(--uf-info-bg, #eff6ff);
+    border: 1px solid var(--uf-info-border, #bfdbfe);
+    border-left: 4px solid var(--uf-info-text, #1e40af);
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    color: var(--uf-info-text, #1e3a8a);
+    font-size: 14px;
+  }
+  .import-divider {
+    height: 1px;
+    background: var(--uf-border, #e5e7eb);
+    margin: 24px 0;
+  }
+  .template-download-btn {
+    display: inline-block;
+    padding: 10px 18px;
+    background: var(--uf-primary-600, #0369a1);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    transition: background 0.2s ease;
+    margin-bottom: 20px;
+  }
+  .template-download-btn:hover {
+    background: var(--uf-primary-700, #0c5aa0);
+  }
+  .form-section {
+    margin-bottom: 24px;
+  }
+  .form-section label {
+    display: block;
+    font-weight: 500;
+    margin-bottom: 8px;
+    color: var(--uf-text-primary, #111827);
+  }
+  .form-section input[type="file"] {
+    display: block;
+    padding: 10px;
+    border: 2px dashed var(--uf-border, #d1d5db);
+    border-radius: 6px;
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--uf-input-bg, #f9fafb);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .form-section input[type="file"]:hover {
+    border-color: var(--uf-primary-400, #06b6d4);
+    background: var(--uf-input-bg-hover, #f3f4f6);
+  }
+  .help-text {
+    font-size: 13px;
+    color: var(--uf-text-secondary, #6b7280);
+    margin-top: 8px;
+  }
+  .submit-buttons {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .submit-btn {
+    padding: 10px 20px;
+    background: var(--uf-primary-600, #0369a1);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .submit-btn:hover {
+    background: var(--uf-primary-700, #0c5aa0);
+  }
+  .cancel-btn {
+    padding: 10px 20px;
+    background: var(--uf-gray-200, #e5e7eb);
+    color: var(--uf-text-primary, #111827);
+    border: 1px solid var(--uf-border, #d1d5db);
+    border-radius: 6px;
+    text-decoration: none;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-block;
+  }
+  .cancel-btn:hover {
+    background: var(--uf-gray-300, #d1d5db);
+  }
+  .notes-section {
+    background: var(--uf-surface, #f9fafb);
+    border: 1px solid var(--uf-border, #e5e7eb);
+    border-radius: 8px;
+    padding: 20px;
+  }
+  .notes-section h2 {
+    margin-top: 0;
+    font-size: 16px;
+    color: var(--uf-text-primary, #111827);
+  }
+  .notes-section ul {
+    margin: 12px 0;
+    padding-left: 20px;
+  }
+  .notes-section li {
+    margin-bottom: 8px;
+    color: var(--uf-text-secondary, #4b5563);
+    font-size: 14px;
+  }
+</style>
+
+<div class="import-container">
+  <div class="import-card">
+    <h1 style="margin-top: 0; font-size: 24px; color: var(--uf-text-primary, #111827);">{{ title }}</h1>
+
+    <div class="import-alert">
+      📋 Descarga la plantilla CSV, complétala con tus datos de clientes y sube el archivo para importarlos en masa.
+    </div>
+
+    <a href="{% url 'admin:clients_client_download_csv_template' %}" class="template-download-btn">
+      ⬇ Descargar plantilla CSV
+    </a>
+
+    <div class="import-divider"></div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="form-section">
+        <label for="id_csv_file">{{ form.csv_file.label }}</label>
+        {{ form.csv_file }}
+        {% if form.csv_file.help_text %}
+          <div class="help-text">{{ form.csv_file.help_text }}</div>
+        {% endif %}
+        {% if form.csv_file.errors %}
+          <ul class="errorlist" style="margin-top: 8px;">
+            {% for error in form.csv_file.errors %}
+              <li style="color: #dc2626;">{{ error }}</li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="import-divider"></div>
+
+      <div class="submit-buttons">
+        <button type="submit" class="submit-btn">✓ Importar clientes</button>
+        <a href="{% url 'admin:clients_client_changelist' %}" class="cancel-btn">Cancelar</a>
+      </div>
+    </form>
+  </div>
+
+  <div class="notes-section">
+    <h2>📝 Notas importantes</h2>
+    <ul>
+      <li><strong>Crear o actualizar:</strong> La importación crea nuevos clientes o actualiza existentes por nombre.</li>
+      <li><strong>Sucursales:</strong> Para clientes tipo "branch", debe incluirse el nombre del corporativo en <code>corporate_name</code>.</li>
+      <li><strong>Dirección:</strong> Se importa una dirección de tipo "delivery" (ubicación física) por cliente. Es obligatoria.</li>
+      <li><strong>Contacto:</strong> Si <code>contact_name</code> está vacío, no se crea contacto. Es opcional.</li>
+      <li><strong>Errores:</strong> Si una fila tiene error, se detiene esa fila pero continúa con las demás.</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
