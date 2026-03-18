@@ -9,7 +9,7 @@ from decimal import Decimal
 import csv
 from .models import Order, OrderProduct, OrderStatus, OrderSplit
 from django.core.exceptions import PermissionDenied
-
+from unfold.admin import ModelAdmin, TabularInline
 
 class OrderAmountFilter(admin.SimpleListFilter):
     title = 'Rango de monto'
@@ -125,7 +125,7 @@ class OrderProductInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(ModelAdmin):
     list_display = (
         'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted', 'discount',
         'total_amount_display', 'items_count', 'payment_status', 'billing_status', 'created_display'
@@ -194,7 +194,7 @@ class OrderAdmin(admin.ModelAdmin):
     
     class Media:
         css = {
-            'all': ('admin/css/orders_admin.css',)
+           # 'all': ('admin/css/orders_admin.css',)
         }
         js = ('admin/js/orders_admin.js',)
     
@@ -623,7 +623,7 @@ class OrderAdmin(admin.ModelAdmin):
         
         writer = csv.writer(response)
         writer.writerow([
-            'ID', 'Cliente', 'Estado', 'Fecha', 'Total', 
+            'ID', 'Cliente', 'Estado', 'Fecha', 'SubTotal', 'Descuento','Total',
             'Items', 'Notas', 'Creado'
         ])
         
@@ -633,6 +633,8 @@ class OrderAdmin(admin.ModelAdmin):
                 order.client.name if order.client else '',
                 order.get_status_display(),
                 order.order_date.strftime('%d/%m/%Y %H:%M'),
+                str(order.subtotal_amount),
+                str(order.discount),
                 str(order.total_amount),
                 order.items.count(),
                 order.notes or '',
