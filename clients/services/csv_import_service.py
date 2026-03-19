@@ -1,7 +1,7 @@
 import csv
 import io
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from django.db import transaction
 
@@ -26,6 +26,7 @@ def get_clients_csv_template() -> str:
     writer.writerow(
         [
             "client_name",
+            "external_id",
             "type",
             "corporate_name",
             "active",
@@ -47,6 +48,7 @@ def get_clients_csv_template() -> str:
     writer.writerow(
         [
             "Corporativo Agua Norte",
+            "ERP-0001",
             "corporate",
             "",
             "true",
@@ -68,6 +70,7 @@ def get_clients_csv_template() -> str:
     writer.writerow(
         [
             "Sucursal Agua Norte Juriquilla",
+            "ERP-0101",
             "branch",
             "Corporativo Agua Norte",
             "true",
@@ -157,6 +160,7 @@ def _upsert_client(row: Dict[str, str]) -> Tuple[Client, bool]:
         corporate = _get_or_create_corporate(corporate_name)
 
     client, created = Client.objects.get_or_create(name=client_name)
+    client.external_id = row.get("external_id", "") or None
     client.type = client_type
     client.corporate = corporate
     client.active = _parse_bool(row.get("active", "true"), default=True)
@@ -164,6 +168,70 @@ def _upsert_client(row: Dict[str, str]) -> Tuple[Client, bool]:
     client.full_clean()
     client.save()
     return client, created
+
+
+def export_clients_to_csv(clients: Iterable[Client]) -> str:
+    """Export clients with one delivery address and one contact to CSV."""
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "client_name",
+            "external_id",
+            "type",
+            "corporate_name",
+            "active",
+            "note",
+            "address_street",
+            "address_exterior_number",
+            "address_interior_number",
+            "address_locality",
+            "address_municipality",
+            "address_state",
+            "address_zip_code",
+            "address_country",
+            "address_reference",
+            "contact_name",
+            "contact_phone",
+            "contact_email",
+        ]
+    )
+
+    for client in clients:
+        address = _get_delivery_address(client)
+        contact = _get_first_contact(client)
+        writer.writerow(
+            [
+                client.name,
+                client.external_id or "",
+                client.type,
+                client.corporate.name if client.corporate else "",
+                "true" if client.active else "false",
+                client.note or "",
+                address.street if address else "",
+                address.exterior_number if address and address.exterior_number else "",
+                address.interior_number if address and address.interior_number else "",
+                address.locality if address else "",
+                address.municipality if address else "",
+                address.state if address else "",
+                address.zip_code if address else "",
+                address.country if address else "",
+                address.reference if address and address.reference else "",
+                contact.name if contact else "",
+                contact.phone if contact and contact.phone else "",
+                contact.email if contact and contact.email else "",
+            ]
+        )
+
+    return output.getvalue()
+
+
+def _get_delivery_address(client: Client) -> Optional[Address]:
+    return client.addresses.filter(type="delivery").first()
+
+
+def _get_first_contact(client: Client) -> Optional[Contact]:
+    return client.contacts.first()
 
 
 def _upsert_delivery_address(client: Client, row: Dict[str, str]) -> bool:

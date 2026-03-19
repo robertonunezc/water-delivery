@@ -2,6 +2,7 @@
 Admin mixins for Client admin display methods.
 Separates display logic from main admin configuration for better maintainability.
 """
+
 from django.utils.html import format_html
 from django.urls import reverse, path
 from django.shortcuts import render, redirect
@@ -207,6 +208,7 @@ class AdminActionsMixin:
 			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
 			path('import-csv/', self.admin_site.admin_view(self.import_clients_csv_view), name='clients_client_import_csv'),
 			path('download-csv-template/', self.admin_site.admin_view(self.download_clients_csv_template_view), name='clients_client_download_csv_template'),
+			path('export-csv/', self.admin_site.admin_view(self.export_clients_csv_view), name='clients_client_export_csv'),
 		]
 		return custom_urls + urls
 	
@@ -450,5 +452,19 @@ class AdminActionsMixin:
 
 		response = HttpResponse(get_clients_csv_template(), content_type='text/csv; charset=utf-8')
 		response['Content-Disposition'] = 'attachment; filename="clients_import_template.csv"'
+		return response
+
+	def export_clients_csv_view(self, request):
+		"""Export existing clients in the same shape used by CSV import."""
+		from clients.services.csv_import_service import export_clients_to_csv
+
+		queryset = (
+			self.model.objects.select_related('corporate')
+			.prefetch_related('addresses', 'contacts')
+			.order_by('name')
+		)
+
+		response = HttpResponse(export_clients_to_csv(queryset), content_type='text/csv; charset=utf-8')
+		response['Content-Disposition'] = 'attachment; filename="clients_export.csv"'
 		return response
         

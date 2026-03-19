@@ -3,11 +3,18 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 from datetime import date, timedelta
+import csv
+import io
 from .models import (
     Client, BillingData, Address, BalanceTransaction, CreditTransaction,
     Contact, ClientBillingFrecuency, ClientCreditConfig
 )
 from .forms import AddressInlineForm
+from .services.csv_import_service import (
+    export_clients_to_csv,
+    get_clients_csv_template,
+    import_clients_from_csv,
+)
 
 User = get_user_model()
 
@@ -226,5 +233,56 @@ class AddressInlineFormTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             duplicate.full_clean()
+
+
+class ClientCSVExternalIdTests(TestCase):
+    """Tests for CSV import/export support of client external_id."""
+
+    def test_template_includes_external_id_header(self) -> None:
+        template = get_clients_csv_template()
+        header = template.splitlines()[0]
+        self.assertIn("external_id", header)
+
+    def test_import_sets_external_id(self) -> None:
+        csv_content = (
+            "client_name,external_id,type,corporate_name,active,note,address_street,"
+            "address_exterior_number,address_interior_number,address_locality,address_municipality,"
+            "address_state,address_zip_code,address_country,address_reference,contact_name,"
+            "contact_phone,contact_email\n"
+            "Cliente CSV,EXT-123,corporate,,true,nota,Av 1,10,,Centro,Queretaro,"
+            "Queretaro,76000,Mexico,Referencia,Juan,5551234,juan@test.com\n"
+        )
+
+        summary = import_clients_from_csv(csv_content.encode("utf-8"))
+
+        self.assertEqual(summary.created_clients, 1)
+        client = Client.objects.get(name="Cliente CSV")
+        self.assertEqual(client.external_id, "EXT-123")
+
+    def test_export_includes_external_id_value(self) -> None:
+        client = Client.objects.create(
+            name="Cliente Export",
+            type="corporate",
+            active=True,
+            external_id="ERP-900",
+        )
+        Address.objects.create(
+            client=client,
+            type="delivery",
+            street="Calle Export 1",
+            locality="Queretaro",
+            municipality="Queretaro",
+            state="Queretaro",
+            zip_code="76000",
+            country="Mexico",
+            active=True,
+        )
+
+        exported = export_clients_to_csv([client])
+        reader = csv.DictReader(io.StringIO(exported))
+        rows = list(reader)
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["external_id"], "ERP-900")
 
 

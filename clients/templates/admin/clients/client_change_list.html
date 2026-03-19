@@ -2,6 +2,9 @@
 
 {% block object-tools-items %}
   <li>
+    <a href="{% url 'admin:clients_client_export_csv' %}">Exportar clientes CSV</a>
+  </li>
+  <li>
     <a href="{% url 'admin:clients_client_import_csv' %}">Importar clientes CSV</a>
   </li>
   <li>

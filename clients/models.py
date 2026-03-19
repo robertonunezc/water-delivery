@@ -105,6 +105,7 @@ class Client(TimeStampedModel):
     requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
+    external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID externo", help_text="ID del cliente en sistemas externos (ERP, CRM, etc.)")
     billing_override_enabled = models.BooleanField(
         default=False,
         verbose_name="Usar datos propios de facturación",
