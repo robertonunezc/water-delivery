@@ -40,7 +40,7 @@ class ClientRouteInline(TabularInline):
 
 
 #@admin.register(models.Address)
-class AddressAdmin(admin.ModelAdmin):
+class AddressAdmin(ModelAdmin):
 	list_display = ('street', 'municipality', 'state', 'zip_code', 'client__name')
 	model = models.Address
 	exclude = ('deleted_at',)
@@ -48,7 +48,19 @@ class AddressInline(StackedInline):
 	model = models.Address
 	form = AddressInlineForm
 	extra = 0
-	exclude = ('deleted_at',)
+	fields = (
+		'type',
+		'street',
+		'exterior_number',
+		'interior_number',
+		'locality',
+		'municipality',
+		'state',
+		'zip_code',
+		'country',
+		'reference',
+		'active',
+	)
 	tab = True
 
 class ClientBillingFrecuencyInline(StackedInline):
@@ -131,8 +143,68 @@ class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, M
 			'clients/admin/toggle_corporate_field.js',
 			#'clients/admin/billing_frequency_popup.js',
 			'clients/admin/require_billing_update_client.js',
-			'clients/admin/address_inline_copy_previous.js',
+			'clients/admin/address_inline_global_copy_toggle.js',
 		)
+
+	_OPPOSITE_ADDRESS_TYPE = {'billing': 'delivery', 'delivery': 'billing'}
+	_OPPOSITE_ADDRESS_LABEL = {'billing': 'Fiscal', 'delivery': 'Entrega'}
+
+	def _create_opposite_addresses(self, request, formset) -> None:
+		"""Create a mirror address of the opposite type for each new address row."""
+		created_count = 0
+		for form in formset.forms:
+			if not form.cleaned_data:
+				continue
+			if form.cleaned_data.get('DELETE', False):
+				continue
+
+			address = form.instance
+			if not address.pk or address not in formset.new_objects:
+				continue
+
+			opposite_type = self._OPPOSITE_ADDRESS_TYPE.get(address.type)
+			if not opposite_type:
+				continue
+
+			if models.Address.objects.filter(client=address.client, type=opposite_type).exists():
+				label = self._OPPOSITE_ADDRESS_LABEL.get(opposite_type, opposite_type)
+				messages.warning(
+					request,
+					f"No se creó la dirección {label} porque ya existe una para '{address.client.name}'.",
+				)
+				continue
+
+			models.Address.objects.create(
+				client=address.client,
+				type=opposite_type,
+				street=address.street,
+				exterior_number=address.exterior_number,
+				interior_number=address.interior_number,
+				locality=address.locality,
+				municipality=address.municipality,
+				state=address.state,
+				zip_code=address.zip_code,
+				country=address.country,
+				reference=address.reference,
+				active=address.active,
+			)
+			created_count += 1
+
+		if created_count:
+			messages.success(
+				request,
+				f"Se crearon {created_count} direcciones opuestas automáticamente.",
+			)
+
+	def save_related(self, request, form, formsets, change):
+		super().save_related(request, form, formsets, change)
+		if request.POST.get('copy_address_for_all_inlines') != 'on':
+			return
+
+		for formset in formsets:
+			if formset.model == models.Address:
+				self._create_opposite_addresses(request, formset)
+
 
 	def save_model(self, request, obj, form, change):
 		super().save_model(request, obj, form, change)

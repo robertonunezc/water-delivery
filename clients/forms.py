@@ -315,33 +315,19 @@ class ClientBillingFrequencyForm(forms.ModelForm):
 
 
 class AddressInlineForm(forms.ModelForm):
-    """Inline form for Address with a helper checkbox to copy from opposite type."""
+    """Inline form for Address entries."""
 
     TYPE_CHOICES_WITH_SHIPPING = [
         ('billing', 'Fiscal'),
         ('delivery', 'Ubicacion fisica'),
-        ('shipping', 'Ubicacion fisica'),
         ('other', 'Otro'),
     ]
 
-    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING)
-
-    same_as_previous = forms.BooleanField(
-        required=False,
-        label="Misma dirección que la anterior",
-        help_text="Copiar datos de la dirección del tipo opuesto",
-    )
+    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING, widget=forms.Select(attrs={'class': 'form-control'}))
 
     class Meta:
         model = Address
         exclude = ('deleted_at',)
-
-    def clean_type(self):
-        """Keep backwards compatibility with legacy shipping value from old forms/tests."""
-        address_type = self.cleaned_data['type']
-        if address_type == 'shipping':
-            return 'delivery'
-        return address_type
 
 
 class ClientsCSVImportForm(forms.Form):
