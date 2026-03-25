@@ -19,6 +19,23 @@ class ImportSummary:
     errors: List[str]
 
 
+def _decode_csv_bytes(file_bytes: bytes) -> str:
+    """Decode uploaded CSV bytes trying common encodings used by spreadsheet exports."""
+    candidate_encodings = ("utf-8-sig", "utf-8", "cp1252", "latin-1")
+    last_error: Optional[UnicodeDecodeError] = None
+
+    for encoding in candidate_encodings:
+        try:
+            return file_bytes.decode(encoding)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    raise ValueError(
+        "No se pudo decodificar el archivo CSV. "
+        "Use UTF-8, UTF-8 con BOM o ANSI/Windows-1252."
+    ) from last_error
+
+
 def get_clients_csv_template() -> str:
     """Return a CSV template for client imports."""
     output = io.StringIO()
@@ -94,7 +111,7 @@ def get_clients_csv_template() -> str:
 
 def import_clients_from_csv(file_bytes: bytes) -> ImportSummary:
     """Import clients, one delivery address, and one contact from CSV rows."""
-    decoded = file_bytes.decode("utf-8-sig")
+    decoded = _decode_csv_bytes(file_bytes)
     reader = csv.DictReader(io.StringIO(decoded))
 
     required_headers = {"client_name", "type", "address_street"}
@@ -160,6 +177,13 @@ def _upsert_client(row: Dict[str, str]) -> Tuple[Client, bool]:
         corporate = _get_or_create_corporate(corporate_name)
 
     client, created = Client.objects.get_or_create(name=client_name)
+
+    # Self-referential case: branch lists itself as its own corporate.
+    # Treat it as a standalone corporate instead of creating a circular reference.
+    if corporate is not None and corporate.pk == client.pk:
+        client_type = "corporate"
+        corporate = None
+
     client.external_id = row.get("external_id", "") or None
     client.type = client_type
     client.corporate = corporate
@@ -283,10 +307,11 @@ def _get_or_create_corporate(corporate_name: str) -> Client:
         name=corporate_name,
         defaults={"type": "corporate", "active": True},
     )
-    if corporate.type != "corporate":
+    if corporate.type != "corporate" or corporate.corporate_id is not None:
         corporate.type = "corporate"
+        corporate.corporate = None  # corporates cannot have a parent
         corporate.full_clean()
-        corporate.save(update_fields=["type", "updated_at"])
+        corporate.save(update_fields=["type", "corporate", "updated_at"])
     return corporate
 
 
