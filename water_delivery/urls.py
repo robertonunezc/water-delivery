@@ -28,5 +28,4 @@ urlpatterns = [
     path('orders/', include('orders.urls')),
     path('notifications/', include('notification.urls')),
     path('', include('core.urls')),
-    path('sentry-debug/', trigger_error),
 ]
