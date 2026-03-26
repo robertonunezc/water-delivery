@@ -98,6 +98,15 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://c875ab2e193adf0f0d36d58dceabd992@o4511111944667136.ingest.us.sentry.io/4511111945781249",
+    # Add data like request headers and IP for users,
+    # see https://docs.sentry.io/platforms/python/data-management/data-collected/ for more info
+    send_default_pii=True,
+)
+
 ROOT_URLCONF = 'water_delivery.urls'
 CRISPY_TEMPLATE_PACK = "unfold_crispy"
 
