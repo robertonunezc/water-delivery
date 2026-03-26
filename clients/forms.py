@@ -319,15 +319,28 @@ class AddressInlineForm(forms.ModelForm):
 
     TYPE_CHOICES_WITH_SHIPPING = [
         ('billing', 'Fiscal'),
+        ('shipping', 'Entrega'),
         ('delivery', 'Ubicacion fisica'),
         ('other', 'Otro'),
     ]
+
+    same_as_previous = forms.BooleanField(
+        required=False,
+        label='Misma dirección que la anterior',
+    )
 
     type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING, widget=forms.Select(attrs={'class': 'form-control'}))
 
     class Meta:
         model = Address
         exclude = ('deleted_at',)
+
+    def clean_type(self):
+        """Normalize legacy shipping type to delivery for backward compatibility."""
+        address_type = self.cleaned_data.get('type')
+        if address_type == 'shipping':
+            return 'delivery'
+        return address_type
 
 
 class ClientsCSVImportForm(forms.Form):
