@@ -304,9 +304,9 @@ def _normalize_client_type(value: str) -> str:
 
 def _get_or_create_corporate(corporate_name: str) -> Client:
     normalized_input = corporate_name.strip()
-    corporate_suffix = "corporativo"
+    corporate_suffix = "CORPORATIVO"
 
-    if normalized_input.lower().endswith(f" {corporate_suffix}"):
+    if normalized_input.upper().endswith(f" {corporate_suffix}"):
         normalized_name = normalized_input
         base_name = normalized_input[: -len(corporate_suffix)].rstrip()
     else:
