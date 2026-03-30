@@ -175,8 +175,15 @@ def _upsert_client(row: Dict[str, str]) -> Tuple[Client, bool]:
         if not corporate_name:
             raise ValueError("corporate_name es obligatorio para tipo branch")
         corporate = _get_or_create_corporate(corporate_name)
-
-    client, created = Client.objects.get_or_create(name=client_name)
+        client, created = Client.objects.get_or_create(name=client_name)
+    else:
+        normalized_name, _ = _build_corporate_names(client_name)
+        existing_corporate = Client.objects.filter(
+            type="corporate",
+            name__in=[client_name, normalized_name],
+        ).exists()
+        client = _get_or_create_corporate(client_name)
+        created = not existing_corporate
 
     # Self-referential case: branch lists itself as its own corporate.
     # Treat it as a standalone corporate instead of creating a circular reference.
@@ -302,7 +309,7 @@ def _normalize_client_type(value: str) -> str:
     return normalized
 
 
-def _get_or_create_corporate(corporate_name: str) -> Client:
+def _build_corporate_names(corporate_name: str) -> Tuple[str, str]:
     normalized_input = corporate_name.strip()
     corporate_suffix = "corporativo"
 
@@ -312,6 +319,12 @@ def _get_or_create_corporate(corporate_name: str) -> Client:
     else:
         normalized_name = f"{normalized_input} {corporate_suffix}"
         base_name = normalized_input
+
+    return normalized_name, base_name
+
+
+def _get_or_create_corporate(corporate_name: str) -> Client:
+    normalized_name, base_name = _build_corporate_names(corporate_name)
 
     corporate = Client.objects.filter(name=normalized_name).first()
 

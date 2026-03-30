@@ -308,4 +308,22 @@ class ClientCSVCorporateNormalizationTests(TestCase):
             1,
         )
 
+    def test_import_uses_only_suffixed_corporate_name(self) -> None:
+        csv_content = (
+            "client_name,external_id,type,corporate_name,active,note,address_street,"
+            "address_exterior_number,address_interior_number,address_locality,address_municipality,"
+            "address_state,address_zip_code,address_country,address_reference,contact_name,"
+            "contact_phone,contact_email\n"
+            "BANANE,ERP-200,corporate,,true,,Av 10,10,,Centro,Queretaro,Queretaro,76000,Mexico,,,\n"
+            "BANANE OLVERA,ERP-201,branch,BANANE,true,,Av 11,11,,Centro,Queretaro,Queretaro,76000,Mexico,,,\n"
+        )
+
+        summary = import_clients_from_csv(csv_content.encode("utf-8"))
+
+        self.assertEqual(summary.errors, [])
+        self.assertTrue(Client.objects.filter(name="BANANE OLVERA", type="branch").exists())
+        self.assertTrue(Client.objects.filter(name="BANANE corporativo", type="corporate").exists())
+        self.assertFalse(Client.objects.filter(name="BANANE", type="corporate").exists())
+        self.assertEqual(Client.objects.filter(name__icontains="BANANE", type="corporate").count(), 1)
+
 
