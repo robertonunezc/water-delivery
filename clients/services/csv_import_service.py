@@ -303,16 +303,33 @@ def _normalize_client_type(value: str) -> str:
 
 
 def _get_or_create_corporate(corporate_name: str) -> Client:
-    corporate_name = f'{corporate_name} corporativo'
-    corporate, _ = Client.objects.get_or_create(
-        name=corporate_name,
-        defaults={"type": "corporate", "active": True},
-    )
+    normalized_input = corporate_name.strip()
+    corporate_suffix = "corporativo"
+
+    if normalized_input.lower().endswith(f" {corporate_suffix}"):
+        normalized_name = normalized_input
+        base_name = normalized_input[: -len(corporate_suffix)].rstrip()
+    else:
+        normalized_name = f"{normalized_input} {corporate_suffix}"
+        base_name = normalized_input
+
+    corporate = Client.objects.filter(name=normalized_name).first()
+
+    # If a corporate exists with the base name, reuse it and normalize its name.
+    if corporate is None and base_name and base_name != normalized_name:
+        corporate = Client.objects.filter(name=base_name, type="corporate").first()
+        if corporate is not None:
+            corporate.name = normalized_name
+
+    if corporate is None:
+        corporate = Client(name=normalized_name, type="corporate", active=True)
+
     if corporate.type != "corporate" or corporate.corporate_id is not None:
         corporate.type = "corporate"
         corporate.corporate = None  # corporates cannot have a parent
-        corporate.full_clean()
-        corporate.save(update_fields=["type", "corporate", "updated_at"])
+
+    corporate.full_clean()
+    corporate.save()
     return corporate
 
 

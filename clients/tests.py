@@ -11,6 +11,7 @@ from .models import (
 )
 from .forms import AddressInlineForm
 from .services.csv_import_service import (
+    _get_or_create_corporate,
     export_clients_to_csv,
     get_clients_csv_template,
     import_clients_from_csv,
@@ -284,5 +285,27 @@ class ClientCSVExternalIdTests(TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["external_id"], "ERP-900")
+
+
+class ClientCSVCorporateNormalizationTests(TestCase):
+    def test_reuses_existing_corporate_without_suffix(self) -> None:
+        existing = Client.objects.create(
+            name="Michoacana",
+            type="corporate",
+            active=True,
+        )
+
+        corporate = _get_or_create_corporate("Michoacana")
+
+        self.assertEqual(corporate.pk, existing.pk)
+        corporate.refresh_from_db()
+        self.assertEqual(corporate.name, "Michoacana corporativo")
+        self.assertEqual(
+            Client.objects.filter(
+                type="corporate",
+                name__in=["Michoacana", "Michoacana corporativo"],
+            ).count(),
+            1,
+        )
 
 
