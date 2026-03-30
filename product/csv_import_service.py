@@ -2,7 +2,7 @@ import csv
 import io
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from django.db import transaction
 
@@ -17,6 +17,23 @@ class ProductImportSummary:
     created_client_prices: int
     updated_client_prices: int
     errors: List[str]
+
+
+def _decode_csv_bytes(file_bytes: bytes) -> str:
+    """Decode uploaded CSV bytes trying common encodings used by spreadsheet exports."""
+    candidate_encodings = ("utf-8-sig", "utf-8", "cp1252", "latin-1")
+    last_error: Optional[UnicodeDecodeError] = None
+
+    for encoding in candidate_encodings:
+        try:
+            return file_bytes.decode(encoding)
+        except UnicodeDecodeError as exc:
+            last_error = exc
+
+    raise ValueError(
+        "No se pudo decodificar el archivo CSV. "
+        "Use UTF-8, UTF-8 con BOM o ANSI/Windows-1252."
+    ) from last_error
 
 
 def get_products_csv_template() -> str:
@@ -42,7 +59,7 @@ def get_products_csv_template() -> str:
 
 def import_products_and_prices_from_csv(file_bytes: bytes) -> ProductImportSummary:
     """Import products and optional client-specific prices from CSV."""
-    decoded = file_bytes.decode("utf-8-sig")
+    decoded = _decode_csv_bytes(file_bytes)
     reader = csv.DictReader(io.StringIO(decoded))
 
     required_headers = {"product_name", "presentation", "unit_of_measure", "base_price", "client_name", "client_price"}

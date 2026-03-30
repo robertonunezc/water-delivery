@@ -303,6 +303,7 @@ def _normalize_client_type(value: str) -> str:
 
 
 def _get_or_create_corporate(corporate_name: str) -> Client:
+    corporate_name = f'{corporate_name} corporativo'
     corporate, _ = Client.objects.get_or_create(
         name=corporate_name,
         defaults={"type": "corporate", "active": True},
