@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
@@ -43,10 +43,11 @@ def routes_by_transportation_and_day(request):
 @login_required
 def today_route(request):
     """Show today's route for the logged-in employee"""
-
+       
+    if not hasattr(request.user, 'employee'):
+        return redirect('routes:list')  # Redirect to a page explaining the issue
+    
     employee = request.user.employee
-
-    # Get the transportation assigned to this driver
     try:
         transportation = Transport.objects.get(assigned_driver=employee, is_active=True)
     except Transport.DoesNotExist:
