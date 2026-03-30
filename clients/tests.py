@@ -257,7 +257,7 @@ class ClientCSVExternalIdTests(TestCase):
         summary = import_clients_from_csv(csv_content.encode("utf-8"))
 
         self.assertEqual(summary.created_clients, 1)
-        client = Client.objects.get(name="Cliente CSV")
+        client = Client.objects.get(name="Cliente CSV corporativo")
         self.assertEqual(client.external_id, "EXT-123")
 
     def test_export_includes_external_id_value(self) -> None:
