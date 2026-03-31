@@ -8,6 +8,7 @@ class RouteClientInline(TabularInline):
     model = RouteClient
     form = RouteClientInlineForm
     extra = 1
+    autocomplete_fields = ('client',)
     fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'confirm_duplicate_assignment')
     ordering = ('sequence',)
     verbose_name = "Cliente de la Ruta"
