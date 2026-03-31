@@ -97,19 +97,33 @@ def today_route(request):
 def route_detail(request, route_id):
     """Detailed view of a specific route"""
     route = get_object_or_404(Route, id=route_id, is_active=True)
+    search_query = request.GET.get('q', '').strip()
     
     # Get regular clients in this route with prefetched related data
     route_clients = RouteClient.objects.filter(
         route=route,
         is_active=True
-    ).select_related('client').prefetch_related(
+    )
+
+    if search_query:
+        route_clients = route_clients.filter(
+            Q(client__name__icontains=search_query)
+            | Q(client__addresses__street__icontains=search_query)
+            | Q(client__addresses__number__icontains=search_query)
+            | Q(client__addresses__neighborhood__icontains=search_query)
+            | Q(client__addresses__zip_code__icontains=search_query)
+            | Q(client__contacts__name__icontains=search_query)
+            | Q(client__contacts__phone__icontains=search_query)
+        )
+
+    route_clients = route_clients.select_related('client').prefetch_related(
         'client__addresses',
         'client__contacts',
         'client__product_prices__product',
         Prefetch('client__orders',
                  queryset=Order.objects.select_related().prefetch_related('items__product').order_by('-created_at'),
                  to_attr='recent_orders')
-    ).order_by('sequence')
+    ).distinct().order_by('sequence')
     
     # Get recent client orders for this route
     recent_orders = RouteClientOrder.objects.filter(
@@ -123,6 +137,7 @@ def route_detail(request, route_id):
         'recent_orders': recent_orders,
         'today': date.today(),
         'is_today_view': False,
+        'search_query': search_query,
     }
     
     return render(request, 'routes/route_detail.html', context)
