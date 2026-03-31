@@ -1,0 +1,171 @@
+// ---------------------------------------------------------------------------
+// Grafana Alloy configuration — water-delivery
+// ---------------------------------------------------------------------------
+// Pipeline overview:
+//
+//  [Docker socket]
+//       │
+//       ▼
+//  discovery.docker         ← find all water-delivery containers
+//       │
+//       ▼
+//  discovery.relabel        ← promote Docker labels → Loki labels
+//       │
+//       ▼
+//  loki.source.docker       ← tail container stdout/stderr
+//       │
+//       ▼
+//  loki.write               ← push to Grafana Cloud Loki
+//
+//  [Django app] ──OTLP──► otelcol.receiver.otlp
+//                               │
+//                    ┌──────────┴──────────┐
+//                    ▼                     ▼
+//            otelcol.exporter        otelcol.exporter
+//            .otlphttp (Tempo)       .prometheus (Mimir)
+//
+// All secrets are injected via environment variables — this file is safe
+// to commit to git.
+// ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// PHASE 1 — Container log collection → Grafana Cloud Loki
+// ---------------------------------------------------------------------------
+
+// 1a. Discover running Docker containers on this host.
+//     Filter to only water-delivery containers via the "project" label
+//     already set in docker-compose.prod.yml.
+discovery.docker "water_delivery_containers" {
+  host = "unix:///var/run/docker.sock"
+
+  filter {
+    name   = "label"
+    values = ["project=water-delivery"]
+  }
+}
+
+// 1b. Relabel: promote Docker container metadata into Loki stream labels.
+//     These become the dimensions you query in Grafana Explore:
+//       {project="water-delivery", service="web", environment="production"}
+discovery.relabel "container_labels" {
+  targets = discovery.docker.water_delivery_containers.targets
+
+  // project  — e.g. "water-delivery"
+  rule {
+    source_labels = ["__meta_docker_container_label_project"]
+    target_label  = "project"
+  }
+
+  // environment  — e.g. "production"
+  rule {
+    source_labels = ["__meta_docker_container_label_environment"]
+    target_label  = "environment"
+  }
+
+  // service  — e.g. "web", "postgres", "redis"
+  rule {
+    source_labels = ["__meta_docker_container_label_service"]
+    target_label  = "service"
+  }
+
+  // container  — strip the leading "/" Docker adds to container names
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+// 1c. Tail logs from every discovered container and forward to Loki.
+loki.source.docker "app_logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.container_labels.output
+  forward_to = [loki.write.grafana_cloud.receiver]
+
+  // Refresh container list every 5 seconds
+  refresh_interval = "5s"
+}
+
+// 1d. Write logs to Grafana Cloud Loki.
+//     Required env vars:
+//       GRAFANA_CLOUD_LOKI_URL    — e.g. https://logs-prod-021.grafana.net/loki/api/v1/push
+//       GRAFANA_CLOUD_USER        — numeric stack user/instance ID
+//       GRAFANA_CLOUD_API_KEY     — Grafana Cloud API token (logs:write scope)
+loki.write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_LOKI_URL")
+
+    basic_auth {
+      username = env("GRAFANA_CLOUD_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+
+  // Attach a static label to every log line so you can filter by host
+  external_labels = {
+    host = env("HOSTNAME"),
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// PHASE 2 — OpenTelemetry OTLP receiver (traces + metrics from Django app)
+//
+// Activate once you add opentelemetry-sdk to requirements.txt.
+// The app must set: OTEL_EXPORTER_OTLP_ENDPOINT=http://alloy:4318
+// ---------------------------------------------------------------------------
+
+// 2a. Receive OTLP from the Django app container over HTTP and gRPC.
+otelcol.receiver.otlp "default" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  output {
+    traces  = [otelcol.exporter.otlphttp.grafana_tempo.input]
+    metrics = [otelcol.exporter.prometheus.grafana_mimir.input]
+    // logs from OTLP can also go to Loki — add when Phase 2 is active:
+    // logs = [otelcol.exporter.loki.grafana_cloud.input]
+  }
+}
+
+// 2b. Export traces → Grafana Cloud Tempo via OTLP HTTP.
+//     Required env vars:
+//       GRAFANA_CLOUD_TEMPO_URL   — e.g. https://tempo-prod-04-prod-eu-west-2.grafana.net/tempo
+//       GRAFANA_CLOUD_USER        — same stack user as above
+//       GRAFANA_CLOUD_API_KEY     — token with traces:write scope
+otelcol.exporter.otlphttp "grafana_tempo" {
+  client {
+    endpoint = env("GRAFANA_CLOUD_TEMPO_URL")
+
+    auth = otelcol.auth.basic.grafana_cloud.handler
+  }
+}
+
+// 2c. Export metrics → Grafana Cloud Mimir via Prometheus remote_write.
+//     Required env vars:
+//       GRAFANA_CLOUD_PROM_URL    — e.g. https://prometheus-prod-01-eu-west-0.grafana.net/api/prom/push
+otelcol.exporter.prometheus "grafana_mimir" {
+  forward_to = [prometheus.remote_write.grafana_cloud.receiver]
+}
+
+prometheus.remote_write "grafana_cloud" {
+  endpoint {
+    url = env("GRAFANA_CLOUD_PROM_URL")
+
+    basic_auth {
+      username = env("GRAFANA_CLOUD_USER")
+      password = env("GRAFANA_CLOUD_API_KEY")
+    }
+  }
+}
+
+// Shared basic auth handler for OTLP exporters
+otelcol.auth.basic "grafana_cloud" {
+  username = env("GRAFANA_CLOUD_USER")
+  password = env("GRAFANA_CLOUD_API_KEY")
+}
