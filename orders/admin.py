@@ -37,30 +37,6 @@ class OrderAmountFilter(admin.SimpleListFilter):
             return queryset.filter(total_amount__gte=5000)
 
 
-class ItemsCountFilter(admin.SimpleListFilter):
-    title = 'Cantidad de items'
-    parameter_name = 'items_count'
-    
-    def lookups(self, request, model_admin):
-        return (
-            ('1', '1 item'),
-            ('2-5', '2-5 items'),
-            ('6-10', '6-10 items'),
-            ('11+', '11+ items'),
-        )
-    
-    def queryset(self, request, queryset):
-        queryset = queryset.annotate(items_count=Count('items'))
-        if self.value() == '1':
-            return queryset.filter(items_count=1)
-        elif self.value() == '2-5':
-            return queryset.filter(items_count__gte=2, items_count__lte=5)
-        elif self.value() == '6-10':
-            return queryset.filter(items_count__gte=6, items_count__lte=10)
-        elif self.value() == '11+':
-            return queryset.filter(items_count__gte=11)
-
-
 class BillingAttachedFilter(admin.SimpleListFilter):
     """Filter orders by presence of related billing records (BillingOrder)."""
     title = 'Tiene facturación'
@@ -128,16 +104,14 @@ class OrderProductInline(admin.TabularInline):
 class OrderAdmin(ModelAdmin):
     list_display = (
         'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted', 'discount',
-        'total_amount_display', 'items_count', 'payment_status', 'billing_status', 'created_display'
+        'total_amount_display', 'products_summary', 'payment_status', 'billing_status'
     )
     
     list_filter = (
         'status',
         'owner',
         'order_date',
-        'created_at',
         OrderAmountFilter,
-        ItemsCountFilter,
         BillingAttachedFilter,
         ('client', admin.RelatedOnlyFieldListFilter),
         ('client__type', admin.ChoicesFieldListFilter),
@@ -294,8 +268,6 @@ class OrderAdmin(ModelAdmin):
             'items__product',
             'client__contacts',
             'client__addresses'
-        ).annotate(
-            items_count=Count('items')
         )
     
     # Custom display methods
@@ -347,14 +319,20 @@ class OrderAdmin(ModelAdmin):
     total_amount_display.short_description = 'Total'
     total_amount_display.admin_order_field = 'total_amount'
     
-    def items_count(self, obj):
-        count = getattr(obj, 'items_count', obj.items.count())
+    def products_summary(self, obj):
+        items = obj.items.select_related('product').all()
+        if not items:
+            return '-'
+
+        product_lines = [
+            f'{item.product.name}: {item.quantity}'
+            for item in items
+        ]
         return format_html(
-            '<span class="badge" style="background: #007bff; color: white; padding: 3px 8px; border-radius: 12px;">{}</span>',
-            count
+            '<div style="line-height: 1.3;">{}</div>',
+            mark_safe('<br>'.join(product_lines))
         )
-    items_count.short_description = 'Items'
-    items_count.admin_order_field = 'items_count'
+    products_summary.short_description = 'Productos'
     
     def payment_status(self, obj):
         # Check if there are any payments for this order
