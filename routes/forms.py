@@ -1,3 +1,4 @@
+import datetime
 from django import forms
 from django.core.exceptions import ValidationError
 from django.contrib import messages
@@ -6,24 +7,32 @@ from .models import RouteClient, Route
 
 class RouteClientForm(forms.ModelForm):
     """Custom form for RouteClient with validation for existing assignments"""
-    
+
+    anchor_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
+    )
+
     class Meta:
         model = RouteClient
         fields = ['client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
         widgets = {
             'notes': forms.Textarea(attrs={'rows': 3}),
-            'anchor_date': forms.DateInput(attrs={'type': 'date'}),
         }
-    
-    # def __init__(self, *args, **kwargs):
-    #     self.request = kwargs.pop('request', None)
-    #     super().__init__(*args, **kwargs)
-        
-    #     # Add CSS classes for better styling
-    #     self.fields['client'].widget.attrs.update({'class': 'client-select'})
-    #     self.fields['sequence'].widget.attrs.update({'class': 'form-control'})
-    #     self.fields['frequency'].widget.attrs.update({'class': 'form-select'})
-        
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'anchor_date' in self.fields:
+            self.fields['anchor_date'].localize = False
+            # Default empty field to today
+            instance = kwargs.get('instance')
+            if not instance or not instance.anchor_date:
+                self.fields['anchor_date'].initial = datetime.date.today()
+
+    def clean_anchor_date(self):
+        return self.cleaned_data.get('anchor_date') or datetime.date.today()
+
     def clean(self):
         cleaned_data = super().clean()
         client = cleaned_data.get('client')

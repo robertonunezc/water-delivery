@@ -8,7 +8,7 @@ class RouteClientInline(TabularInline):
     model = RouteClient
     form = RouteClientInlineForm
     extra = 1
-    fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes', 'confirm_duplicate_assignment')
+    fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'confirm_duplicate_assignment')
     ordering = ('sequence',)
     verbose_name = "Cliente de la Ruta"
     verbose_name_plural = "Clientes de la Ruta"
@@ -27,7 +27,7 @@ class RouteClientInline(TabularInline):
 class RouteClientOrderInline(TabularInline):
     model = RouteClientOrder
     extra = 0
-    fields = ('client', 'order', 'sequence', 'visit_date', 'is_completed', 'notes')
+    fields = ('client', 'order', 'sequence', 'visit_date', 'is_completed')
     readonly_fields = ('completed_at',)
     ordering = ('sequence',)
 
