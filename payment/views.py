@@ -9,20 +9,6 @@ from . import services as payment_services
 from orders.models import Order
 
 
-def process_single_payment(order, payment_method, amount, request_user, credit_note=None):
-    """
-    Process a single payment for an order.
-    Returns (payment, error_dict) tuple. If error_dict is not None, the payment failed.
-    """
-    return payment_services.process_single_payment(
-        order=order,
-        payment_method=payment_method,
-        amount=amount,
-        request_user=request_user,
-        credit_note=credit_note,
-    )
-
-
 @login_required
 @require_http_methods(["POST"])
 @transaction.atomic

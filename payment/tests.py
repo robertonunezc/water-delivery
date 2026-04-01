@@ -2,8 +2,12 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.contrib.auth.models import User
+from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
+from clients.models import Client
+from orders.models import Order
 from payment import services
 
 
@@ -72,3 +76,41 @@ class PaymentServicesTests(SimpleTestCase):
 			data=data,
 			request_user=user,
 		)
+
+
+class PaymentViewsIntegrationTests(TestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(username='tester', password='testpass123')
+		self.client.force_login(self.user)
+
+		self.customer = Client.objects.create(
+			name='Cliente Test Endpoint',
+			type='corporate',
+		)
+		self.order = Order.objects.create(
+			client=self.customer,
+			total_amount=Decimal('120.00'),
+		)
+
+	@patch('payment.views.payment_services.process_payment_request')
+	def test_create_payment_delegates_to_service(self, process_request_mock):
+		process_request_mock.return_value = ({'success': True, 'payment_count': 1}, 200)
+
+		payload = {
+			'order_id': self.order.id,
+			'payments': [{'amount': '120.00', 'payment_method': 'cash'}],
+		}
+		response = self.client.post(
+			reverse('payment:create_payment'),
+			data=payload,
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertEqual(response.json(), {'success': True, 'payment_count': 1})
+		process_request_mock.assert_called_once()
+
+		kwargs = process_request_mock.call_args.kwargs
+		self.assertEqual(kwargs['order'].id, self.order.id)
+		self.assertEqual(kwargs['data'], payload)
+		self.assertEqual(kwargs['request_user'].id, self.user.id)
