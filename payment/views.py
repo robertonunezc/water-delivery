@@ -3,11 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
-from decimal import Decimal
 import json
 
 from . import services as payment_services
-from orders.models import OrderStatus, Order
+from orders.models import Order
 
 
 def process_single_payment(order, payment_method, amount, request_user, credit_note=None):
@@ -51,17 +50,12 @@ def create_payment(request):
 
     try:
         order = get_object_or_404(Order, pk=order_id)
-        
-        # Determine if this is a multi-payment request or single payment
-        payments_data = data.get('payments')
-        
-        if payments_data and isinstance(payments_data, list):
-            # New format: array of payments
-            return process_multiple_payments(request, order, payments_data, cantidad_cobrada)
-        else:
-            # Old format: single payment (backward compatible)
-            return process_legacy_payment(request, order, data)
-        
+        response_data, status_code = payment_services.process_payment_request(
+            order=order,
+            data=data,
+            request_user=request.user,
+        )
+        return JsonResponse(response_data, status=status_code)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
@@ -71,139 +65,22 @@ def process_multiple_payments(request, order, payments_data, cantidad_cobrada):
     Process multiple payments for an order (e.g., balance + another method).
     Payments are processed in order - balance should come first.
     """
-    if not payments_data:
-        return JsonResponse({'error': 'No payments provided'}, status=400)
-    
-    order_total = Decimal(str(order.total_amount))
-    
-    # Validate total of all payments equals order total
-    total_payment_amount = Decimal('0.00')
-    for p in payments_data:
-        if 'amount' not in p or 'payment_method' not in p:
-            return JsonResponse({'error': 'Cada transaccion de pago debe tener un metodo de pago asignado'}, status=400)
-        total_payment_amount += Decimal(str(p['amount']))
-    
-    if total_payment_amount != order_total:
-        return JsonResponse({
-            'error': f'La suma de los pagos (${total_payment_amount:.2f}) debe ser igual al total de la orden (${order_total:.2f})'
-        }, status=400)
-    
-    # Process each payment
-    created_payments = []
-    for payment_data in payments_data:
-        amount = Decimal(str(payment_data['amount']))
-        payment_method = payment_data['payment_method']
-        credit_note = payment_data.get('credit_note')
-        
-        # Skip payments with zero amount
-        if amount <= 0:
-            continue
-        
-        payment, error = process_single_payment(
-            order=order,
-            payment_method=payment_method,
-            amount=amount,
-            request_user=request.user,
-            credit_note=credit_note
-        )
-        
-        if error:
-            return JsonResponse(error, status=400)
-        
-        created_payments.append({
-            'payment_id': payment.id,
-            'amount': str(payment.amount),
-            'method': payment.get_method_display(),
-            'method_code': payment.method
-        })
-    
-    try:
-        charged_amount_info = payment_services.apply_cantidad_cobrada(
-            order=order,
-            cantidad_cobrada_value=cantidad_cobrada,
-            user=request.user,
-        )
-    except ValueError as exc:
-        return JsonResponse({'error': str(exc)}, status=400)
-
-    # Update order status
-    order.status = OrderStatus.COMPLETED.value
-    order.save()
-
-    # Build response
-    response_data = {
-        'success': True,
-        'payments': created_payments,
-        'order_total': str(order.total_amount),
-        'payment_count': len(created_payments)
-    }
-    
-    # Include balance addition info if applicable
-    if charged_amount_info['cantidad_cobrada'] is not None and charged_amount_info['balance_added'] > 0:
-        response_data['balance_added'] = str(charged_amount_info['balance_added'])
-        response_data['cantidad_cobrada'] = str(charged_amount_info['cantidad_cobrada'])
-        response_data['new_client_balance'] = str(order.client.balance)
-    
-    return JsonResponse(response_data)
+    response_data, status_code = payment_services.process_multiple_payments(
+        order=order,
+        payments_data=payments_data,
+        cantidad_cobrada=cantidad_cobrada,
+        request_user=request.user,
+    )
+    return JsonResponse(response_data, status=status_code)
 
 
 def process_legacy_payment(request, order, data):
     """
     Process a single payment in the legacy format (backward compatible).
     """
-    payment_method = data.get('payment_method')
-    amount = data.get('amount')
-    cantidad_cobrada = data.get('cantidad_cobrada')
-    credit_note = data.get('credit_note')
-
-    if not payment_method:
-        return JsonResponse({'error': 'Missing payment_method'}, status=400)
-    
-    order_total = Decimal(str(order.total_amount))
-    
-    # Use order total if amount not provided
-    if not amount:
-        amount = order_total
-    else:
-        amount = Decimal(str(amount))
-    
-    # Process the payment
-    payment, error = process_single_payment(
+    response_data, status_code = payment_services.process_legacy_payment(
         order=order,
-        payment_method=payment_method,
-        amount=amount,
+        data=data,
         request_user=request.user,
-        credit_note=credit_note
     )
-    
-    if error:
-        return JsonResponse(error, status=400)
-    
-    try:
-        charged_amount_info = payment_services.apply_cantidad_cobrada(
-            order=order,
-            cantidad_cobrada_value=cantidad_cobrada,
-            user=request.user,
-        )
-    except ValueError as exc:
-        return JsonResponse({'error': str(exc)}, status=400)
-
-    # Update order status
-    order.status = OrderStatus.COMPLETED.value
-    order.save()
-
-    response_data = {
-        'success': True,
-        'payment_id': payment.id,
-        'amount': str(payment.amount),
-        'method': payment.get_method_display(),
-        'order_total': str(order.total_amount)
-    }
-    
-    # Include balance addition info if applicable
-    if charged_amount_info['cantidad_cobrada'] is not None and charged_amount_info['balance_added'] > 0:
-        response_data['balance_added'] = str(charged_amount_info['balance_added'])
-        response_data['cantidad_cobrada'] = str(charged_amount_info['cantidad_cobrada'])
-        response_data['new_client_balance'] = str(order.client.balance)
-    
-    return JsonResponse(response_data)
+    return JsonResponse(response_data, status=status_code)
