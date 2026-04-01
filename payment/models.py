@@ -74,86 +74,96 @@ class Payment(TimeStampedModel):
                         f'exceeds available credit of ${available_credit:.2f}. '
                         f'This will result in exceeding credit limit.'
                     )
+
+    def apply_accounting_side_effects(self):
+        """Apply financial mutations based on payment method."""
+        from clients.services import balance_service
+        from django.core.exceptions import ValidationError
+
+        if self.status != 'completed':
+            return
+
+        if self.method == 'balance':
+            result = balance_service.deduct_balance(
+                client=self.client,
+                amount=self.amount,
+                transaction_type='payment',
+                user=self.created_by,
+                reference_order=self.order,
+                reference_payment=None,
+                notes=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo'
+            )
+            if not result:
+                raise ValidationError("NO cuenta con saldo suficiente para el pago")
+            self.balance_used = self.amount
+
+        elif self.method == 'credit':
+            credit_note = getattr(self, '_credit_note', None)
+            notes_text = f'Compra orden #{self.order.id if self.order else "N/A"} a crédito'
+            if credit_note:
+                notes_text += f'. {credit_note}'
+            result = balance_service.add_debt(
+                client=self.client,
+                amount=self.amount,
+                transaction_type='purchase',
+                user=self.created_by,
+                reference_order=self.order,
+                reference_payment=None,
+                notes=notes_text
+            )
+            if not result:
+                available_credit = self.client.get_available_credit()
+                can_use_credit = self.client.can_pay_with_credit
+                raise ValidationError(
+                    f"No se puede procesar el pago con crédito. "
+                    f"Cliente puede usar crédito: {can_use_credit}, "
+                    f"Crédito disponible: ${available_credit:.2f}, "
+                    f"Monto requerido: ${self.amount:.2f}"
+                )
+            self.credit_used = self.amount
+
+    def link_pending_transaction_references(self):
+        """Link balance/credit transactions created during accounting to this payment."""
+        if not self.pk or self.status != 'completed':
+            return
+
+        if self.method == 'balance':
+            balance_tx = self.client.balance_transactions.filter(
+                reference_order=self.order,
+                amount=self.amount,
+                transaction_type='payment',
+                reference_payment__isnull=True
+            ).first()
+            if balance_tx:
+                balance_tx.reference_payment = self
+                balance_tx.save()
+
+        elif self.method == 'credit':
+            credit_tx = self.client.credit_transactions.filter(
+                reference_order=self.order,
+                amount=self.amount,
+                transaction_type='purchase',
+                reference_payment__isnull=True
+            ).first()
+            if credit_tx:
+                credit_tx.reference_payment = self
+                credit_tx.save()
     
     def save(self, *args, **kwargs):
         """Custom save method to handle balance and credit payments"""
-        from clients.services import balance_service
+        apply_accounting = kwargs.pop('apply_accounting', True)
 
         is_new_payment = self.pk is None
+        should_apply_accounting = apply_accounting and is_new_payment and self.status == 'completed'
 
-        if is_new_payment and self.status == 'completed':
-            # Process payment based on method
-            if self.method == 'balance':
-                # Deduct from client balance
-                result = balance_service.deduct_balance(
-                    client=self.client,
-                    amount=self.amount,
-                    transaction_type='payment',
-                    user=self.created_by,
-                    reference_order=self.order,
-                    reference_payment=None,  # Will be set after save
-                    notes=f'Pago de orden #{self.order.id if self.order else "N/A"} con saldo'
-                )
-                if not result:
-                    from django.core.exceptions import ValidationError
-                    raise ValidationError("NO cuenta con saldo suficiente para el pago")
-                self.balance_used = self.amount
-
-            elif self.method == 'credit':
-                # Add to client debt
-                credit_note = getattr(self, '_credit_note', None)
-                notes_text = f'Compra orden #{self.order.id if self.order else "N/A"} a crédito'
-                if credit_note:
-                    notes_text += f'. {credit_note}'
-                result = balance_service.add_debt(
-                    client=self.client,
-                    amount=self.amount,
-                    transaction_type='purchase',
-                    user=self.created_by,
-                    reference_order=self.order,
-                    reference_payment=None,  # Will be set after save
-                    notes=notes_text
-                )
-                if not result:
-                    from django.core.exceptions import ValidationError
-                    # This should rarely happen now since add_debt allows exceeding limits for authorized clients
-                    available_credit = self.client.get_available_credit()
-                    can_use_credit = self.client.can_pay_with_credit
-                    raise ValidationError(
-                        f"No se puede procesar el pago con crédito. "
-                        f"Cliente puede usar crédito: {can_use_credit}, "
-                        f"Crédito disponible: ${available_credit:.2f}, "
-                        f"Monto requerido: ${self.amount:.2f}"
-                    )
-                self.credit_used = self.amount
+        if should_apply_accounting:
+            self.apply_accounting_side_effects()
 
         super().save(*args, **kwargs)
         
         # Update transaction records with payment reference after save
-        if is_new_payment and self.status == 'completed':
-            if self.method == 'balance' and self.pk:
-                # Update the balance transaction with payment reference
-                balance_tx = self.client.balance_transactions.filter(
-                    reference_order=self.order,
-                    amount=self.amount,
-                    transaction_type='payment',
-                    reference_payment__isnull=True
-                ).first()
-                if balance_tx:
-                    balance_tx.reference_payment = self
-                    balance_tx.save()
-                    
-            elif self.method == 'credit' and self.pk:
-                # Update the credit transaction with payment reference
-                credit_tx = self.client.credit_transactions.filter(
-                    reference_order=self.order,
-                    amount=self.amount,
-                    transaction_type='purchase',
-                    reference_payment__isnull=True
-                ).first()
-                if credit_tx:
-                    credit_tx.reference_payment = self
-                    credit_tx.save()
+        if should_apply_accounting:
+            self.link_pending_transaction_references()
     
     def reverse_payment(self, user=None, reason=''):
         """Reverse the payment by restoring balance or reducing debt"""

@@ -29,8 +29,6 @@ def create_payment(request):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     order_id = data.get('order_id')
-    cantidad_cobrada = data.get('cantidad_cobrada')
-    
     if not order_id:
         return JsonResponse({'error': 'Missing order_id'}, status=400)
 
@@ -44,29 +42,3 @@ def create_payment(request):
         return JsonResponse(response_data, status=status_code)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
-
-
-def process_multiple_payments(request, order, payments_data, cantidad_cobrada):
-    """
-    Process multiple payments for an order (e.g., balance + another method).
-    Payments are processed in order - balance should come first.
-    """
-    response_data, status_code = payment_services.process_multiple_payments(
-        order=order,
-        payments_data=payments_data,
-        cantidad_cobrada=cantidad_cobrada,
-        request_user=request.user,
-    )
-    return JsonResponse(response_data, status=status_code)
-
-
-def process_legacy_payment(request, order, data):
-    """
-    Process a single payment in the legacy format (backward compatible).
-    """
-    response_data, status_code = payment_services.process_legacy_payment(
-        order=order,
-        data=data,
-        request_user=request.user,
-    )
-    return JsonResponse(response_data, status=status_code)

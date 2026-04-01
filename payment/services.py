@@ -2,6 +2,7 @@ from decimal import Decimal
 from typing import Optional
 
 from django.contrib.auth.models import User
+from django.db import transaction
 
 from clients.services import balance_service
 from orders.models import Order, OrderStatus
@@ -74,8 +75,14 @@ def process_single_payment(
     if payment_method == 'credit' and credit_note:
         payment._credit_note = credit_note.strip()
 
-    # Payment.save handles balance/credit accounting for completed payments.
-    payment.save()
+    # Persist payment first, then apply accounting explicitly.
+    with transaction.atomic():
+        payment.save(apply_accounting=False)
+        if payment.status == 'completed':
+            payment.apply_accounting_side_effects()
+            payment.save(update_fields=['balance_used', 'credit_used', 'updated_at'], apply_accounting=False)
+            payment.link_pending_transaction_references()
+
     return payment, None
 
 

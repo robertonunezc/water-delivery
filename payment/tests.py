@@ -77,7 +77,6 @@ class PaymentServicesTests(SimpleTestCase):
 			request_user=user,
 		)
 
-
 class PaymentViewsIntegrationTests(TestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(username='tester', password='testpass123')
@@ -114,3 +113,31 @@ class PaymentViewsIntegrationTests(TestCase):
 		self.assertEqual(kwargs['order'].id, self.order.id)
 		self.assertEqual(kwargs['data'], payload)
 		self.assertEqual(kwargs['request_user'].id, self.user.id)
+
+	@patch('payment.services.Payment')
+	def test_process_single_payment_uses_explicit_accounting_flow(self, payment_cls_mock):
+		client = SimpleNamespace(
+			balance=Decimal('100.00'),
+			can_use_credit_for_payment=lambda: True,
+			requires_note_for_credit_payment=lambda: False,
+			validate_credit_payment=lambda amount, note: {'success': True},
+		)
+		order = SimpleNamespace(client=client)
+		user = SimpleNamespace(id=1)
+
+		payment_instance = payment_cls_mock.return_value
+		payment_instance.status = 'completed'
+
+		payment, error = services.process_single_payment(
+			order=order,
+			payment_method='cash',
+			amount=Decimal('10.00'),
+			request_user=user,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment, payment_instance)
+		payment_instance.save.assert_any_call(apply_accounting=False)
+		payment_instance.apply_accounting_side_effects.assert_called_once()
+		payment_instance.save.assert_any_call(update_fields=['balance_used', 'credit_used', 'updated_at'], apply_accounting=False)
+		payment_instance.link_pending_transaction_references.assert_called_once()
