@@ -8,10 +8,11 @@ class SoftDeleteAdminMixin:
     def get_actions(self, request):
         actions = super().get_actions(request)
         actions.pop('delete_selected', None)
+        action_fn = self.__class__.soft_delete_selected
         actions['soft_delete_selected'] = (
-            self.soft_delete_selected,
+            action_fn,
             'soft_delete_selected',
-            self.soft_delete_selected.short_description,
+            action_fn.short_description,
         )
         return actions
 
