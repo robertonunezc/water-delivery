@@ -3,12 +3,13 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import Employee, Transport, NonWorkingDay
 from unfold.admin import ModelAdmin
+from .admin_mixins import SoftDeleteAdminMixin
 class UserAdmin(BaseUserAdmin):
     # Do not inline Employee here. We want Employee created/managed only from the Employee admin.
     pass
 
 @admin.register(Employee)
-class EmployeeAdmin(ModelAdmin):
+class EmployeeAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('user', 'position', 'phone', 'city', 'state', 'contract_type')
     list_filter = ('position', 'contract_type', 'city', 'state')
     search_fields = ('user__first_name', 'user__last_name', 'user__email', 'curp', 'rfc', 'phone')
@@ -58,7 +59,7 @@ class EmployeeAdmin(ModelAdmin):
             super().save_model(request, obj, form, change)
 
 @admin.register(Transport)
-class TransportAdmin(ModelAdmin):
+class TransportAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('license_plate', 'model', 'capacity_liters', 'assigned_driver', 'is_active')
     list_filter = ('is_active', 'model', 'assigned_driver__position')
     search_fields = ('license_plate', 'model', 'assigned_driver__user__first_name', 'assigned_driver__user__last_name')
@@ -77,7 +78,7 @@ class TransportAdmin(ModelAdmin):
         return super().get_queryset(request).select_related('assigned_driver__user')
 
 @admin.register(NonWorkingDay)
-class NonWorkingDayAdmin(ModelAdmin):
+class NonWorkingDayAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('date', 'name', 'is_active')
     list_filter = ('is_active', 'date')
     search_fields = ('name', 'notes')

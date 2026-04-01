@@ -1,9 +1,10 @@
 from django.contrib import admin
 from django.apps import apps
 from .models import Payment
+from core.admin_mixins import SoftDeleteAdminMixin
 
 # Custom admin for Payment model
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
     list_display = ('id', 'client', 'order', 'amount', 'method', 'get_payment_breakdown_display', 'status', 'date')
     list_filter = ('method', 'status', 'date', 'client')
     search_fields = ('client__name', 'order__id', 'amount')

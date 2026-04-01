@@ -1,4 +1,5 @@
 from django.db import models
+from core.models import TimeStampedModel
 
 # Create your models here.
 
@@ -16,7 +17,7 @@ PAYMENT_STATUS_CHOICES = [
     ('pending', 'Pendiente'),
     ('failed', 'Fallido'),
 ]
-class Payment(models.Model):
+class Payment(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto del Pago")
     date = models.DateTimeField(auto_now_add=True, verbose_name="Fecha")
     method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES, verbose_name="Método de Pago")

@@ -10,6 +10,7 @@ import csv
 from .models import Order, OrderProduct, OrderStatus, OrderSplit
 from django.core.exceptions import PermissionDenied
 from unfold.admin import ModelAdmin, TabularInline
+from core.admin_mixins import SoftDeleteAdminMixin
 
 class OrderAmountFilter(admin.SimpleListFilter):
     title = 'Rango de monto'
@@ -101,7 +102,7 @@ class OrderProductInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(ModelAdmin):
+class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = (
         'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted', 'discount',
         'total_amount_display', 'products_summary', 'payment_status', 'billing_status'
@@ -623,7 +624,7 @@ class OrderAdmin(ModelAdmin):
     export_to_csv.short_description = 'Exportar a CSV'
 
 
-class OrderProductAdmin(admin.ModelAdmin):
+class OrderProductAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
     list_display = (
         'order_link', 'product_name', 'quantity', 'unit_price', 
         'total_price_display', 'order_status', 'order_date', 'client_name'
@@ -767,7 +768,7 @@ class OrderProductAdmin(admin.ModelAdmin):
 
 
 @admin.register(OrderSplit)
-class OrderSplitAdmin(admin.ModelAdmin):
+class OrderSplitAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
     """Admin for tracking order splits"""
     list_display = (
         'id', 'source_order_link', 'child_order_link', 'split_by',

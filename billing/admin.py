@@ -10,6 +10,7 @@ from collections import Counter
 
 from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
+from core.admin_mixins import SoftDeleteAdminMixin
 # Register your models here.
 class BillingRecordInlineAdmin(StackedInline):
     model = BillingOrder
@@ -109,7 +110,7 @@ class BillingOrderInlineFormSet(BaseInlineFormSet):
 BillingRecordInlineAdmin.form = BillingOrderAdminForm
 BillingRecordInlineAdmin.formset = BillingOrderInlineFormSet
 
-class BillingRecordAdmin(ModelAdmin):
+class BillingRecordAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
     list_filter = ('date', 'client')
     search_fields = ('client__name', 'description', 'identifier')
@@ -117,7 +118,7 @@ class BillingRecordAdmin(ModelAdmin):
     inlines = [BillingRecordInlineAdmin]
 
 
-class BillingOrderAdmin(ModelAdmin):
+class BillingOrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid')
     list_filter = ('is_paid', 'partially_paid', 'billing_record__client', 'billing_record')
     search_fields = ('billing_record__client__name', 'order__id')

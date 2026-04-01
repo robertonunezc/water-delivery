@@ -41,7 +41,7 @@ OCCURRENCE_CHOICES = [
 ]
 
 # Create your models here.
-class BillingRecord(models.Model):
+class BillingRecord(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='billing_records', verbose_name='Cliente')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     identifier = models.CharField(max_length=100, unique=True, verbose_name="Serie")

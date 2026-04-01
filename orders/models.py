@@ -67,7 +67,7 @@ class OrderManager(models.Manager):
     """Custom manager for Order model"""
 
     def get_queryset(self):
-        return OrderQuerySet(self.model, using=self._db)
+        return OrderQuerySet(self.model, using=self._db).filter(deleted_at=None)
 
     def unbilled(self):
         return self.get_queryset().unbilled()
@@ -114,7 +114,7 @@ class Order(TimeStampedModel):
     def __str__(self):
         return f"Order {self.id} for {self.client.name} - {self.status} ({self.total_amount})"
 
-class OrderProduct(models.Model):
+class OrderProduct(TimeStampedModel):
     order = models.ForeignKey('Order', related_name='items', on_delete=models.CASCADE)
     product = models.ForeignKey('product.Product', on_delete=models.PROTECT, related_name='order_products')
     quantity = models.PositiveIntegerField()

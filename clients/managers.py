@@ -85,7 +85,7 @@ class BalanceTransactionManager(models.Manager):
     """Manager for BalanceTransaction using BalanceTransactionQuerySet."""
 
     def get_queryset(self) -> BalanceTransactionQuerySet:
-        return BalanceTransactionQuerySet(self.model, using=self._db)
+        return BalanceTransactionQuerySet(self.model, using=self._db).filter(deleted_at=None)
 
     def for_client(self, client: "Client") -> BalanceTransactionQuerySet:
         return self.get_queryset().for_client(client)
@@ -158,7 +158,7 @@ class CreditTransactionManager(models.Manager):
     """Manager for CreditTransaction using CreditTransactionQuerySet."""
 
     def get_queryset(self) -> CreditTransactionQuerySet:
-        return CreditTransactionQuerySet(self.model, using=self._db)
+        return CreditTransactionQuerySet(self.model, using=self._db).filter(deleted_at=None)
 
     def for_client(self, client: "Client") -> CreditTransactionQuerySet:
         return self.get_queryset().for_client(client)

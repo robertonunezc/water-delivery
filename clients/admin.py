@@ -19,6 +19,7 @@ from .forms import (
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
 from routes.models import RouteClient
+from core.admin_mixins import SoftDeleteAdminMixin
 
 logger = logging.getLogger(__name__)
 class ContactInline(TabularInline):
@@ -117,7 +118,7 @@ class ClientBillingDataInline(StackedInline):
 	
 
 @admin.register(models.Client)
-class ClientAdmin(BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, ModelAdmin):
+class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, ModelAdmin):
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')

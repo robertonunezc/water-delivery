@@ -4,6 +4,7 @@ from django.forms import Media
 from .models import Route, RouteClient, RouteClientOrder
 from .forms import RouteClientForm, RouteClientInlineForm, RouteForm
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
+from core.admin_mixins import SoftDeleteAdminMixin
 class RouteClientInline(TabularInline):
     model = RouteClient
     form = RouteClientInlineForm
@@ -33,7 +34,7 @@ class RouteClientOrderInline(TabularInline):
     ordering = ('sequence',)
 
 @admin.register(Route)
-class RouteAdmin(ModelAdmin):
+class RouteAdmin(SoftDeleteAdminMixin, ModelAdmin):
     form = RouteForm
     list_display = ('name', 'transportation', 'weekday', 'is_active', 'client_count')
     list_filter = ('weekday', 'is_active', 'transportation')
@@ -58,7 +59,7 @@ class RouteAdmin(ModelAdmin):
 
 
 
-class RouteClientAdmin(ModelAdmin):
+class RouteClientAdmin(SoftDeleteAdminMixin, ModelAdmin):
     form = RouteClientForm
     list_display = ('client', 'route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active')
     list_filter = ('interval_weeks', 'is_active', 'route__weekday', 'route__transportation')
@@ -82,7 +83,7 @@ class RouteClientAdmin(ModelAdmin):
 
 
 
-class RouteClientOrderAdmin(ModelAdmin):
+class RouteClientOrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('client', 'route', 'order', 'visit_date', 'sequence', 'is_completed')
     list_filter = ('is_completed', 'visit_date', 'route__weekday', 'route__transportation')
     search_fields = ('client__name', 'route__name', 'order__id')

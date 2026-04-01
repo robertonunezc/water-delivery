@@ -13,6 +13,7 @@ from .csv_import_service import (
     get_products_csv_template,
     import_products_and_prices_from_csv,
 )
+from core.admin_mixins import SoftDeleteAdminMixin
 
 class ProductClientPriceInline(admin.TabularInline):
     model = ProductClientPrice
@@ -21,13 +22,13 @@ class ProductClientPriceInline(admin.TabularInline):
 
 
 @admin.register(ProductCategory)
-class ProductCategoryAdmin(ModelAdmin):
+class ProductCategoryAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('name',)
     search_fields = ('name',)
 
 
 @admin.register(Product)
-class ProductAdmin(ModelAdmin):
+class ProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('name', 'presentation', 'unit_of_measure', 'price', 'category','active')
     list_filter = ('category', 'unit_of_measure', 'active')
     search_fields = ('name', 'presentation')
@@ -157,7 +158,7 @@ class ProductAdmin(ModelAdmin):
 
 
 @admin.register(ProductClientPrice)
-class ProductClientPriceAdmin(ModelAdmin):
+class ProductClientPriceAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('product', 'client', 'price','active', 'until_date')
     search_fields = ('product__name', 'client__name')
     list_filter = ('until_date', 'active'   )

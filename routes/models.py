@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from core.models import TimeStampedModel
 
 from django.forms import ValidationError
 WEEKDAY_TO_INDEX = {
@@ -23,10 +24,18 @@ class RouteClientQuerySet(models.QuerySet):
         return self.filter(pk__in=due_ids)
 
 
+class RouteClientManager(models.Manager):
+    def get_queryset(self):
+        return RouteClientQuerySet(self.model, using=self._db).filter(deleted_at=None)
+
+    def due_on(self, target_date: date):
+        return self.get_queryset().due_on(target_date)
+
+
 # Create your models here.
 
 
-class Route(models.Model):
+class Route(TimeStampedModel):
     WEEKDAY_CHOICES = [
     ('monday', 'Lunes'),
     ('tuesday', 'Martes'),
@@ -41,8 +50,6 @@ class Route(models.Model):
     transportation = models.ForeignKey('core.Transport', related_name='routes', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Vehículo")
     weekday = models.CharField(max_length=10, choices=WEEKDAY_CHOICES, default='monday', verbose_name="Día de la Semana")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
-    updated_at = models.DateTimeField(auto_now=True, verbose_name="Fecha de Actualización")
 
     class Meta:
         verbose_name = 'Ruta'
@@ -66,7 +73,7 @@ class Route(models.Model):
             routes = routes.filter(transportation=transportation)
         return routes
 
-class RouteClientOrder(models.Model):
+class RouteClientOrder(TimeStampedModel):
     """Links a route with a client and their specific order for that day"""
     route = models.ForeignKey(Route, related_name='route_client_orders', on_delete=models.CASCADE)
     client = models.ForeignKey('clients.Client', related_name='client_route_orders', on_delete=models.CASCADE)
@@ -108,7 +115,7 @@ class RouteClientOrder(models.Model):
         self.completed_at = timezone.now()
         self.save()
 
-class RouteClient(models.Model):
+class RouteClient(TimeStampedModel):
     """Regular client assignment to a route (for recurring weekly visits)"""
     route = models.ForeignKey(Route, related_name='route_clients', on_delete=models.CASCADE)
     client = models.ForeignKey('clients.Client', verbose_name="Cliente", related_name='client_routes', on_delete=models.CASCADE)
@@ -127,7 +134,7 @@ class RouteClient(models.Model):
         help_text='Fecha base para calcular cada cuántas semanas corresponde la visita.',
     )
 
-    objects = RouteClientQuerySet.as_manager()
+    objects = RouteClientManager()
     
     class Meta:
         unique_together = ('route', 'client')

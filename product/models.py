@@ -1,4 +1,5 @@
 from django.db import models
+from core.models import TimeStampedModel
 
 UNIT_CHOICES = (
     (0, 'not applicable'),
@@ -16,10 +17,10 @@ UNIT_CHOICES = (
 # Create your models here.
 class ProductQuerySet(models.QuerySet):
     def active(self):
-        return self.filter(active=True)
+        return self.filter(active=True, deleted_at=None)
 
     def include_inactive(self):
-        return self.all()
+        return self.filter(deleted_at=None)
 
 
 class ProductManager(models.Manager):
@@ -30,7 +31,7 @@ class ProductManager(models.Manager):
         return ProductQuerySet(self.model, using=self._db)
 
 
-class ProductCategory(models.Model):
+class ProductCategory(TimeStampedModel):
     name = models.CharField(max_length=50, default="General")
     class Meta:
         verbose_name = 'Categoría de producto'
@@ -39,7 +40,7 @@ class ProductCategory(models.Model):
         return self.name
 
 
-class Product(models.Model):
+class Product(TimeStampedModel):
     class Meta:
         ordering = ['name']
         verbose_name = 'Producto'
@@ -78,7 +79,7 @@ class Product(models.Model):
     def get_presentation_display(self):
         return "{} {}".format(self.presentation, self.get_unit_of_measure_display())
 
-class ProductClientPrice(models.Model):
+class ProductClientPrice(TimeStampedModel):
     class Meta: 
         verbose_name_plural = 'Precios de productos por cliente'
         unique_together = ('product', 'client',)
