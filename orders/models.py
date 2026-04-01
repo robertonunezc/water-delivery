@@ -103,7 +103,7 @@ class Order(TimeStampedModel):
             models.Index(fields=['client', 'status'], name='orders_client_status_idx'),
             models.Index(fields=['order_date', 'status'], name='orders_date_status_idx'),
         ]
-    
+
     def get_status_display_fixed(self):
         """
         Helper method - now just an alias to get_status_display() since status values are fixed.

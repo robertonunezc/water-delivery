@@ -34,7 +34,10 @@ class Payment(TimeStampedModel):
     
     # Temporary field to hold credit note during payment processing (not stored in DB)
     _credit_note = None
-    
+    def status_display(self):
+        return dict(PAYMENT_STATUS_CHOICES).get(self.status, 'Desconocido')
+    def get_method_display(self):
+        return dict(PAYMENT_METHOD_CHOICES).get(self.method, 'Desconocido')
     def clean(self):
         """Validate payment before saving"""
         from django.core.exceptions import ValidationError

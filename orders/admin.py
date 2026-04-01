@@ -105,7 +105,7 @@ class OrderProductInline(admin.TabularInline):
 class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = (
         'order_id_display', 'client_link','owner', 'status_display', 'order_date_formatted', 'discount',
-        'total_amount_display', 'products_summary', 'payment_status', 'billing_status'
+        'total_amount_display', 'products_summary', 'payment_status','payment_method', 'billing_status'
     )
     
     list_filter = (
@@ -192,7 +192,15 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         
         extra_context['order_stats'] = stats
         return super().changelist_view(request, extra_context)
-
+    def payment_method(self, obj):
+        try:
+            from payment.models import Payment
+            payment = Payment.objects.filter(order=obj).first()
+            if payment:
+                return payment.get_method_display()
+            return 'Sin Definir'
+        except ImportError:
+            return 'N/A'
     # --- Permission / visibility controls ---
     def is_super(self, request):
         return request.user and request.user.is_superuser
@@ -603,20 +611,28 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         writer = csv.writer(response)
         writer.writerow([
             'ID', 'Cliente', 'Estado', 'Fecha', 'SubTotal', 'Descuento','Total',
-            'Items', 'Notas', 'Creado'
+            'Productos', 'Metodo Pago','Pagado', 'Creado'
         ])
         
         for order in queryset:
+            client_name_external_id = f"{order.client.external_id} - {order.client.name}" if order.client and order.client.external_id else (order.client.name if order.client else '')
+            products = '; '.join([
+                f"{item.product.name} - {item.quantity}"
+                for item in order.items.select_related('product').all()
+            ])
+            payment_method = order.payments.first().get_method_display() if hasattr(order, 'payments') and order.payments.exists() else 'Sin Definir'
+            payment_status = order.payments.first().status_display() if hasattr(order, 'payments') and order.payments.exists() else 'N/A'
             writer.writerow([
                 order.id,
-                order.client.name if order.client else '',
+                client_name_external_id,
                 order.get_status_display(),
                 order.order_date.strftime('%d/%m/%Y %H:%M'),
                 str(order.subtotal_amount),
                 str(order.discount),
                 str(order.total_amount),
-                order.items.count(),
-                order.notes or '',
+                products,
+                payment_method,
+                payment_status,
                 order.created_at.strftime('%d/%m/%Y')
             ])
         
