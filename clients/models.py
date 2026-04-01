@@ -272,6 +272,8 @@ class Client(TimeStampedModel):
         from clients.billing_info import BillingInfo
         return BillingInfo(self)
 
+    def get_products(self):
+        return self.product_prices.select_related('product').all()
     # Backwards-compatible helpers
     def get_effective_billing_data(self):
         return self.billing_info.effective.data

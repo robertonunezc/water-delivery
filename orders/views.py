@@ -169,7 +169,7 @@ def create_order(request, client_pk):
     client = get_object_or_404(Client, pk=client_pk)
     owner = request.user
     order = services.create_order(client, owner=owner)
-    client_products = ProductClientPrice.objects.filter(client=client).prefetch_related('product')
+    client_products = client.get_products()
     payment_types = PAYMENT_METHOD_CHOICES
     # Calculate initial payment breakdown based on client balance and order total
     initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
