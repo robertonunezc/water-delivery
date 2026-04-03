@@ -170,18 +170,23 @@ def create_order(request, client_pk):
     owner = request.user
     order = services.create_order(client, owner=owner)
     client_products = client.get_products()
-    payment_types = PAYMENT_METHOD_CHOICES
+    payment_types = [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value not in {'credit', 'pending_credit'}
+    ]
     # Calculate initial payment breakdown based on client balance and order total
     initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
     has_delivery_address = client.addresses.filter(type='delivery').exists()
-    # Add client credit payment settings for frontend validation
+    has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
+
     context = {
         'client': client, 
         'order': order, 
         'client_products': client_products, 
         'payment_types': payment_types,
-        'can_use_credit': client.can_use_credit_for_payment(),
-        'requires_credit_note': client.requires_note_for_credit_payment(),
+        'order_type': order.type,
+        'has_pending_credit_payment': has_pending_credit_payment,
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_delivery_address': has_delivery_address,
     }

@@ -40,6 +40,9 @@ def get_product_price_for_client(product, client):
         price_entry = ProductClientPrice.objects.get(product=product, client=client)
         return Decimal(str(price_entry.price))
     except ProductClientPrice.DoesNotExist:
+        base_price = getattr(product, 'base_price', None)
+        if base_price is not None:
+            return Decimal(str(base_price))
         return Decimal(str(getattr(product, 'price', 0.0)))
     
 def update_order(order: Order, quantity: int, product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
@@ -251,7 +254,7 @@ def process_order_payment(
                     "note_required": True,
                 }
 
-            available_credit = client.get_available_credit()
+            available_credit = Decimal(str(client.get_available_credit()))
             credit_used = min(available_credit, remaining_amount)
             remaining_amount -= credit_used
 

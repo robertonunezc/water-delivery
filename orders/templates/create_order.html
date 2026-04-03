@@ -96,9 +96,8 @@
       data-order-id="{{ order.pk }}"
       data-cancel-order-url="{% url 'orders:cancel_order' order.pk %}"
       data-client-balance="{{ client.balance|floatformat:2 }}"
-      data-client-available-credit="{{ client.get_available_credit|floatformat:2 }}"
-      data-can-use-credit="{{ can_use_credit|yesno:"true,false" }}"
-      data-requires-credit-note="{{ requires_credit_note|yesno:"true,false" }}"
+      data-order-type="{{ order_type }}"
+      data-has-pending-credit-payment="{{ has_pending_credit_payment|yesno:"true,false" }}"
       data-csrf-token="{{ csrf_token }}"
       data-initial-breakdown='{{ initial_payment_breakdown|escapejs }}'
       data-initial-order-total="{{ order.total_amount|floatformat:2 }}"
@@ -425,17 +424,6 @@
                         {% endfor %}
                       </select>
                     </div>
-                    
-                    <!-- Credit Note for Secondary Payment -->
-                    <div class="mt-2" id="secondary-credit-note-field" style="display: none;">
-                      <label for="secondary_credit_note" class="form-label small">
-                        <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
-                      </label>
-                      <textarea class="form-control form-control-sm" 
-                              id="secondary_credit_note" 
-                              rows="2"
-                              placeholder="Nota requerida para crédito"></textarea>
-                    </div>
                   </div>
                   
                   <!-- Full Payment Without Balance -->
@@ -471,29 +459,23 @@
               </div>
               <div class="card-body">
                 <div class="mb-3">
+                  <label for="order-type-select" class="form-label">
+                    <i class="fas fa-file-invoice-dollar me-1"></i>Tipo de Orden
+                  </label>
+                  <select class="form-select" id="order-type-select" name="order_type">
+                    <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
+                    <option value="credito" {% if order_type == 'credito' %}selected{% endif %}>Crédito</option>
+                  </select>
+                  <div class="form-text" id="order-type-help-text">
+                    Las órdenes a crédito registran deuda y quedan pendientes hasta liquidarse.
+                  </div>
+                </div>
+                <div class="mb-3">
                   <select class="form-select" id="payment-method-select" name="payment_type">
                     {% for value, label in payment_types %}
                       <option value="{{ value }}">{{ label }}</option>
                     {% endfor %}
                   </select>
-                </div>
-                
-                <!-- Credit Note Field (Hidden by default) -->
-                <div class="mb-3" id="credit-note-field" style="display: none;">
-                  <label for="credit_note" class="form-label">
-                    <i class="fas fa-sticky-note me-1"></i>Nota para Crédito <span class="text-danger">*</span>
-                  </label>
-                  <textarea class="form-control" 
-                          id="credit_note" 
-                          name="credit_note"
-                          rows="3"
-                          placeholder="Ingrese una nota explicando el motivo del pago con crédito (requerido)"></textarea>
-                  <div class="form-text">
-                    Esta nota es obligatoria para pagos con crédito para este cliente
-                  </div>
-                  <div class="invalid-feedback">
-                    Por favor ingrese una nota para el pago con crédito
-                  </div>
                 </div>
                 
                 <!-- Cantidad Cobrada Field -->
@@ -563,6 +545,10 @@
         <div class="d-lg-none order-summary-mobile">
           <div class="row mb-2">
             <div class="col-6">
+              <select class="form-select mb-2" id="order-type-select-mobile" name="order_type_mobile">
+                <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
+                <option value="credito" {% if order_type == 'credito' %}selected{% endif %}>Crédito</option>
+              </select>
               <select class="form-select" id="payment-method-select-mobile" name="payment_type">
                 <option value="">Método de pago</option>
                 {% for code, label in payment_types %}
@@ -589,21 +575,6 @@
             </div>
           </div>
 
-          
-          <!-- Mobile Credit Note Field (Hidden by default) -->
-          <div class="row mb-3" id="credit-note-field-mobile" style="display: none;">
-            <div class="col-12">
-              <label for="credit_note_mobile" class="form-label small">Nota para Crédito <span class="text-danger">*</span></label>
-              <textarea class="form-control form-control-sm" 
-                      id="credit_note_mobile" 
-                      name="credit_note_mobile"
-                      rows="2"
-                      placeholder="Nota requerida para crédito"></textarea>
-              <div class="invalid-feedback">
-                Nota requerida para crédito
-              </div>
-            </div>
-          </div>
           
           <!-- Mobile Cantidad Cobrada -->
           <div class="row mb-3">

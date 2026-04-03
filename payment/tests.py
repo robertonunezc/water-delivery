@@ -44,7 +44,7 @@ class PaymentServicesTests(SimpleTestCase):
 	@patch('payment.services.process_multiple_payments')
 	def test_process_payment_request_routes_to_multiple(self, process_multiple_mock):
 		process_multiple_mock.return_value = ({'success': True}, 200)
-		order = SimpleNamespace(total_amount=Decimal('100.00'))
+		order = SimpleNamespace(total_amount=Decimal('100.00'), type='contado')
 		user = SimpleNamespace(id=1)
 		data = {
 			'payments': [{'amount': '100.00', 'payment_method': 'cash'}],
@@ -64,7 +64,7 @@ class PaymentServicesTests(SimpleTestCase):
 	@patch('payment.services.process_legacy_payment')
 	def test_process_payment_request_routes_to_legacy(self, process_legacy_mock):
 		process_legacy_mock.return_value = ({'success': True}, 200)
-		order = SimpleNamespace(total_amount=Decimal('100.00'))
+		order = SimpleNamespace(total_amount=Decimal('100.00'), type='contado')
 		user = SimpleNamespace(id=1)
 		data = {'payment_method': 'cash', 'amount': '100.00'}
 
@@ -76,6 +76,17 @@ class PaymentServicesTests(SimpleTestCase):
 			data=data,
 			request_user=user,
 		)
+
+	@patch('payment.services._process_credit_order_flow')
+	def test_process_payment_request_routes_credit_orders(self, credit_flow_mock):
+		credit_flow_mock.return_value = ({'success': True, 'order_pending_credit': True}, 200)
+		order = SimpleNamespace(total_amount=Decimal('100.00'), type='credito')
+		user = SimpleNamespace(id=1)
+
+		result = services.process_payment_request(order=order, data={}, request_user=user)
+
+		self.assertEqual(result, ({'success': True, 'order_pending_credit': True}, 200))
+		credit_flow_mock.assert_called_once_with(order=order, data={}, request_user=user)
 
 class PaymentViewsIntegrationTests(TestCase):
 	def setUp(self):
@@ -116,12 +127,7 @@ class PaymentViewsIntegrationTests(TestCase):
 
 	@patch('payment.services.Payment')
 	def test_process_single_payment_uses_explicit_accounting_flow(self, payment_cls_mock):
-		client = SimpleNamespace(
-			balance=Decimal('100.00'),
-			can_use_credit_for_payment=lambda: True,
-			requires_note_for_credit_payment=lambda: False,
-			validate_credit_payment=lambda amount, note: {'success': True},
-		)
+		client = SimpleNamespace(balance=Decimal('100.00'))
 		order = SimpleNamespace(client=client)
 		user = SimpleNamespace(id=1)
 
@@ -139,5 +145,5 @@ class PaymentViewsIntegrationTests(TestCase):
 		self.assertEqual(payment, payment_instance)
 		payment_instance.save.assert_any_call(apply_accounting=False)
 		payment_instance.apply_accounting_side_effects.assert_called_once()
-		payment_instance.save.assert_any_call(update_fields=['balance_used', 'credit_used', 'updated_at'], apply_accounting=False)
+		payment_instance.save.assert_any_call(update_fields=['balance_used', 'updated_at'], apply_accounting=False)
 		payment_instance.link_pending_transaction_references.assert_called_once()

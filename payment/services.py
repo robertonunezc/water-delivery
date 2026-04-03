@@ -10,12 +10,28 @@ from orders.models import Order, OrderStatus
 from .models import Payment
 
 
+VALID_SETTLEMENT_METHODS = {
+    'credit_card',
+    'debit_card',
+    'cash',
+    'balance',
+    'paypal',
+    'bank_transfer',
+}
+
+
 def process_payment_request(
     order: Order,
     data: dict,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process a payment request payload in either multi or legacy format."""
+    requested_type = data.get('order_type')
+    _apply_order_type(order=order, requested_type=requested_type)
+
+    if order.type == 'credito':
+        return _process_credit_order_flow(order=order, data=data, request_user=request_user)
+
     payments_data = data.get('payments')
     cantidad_cobrada = data.get('cantidad_cobrada')
 
@@ -42,27 +58,17 @@ def process_single_payment(
     credit_note: Optional[str] = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Process and persist one payment for an order."""
+    if payment_method not in VALID_SETTLEMENT_METHODS:
+        return None, {
+            'error': 'Método de pago inválido para este flujo.'
+        }
+
     client = order.client
 
     if payment_method == 'balance' and client.balance < amount:
         return None, {
             'error': f'Saldo insuficiente. Disponible: ${client.balance:.2f}, Requerido: ${amount:.2f}'
         }
-
-    if payment_method == 'credit':
-        if not client.can_use_credit_for_payment():
-            return None, {
-                'error': 'Este cliente no puede usar crédito para pagos en este momento.'
-            }
-
-        if client.requires_note_for_credit_payment() and (not credit_note or not credit_note.strip()):
-            return None, {
-                'error': 'Se requiere una nota para pagos con crédito para este cliente.'
-            }
-
-        validation_result = client.validate_credit_payment(amount, credit_note)
-        if not validation_result['success']:
-            return None, {'error': validation_result['error']}
 
     payment = Payment(
         amount=amount,
@@ -72,15 +78,12 @@ def process_single_payment(
         created_by=request_user,
     )
 
-    if payment_method == 'credit' and credit_note:
-        payment._credit_note = credit_note.strip()
-
     # Persist payment first, then apply accounting explicitly.
     with transaction.atomic():
         payment.save(apply_accounting=False)
         if payment.status == 'completed':
             payment.apply_accounting_side_effects()
-            payment.save(update_fields=['balance_used', 'credit_used', 'updated_at'], apply_accounting=False)
+            payment.save(update_fields=['balance_used', 'updated_at'], apply_accounting=False)
             payment.link_pending_transaction_references()
 
     return payment, None
@@ -258,3 +261,163 @@ def _append_cantidad_cobrada_response_fields(
         response_data['cantidad_cobrada'] = str(charged_amount_info['cantidad_cobrada'])
         response_data['new_client_balance'] = str(order.client.balance)
     return response_data
+
+
+def _apply_order_type(order: Order, requested_type: Optional[str]) -> None:
+    """Persist incoming order type when it changes in the checkout UI."""
+    if requested_type not in {'contado', 'credito'}:
+        return
+
+    if order.type != requested_type:
+        order.type = requested_type
+        order.save(update_fields=['type', 'updated_at'])
+
+
+def _process_credit_order_flow(
+    order: Order,
+    data: dict,
+    request_user: User,
+) -> tuple[dict, int]:
+    """Process credit-order lifecycle: debt registration and later settlement."""
+    pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').first()
+
+    payments_data = data.get('payments')
+    if pending_credit_payment and payments_data:
+        return _settle_pending_credit_order(
+            order=order,
+            payments_data=payments_data,
+            request_user=request_user,
+            pending_credit_payment=pending_credit_payment,
+        )
+
+    if pending_credit_payment:
+        return {
+            'success': True,
+            'order_pending_credit': True,
+            'message': 'La orden a crédito ya está registrada y pendiente de liquidación.',
+            'order_status': order.status,
+        }, 200
+
+    return _register_credit_order_debt(order=order, request_user=request_user)
+
+
+def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict, int]:
+    """Create debt transaction and pending payment record for a credit order."""
+    existing_purchase = order.client.credit_transactions.filter(
+        reference_order=order,
+        transaction_type='purchase',
+    ).first()
+
+    with transaction.atomic():
+        pending_payment = Payment.objects.create(
+            amount=order.total_amount,
+            method='pending_credit',
+            client=order.client,
+            order=order,
+            status='pending',
+            created_by=request_user,
+            apply_accounting=False,
+        )
+
+        if not existing_purchase:
+            result = balance_service.add_debt(
+                client=order.client,
+                amount=order.total_amount,
+                transaction_type='purchase',
+                user=request_user,
+                reference_order=order,
+                reference_payment=pending_payment,
+                notes=f'Pedido #{order.id} registrado a crédito y pendiente de pago',
+            )
+            if not result:
+                return {
+                    'error': 'No se pudo registrar la deuda para esta orden a crédito.',
+                }, 400
+
+        if order.status != OrderStatus.PENDING.value:
+            order.status = OrderStatus.PENDING.value
+            order.save(update_fields=['status', 'updated_at'])
+
+    return {
+        'success': True,
+        'order_pending_credit': True,
+        'message': 'Orden a crédito registrada. Queda pendiente de pago.',
+        'order_status': order.status,
+    }, 200
+
+
+def _settle_pending_credit_order(
+    order: Order,
+    payments_data: list,
+    request_user: User,
+    pending_credit_payment: Payment,
+) -> tuple[dict, int]:
+    """Settle an existing pending credit order and close associated debt."""
+    if not payments_data:
+        return {'error': 'No payments provided'}, 400
+
+    order_total = Decimal(str(order.total_amount))
+    total_payment_amount = Decimal('0.00')
+    for payment_item in payments_data:
+        if 'amount' not in payment_item or 'payment_method' not in payment_item:
+            return {'error': 'Cada transaccion de pago debe tener un metodo de pago asignado'}, 400
+        total_payment_amount += Decimal(str(payment_item['amount']))
+
+    if total_payment_amount != order_total:
+        return {
+            'error': (
+                f'La suma de los pagos (${total_payment_amount:.2f}) debe ser igual '
+                f'al total de la orden (${order_total:.2f})'
+            )
+        }, 400
+
+    created_payments = []
+    for payment_item in payments_data:
+        amount = Decimal(str(payment_item['amount']))
+        if amount <= 0:
+            continue
+
+        payment, error = process_single_payment(
+            order=order,
+            payment_method=payment_item['payment_method'],
+            amount=amount,
+            request_user=request_user,
+        )
+        if error:
+            return error, 400
+
+        paid_amount = balance_service.pay_debt(
+            client=order.client,
+            amount=amount,
+            transaction_type='payment',
+            user=request_user,
+            reference_order=order,
+            reference_payment=payment,
+            notes=f'Liquidación de orden a crédito #{order.id}',
+        )
+        if paid_amount <= 0:
+            return {
+                'error': 'No se pudo aplicar el pago a la deuda del cliente.'
+            }, 400
+
+        created_payments.append({
+            'payment_id': payment.id,
+            'amount': str(payment.amount),
+            'method': payment.get_method_display(),
+            'method_code': payment.method,
+        })
+
+    with transaction.atomic():
+        pending_credit_payment.status = 'completed'
+        pending_credit_payment.save(update_fields=['status', 'updated_at'], apply_accounting=False)
+
+        order.status = OrderStatus.COMPLETED.value
+        order.save(update_fields=['status', 'updated_at'])
+
+    return {
+        'success': True,
+        'payments': created_payments,
+        'order_total': str(order.total_amount),
+        'payment_count': len(created_payments),
+        'credit_order_settled': True,
+    }, 200

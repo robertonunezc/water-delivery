@@ -4,9 +4,8 @@ class PageConfig {
     this.orderId = root.dataset.orderId;
     this.cancelOrderUrl = root.dataset.cancelOrderUrl || '';
     this.clientBalance = parseFloat(root.dataset.clientBalance) || 0;
-    this.clientAvailableCredit = parseFloat(root.dataset.clientAvailableCredit) || 0;
-    this.canUseCredit = root.dataset.canUseCredit === 'true';
-    this.requiresCreditNote = root.dataset.requiresCreditNote === 'true';
+    this.orderType = root.dataset.orderType || 'contado';
+    this.hasPendingCreditPayment = root.dataset.hasPendingCreditPayment === 'true';
     this.csrfToken = root.dataset.csrfToken;
     this.initialBreakdown = this.parseJSON(root.dataset.initialBreakdown) || null;
     this.initialOrderTotal = parseFloat(root.dataset.initialOrderTotal) || 0;
@@ -146,78 +145,31 @@ class AffordabilityStatusManager {
     if (!this.statusElement) return;
 
     const total = parseFloat(orderTotal.toString().replace(/[^\d.-]/g, '')) || 0;
-    const { clientBalance, clientAvailableCredit, canUseCredit, requiresCreditNote } = this.config;
+    const { clientBalance } = this.config;
 
     if (total === 0) {
       this.statusElement.innerHTML = '';
       return;
     }
 
-    const effectiveCredit = canUseCredit ? clientAvailableCredit : 0;
-    const effectivePurchasingPower = clientBalance + effectiveCredit;
-
-    if (total <= effectivePurchasingPower) {
-      if (total <= clientBalance) {
-        this.statusElement.innerHTML = `
-          <div class="badge bg-success">
-            <i class="fas fa-check-circle me-1"></i>
-            Puede pagar con saldo
-          </div>
-        `;
-        this.enableBalanceOption(true);
-      } else if (total <= clientAvailableCredit && canUseCredit) {
-        const noteText = requiresCreditNote ? ' (Requiere nota)' : '';
-        this.statusElement.innerHTML = `
-          <div class="badge bg-info">
-            <i class="fas fa-credit-card me-1"></i>
-            Puede pagar con crédito${noteText}
-          </div>
-        `;
-      } else if (canUseCredit) {
-        const creditNeeded = total - clientBalance;
-        const noteText = requiresCreditNote ? ' (Requiere nota)' : '';
-        this.statusElement.innerHTML = `
-          <div class="badge bg-warning">
-            <i class="fas fa-calculator me-1"></i>
-            Pago mixto necesario${noteText}<br>
-            <small>Saldo: $${clientBalance.toFixed(2)} + Crédito: $${creditNeeded.toFixed(2)}</small>
-          </div>
-        `;
-      } else {
-        this.statusElement.innerHTML = `
-          <div class="badge bg-success">
-            <i class="fas fa-check-circle me-1"></i>
-            Puede pagar con saldo
-          </div>
-        `;
-      }
-
-      this.updateCreditOption(total);
+    if (total <= clientBalance) {
+      this.statusElement.innerHTML = `
+        <div class="badge bg-success">
+          <i class="fas fa-check-circle me-1"></i>
+          Puede pagar con saldo
+        </div>
+      `;
+      this.enableBalanceOption(true);
     } else {
-      const shortfall = total - effectivePurchasingPower;
-      const creditStatus = canUseCredit ? 'disponible (excederá límite)' : 'no disponible';
-
-      if (canUseCredit) {
-        const noteText = requiresCreditNote ? ' - Requiere nota' : '';
-        this.statusElement.innerHTML = `
-          <div class="badge bg-warning">
-            <i class="fas fa-exclamation-triangle me-1"></i>
-            Excederá límite de crédito<br>
-            <small>Crédito disponible para uso${noteText}</small>
-          </div>
-        `;
-      } else {
-        this.statusElement.innerHTML = `
-          <div class="badge bg-danger">
-            <i class="fas fa-exclamation-triangle me-1"></i>
-            Fondos insuficientes<br>
-            <small>Falta: $${shortfall.toFixed(2)} (Crédito ${creditStatus})</small>
-          </div>
-        `;
-      }
-
+      const shortfall = total - clientBalance;
+      this.statusElement.innerHTML = `
+        <div class="badge bg-warning">
+          <i class="fas fa-info-circle me-1"></i>
+          Requiere otro método<br>
+          <small>Falta cubrir: $${shortfall.toFixed(2)}</small>
+        </div>
+      `;
       this.disableBalanceOption();
-      this.updateCreditOption(total);
     }
   }
 
@@ -237,23 +189,6 @@ class AffordabilityStatusManager {
       if (option) {
         option.disabled = true;
         option.textContent = 'Saldo (Insuficiente)';
-      }
-    });
-  }
-
-  updateCreditOption(total) {
-    this.paymentMethodSelects.forEach(select => {
-      const creditOption = select.querySelector('option[value="credit"]');
-      if (!creditOption) return;
-
-      if (this.config.canUseCredit) {
-        creditOption.disabled = false;
-        const hasLimit = total <= this.config.clientAvailableCredit;
-        const noteText = this.config.requiresCreditNote ? ' (Requiere nota)' : '';
-        creditOption.textContent = hasLimit ? `Crédito (Suficiente)${noteText}` : 'Crédito (Insuficiente solo)';
-      } else {
-        creditOption.disabled = true;
-        creditOption.textContent = 'Crédito (No disponible)';
       }
     });
   }
@@ -278,7 +213,6 @@ class PaymentBreakdownManager {
     this.remainingAmount = document.getElementById('remaining-payment-amount');
     this.fullPaymentAmount = document.getElementById('full-payment-amount');
     this.secondaryPaymentMethod = document.getElementById('secondary-payment-method');
-    this.secondaryCreditNoteField = document.getElementById('secondary-credit-note-field');
   }
 
   setBreakdown(breakdown) {
@@ -326,7 +260,6 @@ class PaymentBreakdownManager {
             <strong class="text-warning">${breakdown.message}</strong>
           `;
         }
-        this.toggleSecondaryCreditNoteField();
       }
     } else {
       if (this.noBalanceSection) {
@@ -348,109 +281,6 @@ class PaymentBreakdownManager {
     if (this.remainingSection) this.remainingSection.style.display = 'none';
     if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
     if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'none';
-  }
-
-  toggleSecondaryCreditNoteField() {
-    if (!this.secondaryPaymentMethod || !this.secondaryCreditNoteField) return;
-    const shouldShow = this.secondaryPaymentMethod.value === 'credit' && this.config.requiresCreditNote;
-    this.secondaryCreditNoteField.style.display = shouldShow ? 'block' : 'none';
-  }
-}
-
-class CreditNoteManager {
-  constructor(config) {
-    this.config = config;
-    this.creditNoteField = document.getElementById('credit-note-field');
-    this.creditNoteFieldMobile = document.getElementById('credit-note-field-mobile');
-    this.creditNoteInput = document.getElementById('credit_note');
-    this.creditNoteInputMobile = document.getElementById('credit_note_mobile');
-    this.secondaryPaymentMethod = document.getElementById('secondary-payment-method');
-    this.secondaryCreditNoteInput = document.getElementById('secondary_credit_note');
-  }
-
-  init() {
-    this.bindPaymentMethodSync();
-    this.bindCreditNoteValidation();
-    this.bindSecondaryCreditNote();
-    const desktop = document.getElementById('payment-method-select');
-    const mobile = document.getElementById('payment-method-select-mobile');
-    const initialMethod = desktop?.value || mobile?.value || '';
-    if (initialMethod) this.toggleCreditNoteField(initialMethod);
-  }
-
-  bindPaymentMethodSync() {
-    const desktop = document.getElementById('payment-method-select');
-    const mobile = document.getElementById('payment-method-select-mobile');
-
-    desktop?.addEventListener('change', () => {
-      if (mobile) mobile.value = desktop.value;
-      this.toggleCreditNoteField(desktop.value);
-    });
-
-    mobile?.addEventListener('change', () => {
-      if (desktop) desktop.value = mobile.value;
-      this.toggleCreditNoteField(mobile.value);
-    });
-  }
-
-  bindCreditNoteValidation() {
-    this.creditNoteInput?.addEventListener('input', () => {
-      this.validateCreditNote(this.creditNoteInput);
-      this.syncCreditNoteValues(this.creditNoteInput, this.creditNoteInputMobile);
-    });
-    this.creditNoteInput?.addEventListener('blur', () => this.validateCreditNote(this.creditNoteInput));
-
-    this.creditNoteInputMobile?.addEventListener('input', () => {
-      this.validateCreditNote(this.creditNoteInputMobile);
-      this.syncCreditNoteValues(this.creditNoteInputMobile, this.creditNoteInput);
-    });
-    this.creditNoteInputMobile?.addEventListener('blur', () => this.validateCreditNote(this.creditNoteInputMobile));
-  }
-
-  bindSecondaryCreditNote() {
-    this.secondaryPaymentMethod?.addEventListener('change', () => this.toggleSecondaryCreditNoteField());
-    this.toggleSecondaryCreditNoteField();
-  }
-
-  toggleCreditNoteField(paymentMethod) {
-    const shouldShow = paymentMethod === 'credit' && this.config.requiresCreditNote;
-
-    if (this.creditNoteField) this.creditNoteField.style.display = shouldShow ? 'block' : 'none';
-    if (this.creditNoteFieldMobile) this.creditNoteFieldMobile.style.display = shouldShow ? 'block' : 'none';
-
-    this.setRequired(this.creditNoteInput, shouldShow);
-    this.setRequired(this.creditNoteInputMobile, shouldShow);
-  }
-
-  toggleSecondaryCreditNoteField() {
-    const shouldShow = this.secondaryPaymentMethod?.value === 'credit' && this.config.requiresCreditNote;
-    const field = document.getElementById('secondary-credit-note-field');
-    if (field) field.style.display = shouldShow ? 'block' : 'none';
-    this.setRequired(this.secondaryCreditNoteInput, shouldShow);
-  }
-
-  setRequired(input, required) {
-    if (!input) return;
-    input.required = required;
-    if (!required) {
-      input.value = '';
-      input.classList.remove('is-invalid', 'is-valid');
-    }
-  }
-
-  validateCreditNote(input) {
-    if (!input || !input.required) return true;
-    const isValid = input.value.trim().length > 0;
-    input.classList.toggle('is-invalid', !isValid);
-    input.classList.toggle('is-valid', isValid);
-    return isValid;
-  }
-
-  syncCreditNoteValues(source, target) {
-    if (target && source.value !== target.value) {
-      target.value = source.value;
-      this.validateCreditNote(target);
-    }
   }
 }
 
@@ -847,21 +677,81 @@ class QuantityController {
 }
 
 class PaymentController {
-  constructor(config, api, alertManager, paymentBreakdown, amountManager, creditNoteManager, discountManager) {
+  constructor(config, api, alertManager, paymentBreakdown, amountManager, discountManager) {
     this.config = config;
     this.api = api;
     this.alertManager = alertManager;
     this.paymentBreakdown = paymentBreakdown;
     this.amountManager = amountManager;
-    this.creditNoteManager = creditNoteManager;
     this.discountManager = discountManager;
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
   }
 
   init() {
+    this.bindOrderTypeSync();
+    this.configureOrderTypeUI();
     this.finishButton?.addEventListener('click', () => this.handleFinish());
     this.finishButtonMobile?.addEventListener('click', () => this.handleFinish());
+  }
+
+  bindOrderTypeSync() {
+    const desktop = document.getElementById('order-type-select');
+    const mobile = document.getElementById('order-type-select-mobile');
+
+    desktop?.addEventListener('change', () => {
+      if (mobile) mobile.value = desktop.value;
+      this.config.orderType = desktop.value;
+      this.configureOrderTypeUI();
+    });
+
+    mobile?.addEventListener('change', () => {
+      if (desktop) desktop.value = mobile.value;
+      this.config.orderType = mobile.value;
+      this.configureOrderTypeUI();
+    });
+  }
+
+  configureOrderTypeUI() {
+    const orderType = this.getOrderType();
+    const paymentMethodDesktop = document.getElementById('payment-method-select');
+    const paymentMethodMobile = document.getElementById('payment-method-select-mobile');
+    const orderTypeDesktop = document.getElementById('order-type-select');
+    const orderTypeMobile = document.getElementById('order-type-select-mobile');
+    const cantidadCobradaDesktop = document.getElementById('cantidad_cobrada');
+    const cantidadCobradaMobile = document.getElementById('cantidad_cobrada_mobile');
+    const paymentBreakdownCard = document.getElementById('payment-breakdown-card');
+    const helpText = document.getElementById('order-type-help-text');
+
+    const isCreditRegistration = orderType === 'credito' && !this.config.hasPendingCreditPayment;
+    const isCreditSettlement = orderType === 'credito' && this.config.hasPendingCreditPayment;
+
+    if (orderTypeDesktop) orderTypeDesktop.disabled = isCreditSettlement;
+    if (orderTypeMobile) orderTypeMobile.disabled = isCreditSettlement;
+
+    if (paymentMethodDesktop) paymentMethodDesktop.disabled = isCreditRegistration;
+    if (paymentMethodMobile) paymentMethodMobile.disabled = isCreditRegistration;
+    if (cantidadCobradaDesktop) cantidadCobradaDesktop.disabled = isCreditRegistration;
+    if (cantidadCobradaMobile) cantidadCobradaMobile.disabled = isCreditRegistration;
+    if (paymentBreakdownCard) paymentBreakdownCard.style.display = isCreditRegistration ? 'none' : 'block';
+
+    if (helpText) {
+      helpText.textContent = isCreditRegistration
+        ? 'Al terminar, se registrará deuda y la orden quedará pendiente hasta liquidarse.'
+        : 'Las órdenes a crédito registran deuda y quedan pendientes hasta liquidarse.';
+    }
+
+    if (this.finishButton) {
+      this.finishButton.innerHTML = isCreditRegistration
+        ? '<i class="fas fa-hourglass-half me-2"></i>Registrar Como Pendiente'
+        : '<i class="fas fa-check-circle me-2"></i>Terminar Pedido';
+    }
+
+    if (this.finishButtonMobile) {
+      this.finishButtonMobile.innerHTML = isCreditRegistration
+        ? '<i class="fas fa-hourglass-half me-2"></i>Pendiente'
+        : '<i class="fas fa-check-circle me-2"></i>Terminar';
+    }
   }
 
   getOrderTotal() {
@@ -878,6 +768,14 @@ class PaymentController {
     return '';
   }
 
+  getOrderType() {
+    const desktop = document.getElementById('order-type-select');
+    const mobile = document.getElementById('order-type-select-mobile');
+    if (desktop?.value) return desktop.value;
+    if (mobile?.value) return mobile.value;
+    return this.config.orderType || 'contado';
+  }
+
   buildPayments(orderTotal) {
     const payments = [];
     const breakdown = this.paymentBreakdown.getBreakdown();
@@ -892,21 +790,7 @@ class PaymentController {
       if (remainingAmount > 0) {
         const secondaryPaymentSelect = document.getElementById('secondary-payment-method');
         const method = secondaryPaymentSelect?.value || 'cash';
-        if (method === 'credit' && !this.config.canUseCredit) {
-          this.alertManager.show('warning', 'Atención', 'Este cliente no puede usar crédito para pagos.');
-          return null;
-        }
-        if (method === 'credit' && this.config.requiresCreditNote) {
-          const noteInput = document.getElementById('secondary_credit_note');
-          if (!noteInput?.value.trim()) {
-            this.alertManager.show('warning', 'Atención', 'Se requiere una nota para pagos con crédito.');
-            noteInput?.focus();
-            return null;
-          }
-          payments.push({ amount: remainingAmount, payment_method: method, credit_note: noteInput.value.trim() });
-        } else {
           payments.push({ amount: remainingAmount, payment_method: method });
-        }
       }
     } else {
       const method = this.getPaymentMethod();
@@ -915,32 +799,10 @@ class PaymentController {
         return null;
       }
 
-      if (method === 'credit' && !this.config.canUseCredit) {
-        this.alertManager.show('warning', 'Atención', 'Este cliente no puede usar crédito para pagos.');
-        return null;
-      }
-
-      if (method === 'credit' && this.config.requiresCreditNote) {
-        const note = this.getCreditNoteValue();
-        if (!note) {
-          this.alertManager.show('warning', 'Atención', 'Se requiere una nota para pagos con crédito.');
-          return null;
-        }
-        payments.push({ amount: orderTotal, payment_method: method, credit_note: note });
-      } else {
-        payments.push({ amount: orderTotal, payment_method: method });
-      }
+      payments.push({ amount: orderTotal, payment_method: method });
     }
 
     return payments;
-  }
-
-  getCreditNoteValue() {
-    const desktop = document.getElementById('credit_note');
-    const mobile = document.getElementById('credit_note_mobile');
-    if (desktop?.value.trim()) return desktop.value.trim();
-    if (mobile?.value.trim()) return mobile.value.trim();
-    return '';
   }
 
   disableButtons() {
@@ -972,11 +834,35 @@ class PaymentController {
       return;
     }
 
+    const orderType = this.getOrderType();
+
+    if (orderType === 'credito' && !this.config.hasPendingCreditPayment) {
+      const payload = {
+        order_id: this.config.orderId,
+        order_type: 'credito'
+      };
+
+      try {
+        this.disableButtons();
+        const data = await this.api.submitPayment(payload);
+        if (data.success) {
+          this.handleCreditOrderPendingSuccess(data);
+        } else {
+          throw new Error(data.error || 'Error al registrar orden a crédito');
+        }
+      } catch (error) {
+        this.enableButtons();
+        this.alertManager.show('danger', 'Error', `No se pudo registrar la orden a crédito. ${error.message}`);
+        console.error('Credit order registration error', error);
+      }
+      return;
+    }
+
     const payments = this.buildPayments(orderTotal);
     if (!payments) return;
 
     const cantidadCobrada = this.getCantidadCobrada();
-    const payload = { order_id: this.config.orderId, payments };
+    const payload = { order_id: this.config.orderId, order_type: orderType, payments };
     if (cantidadCobrada !== null && cantidadCobrada > 0) payload.cantidad_cobrada = cantidadCobrada;
 
     try {
@@ -1032,6 +918,14 @@ class PaymentController {
     }, 3000);
   }
 
+  handleCreditOrderPendingSuccess(data) {
+    const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
+    this.alertManager.show('success', 'Orden a crédito', message, 6000);
+    setTimeout(() => {
+      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+    }, 2000);
+  }
+
   markCompleted() {
     if (this.finishButton) {
       this.finishButton.innerHTML = '✓ Pedido Completado';
@@ -1056,7 +950,6 @@ class OrderPageApp {
     this.alertManager = new AlertManager();
     this.affordabilityStatusManager = new AffordabilityStatusManager(this.config);
     this.paymentBreakdownManager = new PaymentBreakdownManager(this.config);
-    this.creditNoteManager = new CreditNoteManager(this.config);
     this.summaryManager = new OrderSummaryManager();
     this.amountFieldManager = new AmountFieldManager();
     this.api = new OrderApi(this.config);
@@ -1079,7 +972,6 @@ class OrderPageApp {
       this.alertManager,
       this.paymentBreakdownManager,
       this.amountFieldManager,
-      this.creditNoteManager,
       this.discountManager
     );
   }
@@ -1090,7 +982,6 @@ class OrderPageApp {
     if (this.config.initialDiscount) {
       this.discountManager.setAmount(this.config.initialDiscount);
     }
-    this.creditNoteManager.init();
     this.quantityController.init();
     this.paymentController.init();
     const startingTotal = this.config.initialOrderTotal || this.getCurrentOrderTotal();

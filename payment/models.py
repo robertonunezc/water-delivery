@@ -9,7 +9,7 @@ PAYMENT_METHOD_CHOICES = [
     ('cash', 'Efectivo'),
     ('balance', 'Saldo'),
     ('paypal', 'PayPal'),
-    ('credit', 'Crédito'),
+    ('pending_credit', 'Crédito Pendiente'),
     ('bank_transfer', 'Transferencia Bancaria'),
 ]
 PAYMENT_STATUS_CHOICES = [
@@ -32,8 +32,6 @@ class Payment(TimeStampedModel):
     # Audit field
     created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
     
-    # Temporary field to hold credit note during payment processing (not stored in DB)
-    _credit_note = None
     def status_display(self):
         return dict(PAYMENT_STATUS_CHOICES).get(self.status, 'Desconocido')
     def get_method_display(self):
@@ -52,29 +50,6 @@ class Payment(TimeStampedModel):
                         f"Monto requerido: ${self.amount:.2f}"
                     )
         
-        elif self.method == 'credit':
-            # For credit payments, use client's validation method
-            if not self.pk:  # Only validate on creation, not updates
-                # Note: We can't validate the note requirement here since we don't have access to it
-                # The note validation should be done at the view level before creating the payment
-                if not self.client.can_use_credit_for_payment():
-                    raise ValidationError(
-                        "Este cliente no puede usar crédito para pagos en este momento."
-                    )
-                
-                # For clients that can pay with credit, allow payments even if they exceed the credit limit
-                # This enables negative credit balances when necessary
-                available_credit = self.client.get_available_credit()
-                if available_credit < self.amount:
-                    # Log a warning but allow the payment to proceed
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(
-                        f'Payment {self.amount} for client {self.client.id} ({self.client.name}) '
-                        f'exceeds available credit of ${available_credit:.2f}. '
-                        f'This will result in exceeding credit limit.'
-                    )
-
     def apply_accounting_side_effects(self):
         """Apply financial mutations based on payment method."""
         from clients.services import balance_service
@@ -97,31 +72,6 @@ class Payment(TimeStampedModel):
                 raise ValidationError("NO cuenta con saldo suficiente para el pago")
             self.balance_used = self.amount
 
-        elif self.method == 'credit':
-            credit_note = getattr(self, '_credit_note', None)
-            notes_text = f'Compra orden #{self.order.id if self.order else "N/A"} a crédito'
-            if credit_note:
-                notes_text += f'. {credit_note}'
-            result = balance_service.add_debt(
-                client=self.client,
-                amount=self.amount,
-                transaction_type='purchase',
-                user=self.created_by,
-                reference_order=self.order,
-                reference_payment=None,
-                notes=notes_text
-            )
-            if not result:
-                available_credit = self.client.get_available_credit()
-                can_use_credit = self.client.can_pay_with_credit
-                raise ValidationError(
-                    f"No se puede procesar el pago con crédito. "
-                    f"Cliente puede usar crédito: {can_use_credit}, "
-                    f"Crédito disponible: ${available_credit:.2f}, "
-                    f"Monto requerido: ${self.amount:.2f}"
-                )
-            self.credit_used = self.amount
-
     def link_pending_transaction_references(self):
         """Link balance/credit transactions created during accounting to this payment."""
         if not self.pk or self.status != 'completed':
@@ -138,19 +88,9 @@ class Payment(TimeStampedModel):
                 balance_tx.reference_payment = self
                 balance_tx.save()
 
-        elif self.method == 'credit':
-            credit_tx = self.client.credit_transactions.filter(
-                reference_order=self.order,
-                amount=self.amount,
-                transaction_type='purchase',
-                reference_payment__isnull=True
-            ).first()
-            if credit_tx:
-                credit_tx.reference_payment = self
-                credit_tx.save()
-    
+
     def save(self, *args, **kwargs):
-        """Custom save method to handle balance and credit payments"""
+        """Custom save method to handle payment accounting side effects."""
         apply_accounting = kwargs.pop('apply_accounting', True)
 
         is_new_payment = self.pk is None
@@ -166,7 +106,7 @@ class Payment(TimeStampedModel):
             self.link_pending_transaction_references()
     
     def reverse_payment(self, user=None, reason=''):
-        """Reverse the payment by restoring balance or reducing debt"""
+        """Reverse the payment by restoring balance when applicable."""
         from clients.services import balance_service
 
         if self.status != 'completed':
@@ -185,19 +125,6 @@ class Payment(TimeStampedModel):
             )
             self.balance_used = 0
 
-        elif self.method == 'credit' and self.credit_used > 0:
-            # Reduce client debt
-            balance_service.pay_debt(
-                client=self.client,
-                amount=self.credit_used,
-                transaction_type='adjustment',
-                user=user,
-                reference_order=self.order,
-                reference_payment=self,
-                notes=f'Reversión de compra a crédito #{self.id} - {reason}'
-            )
-            self.credit_used = 0
-
         self.status = 'failed'
         self.save()
         return True
@@ -212,7 +139,7 @@ class Payment(TimeStampedModel):
             'cash_amount': 0
         }
         
-        if self.method not in ['balance', 'credit']:
+        if self.method != 'balance':
             breakdown['cash_amount'] = self.amount
             
         return breakdown
