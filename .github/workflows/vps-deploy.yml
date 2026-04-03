@@ -183,6 +183,15 @@ jobs:
           # Verify key still exists
           ls -la ~/.ssh/id_rsa
           ssh -p "$PORT" -o StrictHostKeyChecking=yes -vvv -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}"@"$HOST" "echo 'SSH connection successful'"
+
+      - name: Sync production compose file
+        run: |
+          set -euxo pipefail
+          HOST="${{ secrets.EC2_HOST }}"
+          PORT="${SSH_PORT:-22}"
+          scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
+            docker-compose.prod.yml \
+            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/docker-compose.prod.yml"
           
       - name: Deploy to VPS
         run: |
@@ -192,6 +201,15 @@ jobs:
             set -euo pipefail
             echo "Deploying water-delivery application..."
             cd projects/water-delivery
+
+            echo "Validating docker-compose services..."
+            SERVICES=$(docker-compose -f docker-compose.prod.yml config --services)
+            echo "$SERVICES"
+            echo "$SERVICES" | grep -qx "web"
+            echo "$SERVICES" | grep -qx "celery-worker"
+            echo "$SERVICES" | grep -qx "celery-beat"
+            echo "$SERVICES" | grep -qx "postgres"
+            echo "$SERVICES" | grep -qx "redis"
             
             echo "Creating static and media directories..."
             mkdir -p staticfiles media
