@@ -3,8 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Max, Min, Sum, Avg, Subquery, OuterRef, Count
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.utils import timezone
+from django.http import HttpResponse
 from datetime import datetime, timedelta
 from decimal import Decimal
+import csv
 from django.contrib.auth.models import User
 from clients.models import Client, CreditTransaction
 from orders.models import Order, ORDER_STATUS_CHOICES
@@ -321,3 +323,72 @@ def today(request):
         'today': today,
         'stats': stats
     })
+
+
+@login_required
+def today_csv(request):
+    """
+    Download today's orders report as CSV format.
+    Includes summary statistics and detailed order information
+    by payment method.
+    """
+    today = datetime.now().date()
+    owner = request.user
+    orders = Order.objects.today_orders(owner)
+    
+    # Calculate overall statistics
+    total_orders = orders.count()
+    total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
+
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="reporte_hoy_{today}.csv"'
+    
+    writer = csv.writer(response, delimiter=',', quoting=csv.QUOTE_ALL)
+    
+    # Write header section with summary statistics
+    writer.writerow(['Reporte de Órdenes del Día', today.strftime('%d/%m/%Y')])
+    writer.writerow([])  # Blank row
+    writer.writerow(['RESUMEN ESTADÍSTICO'])
+    writer.writerow(['Total de Órdenes', total_orders])
+    writer.writerow(['Monto Total', f'${total_amount:.2f}'])
+    writer.writerow(['Promedio por Orden', f'${avg_amount:.2f}'])
+    writer.writerow([])  # Blank row
+    
+    # Write detailed orders section
+    writer.writerow(['DETALLE DE ÓRDENES'])
+    writer.writerow([
+        'Orden #',
+        'Cliente',
+        'ID Externo',
+        'Método de Pago',
+        'Productos',
+        'Hora',
+        'Total'
+    ])
+    
+    # Write each order
+    for order in orders.prefetch_related('items__product', 'payments'):
+        # Get payment method
+        payment_method = 'N/A'
+        if order.payments.exists():
+            payment_method = order.payments.first().get_method_display()
+        
+        # Get products as comma-separated string
+        products = ', '.join([
+            f"{item.quantity}x {item.product.name}"
+            for item in order.items.all()
+        ]) if order.items.exists() else 'Sin productos'
+        
+        writer.writerow([
+            f'#{order.id}',
+            order.client.name,
+            order.client.external_id or '',
+            payment_method,
+            products,
+            order.order_date.strftime('%H:%M'),
+            f'${order.total_amount:.2f}'
+        ])
+    
+    return response
