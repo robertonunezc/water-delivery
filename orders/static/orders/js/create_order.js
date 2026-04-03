@@ -723,17 +723,33 @@ class PaymentController {
     const paymentBreakdownCard = document.getElementById('payment-breakdown-card');
     const helpText = document.getElementById('order-type-help-text');
 
-    const isCreditRegistration = orderType === 'credito' && !this.config.hasPendingCreditPayment;
-    const isCreditSettlement = orderType === 'credito' && this.config.hasPendingCreditPayment;
+    const isCredit = orderType === 'credito';
+    const isCreditRegistration = isCredit && !this.config.hasPendingCreditPayment;
+    const isCreditSettlement = isCredit && this.config.hasPendingCreditPayment;
 
-    if (orderTypeDesktop) orderTypeDesktop.disabled = isCreditSettlement;
-    if (orderTypeMobile) orderTypeMobile.disabled = isCreditSettlement;
+    this.syncPaymentMethodSelectionForCredit(isCredit);
 
-    if (paymentMethodDesktop) paymentMethodDesktop.disabled = isCreditRegistration;
-    if (paymentMethodMobile) paymentMethodMobile.disabled = isCreditRegistration;
-    if (cantidadCobradaDesktop) cantidadCobradaDesktop.disabled = isCreditRegistration;
-    if (cantidadCobradaMobile) cantidadCobradaMobile.disabled = isCreditRegistration;
-    if (paymentBreakdownCard) paymentBreakdownCard.style.display = isCreditRegistration ? 'none' : 'block';
+    // Hide/show payment method containers
+    if (paymentMethodDesktop) {
+      const container = paymentMethodDesktop.closest('.mb-3');
+      if (container) container.style.display = isCredit ? 'none' : 'block';
+    }
+    if (paymentMethodMobile) {
+      const container = paymentMethodMobile.closest('.mb-3');
+      if (container) container.style.display = isCredit ? 'none' : 'block';
+    }
+
+    // Hide/show cantidad cobrada containers
+    if (cantidadCobradaDesktop) {
+      const container = cantidadCobradaDesktop.closest('.mb-3');
+      if (container) container.style.display = isCredit ? 'none' : 'block';
+    }
+    if (cantidadCobradaMobile) {
+      const container = cantidadCobradaMobile.closest('.mb-3');
+      if (container) container.style.display = isCredit ? 'none' : 'block';
+    }
+
+    if (paymentBreakdownCard) paymentBreakdownCard.style.display = isCredit ? 'none' : 'block';
 
     if (helpText) {
       helpText.textContent = isCreditRegistration
@@ -752,6 +768,34 @@ class PaymentController {
         ? '<i class="fas fa-hourglass-half me-2"></i>Pendiente'
         : '<i class="fas fa-check-circle me-2"></i>Terminar';
     }
+  }
+
+  syncPaymentMethodSelectionForCredit(isCredit) {
+    const selectIds = ['payment-method-select', 'payment-method-select-mobile'];
+
+    selectIds.forEach(selectId => {
+      const select = document.getElementById(selectId);
+      if (!select) return;
+
+      const placeholderValue = '__credit_no_payment__';
+      let placeholderOption = select.querySelector(`option[value="${placeholderValue}"]`);
+
+      if (isCredit) {
+        if (!placeholderOption) {
+          placeholderOption = document.createElement('option');
+          placeholderOption.value = placeholderValue;
+          placeholderOption.textContent = 'Sin metodo de pago (credito)';
+          select.prepend(placeholderOption);
+        }
+        select.value = placeholderValue;
+      } else if (placeholderOption) {
+        const wasSelected = select.value === placeholderValue;
+        placeholderOption.remove();
+        if (wasSelected && select.options.length > 0) {
+          select.selectedIndex = 0;
+        }
+      }
+    });
   }
 
   getOrderTotal() {
@@ -836,7 +880,7 @@ class PaymentController {
 
     const orderType = this.getOrderType();
 
-    if (orderType === 'credito' && !this.config.hasPendingCreditPayment) {
+    if (orderType === 'credito') {
       const payload = {
         order_id: this.config.orderId,
         order_type: 'credito'
@@ -914,7 +958,7 @@ class PaymentController {
     this.alertManager.show('success', 'Éxito', message, 8000);
     this.markCompleted();
     setTimeout(() => {
-      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      //window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
     }, 3000);
   }
 
@@ -922,7 +966,7 @@ class PaymentController {
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
     setTimeout(() => {
-      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      //window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
     }, 2000);
   }
 

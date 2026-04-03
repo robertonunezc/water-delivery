@@ -289,35 +289,36 @@ def _process_credit_order_flow(
             request_user=request_user,
             pending_credit_payment=pending_credit_payment,
         )
-
-    if pending_credit_payment:
-        return {
-            'success': True,
-            'order_pending_credit': True,
-            'message': 'La orden a crédito ya está registrada y pendiente de liquidación.',
-            'order_status': order.status,
-        }, 200
-
+    
     return _register_credit_order_debt(order=order, request_user=request_user)
 
 
 def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict, int]:
     """Create debt transaction and pending payment record for a credit order."""
+    existing_credit_payment = order.payments.filter(method='pending_credit').first()
+    if existing_credit_payment:
+        return {
+            'success': True,
+            'order_pending_credit': existing_credit_payment.status == 'pending',
+            'message': 'La orden a credito ya tiene un registro pendiente de liquidacion.',
+            'order_status': order.status,
+        }, 200
+
     existing_purchase = order.client.credit_transactions.filter(
         reference_order=order,
         transaction_type='purchase',
     ).first()
 
     with transaction.atomic():
-        pending_payment = Payment.objects.create(
+        pending_payment = Payment(
             amount=order.total_amount,
             method='pending_credit',
             client=order.client,
             order=order,
             status='pending',
             created_by=request_user,
-            apply_accounting=False,
         )
+        pending_payment.save(apply_accounting=False)
 
         if not existing_purchase:
             result = balance_service.add_debt(
@@ -334,8 +335,8 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
                     'error': 'No se pudo registrar la deuda para esta orden a crédito.',
                 }, 400
 
-        if order.status != OrderStatus.PENDING.value:
-            order.status = OrderStatus.PENDING.value
+        if order.status != OrderStatus.COMPLETED.value:
+            order.status = OrderStatus.COMPLETED.value
             order.save(update_fields=['status', 'updated_at'])
 
     return {
