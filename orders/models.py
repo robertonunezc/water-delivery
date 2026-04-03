@@ -120,7 +120,7 @@ class Order(TimeStampedModel):
     notes = models.TextField(blank=True, null=True)
     owner = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Descuento", help_text="Descuento aplicado a la orden (en la moneda del total)")
-    type = models.CharField(max_length=50, default='contado', choices=ORDER_TYPE_CHOICES, verbose_name="Tipo de Orden", help_text="Tipo de orden para diferenciar entre órdenes a credito y órdenes de contado")
+    type = models.CharField(max_length=50, default='contado', null=True, blank=True, choices=ORDER_TYPE_CHOICES, verbose_name="Tipo de Orden", help_text="Tipo de orden para diferenciar entre órdenes a credito y órdenes de contado")
     objects = OrderManager()
 
     class Meta:
