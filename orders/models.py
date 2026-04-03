@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django.db import models
-from django.db.models import Q
+from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from enum import Enum
 from django.utils import timezone
 
@@ -89,6 +92,31 @@ class OrderQuerySet(models.QuerySet):
 
         return qs
 
+    def with_payment_totals(self) -> 'OrderQuerySet':
+        """Annotate each order with the sum of its completed payments as `total_paid`."""
+        from payment.models import Payment
+
+        paid_subquery = (
+            Payment.objects.filter(order=OuterRef('pk'), status='completed')
+            .values('order')
+            .annotate(total=Sum('amount'))
+            .values('total')
+        )
+        return self.annotate(
+            total_paid=Coalesce(
+                Subquery(paid_subquery, output_field=DecimalField()),
+                Value(Decimal('0'), output_field=DecimalField()),
+            )
+        )
+
+    def paid(self) -> 'OrderQuerySet':
+        """Filter orders where total completed payments >= total_amount."""
+        return self.with_payment_totals().filter(total_paid__gte=F('total_amount'))
+
+    def unpaid(self) -> 'OrderQuerySet':
+        """Filter orders where total completed payments < total_amount."""
+        return self.with_payment_totals().filter(total_paid__lt=F('total_amount'))
+
 
 class OrderManager(models.Manager):
     """Custom manager for Order model"""
@@ -141,6 +169,19 @@ class Order(TimeStampedModel):
         """
         return self.get_status_display()
     
+    @property
+    def total_paid(self) -> Decimal:
+        """Sum of all completed payments. Uses prefetch cache when available."""
+        return sum(
+            (p.amount for p in self.payments.all() if p.status == 'completed'),
+            Decimal('0'),
+        )
+
+    @property
+    def is_paid(self) -> bool:
+        """True when total completed payments cover the order total."""
+        return self.total_paid >= self.total_amount
+
     def __str__(self):
         return f"Order {self.id} for {self.client.name} - {self.status} ({self.total_amount})"
 

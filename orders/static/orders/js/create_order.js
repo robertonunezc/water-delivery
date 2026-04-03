@@ -958,7 +958,7 @@ class PaymentController {
     this.alertManager.show('success', 'Éxito', message, 8000);
     this.markCompleted();
     setTimeout(() => {
-      //window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
     }, 3000);
   }
 
@@ -966,7 +966,7 @@ class PaymentController {
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
     setTimeout(() => {
-      //window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
     }, 2000);
   }
 

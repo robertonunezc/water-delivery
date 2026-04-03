@@ -193,14 +193,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         extra_context['order_stats'] = stats
         return super().changelist_view(request, extra_context)
     def payment_method(self, obj):
-        try:
-            from payment.models import Payment
-            payment = Payment.objects.filter(order=obj).first()
-            if payment:
-                return payment.get_method_display()
-            return 'Sin Definir'
-        except ImportError:
-            return 'N/A'
+        payment = next(iter(obj.payments.all()), None)
+        if payment:
+            return payment.get_method_display()
+        return 'Sin Definir'
     # --- Permission / visibility controls ---
     def is_super(self, request):
         return request.user and request.user.is_superuser
@@ -276,7 +272,8 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         ).prefetch_related(
             'items__product',
             'client__contacts',
-            'client__addresses'
+            'client__addresses',
+            'payments',
         )
     
     # Custom display methods
@@ -344,25 +341,11 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     products_summary.short_description = 'Productos'
     
     def payment_status(self, obj):
-        # Check if there are any payments for this order
-        try:
-            from payment.models import Payment
-            payments = Payment.objects.filter(order=obj)
-            if payments.exists():
-                total_paid = payments.aggregate(Sum('amount'))['amount__sum'] or 0
-                if total_paid >= obj.total_amount:
-                    return format_html(
-                        '<span style="color: #28a745; font-weight: bold;">✓ Pagado</span>'
-                    )
-                elif total_paid > 0:
-                    return format_html(
-                        '<span style="color: #ffc107; font-weight: bold;">⚠ Parcial</span>'
-                    )
-            return format_html(
-                '<span style="color: #dc3545; font-weight: bold;">✗ Pendiente</span>'
-            )
-        except ImportError:
-            return '-'
+        if obj.is_paid:
+            return format_html('<span style="color: #28a745; font-weight: bold;">✓ Pagado</span>')
+        if obj.total_paid > 0:
+            return format_html('<span style="color: #ffc107; font-weight: bold;">⚠ Parcial</span>')
+        return format_html('<span style="color: #dc3545; font-weight: bold;">✗ Pendiente</span>')
     payment_status.short_description = 'Pago'
     
     def billing_status(self, obj):
