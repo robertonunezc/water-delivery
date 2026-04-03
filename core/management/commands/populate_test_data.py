@@ -215,25 +215,24 @@ class Command(BaseCommand):
             "Mariscos Del Mar", "Pizzería Italia"
         ]
 
-        # Address data for variety
-        streets = [
-            "Av. Universidad", "Calle Hidalgo", "Blvd. Constitución", "Av. Tecnológico",
-            "Calle 5 de Febrero", "Av. Zaragoza", "Calle Corregidora", "Av. Bernardo Quintana",
-            "Calle Ezequiel Montes", "Blvd. Centro Sur", "Av. Revolución", "Calle Pino Suárez",
-            "Av. Las Américas", "Calle Madero", "Blvd. Juriquilla", "Av. Epigmenio González",
-        ]
-        localities = [
-            "Centro", "Jardines de Querétaro", "El Pueblito", "Juriquilla",
-            "San Pablo", "Carretas", "La Piedad", "Cimatario",
-        ]
-        municipalities = ["Querétaro", "Corregidora", "El Marqués", "Huimilpan"]
-
         # Contact name data
         first_names = ["Ana", "Miguel", "Laura", "José", "Carmen", "Francisco", "María", "Antonio",
                        "Patricia", "Roberto", "Alejandra", "Jorge", "Sofía", "Ricardo", "Gabriela"]
         last_names = ["García", "Martínez", "López", "Hernández", "González", "Rodríguez",
                       "Pérez", "Sánchez", "Ramírez", "Torres", "Flores", "Rivera", "Gómez"]
         positions = ["Gerente", "Encargado", "Recepcionista", "Administrador", "Compras", "Dueño"]
+        shared_address_data = {
+            'street': 'Av. Universidad',
+            'exterior_number': '123',
+            'interior_number': 'Local 1',
+            'locality': 'Centro',
+            'municipality': 'Querétaro',
+            'state': 'Querétaro',
+            'zip_code': '76000',
+            'country': 'México',
+            'reference': 'Cerca de la plaza principal',
+            'active': True,
+        }
 
         for i in range(count):
             name = client_names[i] if i < len(client_names) else f"Cliente Test {i + 1}"
@@ -253,25 +252,33 @@ class Command(BaseCommand):
             )
             clients.append(client)
 
+            delivery_address, delivery_created = Address.objects.get_or_create(
+                client=client,
+                type='delivery',
+                defaults=shared_address_data,
+            )
+
+            billing_defaults = {
+                'street': delivery_address.street,
+                'exterior_number': delivery_address.exterior_number,
+                'interior_number': delivery_address.interior_number,
+                'locality': delivery_address.locality,
+                'municipality': delivery_address.municipality,
+                'state': delivery_address.state,
+                'zip_code': delivery_address.zip_code,
+                'country': delivery_address.country,
+                'reference': delivery_address.reference,
+                'active': delivery_address.active,
+            }
+            _, billing_created = Address.objects.get_or_create(
+                client=client,
+                type='billing',
+                defaults=billing_defaults,
+            )
+
             if created:
                 self.stdout.write(self.style.SUCCESS(f"  ✓ Created client: {client.name}"))
-
-                # Create shipping address for each client
-                Address.objects.create(
-                    client=client,
-                    street=random.choice(streets),
-                    exterior_number=str(random.randint(1, 500)),
-                    interior_number=random.choice([None, str(random.randint(1, 20)), f"Local {random.randint(1, 10)}"]),
-                    locality=random.choice(localities),
-                    municipality=random.choice(municipalities),
-                    state='Querétaro',
-                    zip_code=f'76{random.randint(100, 999)}',
-                    country='México',
-                    reference=f'Cerca de {random.choice(["la plaza", "el parque", "la iglesia", "el mercado", "la escuela"])}',
-                    active=True,
-                    type='shipping',
-                )
-                self.stdout.write(f"    → Created shipping address")
+                self.stdout.write("    → Ensured delivery and billing addresses")
 
                 # Create 1-2 contacts for each client
                 num_contacts = random.randint(1, 2)
@@ -288,6 +295,8 @@ class Command(BaseCommand):
                 self.stdout.write(f"    → Created {num_contacts} contact(s)")
             else:
                 self.stdout.write(f"  - Client already exists: {client.name}")
+                if delivery_created or billing_created:
+                    self.stdout.write("    → Added missing delivery/billing address")
 
         return clients
 
@@ -303,20 +312,14 @@ class Command(BaseCommand):
                 'name': 'Garrafón',
                 'presentation': '20',
                 'unit_of_measure': 1,  # lt
-                'order': 1,
-                'quantity': 100,
-                'min_inventory': 20,
-                'max_inventory': 200,
+                
                 'category': category,
             },
             {
                 'name': 'Botella',
                 'presentation': '500',
                 'unit_of_measure': 2,  # ml
-                'order': 2,
-                'quantity': 500,
-                'min_inventory': 100,
-                'max_inventory': 1000,
+               
                 'category': category,
             },
         ]
@@ -474,7 +477,6 @@ class Command(BaseCommand):
                     defaults={
                         'sequence': seq,
                         'is_active': True,
-                        'frequency': 'weekly',
                         'notes': f'Asignado automáticamente - Secuencia {seq}',
                     }
                 )
