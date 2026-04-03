@@ -215,6 +215,50 @@ class PaymentBreakdownManager {
     this.secondaryPaymentMethod = document.getElementById('secondary-payment-method');
   }
 
+  calculateFallbackBreakdown(orderTotal) {
+    const total = parseFloat(orderTotal) || 0;
+    const availableBalance = parseFloat(this.config.clientBalance) || 0;
+
+    if (total <= 0) {
+      return {
+        use_balance: false,
+        balance_amount: '0.00',
+        remaining_amount: '0.00',
+        balance_covers_order: false,
+        message: ''
+      };
+    }
+
+    if (availableBalance <= 0) {
+      return {
+        use_balance: false,
+        balance_amount: '0.00',
+        remaining_amount: total.toFixed(2),
+        balance_covers_order: false,
+        message: 'Sin saldo disponible. Pago completo con otro método.'
+      };
+    }
+
+    if (availableBalance >= total) {
+      return {
+        use_balance: true,
+        balance_amount: total.toFixed(2),
+        remaining_amount: '0.00',
+        balance_covers_order: true,
+        message: `Pago completo con saldo disponible ($${total.toFixed(2)})`
+      };
+    }
+
+    const remaining = total - availableBalance;
+    return {
+      use_balance: true,
+      balance_amount: availableBalance.toFixed(2),
+      remaining_amount: remaining.toFixed(2),
+      balance_covers_order: false,
+      message: `Saldo: $${availableBalance.toFixed(2)} + Otro método: $${remaining.toFixed(2)}`
+    };
+  }
+
   setBreakdown(breakdown) {
     this.currentBreakdown = breakdown || this.currentBreakdown;
   }
@@ -1033,9 +1077,14 @@ class OrderPageApp {
     this.affordabilityStatusManager.update(startingTotal);
     this.updateSummaryTotals(startingTotal, this.config.initialDiscount, this.config.initialSubtotal);
 
-    if (this.config.initialBreakdown) {
-      this.paymentBreakdownManager.updateUI(this.config.initialBreakdown, this.config.initialOrderTotal);
-    }
+    const hasBalance = (parseFloat(this.config.clientBalance) || 0) > 0;
+    const serverBreakdown = this.config.initialBreakdown;
+    const shouldForceBalanceBreakdown = hasBalance && startingTotal > 0 && (!serverBreakdown || !serverBreakdown.use_balance);
+    const initialBreakdown = shouldForceBalanceBreakdown
+      ? this.paymentBreakdownManager.calculateFallbackBreakdown(startingTotal)
+      : (serverBreakdown || this.paymentBreakdownManager.calculateFallbackBreakdown(startingTotal));
+
+    this.paymentBreakdownManager.updateUI(initialBreakdown, startingTotal);
   }
 
   async handleDiscountChange(amount) {
