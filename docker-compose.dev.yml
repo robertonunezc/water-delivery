@@ -23,7 +23,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: redis_dev
+    container_name: water_delivery_redis_dev
     restart: unless-stopped
     env_file:
       - .env

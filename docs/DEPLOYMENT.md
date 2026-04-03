@@ -43,6 +43,29 @@ Troubleshooting:
 - If tasks do not start, confirm EC2 instances are `ACTIVE` in the ECS cluster and have the correct instance profile and IAM permissions.
 - For more verbose AWS CLI output, set `AWS_DEBUG=1` in the environment.
 
+VPS Docker Compose production commands
+
+If you deploy on a VPS with `docker-compose.prod.yml`, run this stack to include Celery:
+
+```bash
+docker-compose -f docker-compose.prod.yml pull web celery-worker celery-beat
+docker-compose -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
+docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.prod.yml logs -f celery-worker celery-beat
+```
+
+Required runtime variables in `/etc/water-delivery/.env`:
+- `REDIS_HOST`
+- `REDIS_PORT`
+- `REDIS_PASSWORD`
+- `POSTGRES_HOST`
+- `POSTGRES_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_USER`
+- `POSTGRES_PASSWORD`
+- `DJANGO_SECRET_KEY`
+
 Environment-specific Django settings
 - Set the `DJANGO_SETTINGS_MODULE` environment variable to select which Django settings module to use.
 

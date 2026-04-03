@@ -1,4 +1,4 @@
-.PHONY: help install migrate runserver test lint format clean shell collectstatic
+.PHONY: help install migrate runserver test lint format clean shell collectstatic celery-worker celery-beat
 
 help:
 	@echo "Available commands:"
@@ -11,6 +11,8 @@ help:
 	@echo "  clean        - Clean cache files"
 	@echo "  shell        - Open Django shell"
 	@echo "  collectstatic - Collect static files"
+	@echo "  celery-worker - Start Celery worker"
+	@echo "  celery-beat   - Start Celery beat scheduler"
 
 install:
 	pip install -r requirements.txt
@@ -42,3 +44,9 @@ shell:
 
 collectstatic:
 	python manage.py collectstatic --noinput
+
+celery-worker:
+	celery -A water_delivery worker -l info
+
+celery-beat:
+	celery -A water_delivery beat -l info

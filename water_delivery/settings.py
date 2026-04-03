@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from celery.schedules import crontab
 
 import os
 from dotenv import load_dotenv
@@ -71,8 +72,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'django_celery_beat',
-    # 'django_celery_results',
+    'django_celery_beat',
+    'django_celery_results',
     "crispy_forms",
     # Local apps
     'clients',
@@ -149,6 +150,45 @@ DATABASES = {
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
     }
+}
+
+
+def _build_redis_url(db: int) -> str:
+    host = os.environ.get('REDIS_HOST', 'localhost')
+    port = os.environ.get('REDIS_PORT', '6379')
+    password = os.environ.get('REDIS_PASSWORD', '').strip()
+
+    if password:
+        return f'redis://:{password}@{host}:{port}/{db}'
+    return f'redis://{host}:{port}/{db}'
+
+
+REDIS_BROKER_URL = os.environ.get('REDIS_BROKER_URL', _build_redis_url(db=0))
+REDIS_RESULT_BACKEND = os.environ.get('REDIS_RESULT_BACKEND', _build_redis_url(db=1))
+
+CELERY_BROKER_URL = REDIS_BROKER_URL
+CELERY_RESULT_BACKEND = REDIS_RESULT_BACKEND
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = 'America/Mexico_City'
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 30 * 60
+CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 4
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
+CELERY_RESULT_EXPIRES = 3600
+CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BEAT_SCHEDULE = {
+    'populate-billing-dates-monthly': {
+        'task': 'clients.populate_billing_dates',
+        'schedule': crontab(hour=0, minute=0, day_of_month=1),
+        'options': {
+            'expires': 3600,
+        },
+    },
 }
 
 

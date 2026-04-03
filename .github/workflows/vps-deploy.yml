@@ -197,13 +197,13 @@ jobs:
             mkdir -p staticfiles media
             
             # Pull immutable image
-            docker-compose -f docker-compose.prod.yml pull web
+            docker-compose -f docker-compose.prod.yml pull web celery-worker celery-beat
             
             echo "Stopping existing containers..."
             docker-compose -f docker-compose.prod.yml down
             
             echo "Building and starting containers..."
-            docker-compose -f docker-compose.prod.yml up -d
+            docker-compose -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
             
             echo "Collecting static files..."
             docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
