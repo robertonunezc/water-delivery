@@ -281,9 +281,8 @@ def today(request):
     The report will only show orders from the logged in user.
     """
     today = datetime.now().date()
-    print(today)
-    orders = Order.objects.filter(order_date__date=today, owner=request.user).select_related('client', 'owner').prefetch_related('items', 'payments')
-    print(orders)
+    owner = request.user
+    orders = Order.objects.today_orders(owner)
     # Calculate overall statistics
     total_orders = orders.count()
     total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')

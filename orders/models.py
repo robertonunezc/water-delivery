@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from enum import Enum
+from django.utils import timezone
 
 from core.models import TimeStampedModel
 
@@ -62,6 +63,27 @@ class OrderQuerySet(models.QuerySet):
 
         return qs.order_by('-order_date')
 
+    def today_orders(self, user=None):
+        """
+        Get orders from today, optionally filtered by user.
+
+        Args:
+            user: Optional User instance to filter by. If provided and user is not staff,
+                  only returns orders created by that user.
+
+        Returns:
+            QuerySet of today's orders with optimized prefetch/select_related
+        """
+        today = timezone.now().date()
+        qs = self.filter(order_date__date=today).select_related(
+            'client', 'owner'
+        ).prefetch_related('items', 'payments')
+
+        if user and not user.is_staff:
+            qs = qs.filter(owner=user)
+
+        return qs
+
 
 class OrderManager(models.Manager):
     """Custom manager for Order model"""
@@ -77,6 +99,9 @@ class OrderManager(models.Manager):
 
     def unbilled_for_client(self, client, exclude_order_id=None):
         return self.get_queryset().unbilled_for_client(client, exclude_order_id)
+
+    def today_orders(self, user=None):
+        return self.get_queryset().today_orders(user)
 
 
 # Create your models here.
