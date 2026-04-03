@@ -34,7 +34,7 @@ services:
     container_name: water_delivery_celery_worker_prod
     restart: unless-stopped
     env_file:
-      - /etc/water-delivery/.env
+      - /etc/water_delivery/.env
     environment:
       - ENV=prod
       - DEBUG=false
