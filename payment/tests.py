@@ -1,13 +1,16 @@
 from decimal import Decimal
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
+from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from clients.models import Client
 from orders.models import Order
+from payment.models import Payment
 from payment import services
 
 
@@ -147,3 +150,63 @@ class PaymentViewsIntegrationTests(TestCase):
 		payment_instance.apply_accounting_side_effects.assert_called_once()
 		payment_instance.save.assert_any_call(update_fields=['balance_used', 'updated_at'], apply_accounting=False)
 		payment_instance.link_pending_transaction_references.assert_called_once()
+
+
+class MigrateLegacyCreditOrdersCommandTests(TestCase):
+	def setUp(self):
+		self.customer = Client.objects.create(
+			name='Cliente Crédito',
+			credit_limit=Decimal('500.00'),
+		)
+
+	def test_command_migrates_single_legacy_credit_payment(self):
+		order = Order.objects.create(
+			client=self.customer,
+			total_amount=Decimal('120.00'),
+			type='contado',
+		)
+		payment = Payment(
+			amount=Decimal('120.00'),
+			method='credit',
+			status='completed',
+			client=self.customer,
+			order=order,
+		)
+		payment.save(apply_accounting=False)
+
+		stdout = StringIO()
+		call_command('migrate_legacy_credit_orders', '--apply', stdout=stdout)
+
+		order.refresh_from_db()
+		payment.refresh_from_db()
+
+		self.assertEqual(order.type, 'credito')
+		self.assertEqual(payment.method, 'pending_credit')
+		self.assertEqual(payment.status, 'pending')
+		self.assertIn('Orders migrated: 1', stdout.getvalue())
+
+	def test_command_dry_run_leaves_records_unchanged(self):
+		order = Order.objects.create(
+			client=self.customer,
+			total_amount=Decimal('80.00'),
+			type='contado',
+		)
+		payment = Payment(
+			amount=Decimal('80.00'),
+			method='credit',
+			status='completed',
+			client=self.customer,
+			order=order,
+		)
+		payment.save(apply_accounting=False)
+
+		stdout = StringIO()
+		call_command('migrate_legacy_credit_orders', stdout=stdout)
+
+		order.refresh_from_db()
+		payment.refresh_from_db()
+
+		self.assertEqual(order.type, 'contado')
+		self.assertEqual(payment.method, 'credit')
+		self.assertEqual(payment.status, 'completed')
+		self.assertIn('Dry run mode. No changes will be written.', stdout.getvalue())
