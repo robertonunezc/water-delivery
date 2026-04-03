@@ -7,7 +7,7 @@ services:
     container_name: water_delivery_web_prod
     restart: unless-stopped
     env_file:
-      - /etc/water-delivery/.env
+      - /etc/water_delivery/.env
     environment:
       - ENV=prod
       - DEBUG=false
@@ -35,14 +35,6 @@ services:
     restart: unless-stopped
     env_file:
       - /etc/water_delivery/.env
-    environment:
-      - ENV=prod
-      - DEBUG=false
-      - DJANGO_SETTINGS_MODULE=water_delivery.settings_production
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
     command: celery -A water_delivery worker -l info
     depends_on:
       - postgres
@@ -57,15 +49,8 @@ services:
     container_name: water_delivery_celery_beat_prod
     restart: unless-stopped
     env_file:
-      - /etc/water-delivery/.env
-    environment:
-      - ENV=prod
-      - DEBUG=false
-      - DJANGO_SETTINGS_MODULE=water_delivery.settings_production
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
+      - /etc/water_delivery/.env
+    
     command: celery -A water_delivery beat -l info
     depends_on:
       - postgres
@@ -80,7 +65,7 @@ services:
     container_name: water_delivery_postgres_prod
     restart: unless-stopped
     env_file:
-      - /etc/water-delivery/.env
+      - /etc/water_delivery/.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -103,7 +88,7 @@ services:
       - "service=redis"
     restart: unless-stopped
     env_file:
-      - /etc/water-delivery/.env
+      - /etc/water_delivery/.env
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
