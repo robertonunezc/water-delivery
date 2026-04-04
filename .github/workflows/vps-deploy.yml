@@ -192,18 +192,76 @@ jobs:
           scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             docker-compose.prod.yml \
             "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/docker-compose.prod.yml"
+
+          ssh -p "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
+            "${{ secrets.EC2_USER }}@$HOST" \
+            "mkdir -p projects/water-delivery/observability"
+
+          scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
+            observability/docker-compose.logging.yml \
+            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/observability/docker-compose.logging.yml"
           
       - name: Deploy to VPS
+        env:
+          POSTGRES_DB: ${{ secrets['POSTGRES_DB'] }}
+          POSTGRES_PASSWORD: ${{ secrets['POSTGRES_PASSWORD'] }}
+          POSTGRES_USER: ${{ secrets['POSTGRES_USER'] }}
+          REDIS_PASSWORD: ${{ secrets['REDIS_PASSWORD'] }}
+          GRAFANA_CLOUD_API_KEY: ${{ secrets['GRAFANA_CLOUD_API_KEY'] }}
+          GRAFANA_CLOUD_USER: ${{ secrets['GRAFANA_CLOUD_USER'] }}
+          GRAFANA_CLOUD_LOKI_URL: ${{ secrets['GRAFANA_CLOUD_LOKI_URL'] }}
+          LOG_HOSTNAME: ${{ secrets.EC2_HOST }}
+
         run: |
           HOST="${{ secrets.EC2_HOST }}"
           PORT="${SSH_PORT:-22}"
+          ENV_FILE="$(mktemp)"
+          LOGGING_ENV_FILE="$(mktemp)"
+
+          install -m 600 /dev/null "$ENV_FILE"
+          {
+            printf '%s\n' 'ENV=prod'
+            printf '%s\n' 'DEBUG=false'
+            printf '%s\n' 'POSTGRES_HOST=postgres'
+            printf '%s\n' 'POSTGRES_PORT=5432'
+            printf '%s\n' 'REDIS_HOST=redis'
+            printf '%s\n' 'REDIS_PORT=6379'
+            printf '%s\n' "POSTGRES_DB=${POSTGRES_DB}"
+            printf '%s\n' "POSTGRES_USER=${POSTGRES_USER}"
+            printf '%s\n' "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
+            printf '%s\n' "REDIS_PASSWORD=${REDIS_PASSWORD}"
+          } > "$ENV_FILE"
+
+          install -m 600 /dev/null "$LOGGING_ENV_FILE"
+          {
+            printf '%s\n' "GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}"
+            printf '%s\n' "GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}"
+            printf '%s\n' "GRAFANA_CLOUD_USER=${GRAFANA_CLOUD_USER}"
+            printf '%s\n' "GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}"
+            printf '%s\n' "HOSTNAME=${LOG_HOSTNAME}"
+          } > "$LOGGING_ENV_FILE"
+
+          scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
+            "$ENV_FILE" \
+            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/.env.production"
+
+          scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
+            "$LOGGING_ENV_FILE" \
+            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/observability/.env.production"
+
+          rm -f "$ENV_FILE"
+          rm -f "$LOGGING_ENV_FILE"
+
           ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" << 'EOF'
             set -euo pipefail
             echo "Deploying water-delivery application..."
             cd projects/water-delivery
 
+            chmod 600 .env.production
+            chmod 600 observability/.env.production
+
             echo "Validating docker-compose services..."
-            SERVICES=$(docker-compose -f docker-compose.prod.yml config --services)
+            SERVICES=$(docker-compose --env-file .env.production -f docker-compose.prod.yml config --services)
             echo "$SERVICES"
             echo "$SERVICES" | grep -qx "web"
             echo "$SERVICES" | grep -qx "celery-worker"
@@ -215,22 +273,22 @@ jobs:
             mkdir -p staticfiles media
             
             # Pull immutable image
-            docker-compose -f docker-compose.prod.yml pull web celery-worker celery-beat
+            docker-compose --env-file .env.production -f docker-compose.prod.yml pull web celery-worker celery-beat
             
             echo "Stopping existing containers..."
-            docker-compose -f docker-compose.prod.yml down
+            docker-compose --env-file .env.production -f docker-compose.prod.yml down
             
             echo "Building and starting containers..."
-            docker-compose -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
+            docker-compose --env-file .env.production -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
             
             echo "Collecting static files..."
-            docker-compose -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
+            docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
             
             echo "Running database migrations..."
-            docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
             
             # Optional: show running image
-            docker-compose -f docker-compose.prod.yml ps
+            docker-compose --env-file .env.production -f docker-compose.prod.yml ps
 
             echo "Running post-deploy health check..."
             HEALTHCHECK_URL="http://localhost:8001/health/"

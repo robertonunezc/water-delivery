@@ -48,14 +48,14 @@ VPS Docker Compose production commands
 If you deploy on a VPS with `docker-compose.prod.yml`, run this stack to include Celery:
 
 ```bash
-docker-compose -f docker-compose.prod.yml pull web celery-worker celery-beat
-docker-compose -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
-docker-compose -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
-docker-compose -f docker-compose.prod.yml ps
-docker-compose -f docker-compose.prod.yml logs -f celery-worker celery-beat
+docker-compose --env-file .env.production -f docker-compose.prod.yml pull web celery-worker celery-beat
+docker-compose --env-file .env.production -f docker-compose.prod.yml up -d web celery-worker celery-beat postgres redis
+docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+docker-compose --env-file .env.production -f docker-compose.prod.yml ps
+docker-compose --env-file .env.production -f docker-compose.prod.yml logs -f celery-worker celery-beat
 ```
 
-Required runtime variables in `/etc/water-delivery/.env`:
+Required runtime variables in `.env.production` stored next to `docker-compose.prod.yml`:
 - `REDIS_HOST`
 - `REDIS_PORT`
 - `REDIS_PASSWORD`
@@ -64,7 +64,14 @@ Required runtime variables in `/etc/water-delivery/.env`:
 - `POSTGRES_DB`
 - `POSTGRES_USER`
 - `POSTGRES_PASSWORD`
+- `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_SECRET_KEY`
+
+Recommended GitHub Actions setup for the current VPS workflow:
+- Create a GitHub Environment named `production`.
+- Store the production values as environment secrets.
+- Let the deploy job generate `.env.production` on the VPS during each deploy.
+- Do not commit the real `.env.production` file.
 
 Environment-specific Django settings
 - Set the `DJANGO_SETTINGS_MODULE` environment variable to select which Django settings module to use.
