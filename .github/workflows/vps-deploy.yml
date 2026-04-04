@@ -234,7 +234,6 @@ jobs:
 
           install -m 600 /dev/null "$LOGGING_ENV_FILE"
           {
-            printf '%s\n' "GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}"
             printf '%s\n' "GRAFANA_CLOUD_API_KEY=${GRAFANA_CLOUD_API_KEY}"
             printf '%s\n' "GRAFANA_CLOUD_USER=${GRAFANA_CLOUD_USER}"
             printf '%s\n' "GRAFANA_CLOUD_LOKI_URL=${GRAFANA_CLOUD_LOKI_URL}"
