@@ -290,6 +290,14 @@ jobs:
             # Optional: show running image
             docker-compose --env-file .env.production -f docker-compose.prod.yml ps
 
+            echo "Starting observability (Alloy)..."
+            LOGGING_SERVICES=$(docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml config --services)
+            echo "$LOGGING_SERVICES"
+            echo "$LOGGING_SERVICES" | grep -qx "alloy"
+            docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml pull alloy
+            docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml up -d alloy
+            docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml ps
+
             echo "Running post-deploy health check..."
             HEALTHCHECK_URL="http://localhost:8001/health/"
             ATTEMPTS=12
