@@ -4,8 +4,9 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from datetime import date
 from .models import Route, RouteClient
+from .services import get_route_detail_payload
 from .forms import RouteClientForm, RouteClientInlineForm
-from clients.models import Address, Client
+from clients.models import Address, Client, Contact
 from core.models import Transport
 
 
@@ -244,3 +245,83 @@ class RouteClientFrequencyIntervalTest(TestCase):
 
         self.assertEqual(due_first_week.count(), 2)
         self.assertEqual(due_second_week.count(), 1)
+
+
+class RouteDetailRefactorTest(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='route_user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.transport = Transport.objects.create(
+            license_plate='RTE-001',
+            model='Test Truck',
+            capacity_liters=800,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Route Search',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+
+        self.client_match = Client.objects.create(name='Alpha Water')
+        Address.objects.create(
+            client=self.client_match,
+            type='delivery',
+            street='Calle Norte',
+            locality='Centro',
+            zip_code='76010',
+        )
+        Contact.objects.create(
+            client=self.client_match,
+            name='Ana',
+            phone='5551112222',
+        )
+        self.route_client_match = RouteClient.objects.create(
+            route=self.route,
+            client=self.client_match,
+            sequence=1,
+            is_active=True,
+        )
+
+        self.client_other = Client.objects.create(name='Beta Water')
+        Address.objects.create(
+            client=self.client_other,
+            type='delivery',
+            street='Calle Sur',
+        )
+        self.route_client_other = RouteClient.objects.create(
+            route=self.route,
+            client=self.client_other,
+            sequence=2,
+            is_active=True,
+        )
+
+    def test_get_route_detail_payload_filters_and_prefetches(self):
+        payload = get_route_detail_payload(route=self.route, search_query='Ana')
+        route_clients = list(payload.route_clients)
+
+        self.assertEqual(len(route_clients), 1)
+        self.assertEqual(route_clients[0].id, self.route_client_match.id)
+        self.assertEqual(payload.search_query, 'Ana')
+        self.assertFalse(payload.is_today_view)
+        self.assertEqual(payload.today, date.today())
+        self.assertTrue(hasattr(route_clients[0].client, 'recent_orders'))
+
+    def test_route_detail_view_uses_service_payload_with_search(self):
+        client = TestClient()
+        client.login(username='route_user', password='testpass123')
+
+        response = client.get(
+            reverse('routes:detail', kwargs={'route_id': self.route.id}),
+            {'q': 'Norte'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'routes/route_detail.html')
+        self.assertEqual(response.context['search_query'], 'Norte')
+        self.assertEqual(len(response.context['route_clients']), 1)
+        self.assertEqual(response.context['route_clients'][0].id, self.route_client_match.id)

@@ -3,13 +3,13 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Q, Count, Prefetch
+from django.db.models import Count
 from django.utils import timezone
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from .models import Route, RouteClient, RouteClientOrder
+from .services import get_route_detail_payload
 from core.models import Employee, Transport
 from clients.models import Client
-from orders.models import Order
 
 
 @login_required
@@ -98,46 +98,15 @@ def route_detail(request, route_id):
     """Detailed view of a specific route"""
     route = get_object_or_404(Route, id=route_id, is_active=True)
     search_query = request.GET.get('q', '').strip()
-    
-    # Get regular clients in this route with prefetched related data
-    route_clients = RouteClient.objects.filter(
-        route=route,
-        is_active=True
-    )
-
-    if search_query:
-        route_clients = route_clients.filter(
-            Q(client__name__icontains=search_query)
-            | Q(client__addresses__street__icontains=search_query)
-            | Q(client__addresses__number__icontains=search_query)
-            | Q(client__addresses__neighborhood__icontains=search_query)
-            | Q(client__addresses__zip_code__icontains=search_query)
-            | Q(client__contacts__name__icontains=search_query)
-            | Q(client__contacts__phone__icontains=search_query)
-        )
-
-    route_clients = route_clients.select_related('client').prefetch_related(
-        'client__addresses',
-        'client__contacts',
-        'client__product_prices__product',
-        Prefetch('client__orders',
-                 queryset=Order.objects.select_related().prefetch_related('items__product').order_by('-created_at'),
-                 to_attr='recent_orders')
-    ).distinct().order_by('sequence')
-    
-    # Get recent client orders for this route
-    recent_orders = RouteClientOrder.objects.filter(
-        route=route,
-        visit_date__gte=date.today() - timedelta(days=7)
-    ).select_related('client', 'order').order_by('-visit_date', 'sequence')
+    payload = get_route_detail_payload(route=route, search_query=search_query)
     
     context = {
         'route': route,
-        'route_clients': route_clients,
-        'recent_orders': recent_orders,
-        'today': date.today(),
-        'is_today_view': False,
-        'search_query': search_query,
+        'route_clients': payload.route_clients,
+        'recent_orders': payload.recent_orders,
+        'today': payload.today,
+        'is_today_view': payload.is_today_view,
+        'search_query': payload.search_query,
     }
     
     return render(request, 'routes/route_detail.html', context)

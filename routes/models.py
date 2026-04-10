@@ -2,6 +2,8 @@ from datetime import date, timedelta
 
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models import Prefetch, Q
+from django.utils import timezone
 from core.models import TimeStampedModel
 
 from django.forms import ValidationError
@@ -23,13 +25,63 @@ class RouteClientQuerySet(models.QuerySet):
         due_ids = [route_client.pk for route_client in candidates if route_client.is_due_on(target_date)]
         return self.filter(pk__in=due_ids)
 
+    def for_route(self, route: 'Route') -> 'RouteClientQuerySet':
+        return self.filter(route=route, is_active=True)
 
-class RouteClientManager(models.Manager):
+    def search_by_client(self, query: str) -> 'RouteClientQuerySet':
+        cleaned_query = query.strip()
+        if not cleaned_query:
+            return self
+
+        return self.filter(
+            Q(client__name__icontains=cleaned_query)
+            | Q(client__addresses__street__icontains=cleaned_query)
+            | Q(client__addresses__exterior_number__icontains=cleaned_query)
+            | Q(client__addresses__locality__icontains=cleaned_query)
+            | Q(client__addresses__zip_code__icontains=cleaned_query)
+            | Q(client__contacts__name__icontains=cleaned_query)
+            | Q(client__contacts__phone__icontains=cleaned_query)
+        )
+
+    def with_client_details(self) -> 'RouteClientQuerySet':
+        return self.select_related('client').prefetch_related(
+            'client__addresses',
+            'client__contacts',
+        )
+
+    def with_client_products(self) -> 'RouteClientQuerySet':
+        return self.prefetch_related('client__product_prices__product')
+
+    def with_recent_client_orders(
+        self,
+        *,
+        days: int = 30,
+        to_attr: str = 'recent_orders',
+    ) -> 'RouteClientQuerySet':
+        from orders.models import Order
+
+        since = timezone.now() - timedelta(days=days)
+        recent_orders_queryset = (
+            Order.objects.filter(created_at__gte=since)
+            .select_related()
+            .prefetch_related('items__product')
+            .order_by('-created_at')
+        )
+        return self.prefetch_related(
+            Prefetch(
+                'client__orders',
+                queryset=recent_orders_queryset,
+                to_attr=to_attr,
+            )
+        )
+
+    def ordered_for_detail(self) -> 'RouteClientQuerySet':
+        return self.distinct().order_by('sequence')
+
+
+class RouteClientManager(models.Manager.from_queryset(RouteClientQuerySet)):
     def get_queryset(self):
         return RouteClientQuerySet(self.model, using=self._db).filter(deleted_at=None)
-
-    def due_on(self, target_date: date):
-        return self.get_queryset().due_on(target_date)
 
 
 # Create your models here.
