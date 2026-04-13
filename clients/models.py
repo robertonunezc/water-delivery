@@ -93,7 +93,7 @@ USO_CFDI_CHOICES = [
 ]
 
 class Client(TimeStampedModel):
-    name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente", unique=True)
+    name = models.CharField(max_length=100, db_index=True, verbose_name="Nombre del cliente")
     active = models.BooleanField(default=True, verbose_name="Activo")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     type = models.CharField(max_length=50, choices=CLIENT_TYPE_CHOICES, default='branch', verbose_name="Tipo de cliente")
@@ -118,6 +118,7 @@ class Client(TimeStampedModel):
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
+        unique_together = ('deleted_at', 'name')  # Ensure unique client names within the same corporate group
         indexes = [
             models.Index(fields=['name'], name='clients_client_name_idx'),
             models.Index(fields=['active'], name='clients_client_active_idx'),
@@ -138,7 +139,11 @@ class Client(TimeStampedModel):
             errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
         if self.type == 'corporate' and self.corporate:
             errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
-
+        if self.pk:
+            existing_client_qs = Client.objects.filter(name=self.name, deleted_at__isnull=True)
+            existing_client_qs = existing_client_qs.exclude(pk=self.pk)
+            if existing_client_qs.exists():
+                errors['name'] = 'Ya existe un cliente con este nombre. Los nombres de clientes deben ser únicos.'
         # NEW: Validate billing_override_enabled
         if self.billing_override_enabled and self.type != 'branch':
             errors['billing_override_enabled'] = 'Solo las sucursales pueden habilitar datos propios de facturación.'
