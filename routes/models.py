@@ -169,7 +169,7 @@ class RouteClientOrder(TimeStampedModel):
 
 class RouteClient(TimeStampedModel):
     """Regular client assignment to a route (for recurring weekly visits)"""
-    route = models.ForeignKey(Route, related_name='route_clients', on_delete=models.CASCADE)
+    route = models.ForeignKey(Route, verbose_name="Ruta", related_name='route_clients', on_delete=models.CASCADE)
     client = models.ForeignKey('clients.Client', verbose_name="Cliente", related_name='client_routes', on_delete=models.CASCADE)
     sequence = models.PositiveIntegerField(help_text="Default sequence order for this client", verbose_name="Ordinal")
     is_active = models.BooleanField(default=True, verbose_name="Activo")
@@ -190,6 +190,8 @@ class RouteClient(TimeStampedModel):
     
     class Meta:
         unique_together = ('route', 'client')
+        verbose_name = 'Cliente en Ruta'
+        verbose_name_plural = 'Clientes en Rutas'
         ordering = ['sequence']
         indexes = [
             models.Index(fields=['is_active'], name='routes_client_active_idx'),
