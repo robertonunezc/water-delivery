@@ -323,7 +323,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 
 class ContactAdmin(admin.ModelAdmin):
 	list_display = ('name', 'client', 'email', 'phone')
-	search_fields = ('name', 'client__name', 'email', 'phone')
+	search_fields = ('name', 'client', 'email', 'phone')
 	exclude = ('deleted_at',)
 
 
@@ -340,7 +340,7 @@ class BillingDataAdmin(admin.ModelAdmin):
 class BalanceTransactionAdmin(admin.ModelAdmin):
 	list_display = ('client', 'transaction_type', 'amount', 'balance_before', 'balance_after', 'created_at', 'created_by')
 	list_filter = ('transaction_type', 'created_at', 'client')
-	search_fields = ('client__name', 'notes')
+	search_fields = ('client',)
 	readonly_fields = ('created_at', 'updated_at', 'get_balance_change', 'get_transaction_summary')
 	autocomplete_fields = ('client', 'reference_order', 'reference_payment', 'transfer_to_client', 'created_by')
 	date_hierarchy = 'created_at'
@@ -414,7 +414,7 @@ class BalanceTransactionAdmin(admin.ModelAdmin):
 class CreditTransactionAdmin(admin.ModelAdmin):
 	list_display = ('client', 'transaction_type', 'amount', 'debt_before', 'debt_after', 'created_at', 'created_by')
 	list_filter = ('transaction_type', 'created_at', 'client')
-	search_fields = ('client__name',  'notes')
+	search_fields = ('client',)
 	readonly_fields = ('created_at', 'updated_at', 'get_debt_change', 'get_credit_limit_change', 'get_transaction_summary')
 	autocomplete_fields = ('client', 'reference_order', 'reference_payment', 'created_by')
 	date_hierarchy = 'created_at'

@@ -16,6 +16,7 @@ class BillingRecordInlineAdmin(StackedInline):
     model = BillingOrder
     extra = 0
     fields = ('order', 'is_paid', 'partially_paid')
+    autocomplete_fields = ('order',)
     can_delete = False
     show_change_link = True
     # Custom form and formset to enforce queryset filtering and validation
@@ -26,6 +27,7 @@ class BillingOrderAdminForm(forms.ModelForm):
     class Meta:
         model = BillingOrder
         fields = ['billing_record', 'order', 'is_paid', 'partially_paid']
+        search_fields = ('billing_record__client', 'order__id')
         readonly_fields = ['billing_record','order']
     class Media:
         js = (
@@ -114,6 +116,8 @@ class BillingRecordAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
     list_filter = ('date', 'client')
     search_fields = ('client__name', 'description', 'identifier')
+    autocomplete_fields = ('client',)
+    exclude = ('deleted_at',)
     ordering = ('-date',)
     inlines = [BillingRecordInlineAdmin]
 
@@ -121,27 +125,12 @@ class BillingRecordAdmin(SoftDeleteAdminMixin, ModelAdmin):
 class BillingOrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid')
     list_filter = ('is_paid', 'partially_paid', 'billing_record__client', 'billing_record')
-    search_fields = ('billing_record__client__name', 'order__id')
+    search_fields = ('billing_record__client', 'order')
+    autocomplete_fields = ('billing_record', 'order')
     ordering = ('-created_at',)
     form = BillingOrderAdminForm
     
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name in ['billing_record', 'order']:
-            kwargs['widget'] = admin.widgets.ForeignKeyRawIdWidget(
-                db_field.remote_field,
-                self.admin_site,
-                using=kwargs.get('using'),
-            )
-            kwargs['widget'].can_add_related = False
-            kwargs['widget'].can_change_related = False
-            kwargs['widget'].can_delete_related = False
-            # Use regular Select widget instead of raw id for cleaner dropdown
-            from django.forms import Select
-            formfield = super().formfield_for_foreignkey(db_field, request, **kwargs)
-            formfield.widget = Select(choices=formfield.choices)
-            return formfield
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
+    
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
