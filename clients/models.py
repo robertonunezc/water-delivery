@@ -138,10 +138,10 @@ class Client(TimeStampedModel):
             errors['corporate'] = 'Cliente sucursal debe tener un cliente corporativo asociado.'
         if self.type == 'corporate' and self.corporate:
             errors['corporate'] = 'Cliente corporativo no puede tener un padre corporativo.'
-        if self.pk:
-            existing_client_qs = Client.objects.filter(name=self.name, deleted_at__isnull=True)
-            existing_client_qs = existing_client_qs.exclude(pk=self.pk)
-            if existing_client_qs.exists():
+        
+        existing_client_qs = Client.objects.filter(name=self.name, deleted_at__isnull=True)
+        existing_client_qs = existing_client_qs.exclude(pk=self.pk)
+        if existing_client_qs.exists():
                 errors['name'] = 'Ya existe un cliente con este nombre. Los nombres de clientes deben ser únicos.'
         # NEW: Validate billing_override_enabled
         if self.billing_override_enabled and self.type != 'branch':
