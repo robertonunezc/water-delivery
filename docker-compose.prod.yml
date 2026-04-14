@@ -6,6 +6,11 @@ services:
     image: robe/development:water
     container_name: water_delivery_web_prod
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
     env_file:
       - ./.env.production
     volumes:
@@ -28,6 +33,11 @@ services:
     env_file:
       - ./.env.production
     command: celery -A water_delivery worker -l info
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 
     depends_on:
       - postgres
       - redis
