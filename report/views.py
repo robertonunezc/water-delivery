@@ -274,17 +274,27 @@ def orders_report(request):
     return render(request, 'report/orders_report.html', context)
 
 
+
 @login_required
-def today(request):
-    """Generate a report for today's orders.
-    This report will list all orders placed today.
-    I need the orders aggregated by payment methods.
-    Each method with its total amount and count of orders and order list.
-    The report will only show orders from the logged in user.
+def breakdown_payment_method(request):
     """
-    today = datetime.now().date()
+    Generate a report for orders on a selected date, aggregated by payment methods.
+    The user can select the date (default: today).
+    Only orders from the logged-in user are shown.
+    """
+    date_str = request.GET.get('date', '')
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+    except ValueError:
+        selected_date = timezone.now().date()
+
     owner = request.user
-    orders = Order.objects.today_orders(owner)
+    # Query orders for the selected date and owner
+    orders = Order.objects.filter(
+        owner=owner,
+        order_date__date=selected_date
+    ).prefetch_related('items__product', 'payments', 'client')
+
     # Calculate overall statistics
     total_orders = orders.count()
     total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
@@ -293,23 +303,19 @@ def today(request):
     # Aggregate orders by payment method
     payment_method_stats = {}
     active_payment_methods = 0
-    
     for method_key, method_name in PAYMENT_METHOD_CHOICES:
         method_orders = orders.filter(payments__method=method_key).distinct()
         method_total = method_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
         order_count = method_orders.count()
-        
         payment_method_stats[method_key] = {
             'name': method_name,
             'total_amount': method_total,
             'order_count': order_count,
             'orders': method_orders
         }
-        
         if order_count > 0:
             active_payment_methods += 1
-    print(payment_method_stats)
-    # Create summary statistics
+
     stats = {
         'total_orders': total_orders,
         'total_amount': total_amount,
@@ -317,10 +323,10 @@ def today(request):
         'active_payment_methods': active_payment_methods
     }
 
-    return render(request, 'report/today_report.html', {
-        'orders': orders, 
+    return render(request, 'report/breakdown_payment_method.html', {
+        'orders': orders,
         'payment_method_stats': payment_method_stats,
-        'today': today,
+        'selected_date': selected_date,
         'stats': stats
     })
 

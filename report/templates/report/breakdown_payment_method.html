@@ -65,12 +65,20 @@
     <!-- Header Section -->
     <div class="row mb-4">
       <div class="col-md-8">
-        <h1><i class="fas fa-calendar-day me-2"></i>Reporte de Órdenes de Hoy</h1>
+        <h1><i class="fas fa-calendar-day me-2"></i>Reporte de Órdenes por Método de Pago</h1>
         <p class="text-muted mb-0">
-          Resumen de todas las órdenes del día {{ today|date:"d/m/Y" }}
+          Resumen de todas las órdenes del día
+          {% if selected_date %}
+            {{ selected_date|date:"d/m/Y" }}
+          {% else %}
+            {{ today|date:"d/m/Y" }}
+          {% endif %}
         </p>
       </div>
       <div class="col-md-4 text-md-end">
+        <form method="get" class="d-inline-block">
+          <input type="date" name="date" class="form-control d-inline-block w-auto" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
+        </form>
         <a href="{% url 'report:today_csv' %}" class="btn btn-outline-success me-2">
           <i class="fas fa-download me-2"></i>Descargar CSV
         </a>
