@@ -115,6 +115,7 @@ class Client(TimeStampedModel):
     last_first_reminder_sent_at = models.DateTimeField(null=True, blank=True)
     last_second_reminder_sent_at = models.DateTimeField(null=True, blank=True)
     last_cancellation_sent_at = models.DateTimeField(null=True, blank=True)
+    external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID externo", help_text="ID del cliente en sistemas externos (ERP, CRM, etc.)")
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
@@ -523,7 +524,7 @@ class Address(TimeStampedModel):
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")
-    locality = models.CharField(max_length=100, verbose_name="Localidad", default='Querétaro')
+    locality = models.CharField(max_length=100, verbose_name="Colonia", default='Querétaro')
     municipality = models.CharField(max_length=100,default='Querétaro', verbose_name="Delegación o Municipio")
     state = models.CharField(max_length=100, default='Querétaro', verbose_name="Estado")
     zip_code = models.CharField(max_length=20, default='76000', verbose_name="Código Postal")
