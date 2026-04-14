@@ -7,6 +7,7 @@ Quick architecture summary
 - Django 5.2 monolith with multiple Django apps under the repo root: `clients`, `core`, `orders`, `billing`, `routes`, `product`, `payment`, `report`, `notification`.
 - `water_delivery/` contains Django settings and WSGI/ASGI entrypoints. `settings.py` loads `.env` via `python-dotenv`; `settings_development.py` and `settings_production.py` provide environment-specific overrides.
 - Data flows: most domain logic lives in app `models.py` and `services.py` (e.g., `orders/services.py`). `clients` implements balance/credit history with transaction models — see `tests/` demo scripts for examples of usage.
+- Admin theme used is Unfold
 
 Important project conventions & patterns
 - Time-stamped / soft-delete pattern:
