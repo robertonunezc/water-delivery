@@ -272,7 +272,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		# Base fieldsets for new clients
 		base_fieldsets = (
 			('Información Básica', {
-				'fields': (('name', 'active'), ('type', 'corporate'), ('note', 'address_link'), ),
+				'fields': (('name', 'active', 'external_id'), ('type', 'corporate'), ('note', 'address_link'), ),
 			}),
 			('Balance y Crédito', {
 				'fields': (
