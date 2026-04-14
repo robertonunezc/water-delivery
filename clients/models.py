@@ -118,7 +118,6 @@ class Client(TimeStampedModel):
     class Meta:
         verbose_name = 'Cliente'
         verbose_name_plural = 'Clientes'
-        unique_together = ('deleted_at', 'name')  # Ensure unique client names within the same corporate group
         indexes = [
             models.Index(fields=['name'], name='clients_client_name_idx'),
             models.Index(fields=['active'], name='clients_client_active_idx'),
