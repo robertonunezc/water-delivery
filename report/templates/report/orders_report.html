@@ -153,15 +153,7 @@
         <a href="{% url 'clients:list' %}" class="btn btn-outline-primary me-2">
           <i class="fas fa-users"></i> Ver Clientes
         </a>
-        <div class="btn-group" role="group">
-          <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown">
-            <i class="fas fa-download"></i> Exportar
-          </button>
-          <ul class="dropdown-menu">
-            <li><a class="dropdown-item" href="#"><i class="fas fa-file-excel me-2"></i>Excel</a></li>
-            <li><a class="dropdown-item" href="#"><i class="fas fa-file-pdf me-2"></i>PDF</a></li>
-          </ul>
-        </div>
+        <a class="btn btn-outline-success me-2" href="{% url 'report:orders_report_csv' %}"><i class="fas fa-file-excel me-2"></i>Exportar</a>
       </div>
     </div>
 

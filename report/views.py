@@ -112,6 +112,9 @@ def orders_report(request):
     - Filter by amount range
     - Sort options
     """
+    # CSV download support
+    if request.GET.get('download') == 'csv':
+        return orders_report_csv(request)
     owner = request.user
     # Get filter parameters from request
     search_query = request.GET.get('search', '').strip()
@@ -274,6 +277,122 @@ def orders_report(request):
     return render(request, 'report/orders_report.html', context)
 
 
+# CSV download view for orders_report
+from django.utils.encoding import smart_str
+
+@login_required
+def orders_report_csv(request):
+    """
+    Download filtered orders as CSV (same filters as orders_report)
+    """
+    # Duplicate filter logic from orders_report
+    owner = request.user
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_filter = request.GET.get('date_filter', '').strip()
+    start_date = request.GET.get('start_date', '').strip()
+    end_date = request.GET.get('end_date', '').strip()
+    employee_filter = request.GET.get('employee', '').strip()
+    has_billing = request.GET.get('has_billing', '').strip()
+    min_amount = request.GET.get('min_amount', '').strip()
+    max_amount = request.GET.get('max_amount', '').strip()
+    sort_by = request.GET.get('sort_by', '-order_date').strip()
+    payment_method = request.GET.get('payment_method', '').strip()
+
+    orders_queryset = Order.objects.select_related(
+        'client', 'owner',
+    ).prefetch_related(
+        'items__product', 'client__contacts', 'payments', 'billing_orders__billing_record'
+    )
+
+    if search_query:
+        orders_queryset = orders_queryset.filter(
+            Q(client__name__icontains=search_query) |
+            Q(id__icontains=search_query) |
+            Q(notes__icontains=search_query) |
+            Q(client__contacts__name__icontains=search_query)
+        ).distinct()
+    if payment_method:
+        orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
+    if has_billing == 'yes':
+        orders_queryset = orders_queryset.filter(billing_orders__isnull=False).distinct()
+    elif has_billing == 'no':
+        orders_queryset = orders_queryset.filter(billing_orders__isnull=True)
+    if status_filter and status_filter != 'all':
+        orders_queryset = orders_queryset.filter(status=status_filter)
+    today = timezone.now().date()
+    if date_filter == 'today':
+        orders_queryset = orders_queryset.filter(order_date__date=today)
+    elif date_filter == 'week':
+        week_start = today - timedelta(days=today.weekday())
+        orders_queryset = orders_queryset.filter(order_date__date__gte=week_start)
+    elif date_filter == 'month':
+        month_start = today.replace(day=1)
+        orders_queryset = orders_queryset.filter(order_date__date__gte=month_start)
+    elif date_filter == 'custom' and start_date and end_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            orders_queryset = orders_queryset.filter(
+                order_date__date__gte=start_date_obj,
+                order_date__date__lte=end_date_obj
+            )
+        except ValueError:
+            pass
+    if employee_filter != 'all' and employee_filter:
+        orders_queryset = orders_queryset.filter(owner_id=employee_filter)
+    if not employee_filter:
+        orders_queryset = orders_queryset.filter(owner=owner)
+    if min_amount:
+        try:
+            min_amount_value = Decimal(min_amount)
+            orders_queryset = orders_queryset.filter(total_amount__gte=min_amount_value)
+        except (ValueError, TypeError):
+            pass
+    if max_amount:
+        try:
+            max_amount_value = Decimal(max_amount)
+            orders_queryset = orders_queryset.filter(total_amount__lte=max_amount_value)
+        except (ValueError, TypeError):
+            pass
+    valid_sort_options = [
+        'order_date', '-order_date', 'total_amount', '-total_amount',
+        'client__name', '-client__name', 'status', '-status'
+    ]
+    if sort_by in valid_sort_options:
+        orders_queryset = orders_queryset.order_by(sort_by)
+    else:
+        orders_queryset = orders_queryset.order_by('-order_date')
+
+    # CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="orders_report.csv"'
+    writer = csv.writer(response)
+
+    # Header
+    writer.writerow([
+        'ID', 'Fecha', 'Cliente', 'Total', 'Status', 'Empleado', 'Notas', 'Método de pago', 'Facturado'
+    ])
+
+    for order in orders_queryset:
+        # Get payment method(s) as comma-separated
+        payment_methods = ', '.join(set([
+            str(p.method) for p in order.payments.all()
+        ]))
+        writer.writerow([
+            smart_str(order.id),
+            order.order_date.strftime('%Y-%m-%d %H:%M'),
+            smart_str(order.client.name if order.client else ''),
+            str(order.total_amount),
+            smart_str(order.status),
+            smart_str(order.owner.get_full_name() if order.owner else ''),
+            smart_str(order.notes or ''),
+            payment_methods,
+            'Sí' if order.billing_orders.exists() else 'No',
+        ])
+    return response
+
+
 
 @login_required
 def breakdown_payment_method(request):
@@ -332,7 +451,7 @@ def breakdown_payment_method(request):
 
 
 @login_required
-def today_csv(request):
+def breakdown_payment_method_csv(request):
     """
     Download today's orders report as CSV format.
     Includes summary statistics and detailed order information
