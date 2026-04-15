@@ -34,11 +34,9 @@
                     <div>
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
                             <input type="checkbox" name="${this.fieldName}" id="id_${this.fieldName}">
-                            Crear dirección opuesta automáticamente
+                                Copiar esta dirección como direccion fiscal 
                         </label>
-                        <p class="help" style="margin-top: 4px;">
-                            Aplica para todas las direcciones nuevas del tab Domicilios al guardar.
-                        </p>
+                      
                     </div>
                 </div>
             `);
