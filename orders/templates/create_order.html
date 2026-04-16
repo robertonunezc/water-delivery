@@ -473,7 +473,7 @@
                 <div class="mb-3">
                   <select class="form-select" id="payment-method-select" name="payment_type">
                     {% for value, label in payment_types %}
-                      <option value="{{ value }}">{{ label }}</option>
+                      <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                   </select>
                 </div>
