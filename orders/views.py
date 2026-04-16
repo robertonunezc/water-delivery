@@ -166,10 +166,16 @@ def list_orders(request):
 
 
 @login_required
-def create_order(request, client_pk, order_id=None):
-    client = get_object_or_404(Client, pk=client_pk)
+def get_or_create_order(request, client_pk=None, order_id=None):
+    if order_id is not None:
+        order = services.get_or_create_order(order_id=order_id)
+        client = order.client
+    else:
+        client = get_object_or_404(Client, pk=client_pk)
+        owner = request.user
+        order = services.get_or_create_order(client, owner=owner)
+
     owner = request.user
-    order = services.get_or_create_order(client, order_id=order_id, owner=owner)
     client_products = client.get_products()
     payment_types = [
         (value, label)
@@ -191,37 +197,11 @@ def create_order(request, client_pk, order_id=None):
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_delivery_address': has_delivery_address,
     }
-    log.info(f"Created new order id:{order.id} for client {client.id} by user {owner.username}")
+    log.info(
+        f"Opened order id:{order.id} for client {client.id} by user {owner.username}"
+    )
     
     return render(request, 'create_order.html', context)
-
-@login_required
-def get_order(request, order_id):
-    order = services.get_or_create_order(order_id=order_id)
-    client = order.client
-    client_products = client.get_products()
-    payment_types = [
-        (value, label)
-        for value, label in PAYMENT_METHOD_CHOICES
-        if value not in {'credit', 'pending_credit'}
-    ]
-    # Calculate initial payment breakdown based on client balance and order total
-    initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
-    has_delivery_address = client.addresses.filter(type='delivery').exists()
-    has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
-    context = {
-        'client': client, 
-        'order': order, 
-        'client_products': client_products, 
-        'payment_types': payment_types,
-        'order_type': order.type,
-        'has_pending_credit_payment': has_pending_credit_payment,
-        'initial_payment_breakdown': json.dumps(initial_breakdown),
-        'has_delivery_address': has_delivery_address,
-    }
-    
-    return render(request, 'create_order.html', context)
-
 
 @login_required
 @require_http_methods(["POST"])
