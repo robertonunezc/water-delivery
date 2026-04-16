@@ -554,10 +554,10 @@ Desde {{date_since}}</small>
                     <th>Estado</th>
                     <th>Subtotal</th>
                     <th>Descuento</th>
-                    <th>Pagado</th>
+                    <th>Total</th>
                     <th>Productos</th>
                     <th>Pago</th>
-                    {% comment %} <th>Acciones</th> {% endcomment %}
+                   <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -566,7 +566,7 @@ Desde {{date_since}}</small>
                       <td><strong>#{{ order.id }}</strong></td>
                       <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                       <td>
-                        <span class="badge bg-{% if order.status == 'completed' %}success{% elif order.status == 'pending' %}warning{% else %}secondary{% endif %}">
+                        <span class="badge bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning{% else %}danger{% endif %}">
                           {{ order.get_status_display_fixed }}
                         </span>
                       </td>
@@ -606,13 +606,13 @@ Desde {{date_since}}</small>
                           <br>
                         {% endfor %}
                       </td>
-                      {% comment %} <td>
-                        {% if order.status == 'pending' %}
-                          <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-primary">
+                    <td>
+                        {% if order.status == 'PENDING' %}
+                          <a href="{% url 'orders:get_order' order.id %}" class="btn btn-sm btn-outline-primary">
                             <i class="fas fa-edit"></i>
                           </a>
                         {% endif %}
-                      </td> {% endcomment %}
+                      </td> 
                     </tr>
                   {% endfor %}
                 </tbody>

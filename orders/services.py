@@ -22,8 +22,15 @@ class OrderData:
     items: List = None
 
 
-def create_order(client, owner=None) -> Order:
+def get_or_create_order(client=None, order_id=None, owner=None) -> Order:
     #TODO: decouple this logic from QuerySet and use dataclasses or similar
+    if not client and not order_id:
+        raise ValueError("Se requiere un cliente o un ID de orden para obtener o crear una orden.")
+    if order_id:
+        try:
+            return Order.objects.get(pk=order_id)
+        except Order.DoesNotExist:
+            pass
     if get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).exists():
         return get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).first()
     order = Order.objects.create(client=client, total_amount=Decimal('0.00'), owner=owner)
