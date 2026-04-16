@@ -162,7 +162,7 @@ class ProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
 @admin.register(ProductClientPrice)
 class ProductClientPriceAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('product', 'client', 'price','active', 'until_date')
-    search_fields = ('product__name', 'client__name', 'client')
+    search_fields = ('product__name', 'client__name')
     list_filter = ('until_date', 'active')
     autocomplete_fields = ('client',)
 
