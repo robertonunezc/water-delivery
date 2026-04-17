@@ -131,41 +131,7 @@ services:
     depends_on:
       - nginx
 
-  celery-worker:
-    build: .
-    container_name: water_delivery_celery_worker_prod
-    restart: unless-stopped
-    env_file:
-      - .env
-    command: celery -A water_delivery worker -l info
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - postgres
-      - redis
-      - web
-    labels:
-      - "project=water-delivery"
-      - "environment=production"
-      - "service=celery-worker"
-
-  celery-beat:
-    build: .
-    container_name: water_delivery_celery_beat_prod
-    restart: unless-stopped
-    env_file:
-      - .env
-    command: celery -A water_delivery beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    volumes:
-      - ./logs:/app/logs
-    depends_on:
-      - postgres
-      - redis
-      - web
-    labels:
-      - "project=water-delivery"
-      - "environment=production"
-      - "service=celery-beat"
+  
   
   # promtail:
   #   image: grafana/promtail:latest
