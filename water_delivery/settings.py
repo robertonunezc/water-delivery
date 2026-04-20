@@ -29,6 +29,8 @@ def _get_bool_env(name: str, default: bool = False) -> bool:
     if normalized in {"0", "false", "f", "no", "n", "off"}:
         return False
     return default
+def is_prod() -> bool:
+    return os.getenv('ENV') == 'prod'
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,7 +45,7 @@ ADMIN_INDEX_TITLE = "Welcome to PuriGest Admin Portal"
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-3)1vw7#a^-n0h9uuujkveyqb2*j-f2^k5a5v8d3t9m+etkcvi2')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-default_debug = os.getenv('ENV') != 'prod'
+default_debug = not is_prod()
 DEBUG = _get_bool_env('DEBUG', default=default_debug)
 
 # Multi-tenant security settings
@@ -62,7 +64,7 @@ CSRF_TRUSTED_ORIGINS = [
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Production-only security settings
-if os.environ.get('ENV') == 'prod':
+if is_prod():
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
@@ -106,6 +108,12 @@ SHARED_APPS = (
 )
 
 TENANT_APPS = (
+    # Auth per-tenant: each schema gets its own auth_user, auth_permission, etc.
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
+    'django.contrib.admin',
+    'django.contrib.sessions',
+    # Business apps
     'clients',
     'core',
     'payment',
@@ -123,24 +131,7 @@ BASE_DOMAIN = "localhost"
 PUBLIC_SCHEMA_NAME = "public"
 TENANT_DOMAIN_MODEL = "tenant_client.Domain"  # app.Model
 AUTH_USER_MODEL = "auth.User"
-# INSTALLED_APPS = [
-#     'jazzmin',
-#     'django.contrib.admin',
-#     'django.contrib.auth',
-#     'django.contrib.contenttypes',
-#     'django.contrib.sessions',
-#     'django.contrib.messages',
-#     'django.contrib.staticfiles',
-#     # Local apps
-#     'clients',
-#     'core',
-#     'payment',
-#     'product',
-#     'report',
-#     'routes',
-#     'orders',
-    
-# ]
+
 
 MIDDLEWARE = [
     'django_tenants.middleware.main.TenantMainMiddleware',
@@ -165,9 +156,6 @@ if not DEBUG:
     )
 ROOT_URLCONF = 'water_delivery.tenant_urls'
 PUBLIC_SCHEMA_URLCONF = 'water_delivery.public_urls'
-
-
-ROOT_URLCONF = 'water_delivery.urls'
 CRISPY_TEMPLATE_PACK = "unfold_crispy"
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = ["unfold_crispy"]

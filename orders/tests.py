@@ -1,11 +1,13 @@
 from django.test import TestCase
 from django.urls import reverse
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
 import json
 
 from clients.models import Client
+
+User = get_user_model()
 from orders.models import Order, OrderProduct, OrderStatus
 from orders import services
 from payment.models import Payment
@@ -918,9 +920,9 @@ class CreatePaymentForOrderTestCase(TestCase):
         self, mock_process_payment: MagicMock
     ) -> None:
         """Test create_payment_for_order passes user to process_order_payment."""
-        from django.contrib.auth.models import User
+        from django.contrib.auth import get_user_model
 
-        user = User.objects.create_user(username="testuser", password="testpass")
+        user = get_user_model().objects.create_user(username="testuser", password="testpass")
         mock_process_payment.return_value = {
             "success": True,
             "balance_used": Decimal("50.00"),

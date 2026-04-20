@@ -3,10 +3,12 @@ from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
+
+User = get_user_model()
 
 from clients.models import Client
 from orders.models import Order

@@ -22,7 +22,9 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'water_delivery.settings')
 django.setup()
 
 from clients.models import Client, BalanceTransaction, CreditTransaction
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 
 def demo_balance_credit_history():

@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from datetime import datetime, timedelta
 from decimal import Decimal
 import csv
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from clients.models import Client, CreditTransaction
 from orders.models import Order, ORDER_STATUS_CHOICES
 from payment.models import PAYMENT_METHOD_CHOICES
@@ -226,7 +226,7 @@ def orders_report(request):
     ).order_by('status')
     
     # Get all employees for filter dropdown
-    employees = User.objects.filter(
+    employees = get_user_model().objects.filter(
         id__in=Order.objects.values_list('owner_id', flat=True).distinct()
     ).order_by('first_name', 'last_name')
     

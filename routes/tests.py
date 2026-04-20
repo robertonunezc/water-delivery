@@ -1,5 +1,5 @@
 from django.test import TestCase, Client as TestClient
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.urls import reverse
 from datetime import date
@@ -8,6 +8,8 @@ from .services import get_route_detail_payload
 from .forms import RouteClientForm, RouteClientInlineForm
 from clients.models import Address, Client, Contact
 from core.models import Transport
+
+User = get_user_model()
 
 
 class RouteClientValidationTest(TestCase):
