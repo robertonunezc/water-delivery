@@ -1,11 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from unfold.admin import ModelAdmin
 
 from . import models
 from core.admin_mixins import SoftDeleteAdminMixin
 
 
-class NotificationAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
+class NotificationAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('title', 'client', 'type', 'channel', 'created_at', 'status', 'sent_at')
     list_filter = ('type', 'channel', 'created_at')
     search_fields = ('title', 'client__name', 'message')
@@ -35,7 +36,7 @@ class NotificationAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
 
 
 
-class ClientNotificationSettingAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
+class ClientNotificationSettingAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = (
         'client',
         'first_reminder_days',

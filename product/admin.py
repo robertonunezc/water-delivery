@@ -16,7 +16,7 @@ from .csv_import_service import (
 )
 from core.admin_mixins import SoftDeleteAdminMixin
 
-class ProductClientPriceInline(admin.TabularInline):
+class ProductClientPriceInline(TabularInline):
     model = ProductClientPrice
     extra = 0
     fields = ('client', 'price', 'until_date', 'note')

@@ -58,7 +58,7 @@ class BillingAttachedFilter(admin.SimpleListFilter):
             return queryset.filter(invoice_links__isnull=True)
 
 
-class OrderProductInline(admin.TabularInline):
+class OrderProductInline(TabularInline):
     model = OrderProduct
     extra = 1
     fields = ('product', 'quantity', 'unit_price', 'total_price_display', 'note')
@@ -623,7 +623,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     export_to_csv.short_description = 'Exportar a CSV'
 
 
-class OrderProductAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
+class OrderProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = (
         'order_link', 'product_name', 'quantity', 'unit_price', 
         'total_price_display', 'order_status', 'order_date', 'client_name'
@@ -767,7 +767,7 @@ class OrderProductAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
 
 
 @admin.register(OrderSplit)
-class OrderSplitAdmin(SoftDeleteAdminMixin, admin.ModelAdmin):
+class OrderSplitAdmin(SoftDeleteAdminMixin, ModelAdmin):
     """Admin for tracking order splits"""
     list_display = (
         'id', 'source_order_link', 'child_order_link', 'split_by',

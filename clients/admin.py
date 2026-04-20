@@ -320,7 +320,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 # OTHER ADMIN CLASSES
 # ============================================================
 
-class ContactAdmin(admin.ModelAdmin):
+class ContactAdmin(ModelAdmin):
 	list_display = ('name', 'client', 'email', 'phone')
 	search_fields = ('name', 'client', 'email', 'phone')
 	exclude = ('deleted_at',)
