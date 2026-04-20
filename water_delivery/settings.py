@@ -79,11 +79,13 @@ CSRF_TRUSTED_ORIGINS = [
     "https://pabel.puntoreica.com",
     "https://agua.puntoreica.com",
     "http://localhost:8000",
+    "http://water.local:8000",
 ]
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 USE_X_FORWARDED_HOST = True
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+# Only enforce secure cookies in production (HTTPS). Plain HTTP dev sessions need these off.
+CSRF_COOKIE_SECURE = is_prod()
+SESSION_COOKIE_SECURE = is_prod()
 
 # Application definition
 
