@@ -326,7 +326,7 @@ class ContactAdmin(admin.ModelAdmin):
 	exclude = ('deleted_at',)
 
 
-class InvoiceDataAdmin(admin.ModelAdmin):
+class BillingDataAdmin(ModelAdmin):
 	# show related client name via a callable
 	list_display = ('rfc', 'razon_social', 'client_name')
 	search_fields = ('razon_social', 'rfc',)
@@ -336,7 +336,7 @@ class InvoiceDataAdmin(admin.ModelAdmin):
 	client_name.short_description = 'client'
 
 @admin.register(models.BalanceTransaction)
-class BalanceTransactionAdmin(admin.ModelAdmin):
+class BalanceTransactionAdmin(ModelAdmin):
 	list_display = ('client', 'transaction_type', 'amount', 'balance_before', 'balance_after', 'created_at', 'created_by')
 	list_filter = ('transaction_type', 'created_at', 'client')
 	search_fields = ('client',)
@@ -410,7 +410,7 @@ class BalanceTransactionAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.CreditTransaction)
-class CreditTransactionAdmin(admin.ModelAdmin):
+class CreditTransactionAdmin(ModelAdmin):
 	list_display = ('client', 'transaction_type', 'amount', 'debt_before', 'debt_after', 'created_at', 'created_by')
 	list_filter = ('transaction_type', 'created_at', 'client')
 	search_fields = ('client',)

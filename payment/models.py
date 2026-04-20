@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from core.models import TimeStampedModel
 
@@ -30,7 +31,7 @@ class Payment(TimeStampedModel):
     credit_used = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Crédito Utilizado", help_text="Monto pagado usando crédito del cliente")
     
     # Audit field
-    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
     
     def status_display(self):
         return dict(PAYMENT_STATUS_CHOICES).get(self.status, 'Desconocido')

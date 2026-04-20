@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Optional, List
+from django.conf import settings
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
 from core.models import TimeStampedModel
@@ -365,7 +366,7 @@ class BalanceTransaction(TimeStampedModel):
     transfer_to_client = models.ForeignKey('Client', null=True, blank=True, on_delete=models.SET_NULL, related_name='balance_transfers_received', verbose_name="Cliente destino (transferencia)")
     
     # Audit fields
-    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
 
     # Manager
     from clients.managers import BalanceTransactionManager
@@ -439,7 +440,7 @@ class CreditTransaction(TimeStampedModel):
     reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")
     
     # Audit fields
-    created_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
 
     # Manager
     from clients.managers import CreditTransactionManager

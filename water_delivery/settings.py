@@ -119,7 +119,10 @@ TENANT_APPS = (
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
 
 TENANT_MODEL = "tenant_client.ClientTenant"  # app.Model
-
+BASE_DOMAIN = "localhost"
+PUBLIC_SCHEMA_NAME = "public"
+TENANT_DOMAIN_MODEL = "tenant_client.Domain"  # app.Model
+AUTH_USER_MODEL = "auth.User"
 # INSTALLED_APPS = [
 #     'jazzmin',
 #     'django.contrib.admin',

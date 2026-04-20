@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
@@ -154,7 +155,7 @@ class Order(TimeStampedModel):
     cantidad_cobrada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Cantidad Cobrada", help_text="Cantidad realmente cobrada al cliente (puede ser mayor al total para agregar saldo)")
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default=OrderStatus.PENDING.value, db_index=True)
     notes = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Descuento", help_text="Descuento aplicado a la orden (en la moneda del total)")
     type = models.CharField(max_length=50, default='contado', null=True, blank=True, choices=ORDER_TYPE_CHOICES, verbose_name="Tipo de Orden", help_text="Tipo de orden para diferenciar entre órdenes a credito y órdenes de contado")
     objects = OrderManager()
@@ -209,7 +210,7 @@ class OrderSplit(TimeStampedModel):
     """Track order split operations for reporting purposes"""
     source_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='split_as_source', verbose_name="Orden Original")
     child_order = models.ForeignKey('Order', on_delete=models.CASCADE, related_name='split_as_child', verbose_name="Orden Derivada")
-    split_by = models.ForeignKey('auth.User', on_delete=models.SET_NULL, null=True, verbose_name="Dividido por")
+    split_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name="Dividido por")
     
     class Meta:
         ordering = ['-created_at']

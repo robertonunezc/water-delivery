@@ -1,8 +1,7 @@
 from django.utils import timezone
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 # Create your models here.
-
 
 class SoftDeleteManager(models.Manager):
     def get_queryset(self):
@@ -36,7 +35,7 @@ EMPLOYEE_POSITIONS = [('manager', 'Administrador'), ('driver', 'Chofer'), ('staf
 
 class Employee(TimeStampedModel):
     # Allow employees without a linked User account (some employees don't access the system)
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
     nombre = models.CharField(max_length=100, default='')
     apellidos = models.CharField(max_length=100, default='')
     sexo = models.CharField(max_length=10, choices=[('M', 'Masculino'), ('F', 'Femenino')], null=True, blank=True)

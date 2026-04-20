@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import Employee, Transport, NonWorkingDay
 from unfold.admin import ModelAdmin
@@ -40,7 +40,7 @@ class EmployeeAdmin(SoftDeleteAdminMixin, ModelAdmin):
         # If no user is set, save the employee first so we have a PK to build a username
         if obj.user is None:
             super().save_model(request, obj, form, change)
-            from django.contrib.auth.models import User as AuthUser
+            AuthUser = get_user_model()
 
             base_username = f"employee_{obj.pk}"
             username = base_username
@@ -96,5 +96,7 @@ class NonWorkingDayAdmin(SoftDeleteAdminMixin, ModelAdmin):
     )
 
 # Unregister the original User admin and register our (inline-free) UserAdmin
-admin.site.unregister(User)
-admin.site.register(User, UserAdmin)
+UserModel = get_user_model()
+if admin.site.is_registered(UserModel):
+    admin.site.unregister(UserModel)
+admin.site.register(UserModel, UserAdmin)
