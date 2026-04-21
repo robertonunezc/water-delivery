@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
 from collections import Counter
 
-from billing.models import Invoice, InvoiceOrderLink, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
+from billing.models import Invoice, InvoiceOrderLink, BillingFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
 from core.admin_mixins import SoftDeleteAdminMixin
 # Register your models here.
@@ -253,8 +253,8 @@ class BillingFrequencyReportAdmin(ModelAdmin):
             context
         )
 
-#@admin.register(ClientBillingFrecuency)
-class ClientBillingFrecuencyAdmin(ModelAdmin):
+#@admin.register(InvoiceSchedule)
+class InvoiceScheduleAdmin(ModelAdmin):
     list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
     search_fields = ('client__name', 'frequency')
     list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')

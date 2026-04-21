@@ -256,7 +256,7 @@ class Client(TimeStampedModel):
         return {'success': True}
     def has_billing_frequency(self):
         """Check if client has an active billing frequency set"""
-        has_frequency = hasattr(self, 'billing_frecuency') and self.billing_frecuency.exists()
+        has_frequency = hasattr(self, 'invoice_schedule')
         return has_frequency
         
     def can_afford_order(self, order_amount):
@@ -495,9 +495,10 @@ class CreditTransaction(TimeStampedModel):
                 raise ValidationError({'amount': f'Excede límite de crédito. Límite: ${self.credit_limit_after:.2f}'})
 
 
-# ClientBillingFrecuency has been moved to billing.models
+# InvoiceSchedule has been moved to billing.models
 # Import it from there for backward compatibility
-from billing.models import ClientBillingFrecuency
+from billing.models import InvoiceSchedule
+ClientBillingFrecuency = InvoiceSchedule  # backward compat alias
 
 class Contact(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='contacts', on_delete=models.CASCADE)

@@ -78,8 +78,8 @@ class InvoiceOrderLink(TimeStampedModel):
         verbose_name = 'Venta en factura'
         verbose_name_plural = 'Ventas en factura'
 
-class ClientBillingFrecuency(TimeStampedModel):
-    client = models.OneToOneField('clients.Client', related_name='billing_frecuency', on_delete=models.CASCADE, related_query_name='client_billing_frecuency')
+class InvoiceSchedule(TimeStampedModel):
+    client = models.OneToOneField('clients.Client', related_name='invoice_schedule', on_delete=models.CASCADE, related_query_name='invoice_schedule')
     frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='other', verbose_name="Frecuencia de Facturación")
     billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, null=True, blank=True, verbose_name="Fecha de Facturación")
 
@@ -124,7 +124,7 @@ class ClientBillingFrecuency(TimeStampedModel):
         from django.core.exceptions import ValidationError
         # Validate a client can have only one active billing frequency
         if self.is_active:
-            active_frequencies = ClientBillingFrecuency.objects.filter(client=self.client, is_active=True).exclude(id=self.id)
+            active_frequencies = InvoiceSchedule.objects.filter(client=self.client, is_active=True).exclude(id=self.id)
             if active_frequencies.exists():
                 raise ValidationError({'is_active': 'El cliente ya tiene una frecuencia de facturación activa.'})
         if self.client.requires_billing is False:

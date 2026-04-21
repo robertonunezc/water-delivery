@@ -14,7 +14,7 @@ from django.db.models import Count, Sum, Q, Prefetch
 from django.core.exceptions import ValidationError
 from calendar import monthrange
 
-from billing.models import ClientBillingFrecuency
+from billing.models import InvoiceSchedule
 from clients.models import Client, BillingData
 from clients.services import client_service
 from core.utils import get_first_last_day_of_month
@@ -50,9 +50,9 @@ def get_clients_needing_billing(
     # Base queryset: active clients with active billing frequency
     queryset = Client.objects.filter(
         active=True,
-        client_billing_frecuency__is_active=True
+        invoice_schedule__is_active=True
     ).select_related(
-        'client_billing_frecuency',
+        'invoice_schedule',
         'billing_data'
     ).prefetch_related(
         Prefetch(
@@ -68,7 +68,7 @@ def get_clients_needing_billing(
     print('Frecuency filter:', frequency_filter)
     # Apply frequency filter
     if frequency_filter:
-        queryset = queryset.filter(client_billing_frecuency__frequency=frequency_filter)
+        queryset = queryset.filter(invoice_schedule__frequency=frequency_filter)
     # Apply search filter
     if search_query:
         queryset = queryset.filter(
@@ -103,9 +103,9 @@ def get_clients_needing_billing(
 
     for client in queryset:
         # Skip if client doesn't have billing frequency (shouldn't happen due to filter, but defensive)
-        if not hasattr(client, 'billing_frecuency') or client.billing_frecuency is None:
+        if not hasattr(client, 'invoice_schedule') or client.invoice_schedule is None:
             continue
-        billing_freq = client.billing_frecuency
+        billing_freq = client.invoice_schedule
 
         # Special handling for contraentrega (when_delivery)
         if billing_freq.frequency == 'when_delivery':
@@ -145,20 +145,20 @@ def set_billing_date_to_clients() -> Optional[date]:
     """
     Update next_billing_date for all active clients with active billing frequency.
 
-    This triggers the save logic on ClientBillingFrecuency which calculates
+    This triggers the save logic on InvoiceSchedule which calculates
     the next billing date based on the frequency configuration.
     """
     first_day, last_day = get_first_last_day_of_month(date.today().year, date.today().month)
     queryset = Client.objects.filter(
         active=True,
-        client_billing_frecuency__is_active=True
+        invoice_schedule__is_active=True
     ).select_related(
-        'client_billing_frecuency',
+        'invoice_schedule',
         'billing_data'
     )
 
     for client in queryset:
-        client.billing_frecuency.save()  # Triggers save logic to update next_billing_date
+        client.invoice_schedule.save()  # Triggers save logic to update next_billing_date
 
 
 # Billing Order Validation Services
@@ -286,9 +286,9 @@ def delete_billing_frequency_for_client(client_id: int) -> None:
         client_id: ID of the client to update
     """
     try:
-        billing_frequency = ClientBillingFrecuency.objects.get(client_id=client_id)
+        billing_frequency = InvoiceSchedule.objects.get(client_id=client_id)
         billing_frequency.delete()
-    except ClientBillingFrecuency.DoesNotExist:
+    except InvoiceSchedule.DoesNotExist:
         pass  # If no billing frequency exists, nothing to disable
 
 def delete_billing_data_for_client(client_id: int) -> None:

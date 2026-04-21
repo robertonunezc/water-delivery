@@ -68,7 +68,7 @@ class BillingDisplayMixin:
 		if obj.pk:
 			url = reverse('admin:clients_client_manage_billing', args=[obj.pk])
 			has_billing = hasattr(obj, 'billing_data')
-			has_frequency = hasattr(obj, 'billing_frecuency') and obj.billing_frecuency.exists()
+			has_frequency = hasattr(obj, 'invoice_schedule')
 			
 			if has_billing and has_frequency:
 				status = '<span style="color: green;">✓ Configurado</span>'

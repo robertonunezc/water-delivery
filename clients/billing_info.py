@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional, Set
 
 from clients.models import Client, BillingData, Address
-from billing.models import ClientBillingFrecuency
+from billing.models import InvoiceSchedule
 
 
 @dataclass
@@ -12,7 +12,7 @@ class BillingComponents:
 
     data: Optional[BillingData]  # Assuming BillingData is defined elsewhere
     address: Optional[Address]
-    frequency: Optional[ClientBillingFrecuency]  # Assuming ClientBillingFrecuency is defined elsewhere
+    frequency: Optional[InvoiceSchedule]  # Assuming InvoiceSchedule is defined elsewhere
 
     @property
     def has_data(self) -> bool:
@@ -46,7 +46,7 @@ class BillingInfo:
     def _get_own_components(self, client: Client) -> BillingComponents:
         data = getattr(client, 'billing_data', None) if hasattr(client, 'billing_data') else None
         address = client.addresses.filter(type='billing', active=True).first() if client.pk else None
-        frequency = getattr(client, 'billing_frecuency', None) if hasattr(client, 'billing_frecuency') else None
+        frequency = getattr(client, 'invoice_schedule', None) if hasattr(client, 'invoice_schedule') else None
         return BillingComponents(data=data, address=address, frequency=frequency)
 
     def _resolve_effective(self, client: Client, own: BillingComponents):

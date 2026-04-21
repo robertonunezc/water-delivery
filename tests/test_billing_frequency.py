@@ -11,7 +11,8 @@ from datetime import date
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'water_delivery.settings')
 django.setup()
 
-from clients.models import Client, ClientBillingFrecuency
+from clients.models import Client
+from billing.models import InvoiceSchedule as ClientBillingFrecuency  # renamed; alias kept for this test file
 
 def test_billing_frequency_examples():
     """Test different billing frequency scenarios"""

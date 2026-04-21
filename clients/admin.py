@@ -65,7 +65,7 @@ class AddressInline(StackedInline):
 	tab = True
 
 class ClientBillingFrecuencyInline(StackedInline):
-	model = models.ClientBillingFrecuency
+	model = models.InvoiceSchedule
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
 	verbose_name_plural = "Frecuencias de Facturación"
@@ -81,7 +81,7 @@ class ClientBillingFrecuencyInline(StackedInline):
 	tab = True
 
 class BillingFrecuencyInline(StackedInline):
-	model = models.ClientBillingFrecuency
+	model = models.InvoiceSchedule
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
 	verbose_name_plural = "Frecuencias de Facturación"

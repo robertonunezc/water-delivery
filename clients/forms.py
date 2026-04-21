@@ -256,8 +256,8 @@ class ClientBillingFrequencyForm(forms.ModelForm):
     """Form for managing client billing frequency"""
     
     class Meta:
-        from .models import ClientBillingFrecuency
-        model = ClientBillingFrecuency
+        from billing.models import InvoiceSchedule
+        model = InvoiceSchedule
         fields = ['frequency', 'billing_date', 'specific_day', 'weekday', 'occurrence', 'is_active', 'notes']
         widgets = {
             'frequency': forms.Select(attrs={'class': 'form-control'}),
