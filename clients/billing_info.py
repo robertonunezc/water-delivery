@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-from clients.models import Client, BillingData, Address
+from clients.models import Client, InvoiceData, Address
 from billing.models import InvoiceSchedule
 
 
@@ -10,7 +10,7 @@ from billing.models import InvoiceSchedule
 class BillingComponents:
     """Simple container for billing parts."""
 
-    data: Optional[BillingData]  # Assuming BillingData is defined elsewhere
+    data: Optional[InvoiceData]  # Assuming InvoiceData is defined elsewhere
     address: Optional[Address]
     frequency: Optional[InvoiceSchedule]  # Assuming InvoiceSchedule is defined elsewhere
 
@@ -44,7 +44,7 @@ class BillingInfo:
         self.effective, self.source = self._resolve_effective(client, self.own)
 
     def _get_own_components(self, client: Client) -> BillingComponents:
-        data = getattr(client, 'billing_data', None) if hasattr(client, 'billing_data') else None
+        data = getattr(client, 'invoice_data', None) if hasattr(client, 'invoice_data') else None
         address = client.addresses.filter(type='billing', active=True).first() if client.pk else None
         frequency = getattr(client, 'invoice_schedule', None) if hasattr(client, 'invoice_schedule') else None
         return BillingComponents(data=data, address=address, frequency=frequency)
@@ -90,7 +90,7 @@ class BillingInfo:
     def missing_components(self) -> List[str]:
         missing = []
         if not self.effective.has_data:
-            missing.append('billing_data')
+            missing.append('invoice_data')
         if not self.effective.has_address:
             missing.append('billing_address')
         if not self.effective.has_frequency:

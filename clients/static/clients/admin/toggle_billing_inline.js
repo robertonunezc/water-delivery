@@ -19,7 +19,7 @@
          */
         initializeElements() {
             this.toggleBillingFormCheckbox = this.$('#id_billing_override_enabled');
-            this.billingDataInline = this.$('#billing_data-group');
+            this.billingDataInline = this.$('#invoice_data-group');
             this.billingFrequencyInline = this.$('#billing_frecuency-group');
         }
 
