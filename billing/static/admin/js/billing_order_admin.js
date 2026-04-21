@@ -75,9 +75,9 @@
   function fetchBillableOrders(clientId, billingRecordId) {
     let url = `/admin/billing/invoiceorderlink/billable-orders/${clientId}/`;
 
-    // Add billing_record_id as query param for date filtering
+    // Add invoice_id as query param for date filtering
     if (billingRecordId) {
-      url += `?billing_record_id=${billingRecordId}`;
+      url += `?invoice_id=${billingRecordId}`;
     }
     
     console.log("fetchBillableOrders: requesting", url);
