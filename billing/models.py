@@ -383,9 +383,9 @@ class InvoiceSchedule(TimeStampedModel):
         return None
 
 
-class BillingFrequencyReport(models.Model):
+class InvoiceFrequencyReport(models.Model):
     """
-    Proxy model to create an admin menu entry for the billing frequency report.
+    Proxy model to create an admin menu entry for the invoice frequency report.
     This model has no database table - it's just for admin navigation.
     """
     class Meta:

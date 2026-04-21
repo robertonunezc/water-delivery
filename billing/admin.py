@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
 from collections import Counter
 
-from billing.models import Invoice, InvoiceOrderLink, BillingFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
+from billing.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
 from core.admin_mixins import SoftDeleteAdminMixin
 # Register your models here.
@@ -63,7 +63,8 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
             # Use custom manager method to get unbilled orders for client
             self.fields['order'].queryset = Order.objects.unbilled_for_client(
                 invoice.client,
-                exclude_order_id=current_order_id
+                exclude_order_id=current_order_id,
+                invoice_date=invoice.date,
             )
         elif 'order' in self.fields:
             # No invoice available yet - show all unbilled orders
@@ -140,7 +141,7 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
                 name='billing_invoiceorderlink_billable_orders',
             ),
             path(
-                'billing-record/<int:billing_record_pk>/client/',
+                'invoice/<int:invoice_pk>/client/',
                 self.admin_site.admin_view(self.get_invoice_client),
                 name='billing_invoiceorderlink_get_client',
             ),
@@ -160,17 +161,17 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
         return JsonResponse({'orders': orders_data})
 
-    def get_invoice_client(self, request, billing_record_pk):
+    def get_invoice_client(self, request, invoice_pk):
         """Return the client_id for a given invoice"""
         from django.shortcuts import get_object_or_404
-        invoice = get_object_or_404(Invoice, pk=billing_record_pk)
+        invoice = get_object_or_404(Invoice, pk=invoice_pk)
         return JsonResponse({
             'client_id': invoice.client_id,
             'client_name': invoice.client.name,
         })
 
-@admin.register(BillingFrequencyReport)
-class BillingFrequencyReportAdmin(ModelAdmin):
+@admin.register(InvoiceFrequencyReport)
+class InvoiceFrequencyReportAdmin(ModelAdmin):
     """
     Custom admin for billing frequency report.
     Overrides changelist_view to show custom report instead of model list.

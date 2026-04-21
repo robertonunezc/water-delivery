@@ -9,23 +9,23 @@
   }
 
   function init() {
-    const billingRecordSelect = document.getElementById("id_invoice");
+    const invoiceSelect = document.getElementById("id_invoice");
     const orderSelect = document.getElementById("id_order");
 
-    if (!billingRecordSelect || !orderSelect) {
+    if (!invoiceSelect || !orderSelect) {
       return; // not on InvoiceOrderLink admin form
     }
 
-    const handleBillingRecordChange = (billingRecordId) => {
-      if (!billingRecordId) {
+    const handleInvoiceChange = (invoiceId) => {
+      if (!invoiceId) {
         clearOrderSelect(orderSelect);
         return;
       }
 
-      fetchClientId(billingRecordId)
+      fetchClientId(invoiceId)
         .then((clientId) => {
           if (clientId) {
-            return fetchBillableOrders(clientId, billingRecordId);
+            return fetchBillableOrders(clientId, invoiceId);
           }
           return [];
         })
@@ -38,19 +38,19 @@
         });
     };
 
-    // Listen for native change events on billing_record select
-    billingRecordSelect.addEventListener("change", function () {
-      handleBillingRecordChange(this.value);
+    // Listen for native change events on invoice select
+    invoiceSelect.addEventListener("change", function () {
+      handleInvoiceChange(this.value);
     });
 
     // Load billable orders immediately if a record is preselected
-    if (billingRecordSelect.value) {
-      handleBillingRecordChange(billingRecordSelect.value);
+    if (invoiceSelect.value) {
+      handleInvoiceChange(invoiceSelect.value);
     }
   }
 
-  function fetchClientId(billingRecordId) {
-    const url = `/admin/billing/invoiceorderlink/billing-record/${billingRecordId}/client/`;
+  function fetchClientId(invoiceId) {
+    const url = `/admin/billing/invoiceorderlink/invoice/${invoiceId}/client/`;
     console.log("fetchClientId: requesting", url);
 
     return fetch(url, {
@@ -72,12 +72,12 @@
       });
   }
 
-  function fetchBillableOrders(clientId, billingRecordId) {
+  function fetchBillableOrders(clientId, invoiceId) {
     let url = `/admin/billing/invoiceorderlink/billable-orders/${clientId}/`;
 
     // Add invoice_id as query param for date filtering
-    if (billingRecordId) {
-      url += `?invoice_id=${billingRecordId}`;
+    if (invoiceId) {
+      url += `?invoice_id=${invoiceId}`;
     }
     
     console.log("fetchBillableOrders: requesting", url);
