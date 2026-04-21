@@ -32,8 +32,8 @@ def list(request):
             Q(addresses__street__icontains=search_query) |
             Q(addresses__municipality__icontains=search_query) |
             Q(addresses__state__icontains=search_query) |
-            Q(billing_data__rfc__icontains=search_query) |
-            Q(billing_data__razon_social__icontains=search_query)
+            Q(invoice_data__rfc__icontains=search_query) |
+            Q(invoice_data__razon_social__icontains=search_query)
         ).distinct()
     
     # Pagination

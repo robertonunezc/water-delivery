@@ -42,7 +42,7 @@ class BillingDisplayMixin:
 		if not obj.pk:
 			return ''
 		missing_messages = {
-			'billing_data': 'Datos de Facturacion',
+			'invoice_data': 'Datos de Facturacion',
 			'billing_address': 'Dirección Fiscal',
 			'billing_frequency': 'Frecuencia de Facturación',
 		}
@@ -67,7 +67,7 @@ class BillingDisplayMixin:
 		"""Display a button to manage billing data and frequency"""
 		if obj.pk:
 			url = reverse('admin:clients_client_manage_billing', args=[obj.pk])
-			has_billing = hasattr(obj, 'billing_data')
+			has_billing = hasattr(obj, 'invoice_data')
 			has_frequency = hasattr(obj, 'invoice_schedule')
 			
 			if has_billing and has_frequency:

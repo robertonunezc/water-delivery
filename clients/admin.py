@@ -107,8 +107,8 @@ class ClientCreditConfigInline(StackedInline):
 	)
 	tab = True
 	
-class ClientBillingDataInline(StackedInline):
-	model = models.BillingData
+class ClientInvoiceDataInline(StackedInline):
+	model = models.InvoiceData
 	display_fields = ('rfc', 'razon_social', 'curp')
 	exclude = ('deleted_at',)
 	extra = 0
@@ -123,7 +123,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	change_list_template = 'admin/clients/client_change_list.html'
-	inlines = [BillingFrecuencyInline,ClientBillingDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
+	inlines = [BillingFrecuencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
 		'balance', 'current_debt', 'get_available_credit',
@@ -248,15 +248,15 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if not obj.requires_billing:
 			filtered_inlines = [
 				inline for inline in all_inlines
-				if not isinstance(inline, (BillingFrecuencyInline, ClientBillingDataInline))
-			]
+			if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
+		]
 			return filtered_inlines
 
 		# If it's a branch client without billing override, filter out billing-related inlines
 		if obj.type == 'branch' and not obj.billing_override_enabled:
 			filtered_inlines = [
 				inline for inline in all_inlines
-				if not isinstance(inline, (BillingFrecuencyInline, ClientBillingDataInline))
+				if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
 			]
 			return filtered_inlines
 		
@@ -326,7 +326,7 @@ class ContactAdmin(admin.ModelAdmin):
 	exclude = ('deleted_at',)
 
 
-class BillingDataAdmin(admin.ModelAdmin):
+class InvoiceDataAdmin(admin.ModelAdmin):
 	# show related client name via a callable
 	list_display = ('rfc', 'razon_social', 'client_name')
 	search_fields = ('razon_social', 'rfc',)

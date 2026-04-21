@@ -6,7 +6,7 @@ from datetime import date, timedelta
 import csv
 import io
 from .models import (
-    Client, BillingData, Address, BalanceTransaction, CreditTransaction,
+    Client, InvoiceData, Address, BalanceTransaction, CreditTransaction,
     Contact, ClientBillingFrecuency, ClientCreditConfig
 )
 from .forms import AddressInlineForm
@@ -30,7 +30,7 @@ class ClientBillingInheritanceTestCase(TestCase):
             requires_billing=True,
             active=True,
         )
-        BillingData.objects.create(
+        InvoiceData.objects.create(
             client=self.corporate,
             rfc="CORP123456ABC",
             razon_social="Corporativo SA de CV",
@@ -80,7 +80,7 @@ class ClientBillingInheritanceTestCase(TestCase):
             requires_billing=True,
             active=True,
         )
-        BillingData.objects.create(
+        InvoiceData.objects.create(
             client=corporate,
             rfc="MISS123456",
             razon_social="Missing SA",
@@ -108,7 +108,7 @@ class ClientBillingInheritanceTestCase(TestCase):
             requires_billing=True,
             active=True,
         )
-        BillingData.objects.create(
+        InvoiceData.objects.create(
             client=corp_incomplete,
             rfc="INC123456",
             razon_social="Incomplete SA",
@@ -131,7 +131,7 @@ class ClientBillingInheritanceTestCase(TestCase):
         self.assertEqual(billing.source, 'corporate')
 
     def test_branch_override_ready_with_own_complete_data(self):
-        BillingData.objects.create(
+        InvoiceData.objects.create(
             client=self.branch_override,
             rfc="BRANCH123456XYZ",
             razon_social="Sucursal SA de CV",
@@ -158,7 +158,7 @@ class ClientBillingInheritanceTestCase(TestCase):
         self.assertEqual(billing.source, 'own')
 
     def test_branch_override_not_ready_with_incomplete_own_data(self):
-        BillingData.objects.create(
+        InvoiceData.objects.create(
             client=self.branch_override,
             rfc="PART123456",
             razon_social="Parcial SA",

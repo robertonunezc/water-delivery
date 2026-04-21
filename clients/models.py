@@ -577,8 +577,8 @@ class Address(TimeStampedModel):
 
 
 
-class BillingData(TimeStampedModel):
-    client = models.OneToOneField('Client', related_name='billing_data', on_delete=models.CASCADE)
+class InvoiceData(TimeStampedModel):
+    client = models.OneToOneField('Client', related_name='invoice_data', on_delete=models.CASCADE)
     rfc = models.CharField(max_length=255, db_index=True)
     razon_social = models.TextField()
     curp = models.CharField(max_length=255, blank=True, null=True, verbose_name="CURP")
@@ -587,6 +587,7 @@ class BillingData(TimeStampedModel):
     #address = models.ForeignKey('Address', related_name='billing_data', on_delete=models.CASCADE)
     #regimen_fiscal = models.CharField(max_length=10, choices=REGIMEN_FISCAL_CHOICES, blank=True, null=True, verbose_name="Régimen Fiscal")
     class Meta:
+        db_table = 'clients_billingdata'  # Keep existing table name to avoid migration
         verbose_name = 'Datos de facturación'
         verbose_name_plural = 'Datos de facturación'
         indexes = [
@@ -594,7 +595,7 @@ class BillingData(TimeStampedModel):
         ]
     
     def __str__(self):
-        return f"Billing data for {self.client.name}"
+        return f"Invoice data for {self.client.name}"
     
 class ClientCreditConfig(TimeStampedModel):
     client = models.OneToOneField(Client, related_name='credit_config', on_delete=models.CASCADE)

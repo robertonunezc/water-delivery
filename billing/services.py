@@ -15,7 +15,7 @@ from django.core.exceptions import ValidationError
 from calendar import monthrange
 
 from billing.models import InvoiceSchedule
-from clients.models import Client, BillingData
+from clients.models import Client, InvoiceData
 from clients.services import client_service
 from core.utils import get_first_last_day_of_month
 from orders.models import Order
@@ -53,7 +53,7 @@ def get_clients_needing_billing(
         invoice_schedule__is_active=True
     ).select_related(
         'invoice_schedule',
-        'billing_data'
+        'invoice_data'
     ).prefetch_related(
         Prefetch(
             'orders',
@@ -73,7 +73,7 @@ def get_clients_needing_billing(
     if search_query:
         queryset = queryset.filter(
             Q(name__icontains=search_query) |
-            Q(billing_data__razon_social__icontains=search_query) |
+            Q(invoice_data__razon_social__icontains=search_query) |
             Q(rfc__icontains=search_query)
         )
     # Annotate with order counts and amounts
@@ -154,7 +154,7 @@ def set_billing_date_to_clients() -> Optional[date]:
         invoice_schedule__is_active=True
     ).select_related(
         'invoice_schedule',
-        'billing_data'
+        'invoice_data'
     )
 
     for client in queryset:
@@ -298,7 +298,7 @@ def delete_billing_data_for_client(client_id: int) -> None:
     Args:
         client_id: ID of the client to update
     """
-    billing_data = BillingData.objects.filter(client_id=client_id).first()
+    billing_data = InvoiceData.objects.filter(client_id=client_id).first()
     if billing_data:
         billing_data.delete() 
 

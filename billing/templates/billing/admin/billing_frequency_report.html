@@ -256,7 +256,7 @@
             <tr>
                 <td>
                     <strong>{{ result.client.name }}</strong><br>
-                    <small>{{ result.client.billing_data.rfc|default:"Sin RFC" }}</small>
+                    <small>{{ result.client.invoice_data.rfc|default:"Sin RFC" }}</small>
                 </td>
                 <td>
                     {% if result.client.type == 'corporate' %}
