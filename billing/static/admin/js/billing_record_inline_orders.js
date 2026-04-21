@@ -45,7 +45,7 @@
      */
     function updateAllInlineOrderSelects(clientId) {
         const orderSelects = document.querySelectorAll(
-            '[id^="id_billing_orders-"][id$="-order"]'
+            '[id^="id_invoice_links-"][id$="-order"]'
         );
 
         console.log("Found", orderSelects.length, "order selects to update");
@@ -107,7 +107,7 @@
     function fetchBillableOrdersForClient(clientId) {
         // For filtering, we might want to get the billing record ID if editing
         const billingRecordId = getBillingRecordId();
-        let queryParam = billingRecordId ? `?billing_record_id=${billingRecordId}` : "";
+        let queryParam = billingRecordId ? `?invoice_id=${billingRecordId}` : "";
 
         // Use the Invoice admin's endpoint for inline context
         const url = `/admin/billing/invoice/billable-orders/${clientId}/${queryParam}`;

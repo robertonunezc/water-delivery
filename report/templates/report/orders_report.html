@@ -409,11 +409,11 @@
                       </span>
                     </td>
                     <td class="text-center">
-                      {% with billing_list=order.billing_orders.all %}
+                      {% with billing_list=order.invoice_links.all %}
                         {% if billing_list %}
                           {% for bo in billing_list %}
                             <span class="badge" style="background:#28a745; color:#fff; margin-right:4px;">
-                              {{ bo.billing_record.identifier }}
+                              {{ bo.invoice.identifier }}
                             </span>
                           {% endfor %}
                         {% else %}
@@ -634,14 +634,14 @@
               </div>
             {% endif %}
             {% comment %} Billing information for the order (if any) {% endcomment %}
-            {% with billing_list=order.billing_orders.all %}
+            {% with billing_list=order.invoice_links.all %}
               {% if billing_list %}
                 <h6><i class="fas fa-file-invoice-dollar me-2"></i>Facturación</h6>
                 <ul>
                   {% for bo in billing_list %}
                     <li>
-                      <strong>{{ bo.billing_record.identifier }}</strong>
-                      - Monto: ${{ bo.billing_record.amount|floatformat:2 }}
+                      <strong>{{ bo.invoice.identifier }}</strong>
+                      - Monto: ${{ bo.invoice.amount|floatformat:2 }}
                       {% if bo.is_paid %}
                         <span class="badge bg-success ms-2">Pagado</span>
                       {% elif bo.partially_paid %}
