@@ -71,8 +71,8 @@
         <p class="feature-note">{% trans "Consulta y gestiona pedidos." %}</p>
       </a>
     {% endif %}
-    {% if perms.billing.view_billingfrequencyreport %}
-      <a class="feature-card" href="{% url 'admin:billing_billingfrequencyreport_changelist' %}">
+    {% if perms.billing.view_invoicefrequencyreport %}
+      <a class="feature-card" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">
         <p class="feature-meta">{% trans "Reportes" %}</p>
         <p class="feature-title">{% trans "Frecuencia de facturación" %}</p>
         <p class="feature-note">{% trans "Revisa clientes listos para facturar." %}</p>
@@ -87,11 +87,11 @@
     {% endif %}
   </div>
 
-  {% if perms.billing.view_billingfrequencyreport %}
+  {% if perms.billing.view_invoicefrequencyreport %}
     <div class="reports">
       <h2>{% trans "Reportes comunes" %}</h2>
       <div class="report-links">
-        <a class="report-tile" href="{% url 'admin:billing_billingfrequencyreport_changelist' %}">{% trans "Reporte de frecuencia de facturación" %}</a>
+        <a class="report-tile" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">{% trans "Reporte de frecuencia de facturación" %}</a>
       </div>
     </div>
   {% endif %}

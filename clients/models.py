@@ -274,8 +274,8 @@ class Client(TimeStampedModel):
     @property
     def billing_info(self):
         """Build billing info on demand to reflect latest state."""
-        from clients.billing_info import BillingInfo
-        return BillingInfo(self)
+        from clients.invoice_info import InvoiceInfo
+        return InvoiceInfo(self)
 
     def get_products(self):
         return self.product_prices.select_related('product').all()

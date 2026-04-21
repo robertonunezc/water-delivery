@@ -1,18 +1,18 @@
-"""Centralized billing information logic for Client model, kept lean for clarity."""
+"""Centralized invoice information logic for Client model, kept lean for clarity."""
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-from clients.models import Client, InvoiceData, Address
 from billing.models import InvoiceSchedule
+from clients.models import Address, Client, InvoiceData
 
 
 @dataclass
-class BillingComponents:
-    """Simple container for billing parts."""
+class InvoiceComponents:
+    """Simple container for invoice parts."""
 
-    data: Optional[InvoiceData]  # Assuming InvoiceData is defined elsewhere
+    data: Optional[InvoiceData]
     address: Optional[Address]
-    frequency: Optional[InvoiceSchedule]  # Assuming InvoiceSchedule is defined elsewhere
+    frequency: Optional[InvoiceSchedule]
 
     @property
     def has_data(self) -> bool:
@@ -35,46 +35,46 @@ class BillingComponents:
         return self.has_data and self.has_address and self.has_frequency
 
 
-class BillingInfo:
-    """Resolved billing info for a client (own + effective + source)."""
+class InvoiceInfo:
+    """Resolved invoice info for a client (own + effective + source)."""
 
     def __init__(self, client: Client):
         self._client = client
         self.own = self._get_own_components(client)
         self.effective, self.source = self._resolve_effective(client, self.own)
 
-    def _get_own_components(self, client: Client) -> BillingComponents:
-        data = getattr(client, 'invoice_data', None) if hasattr(client, 'invoice_data') else None
-        address = client.addresses.filter(type='billing', active=True).first() if client.pk else None
-        frequency = getattr(client, 'invoice_schedule', None) if hasattr(client, 'invoice_schedule') else None
-        return BillingComponents(data=data, address=address, frequency=frequency)
+    def _get_own_components(self, client: Client) -> InvoiceComponents:
+        data = getattr(client, "invoice_data", None) if hasattr(client, "invoice_data") else None
+        address = client.addresses.filter(type="billing", active=True).first() if client.pk else None
+        frequency = getattr(client, "invoice_schedule", None) if hasattr(client, "invoice_schedule") else None
+        return InvoiceComponents(data=data, address=address, frequency=frequency)
 
-    def _resolve_effective(self, client: Client, own: BillingComponents):
+    def _resolve_effective(self, client: Client, own: InvoiceComponents):
         """Resolve effective billing without recursive calls deep into corporate chains."""
         visited: Set[int] = set()
 
-        def resolve(current: Client, current_own: BillingComponents):
+        def resolve(current: Client, current_own: InvoiceComponents):
             if current.pk and current.pk in visited:
-                return BillingComponents(None, None, None), 'none'
+                return InvoiceComponents(None, None, None), "none"
             if current.pk:
                 visited.add(current.pk)
 
             # Non-branches use only their own setup
-            if current.type != 'branch':
-                return current_own, 'own' if current_own.is_complete else 'none'
+            if current.type != "branch":
+                return current_own, "own" if current_own.is_complete else "none"
 
             # Branch with override enabled prefers own; otherwise fall back to corporate
             if current.billing_override_enabled and current_own.has_any:
-                return current_own, 'own'
+                return current_own, "own"
 
             if current.corporate:
                 corporate_own = self._get_own_components(current.corporate)
-                corporate_effective, corporate_source = resolve(current.corporate, corporate_own)
+                corporate_effective, _corporate_source = resolve(current.corporate, corporate_own)
                 if corporate_effective.has_any:
-                    return corporate_effective, 'corporate'
+                    return corporate_effective, "corporate"
 
             # No usable data
-            return BillingComponents(None, None, None), 'none'
+            return InvoiceComponents(None, None, None), "none"
 
         return resolve(client, own)
 
@@ -84,35 +84,36 @@ class BillingInfo:
 
     @property
     def uses_inheritance(self) -> bool:
-        return self.source == 'corporate'
+        return self.source == "corporate"
 
     @property
     def missing_components(self) -> List[str]:
         missing = []
         if not self.effective.has_data:
-            missing.append('invoice_data')
+            missing.append("invoice_data")
         if not self.effective.has_address:
-            missing.append('billing_address')
+            missing.append("billing_address")
         if not self.effective.has_frequency:
-            missing.append('billing_frequency')
+            missing.append("billing_frequency")
         return missing
 
     def get_setup_status(self) -> dict:
         return {
-            'is_complete': self.is_complete,
-            'source': self.source,
-            'missing_components': self.missing_components,
+            "is_complete": self.is_complete,
+            "source": self.source,
+            "missing_components": self.missing_components,
         }
 
     def get_override_validation_warnings(self) -> List[str]:
         warnings: List[str] = []
-        if not (self._client.type == 'branch' and self._client.billing_override_enabled):
+        if not (self._client.type == "branch" and self._client.billing_override_enabled):
             return warnings
 
         if not self.own.has_data:
-            warnings.append('Datos de facturación propios requeridos: debe agregar RFC y Razón Social.')
+            warnings.append("Datos de facturación propios requeridos: debe agregar RFC y Razón Social.")
         if not self.own.has_address:
             warnings.append('Dirección fiscal propia requerida: debe agregar una dirección de tipo "Fiscal".')
         if not self.own.has_frequency:
-            warnings.append('Frecuencia de facturación propia requerida: debe configurar la frecuencia.')
+            warnings.append("Frecuencia de facturación propia requerida: debe configurar la frecuencia.")
         return warnings
+

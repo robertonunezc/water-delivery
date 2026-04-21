@@ -51,7 +51,7 @@ class OrderQuerySet(models.QuerySet):
             return self.filter(client=client)
         return self.filter(client_id=client)
 
-    def unbilled_for_client(self, client, exclude_order_id=None):
+    def unbilled_for_client(self, client, exclude_order_id=None, invoice_date=None):
         """
         Get unbilled orders for a specific client.
 
@@ -62,12 +62,16 @@ class OrderQuerySet(models.QuerySet):
         Returns:
             QuerySet of unbilled orders for the client
         """
-        qs = self.for_client(client).unbilled()
+        qs = self.for_client(client)
+
+        if invoice_date:
+            qs = qs.filter(order_date__gte=invoice_date)
 
         if exclude_order_id:
-            # Include the current order if we're editing an existing billing order
-            qs = qs | self.filter(pk=exclude_order_id)
-            qs = qs.distinct()
+            # Include the current order if we're editing an existing invoice link.
+            qs = qs.filter(Q(invoice_links__isnull=True) | Q(pk=exclude_order_id)).distinct()
+        else:
+            qs = qs.filter(invoice_links__isnull=True).distinct()
 
         return qs.order_by('-order_date')
 
@@ -130,8 +134,8 @@ class OrderManager(models.Manager):
     def for_client(self, client):
         return self.get_queryset().for_client(client)
 
-    def unbilled_for_client(self, client, exclude_order_id=None):
-        return self.get_queryset().unbilled_for_client(client, exclude_order_id)
+    def unbilled_for_client(self, client, exclude_order_id=None, invoice_date=None):
+        return self.get_queryset().unbilled_for_client(client, exclude_order_id, invoice_date)
 
     def today_orders(self, user=None):
         return self.get_queryset().today_orders(user)
