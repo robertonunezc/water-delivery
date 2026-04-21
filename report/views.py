@@ -132,7 +132,7 @@ def orders_report(request):
     orders_queryset = Order.objects.select_related(
         'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts', 'payments', 'billing_orders__billing_record'
+        'items__product', 'client__contacts', 'payments', 'invoice_links__invoice'
     )
     
     # Apply search filter
@@ -149,11 +149,11 @@ def orders_report(request):
     if payment_method:
         orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
 
-    # Apply billing attached filter: 'yes' => has billing_orders, 'no' => no billing_orders
+    # Apply billing attached filter: 'yes' => has invoice_links, 'no' => no invoice_links
     if has_billing == 'yes':
-        orders_queryset = orders_queryset.filter(billing_orders__isnull=False).distinct()
+        orders_queryset = orders_queryset.filter(invoice_links__isnull=False).distinct()
     elif has_billing == 'no':
-        orders_queryset = orders_queryset.filter(billing_orders__isnull=True)
+        orders_queryset = orders_queryset.filter(invoice_links__isnull=True)
 
     # Apply status filter
     if status_filter and status_filter != 'all':
@@ -302,7 +302,7 @@ def orders_report_csv(request):
     orders_queryset = Order.objects.select_related(
         'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts', 'payments', 'billing_orders__billing_record'
+        'items__product', 'client__contacts', 'payments', 'invoice_links__invoice'
     )
 
     if search_query:
@@ -315,9 +315,9 @@ def orders_report_csv(request):
     if payment_method:
         orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
     if has_billing == 'yes':
-        orders_queryset = orders_queryset.filter(billing_orders__isnull=False).distinct()
+        orders_queryset = orders_queryset.filter(invoice_links__isnull=False).distinct()
     elif has_billing == 'no':
-        orders_queryset = orders_queryset.filter(billing_orders__isnull=True)
+        orders_queryset = orders_queryset.filter(invoice_links__isnull=True)
     if status_filter and status_filter != 'all':
         orders_queryset = orders_queryset.filter(status=status_filter)
     today = timezone.now().date()
@@ -388,7 +388,7 @@ def orders_report_csv(request):
             smart_str(order.owner.get_full_name() if order.owner else ''),
             smart_str(order.notes or ''),
             payment_methods,
-            'Sí' if order.billing_orders.exists() else 'No',
+            'Sí' if order.invoice_links.exists() else 'No',
         ])
     return response
 

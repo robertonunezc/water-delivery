@@ -51,11 +51,11 @@ class BillingAttachedFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value() == 'yes':
-            # Orders that have at least one BillingOrder
-            return queryset.filter(billing_orders__isnull=False).distinct()
+            # Orders that have at least one InvoiceOrderLink
+            return queryset.filter(invoice_links__isnull=False).distinct()
         elif self.value() == 'no':
-            # Orders without any BillingOrder
-            return queryset.filter(billing_orders__isnull=True)
+            # Orders without any InvoiceOrderLink
+            return queryset.filter(invoice_links__isnull=True)
 
 
 class OrderProductInline(admin.TabularInline):
@@ -349,27 +349,27 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     payment_status.short_description = 'Pago'
     
     def billing_status(self, obj):
-        """Display billing status and associated billing records"""
+        """Display billing status and associated invoices"""
         try:
-            from billing.models import BillingOrder
-            billing_orders = BillingOrder.objects.filter(order=obj).select_related('billing_record')
+            from billing.models import InvoiceOrderLink
+            invoice_links = InvoiceOrderLink.objects.filter(order=obj).select_related('invoice')
             
-            if not billing_orders.exists():
+            if not invoice_links.exists():
                 return format_html('<span style="color: #6c757d;">-</span>')
             
             billing_info = []
-            for billing_order in billing_orders:
-                identifier = billing_order.billing_record.identifier
-                url = reverse('admin:billing_billingrecord_change', args=[billing_order.billing_record.id])
+            for invoice_link in invoice_links:
+                identifier = invoice_link.invoice.identifier
+                url = reverse('admin:billing_invoice_change', args=[invoice_link.invoice.id])
                 
-                if billing_order.is_paid:
+                if invoice_link.is_paid:
                     status_icon = '✓'
                     color = '#28a745'
                     status_text = 'Pagado'
-                elif billing_order.partially_paid:
+                elif invoice_link.partially_paid:
                     status_icon = '⚠'
                     color = '#ffc107'
-                    status_text = f'Parcial ${billing_order.amount_paid}'
+                    status_text = f'Parcial ${invoice_link.amount_paid}'
                 else:
                     status_icon = '✗'
                     color = '#dc3545'

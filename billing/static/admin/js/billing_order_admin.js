@@ -9,11 +9,11 @@
   }
 
   function init() {
-    const billingRecordSelect = document.getElementById("id_billing_record");
+    const billingRecordSelect = document.getElementById("id_invoice");
     const orderSelect = document.getElementById("id_order");
 
     if (!billingRecordSelect || !orderSelect) {
-      return; // not on BillingOrder admin form
+      return; // not on InvoiceOrderLink admin form
     }
 
     const handleBillingRecordChange = (billingRecordId) => {
@@ -50,7 +50,7 @@
   }
 
   function fetchClientId(billingRecordId) {
-    const url = `/admin/billing/billingorder/billing-record/${billingRecordId}/client/`;
+    const url = `/admin/billing/invoiceorderlink/billing-record/${billingRecordId}/client/`;
     console.log("fetchClientId: requesting", url);
 
     return fetch(url, {
@@ -73,7 +73,7 @@
   }
 
   function fetchBillableOrders(clientId, billingRecordId) {
-    let url = `/admin/billing/billingorder/billable-orders/${clientId}/`;
+    let url = `/admin/billing/invoiceorderlink/billable-orders/${clientId}/`;
 
     // Add billing_record_id as query param for date filtering
     if (billingRecordId) {

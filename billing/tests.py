@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from clients.models import Client
 from orders.models import Order
-from billing.models import BillingRecord, BillingOrder
-from billing.admin import BillingOrderAdminForm
+from billing.models import Invoice, InvoiceOrderLink
+from billing.admin import InvoiceOrderLinkAdminForm
 
 
 class BillingOrderAdminFormTests(TestCase):
@@ -23,8 +23,8 @@ class BillingOrderAdminFormTests(TestCase):
 	def test_order_queryset_filters_by_client_date_and_unbilled(self):
 		base_time = timezone.now()
 
-		# BillingRecord for client A
-		br = BillingRecord.objects.create(
+		# Invoice for client A
+		br = Invoice.objects.create(
 			client=self.client_a,
 			amount=Decimal('100.00'),
 			identifier='SER-001',
@@ -51,8 +51,8 @@ class BillingOrderAdminFormTests(TestCase):
 		)
 		self._set_datetime(order_b_after_unbilled, 'order_date', base_time + timedelta(hours=2))
 
-		# An order already linked to ANY billing record should be excluded
-		other_br = BillingRecord.objects.create(
+		# An order already linked to ANY invoice should be excluded
+		other_br = Invoice.objects.create(
 			client=self.client_a,
 			amount=Decimal('500.00'),
 			identifier='SER-002',
@@ -63,10 +63,10 @@ class BillingOrderAdminFormTests(TestCase):
 			total_amount=Decimal('40.00'),
 		)
 		self._set_datetime(order_a_linked_elsewhere, 'order_date', base_time + timedelta(hours=3))
-		BillingOrder.objects.create(billing_record=other_br, order=order_a_linked_elsewhere)
+		InvoiceOrderLink.objects.create(invoice=other_br, order=order_a_linked_elsewhere)
 
-		# Build form as inline with parent billing_record
-		form = BillingOrderAdminForm(billing_record=br)
+		# Build form as inline with parent invoice
+		form = InvoiceOrderLinkAdminForm(invoice=br)
 		qs = form.fields['order'].queryset
 
 		self.assertIn(order_a_after_unbilled, qs)
@@ -77,7 +77,7 @@ class BillingOrderAdminFormTests(TestCase):
 	def test_order_queryset_includes_current_order_on_edit(self):
 		base_time = timezone.now()
 
-		br = BillingRecord.objects.create(
+		br = Invoice.objects.create(
 			client=self.client_a,
 			amount=Decimal('100.00'),
 			identifier='SER-003',
@@ -91,15 +91,15 @@ class BillingOrderAdminFormTests(TestCase):
 		)
 		self._set_datetime(current_order, 'order_date', base_time + timedelta(minutes=1))
 
-		bo = BillingOrder.objects.create(billing_record=br, order=current_order)
+		bo = InvoiceOrderLink.objects.create(invoice=br, order=current_order)
 
 		# Editing existing instance: form should include the current order even though it's linked
-		form = BillingOrderAdminForm(instance=bo, billing_record=br)
+		form = InvoiceOrderLinkAdminForm(instance=bo, invoice=br)
 		qs = form.fields['order'].queryset
 		self.assertIn(current_order, qs)
 
 	def test_validation_fails_when_sum_exceeds_billing_amount(self):
-		br = BillingRecord.objects.create(
+		br = Invoice.objects.create(
 			client=self.client_a,
 			amount=Decimal('100.00'),
 			identifier='SER-004',
@@ -110,16 +110,16 @@ class BillingOrderAdminFormTests(TestCase):
 			client=self.client_a,
 			total_amount=Decimal('80.00'),
 		)
-		BillingOrder.objects.create(billing_record=br, order=existing_order)
+		InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
 
 		new_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('30.00'),
 		)
 
-		form = BillingOrderAdminForm(
+		form = InvoiceOrderLinkAdminForm(
 			data={
-				'billing_record': br.id,
+				'invoice': br.id,
 				'order': new_order.id,
 				'is_paid': False,
 				'partially_paid': False,
@@ -132,7 +132,7 @@ class BillingOrderAdminFormTests(TestCase):
 		self.assertIn('order', form.errors)
 
 	def test_validation_passes_at_boundary_equal_to_billing_amount(self):
-		br = BillingRecord.objects.create(
+		br = Invoice.objects.create(
 			client=self.client_a,
 			amount=Decimal('100.00'),
 			identifier='SER-005',
@@ -143,16 +143,16 @@ class BillingOrderAdminFormTests(TestCase):
 			client=self.client_a,
 			total_amount=Decimal('80.00'),
 		)
-		BillingOrder.objects.create(billing_record=br, order=existing_order)
+		InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
 
 		new_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('20.00'),
 		)
 
-		form = BillingOrderAdminForm(
+		form = InvoiceOrderLinkAdminForm(
 			data={
-				'billing_record': br.id,
+				'invoice': br.id,
 				'order': new_order.id,
 				'is_paid': False,
 				'partially_paid': False,

@@ -83,7 +83,7 @@
                     if (node.nodeType === Node.ELEMENT_NODE) {
                         // Check if this is a new inline row with an order select
                         const newOrderSelect = node.querySelector
-                            ? node.querySelector('[id^="id_billing_orders-"][id$="-order"]')
+                            ? node.querySelector('[id^="id_invoice_links-"][id$="-order"]')
                             : null;
                         
                         if (newOrderSelect && clientSelect.value) {
@@ -109,8 +109,8 @@
         const billingRecordId = getBillingRecordId();
         let queryParam = billingRecordId ? `?billing_record_id=${billingRecordId}` : "";
 
-        // Use the BillingRecord admin's endpoint for inline context
-        const url = `/admin/billing/billingrecord/billable-orders/${clientId}/${queryParam}`;
+        // Use the Invoice admin's endpoint for inline context
+        const url = `/admin/billing/invoice/billable-orders/${clientId}/${queryParam}`;
         console.log("Fetching billable orders from:", url);
 
         return fetch(url, {
@@ -132,8 +132,8 @@
      * Get the current BillingRecord ID if editing an existing record
      */
     function getBillingRecordId() {
-        // Check URL for object ID (e.g., /admin/billing/billingrecord/123/change/)
-        const match = window.location.pathname.match(/\/billingrecord\/(\d+)\/change\//);
+        // Check URL for object ID (e.g., /admin/billing/invoice/123/change/)
+        const match = window.location.pathname.match(/\/invoice\/(\d+)\/change\//);
         return match ? match[1] : null;
     }
 
@@ -229,7 +229,7 @@
      */
     function storeInitialValues() {
         const orderSelects = document.querySelectorAll(
-            '[id^="id_billing_orders-"][id$="-order"]'
+            '[id^="id_invoice_links-"][id$="-order"]'
         );
         
         orderSelects.forEach(select => {

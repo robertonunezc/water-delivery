@@ -35,7 +35,7 @@ class OrderQuerySet(models.QuerySet):
         Returns:
             QuerySet of unbilled orders
         """
-        return self.filter(billing_orders__isnull=True).distinct()
+        return self.filter(invoice_links__isnull=True).distinct()
 
     def for_client(self, client):
         """

@@ -8,12 +8,12 @@ from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
 from collections import Counter
 
-from billing.models import BillingOrder, BillingRecord, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
+from billing.models import Invoice, InvoiceOrderLink, BillingFrequencyReport, ClientBillingFrecuency, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
 from core.admin_mixins import SoftDeleteAdminMixin
 # Register your models here.
-class BillingRecordInlineAdmin(StackedInline):
-    model = BillingOrder
+class InvoiceOrderLinkInlineAdmin(StackedInline):
+    model = InvoiceOrderLink
     extra = 0
     fields = ('order', 'is_paid', 'partially_paid')
     autocomplete_fields = ('order',)
@@ -23,112 +23,112 @@ class BillingRecordInlineAdmin(StackedInline):
     form = None  # set below after form class definition
     formset = None  # set below after formset class definition
 
-class BillingOrderAdminForm(forms.ModelForm):
+class InvoiceOrderLinkAdminForm(forms.ModelForm):
     class Meta:
-        model = BillingOrder
-        fields = ['billing_record', 'order', 'is_paid', 'partially_paid']
-        search_fields = ('billing_record__client', 'order__id')
-        readonly_fields = ['billing_record','order']
+        model = InvoiceOrderLink
+        fields = ['invoice', 'order', 'is_paid', 'partially_paid']
+        search_fields = ('invoice__client', 'order__id')
+        readonly_fields = ['invoice', 'order']
     class Media:
         js = (
             'admin/js/billing_order_admin.js',  # Then our script
-            'admin/js/hide_add_modify_dropdown_options.js',  # Hide add/modify options for billing_record and order
+            'admin/js/hide_add_modify_dropdown_options.js',  # Hide add/modify options for invoice and order
         )
 
     def __init__(self, *args, **kwargs):
-        # For inline forms, we inject parent BillingRecord via FormSet
-        self._billing_record = kwargs.pop('billing_record', None)
+        # For inline forms, we inject parent Invoice via FormSet
+        self._invoice = kwargs.pop('invoice', None)
         super().__init__(*args, **kwargs)
 
-        # Determine billing_record for filtering
-        billing_record = (
-            self._billing_record
-            or getattr(self.instance, 'billing_record', None)
+        # Determine invoice for filtering
+        invoice = (
+            self._invoice
+            or getattr(self.instance, 'invoice', None)
         )
 
-        if not billing_record and 'billing_record' in self.data:
+        if not invoice and 'invoice' in self.data:
             # Non-inline admin: derive from POST data if present
             try:
-                br_id = int(self.data.get('billing_record'))
+                br_id = int(self.data.get('invoice'))
             except (TypeError, ValueError):
                 br_id = None
             if br_id:
-                billing_record = BillingRecord.objects.filter(pk=br_id).first()
+                invoice = Invoice.objects.filter(pk=br_id).first()
 
         # Apply queryset filtering to the order field using manager
-        if billing_record and 'order' in self.fields:
+        if invoice and 'order' in self.fields:
             # Resolve current order id (editing existing record)
             current_order_id = getattr(self.instance, 'order_id', None)
             from orders.models import Order
             # Use custom manager method to get unbilled orders for client
             self.fields['order'].queryset = Order.objects.unbilled_for_client(
-                billing_record.client,
+                invoice.client,
                 exclude_order_id=current_order_id
             )
         elif 'order' in self.fields:
-            # No billing_record available yet - show all unbilled orders
+            # No invoice available yet - show all unbilled orders
             from orders.models import Order
             self.fields['order'].queryset = Order.objects.unbilled()
 
-        # Add data-client-id to billing_record select for JavaScript
-        if 'billing_record' in self.fields:
-            self.fields['billing_record'].widget.attrs['class'] = 'billing-record-select'
+        # Add data attribute to invoice select for JavaScript
+        if 'invoice' in self.fields:
+            self.fields['invoice'].widget.attrs['class'] = 'invoice-select'
             # Store client_id mapping in widget for JS to access
-            self.fields['billing_record'].widget.attrs['data-enable-dynamic-orders'] = 'true'
+            self.fields['invoice'].widget.attrs['data-enable-dynamic-orders'] = 'true'
 
 
     def clean(self):
-        from billing.services import validate_billing_order_amount
+        from billing.services import validate_invoice_order_total
 
         cleaned = super().clean()
 
-        billing_record = (
-            self._billing_record
-            or cleaned.get('billing_record')
-            or getattr(self.instance, 'billing_record', None)
+        invoice = (
+            self._invoice
+            or cleaned.get('invoice')
+            or getattr(self.instance, 'invoice', None)
         )
         order = cleaned.get('order') or getattr(self.instance, 'order', None)
 
-        if billing_record and order:
+        if invoice and order:
             # Use service layer for validation
             try:
-                validate_billing_order_amount(
-                    billing_record=billing_record,
+                validate_invoice_order_total(
+                    invoice=invoice,
                     order=order,
-                    exclude_billing_order_id=self.instance.pk
+                    exclude_invoice_order_link_id=self.instance.pk
                 )
             except ValidationError as e:
                 raise ValidationError({'order': str(e)})
 
         return cleaned
 
-class BillingOrderInlineFormSet(BaseInlineFormSet):
-    # Inject parent BillingRecord into each form so it can filter
+class InvoiceOrderLinkInlineFormSet(BaseInlineFormSet):
+    # Inject parent Invoice into each form so it can filter
     def _construct_form(self, i, **kwargs):
-        kwargs['billing_record'] = self.instance
+        kwargs['invoice'] = self.instance
         return super()._construct_form(i, **kwargs)
 
 # Wire custom form and formset into the inline admin
-BillingRecordInlineAdmin.form = BillingOrderAdminForm
-BillingRecordInlineAdmin.formset = BillingOrderInlineFormSet
+InvoiceOrderLinkInlineAdmin.form = InvoiceOrderLinkAdminForm
+InvoiceOrderLinkInlineAdmin.formset = InvoiceOrderLinkInlineFormSet
 
-class BillingRecordAdmin(SoftDeleteAdminMixin, ModelAdmin):
+class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
     list_filter = ('date', 'client')
     search_fields = ('client__name', 'description', 'identifier')
     autocomplete_fields = ('client',)
     exclude = ('deleted_at',)
     ordering = ('-date',)
-    inlines = [BillingRecordInlineAdmin]
+    inlines = [InvoiceOrderLinkInlineAdmin]
 
 
-class BillingOrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
-    list_display = ('id', 'billing_record', 'order', 'is_paid', 'partially_paid')
-    list_filter = ('is_paid', 'partially_paid', 'billing_record__client', 'billing_record')
-    search_fields = ('billing_record__client', 'order')
-    autocomplete_fields = ('billing_record', 'order')
+class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
+    list_display = ('id', 'invoice', 'order', 'is_paid', 'partially_paid')
+    list_filter = ('is_paid', 'partially_paid', 'invoice__client', 'invoice')
+    search_fields = ('invoice__client', 'order')
+    autocomplete_fields = ('invoice', 'order')
     ordering = ('-created_at',)
-    form = BillingOrderAdminForm
+    form = InvoiceOrderLinkAdminForm
     
     
     def get_urls(self):
@@ -137,36 +137,36 @@ class BillingOrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             path(
                 'billable-orders/<int:client_pk>/',
                 self.admin_site.admin_view(self.billable_orders_json),
-                name='billing_billingorder_billable_orders',
+                name='billing_invoiceorderlink_billable_orders',
             ),
             path(
                 'billing-record/<int:billing_record_pk>/client/',
-                self.admin_site.admin_view(self.get_billing_record_client),
-                name='billing_billingorder_get_client',
+                self.admin_site.admin_view(self.get_invoice_client),
+                name='billing_invoiceorderlink_get_client',
             ),
         ]
         return custom_urls + urls
 
     def billable_orders_json(self, request, client_pk):
         """Return billable orders for a given client as JSON"""
-        from billing.services import get_billable_orders_for_client
+        from billing.services import get_invoiceable_orders_for_client
         from clients.models import Client
         from django.shortcuts import get_object_or_404
 
         client = get_object_or_404(Client, pk=client_pk)
 
-        # Use service layer to get billable orders
-        orders_data = get_billable_orders_for_client(client, as_dict=True)
+        # Use service layer to get invoiceable orders
+        orders_data = get_invoiceable_orders_for_client(client, as_dict=True)
 
         return JsonResponse({'orders': orders_data})
 
-    def get_billing_record_client(self, request, billing_record_pk):
-        """Return the client_id for a given billing record"""
+    def get_invoice_client(self, request, billing_record_pk):
+        """Return the client_id for a given invoice"""
         from django.shortcuts import get_object_or_404
-        billing_record = get_object_or_404(BillingRecord, pk=billing_record_pk)
+        invoice = get_object_or_404(Invoice, pk=billing_record_pk)
         return JsonResponse({
-            'client_id': billing_record.client_id,
-            'client_name': billing_record.client.name,
+            'client_id': invoice.client_id,
+            'client_name': invoice.client.name,
         })
 
 @admin.register(BillingFrequencyReport)
@@ -357,5 +357,5 @@ class ClientBillingFrecuencyAdmin(ModelAdmin):
         return super().response_add(request, obj, post_url_continue)
 
 
-admin.site.register(BillingRecord, BillingRecordAdmin)
-admin.site.register(BillingOrder, BillingOrderAdmin)
+admin.site.register(Invoice, InvoiceAdmin)
+admin.site.register(InvoiceOrderLink, InvoiceOrderLinkAdmin)

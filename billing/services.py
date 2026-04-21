@@ -164,34 +164,34 @@ def set_billing_date_to_clients() -> Optional[date]:
 # Billing Order Validation Services
 
 
-def validate_billing_order_amount(billing_record, order, exclude_billing_order_id=None) -> None:
+def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=None) -> None:
     """
-    Validate that adding an order to a billing record won't exceed the billing amount.
+    Validate that adding an order to an invoice won't exceed the invoice amount.
 
     Args:
-        billing_record: BillingRecord instance
+        invoice: Invoice instance
         order: Order instance to add
-        exclude_billing_order_id: Optional ID of billing order being edited
+        exclude_invoice_order_link_id: Optional ID of invoice order link being edited
 
     Raises:
-        ValidationError: If total would exceed billing record amount
+        ValidationError: If total would exceed invoice amount
     """
-    from billing.models import BillingOrder
+    from billing.models import InvoiceOrderLink
 
     # Calculate sum of existing orders (excluding current if editing)
-    existing_orders = BillingOrder.objects.filter(
-        billing_record=billing_record
+    existing_orders = InvoiceOrderLink.objects.filter(
+        invoice=invoice
     )
 
-    if exclude_billing_order_id:
-        existing_orders = existing_orders.exclude(pk=exclude_billing_order_id)
+    if exclude_invoice_order_link_id:
+        existing_orders = existing_orders.exclude(pk=exclude_invoice_order_link_id)
 
     total_existing = existing_orders.aggregate(
         total=Sum('order__total_amount')
     )['total'] or Decimal('0')
 
     new_amount = order.total_amount or Decimal('0')
-    max_amount = billing_record.amount
+    max_amount = invoice.amount
 
     if total_existing + new_amount > max_amount:
         raise ValidationError(
@@ -201,7 +201,7 @@ def validate_billing_order_amount(billing_record, order, exclude_billing_order_i
         )
 
 
-def get_billable_orders_for_client(client, as_dict=False) -> List:
+def get_invoiceable_orders_for_client(client, as_dict=False) -> List:
     """
     Get all unbilled orders for a specific client.
 
