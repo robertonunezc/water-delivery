@@ -185,7 +185,7 @@ class BillingDisplayMixin:
 			return format_html(
 				'<span style="color: green;">✓ Frecuencia de facturación ya configurada.</span>'
 			)
-		add_url = f"/admin/billing/clientbillingfrecuency/add/?client={obj.pk}"
+		add_url = f"/admin/invoice/invoiceschedule/add/?client={obj.pk}"
 		return format_html(
 			'<a href="{}" class="button add-billing-frequency-popup" '
 			'data-popup="true" '

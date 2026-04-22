@@ -50,7 +50,7 @@
   }
 
   function fetchClientId(invoiceId) {
-    const url = `/admin/billing/invoiceorderlink/invoice/${invoiceId}/client/`;
+    const url = `/admin/invoice/invoiceorderlink/invoice/${invoiceId}/client/`;
     console.log("fetchClientId: requesting", url);
 
     return fetch(url, {
@@ -73,7 +73,7 @@
   }
 
   function fetchBillableOrders(clientId, invoiceId) {
-    let url = `/admin/billing/invoiceorderlink/billable-orders/${clientId}/`;
+    let url = `/admin/invoice/invoiceorderlink/invoiceable-orders/${clientId}/`;
 
     // Add invoice_id as query param for date filtering
     if (invoiceId) {

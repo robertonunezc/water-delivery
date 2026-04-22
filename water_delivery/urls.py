@@ -16,9 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from django.views.generic.base import RedirectView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path(
+        'admin/invoice/invoiceschedule/add/',
+        RedirectView.as_view(pattern_name='admin:billing_invoiceschedule_add', permanent=False, query_string=True),
+    ),
+    path('', include('billing.urls')),
     path('clients/', include('clients.urls')),
     # path('products/', include('product.urls')),
     path('payments/', include('payment.urls')),

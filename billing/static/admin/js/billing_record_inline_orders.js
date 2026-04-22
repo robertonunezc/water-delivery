@@ -110,7 +110,7 @@
         let queryParam = billingRecordId ? `?invoice_id=${billingRecordId}` : "";
 
         // Use the Invoice admin's endpoint for inline context
-        const url = `/admin/billing/invoice/billable-orders/${clientId}/${queryParam}`;
+        const url = `/admin/invoice/invoice/invoiceable-orders/${clientId}/${queryParam}`;
         console.log("Fetching billable orders from:", url);
 
         return fetch(url, {
@@ -132,7 +132,7 @@
      * Get the current BillingRecord ID if editing an existing record
      */
     function getBillingRecordId() {
-        // Check URL for object ID (e.g., /admin/billing/invoice/123/change/)
+        // Check URL for object ID (e.g., /admin/invoice/invoice/123/change/)
         const match = window.location.pathname.match(/\/invoice\/(\d+)\/change\//);
         return match ? match[1] : null;
     }

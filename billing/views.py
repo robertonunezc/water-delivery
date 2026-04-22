@@ -5,7 +5,7 @@ from django.contrib.auth.decorators import login_required
 # Create your views here.
 
 @login_required
-def billable_orders(request, client_pk):
+def invoiceable_orders(request, client_pk):
     from orders.services import get_client_order_without_bill
     from clients.models import Client
 
@@ -23,3 +23,14 @@ def billable_orders(request, client_pk):
     ]
 
     return JsonResponse({'orders': orders_data}, safe=False)
+
+
+@login_required
+def invoice_client(request, invoice_id):
+    from billing.models import Invoice
+
+    invoice = get_object_or_404(Invoice, pk=invoice_id)
+    return JsonResponse({
+        'client_id': invoice.client_id,
+        'client_name': invoice.client.name,
+    })

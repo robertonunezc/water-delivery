@@ -1,11 +1,24 @@
-from django.contrib.auth.decorators import login_required
-
 from django.urls import path
-import views 
+from . import views
 app_name = 'billing'
 
 urlpatterns = [
     # Define billing-related URL patterns here
-    path('orders/<int:client_pk>/billable-orders/', views.billable_orders, name='billable_orders'),
-    path('admin/billing/invoiceorderlink/invoice/<int:billingRecordId>/client/', views.billable_orders, name='invoiceorderlink_client'),
+    path('orders/<int:client_pk>/invoiceable-orders/', views.invoiceable_orders, name='invoiceable_orders'),
+    # Invoice-prefixed aliases for admin JS endpoints
+    path(
+        'admin/invoice/invoiceorderlink/invoiceable-orders/<int:client_pk>/',
+        views.invoiceable_orders,
+        name='invoiceorderlink_invoiceable_orders',
+    ),
+    path(
+        'admin/invoice/invoiceorderlink/invoice/<int:invoice_id>/client/',
+        views.invoice_client,
+        name='invoiceorderlink_invoice_client',
+    ),
+    path(
+        'admin/invoice/invoice/invoiceable-orders/<int:client_pk>/',
+        views.invoiceable_orders,
+        name='invoice_invoiceable_orders',
+    ),
 ]

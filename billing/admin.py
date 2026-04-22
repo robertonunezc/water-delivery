@@ -136,14 +136,14 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path(
-                'billable-orders/<int:client_pk>/',
+                'invoiceable-orders/<int:client_pk>/',
                 self.admin_site.admin_view(self.billable_orders_json),
-                name='billing_invoiceorderlink_billable_orders',
+                name='invoice_invoiceorderlink_invoiceable_orders',
             ),
             path(
                 'invoice/<int:invoice_pk>/client/',
                 self.admin_site.admin_view(self.get_invoice_client),
-                name='billing_invoiceorderlink_get_client',
+                name='invoice_invoiceorderlink_get_client',
             ),
         ]
         return custom_urls + urls
