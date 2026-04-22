@@ -8,7 +8,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
 from collections import Counter
 
-from billing.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
+from invoice.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
 from core.admin_mixins import SoftDeleteAdminMixin
 # Register your models here.
@@ -79,7 +79,7 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 
 
     def clean(self):
-        from billing.services import validate_invoice_order_total
+        from invoice.services import validate_invoice_order_total
 
         cleaned = super().clean()
 
@@ -150,7 +150,7 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
     def billable_orders_json(self, request, client_pk):
         """Return billable orders for a given client as JSON"""
-        from billing.services import get_invoiceable_orders_for_client
+        from invoice.services import get_invoiceable_orders_for_client
         from clients.models import Client
         from django.shortcuts import get_object_or_404
 
@@ -192,7 +192,7 @@ class InvoiceFrequencyReportAdmin(ModelAdmin):
 
     def billing_frequency_report_view(self, request):
         """Custom report view"""
-        from billing.services import get_clients_needing_billing, get_date_range_from_preset
+        from invoice.services import get_clients_needing_billing, get_date_range_from_preset
 
         # Extract GET parameters
         search_query = request.GET.get('search', '').strip()

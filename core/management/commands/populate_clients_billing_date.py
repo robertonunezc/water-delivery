@@ -6,7 +6,7 @@ Usage:
 """
 
 from django.core.management.base import BaseCommand
-from billing.services import set_billing_date_to_clients
+from invoice.services import set_billing_date_to_clients
 
 
 class Command(BaseCommand):

@@ -83,7 +83,7 @@ INSTALLED_APPS = [
     'report',
     'routes',
     'orders',
-    'billing',
+    'invoice.apps.InvoiceConfig',
     'notification',
 ]
 

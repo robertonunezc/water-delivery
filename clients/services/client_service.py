@@ -1,5 +1,5 @@
 from datetime import date
-from billing import services as billing_service
+from invoice import services as invoice_service
 
 def get_upcoming_route_orders(client, limit=10):
     """
@@ -135,7 +135,7 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     if update_data.requires_billing is not None:
         # If disabling billing, remove billing data and frequency first
         if update_data.requires_billing is False and client.requires_billing is True:
-            billing_service.disable_billing_for_client(client.id)
+            invoice_service.disable_billing_for_client(client.id)
         
         client.requires_billing = update_data.requires_billing
         updated = True

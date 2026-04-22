@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-app_name = 'billing'
+app_name = 'invoice'
 
 urlpatterns = [
     # Define billing-related URL patterns here

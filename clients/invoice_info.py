@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import List, Optional, Set
 
-from billing.models import InvoiceSchedule
+from invoice.models import InvoiceSchedule
 from clients.models import Address, Client, InvoiceData
 
 

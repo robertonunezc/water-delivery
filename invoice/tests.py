@@ -6,8 +6,8 @@ from django.utils import timezone
 
 from clients.models import Client
 from orders.models import Order
-from billing.models import Invoice, InvoiceOrderLink
-from billing.admin import InvoiceOrderLinkAdminForm
+from invoice.models import Invoice, InvoiceOrderLink
+from invoice.admin import InvoiceOrderLinkAdminForm
 
 
 class BillingOrderAdminFormTests(TestCase):

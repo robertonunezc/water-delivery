@@ -14,7 +14,7 @@ from django.db.models import Count, Sum, Q, Prefetch
 from django.core.exceptions import ValidationError
 from calendar import monthrange
 
-from billing.models import InvoiceSchedule
+from invoice.models import InvoiceSchedule
 from clients.models import Client, InvoiceData
 from clients.services import client_service
 from core.utils import get_first_last_day_of_month
@@ -176,7 +176,7 @@ def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=N
     Raises:
         ValidationError: If total would exceed invoice amount
     """
-    from billing.models import InvoiceOrderLink
+    from invoice.models import InvoiceOrderLink
 
     # Calculate sum of existing orders (excluding current if editing)
     existing_orders = InvoiceOrderLink.objects.filter(

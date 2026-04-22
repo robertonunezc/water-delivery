@@ -497,7 +497,7 @@ class CreditTransaction(TimeStampedModel):
 
 # InvoiceSchedule has been moved to billing.models
 # Import it from there for backward compatibility
-from billing.models import InvoiceSchedule
+from invoice.models import InvoiceSchedule
 ClientBillingFrecuency = InvoiceSchedule  # backward compat alias
 
 class Contact(TimeStampedModel):

@@ -256,7 +256,7 @@ class ClientBillingFrequencyForm(forms.ModelForm):
     """Form for managing client billing frequency"""
     
     class Meta:
-        from billing.models import InvoiceSchedule
+        from invoice.models import InvoiceSchedule
         model = InvoiceSchedule
         fields = ['frequency', 'billing_date', 'specific_day', 'weekday', 'occurrence', 'is_active', 'notes']
         widgets = {

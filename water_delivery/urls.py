@@ -24,7 +24,7 @@ urlpatterns = [
         'admin/invoice/invoiceschedule/add/',
         RedirectView.as_view(pattern_name='admin:billing_invoiceschedule_add', permanent=False, query_string=True),
     ),
-    path('', include('billing.urls')),
+    path('', include('invoice.urls')),
     path('clients/', include('clients.urls')),
     # path('products/', include('product.urls')),
     path('payments/', include('payment.urls')),

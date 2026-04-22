@@ -351,7 +351,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def billing_status(self, obj):
         """Display billing status and associated invoices"""
         try:
-            from billing.models import InvoiceOrderLink
+            from invoice.models import InvoiceOrderLink
             invoice_links = InvoiceOrderLink.objects.filter(order=obj).select_related('invoice')
             
             if not invoice_links.exists():

@@ -27,7 +27,7 @@ def invoiceable_orders(request, client_pk):
 
 @login_required
 def invoice_client(request, invoice_id):
-    from billing.models import Invoice
+    from invoice.models import Invoice
 
     invoice = get_object_or_404(Invoice, pk=invoice_id)
     return JsonResponse({
