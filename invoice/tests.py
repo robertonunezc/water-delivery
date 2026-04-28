@@ -20,7 +20,7 @@ class BillingOrderAdminFormTests(TestCase):
 		# refresh from db to reflect changes
 		obj.refresh_from_db()
 
-	def test_order_queryset_filters_by_client_date_and_unbilled(self):
+	def test_order_queryset_filters_by_client_status_and_unbilled(self):
 		base_time = timezone.now()
 
 		# Invoice for client A
@@ -29,27 +29,37 @@ class BillingOrderAdminFormTests(TestCase):
 			amount=Decimal('100.00'),
 			identifier='SER-001',
 			folio='FOL-001',
+			emmited_at=base_time,
 		)
-		self._set_datetime(br, 'date', base_time)
 
 		# Orders
-		order_a_before = Order.objects.create(
+		order_a_before_unbilled = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('10.00'),
+			status='COMPLETED',
 		)
-		self._set_datetime(order_a_before, 'order_date', base_time - timedelta(days=1))
+		self._set_datetime(order_a_before_unbilled, 'order_date', base_time - timedelta(days=1))
 
 		order_a_after_unbilled = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('20.00'),
+			status='COMPLETED',
 		)
 		self._set_datetime(order_a_after_unbilled, 'order_date', base_time + timedelta(hours=1))
 
 		order_b_after_unbilled = Order.objects.create(
 			client=self.client_b,
 			total_amount=Decimal('30.00'),
+			status='COMPLETED',
 		)
 		self._set_datetime(order_b_after_unbilled, 'order_date', base_time + timedelta(hours=2))
+
+		order_a_before_pending = Order.objects.create(
+			client=self.client_a,
+			total_amount=Decimal('15.00'),
+			status='PENDING',
+		)
+		self._set_datetime(order_a_before_pending, 'order_date', base_time - timedelta(hours=3))
 
 		# An order already linked to ANY invoice should be excluded
 		other_br = Invoice.objects.create(
@@ -57,10 +67,12 @@ class BillingOrderAdminFormTests(TestCase):
 			amount=Decimal('500.00'),
 			identifier='SER-002',
 			folio='FOL-002',
+			emmited_at=base_time,
 		)
 		order_a_linked_elsewhere = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('40.00'),
+			status='COMPLETED',
 		)
 		self._set_datetime(order_a_linked_elsewhere, 'order_date', base_time + timedelta(hours=3))
 		InvoiceOrderLink.objects.create(invoice=other_br, order=order_a_linked_elsewhere)
@@ -69,9 +81,10 @@ class BillingOrderAdminFormTests(TestCase):
 		form = InvoiceOrderLinkAdminForm(invoice=br)
 		qs = form.fields['order'].queryset
 
+		self.assertIn(order_a_before_unbilled, qs)
 		self.assertIn(order_a_after_unbilled, qs)
-		self.assertNotIn(order_a_before, qs)
 		self.assertNotIn(order_b_after_unbilled, qs)
+		self.assertNotIn(order_a_before_pending, qs)
 		self.assertNotIn(order_a_linked_elsewhere, qs)
 
 	def test_order_queryset_includes_current_order_on_edit(self):
@@ -82,12 +95,13 @@ class BillingOrderAdminFormTests(TestCase):
 			amount=Decimal('100.00'),
 			identifier='SER-003',
 			folio='FOL-003',
+			emmited_at=base_time,
 		)
-		self._set_datetime(br, 'date', base_time)
 
 		current_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('50.00'),
+			status='PENDING',
 		)
 		self._set_datetime(current_order, 'order_date', base_time + timedelta(minutes=1))
 
@@ -104,18 +118,23 @@ class BillingOrderAdminFormTests(TestCase):
 			amount=Decimal('100.00'),
 			identifier='SER-004',
 			folio='FOL-004',
+			emmited_at=timezone.now(),
 		)
 
 		existing_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('80.00'),
+			status='COMPLETED',
 		)
+		self._set_datetime(existing_order, 'order_date', timezone.now() - timedelta(days=1))
 		InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
 
 		new_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('30.00'),
+			status='COMPLETED',
 		)
+		self._set_datetime(new_order, 'order_date', timezone.now() - timedelta(hours=12))
 
 		form = InvoiceOrderLinkAdminForm(
 			data={
@@ -137,18 +156,23 @@ class BillingOrderAdminFormTests(TestCase):
 			amount=Decimal('100.00'),
 			identifier='SER-005',
 			folio='FOL-005',
+			emmited_at=timezone.now(),
 		)
 
 		existing_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('80.00'),
+			status='COMPLETED',
 		)
+		self._set_datetime(existing_order, 'order_date', timezone.now() - timedelta(days=1))
 		InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
 
 		new_order = Order.objects.create(
 			client=self.client_a,
 			total_amount=Decimal('20.00'),
+			status='COMPLETED',
 		)
+		self._set_datetime(new_order, 'order_date', timezone.now() - timedelta(hours=12))
 
 		form = InvoiceOrderLinkAdminForm(
 			data={

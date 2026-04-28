@@ -9,7 +9,7 @@ from calendar import monthrange
 from .models import Client
 from .forms import ManualCreditTransactionForm
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
-from orders.services import get_client_order_without_bill
+from orders.models import Order
 
 @login_required
 def list(request):
@@ -189,8 +189,17 @@ def detail(request, pk):
 @login_required
 def client_orders(request, client_pk):
     client = get_object_or_404(Client, pk=client_pk)
-    orders = get_client_order_without_bill(client)
-    return JsonResponse({'orders': orders}, safe=False)
+    orders = Order.objects.unbilled_for_client(client=client)
+    orders_data = [
+        {
+            'id': order.id,
+            'order_date': order.order_date.isoformat(),
+            'total_amount': str(order.total_amount),
+            'status': order.status,
+        }
+        for order in orders
+    ]
+    return JsonResponse({'orders': orders_data})
 
 @login_required
 def update_client(request, pk):

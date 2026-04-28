@@ -201,18 +201,35 @@ def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=N
         )
 
 
-def get_invoiceable_orders_for_client(client, as_dict=False) -> List:
+def get_invoiceable_orders_for_client(
+    client: Client,
+    emitted_at: datetime,
+    include_order_id: Optional[int] = None,
+    as_dict: bool = False,
+) -> List:
     """
-    Get all unbilled orders for a specific client.
+    Get all invoiceable orders for a specific client.
+
+    Eligibility rules:
+    - Order belongs to the provided client
+    - Order status is COMPLETED
+    - Order has no invoice link (unless include_order_id is provided for edit mode)
+    - Order date is on or before invoice emitted_at
 
     Args:
         client: Client instance or client ID
+        emitted_at: Invoice emission datetime used as upper bound for order date
+        include_order_id: Optional order ID to keep in queryset during edit mode
         as_dict: If True, return list of dicts for JSON serialization
 
     Returns:
         QuerySet or list of dicts with order information
     """
-    orders = Order.objects.unbilled_for_client(client)
+    orders = Order.objects.unbilled_for_client(
+        client=client,
+        exclude_order_id=include_order_id,
+        invoice_date=emitted_at,
+    )
 
     if not as_dict:
         return orders

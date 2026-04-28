@@ -59,12 +59,14 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
         if invoice and 'order' in self.fields:
             # Resolve current order id (editing existing record)
             current_order_id = getattr(self.instance, 'order_id', None)
-            from orders.models import Order
-            # Use custom manager method to get unbilled orders for client
-            self.fields['order'].queryset = Order.objects.unbilled_for_client(
-                invoice.client,
-                exclude_order_id=current_order_id,
-                invoice_date=invoice.date,
+            from invoice.services import get_invoiceable_orders_for_client
+
+            emitted_at = invoice.emmited_at or invoice.date
+            self.fields['order'].queryset = get_invoiceable_orders_for_client(
+                client=invoice.client,
+                emitted_at=emitted_at,
+                include_order_id=current_order_id,
+                as_dict=False,
             )
         elif 'order' in self.fields:
             # No invoice available yet - show all unbilled orders
@@ -151,13 +153,39 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def billable_orders_json(self, request, client_pk):
         """Return billable orders for a given client as JSON"""
         from invoice.services import get_invoiceable_orders_for_client
+        from invoice.models import Invoice
         from clients.models import Client
         from django.shortcuts import get_object_or_404
 
         client = get_object_or_404(Client, pk=client_pk)
 
+        invoice_id = request.GET.get('invoice_id')
+        include_order_id = request.GET.get('include_order_id')
+
+        invoice = None
+        if invoice_id:
+            invoice = Invoice.objects.filter(pk=invoice_id).first()
+
+        emitted_at = None
+        if invoice:
+            emitted_at = invoice.emmited_at or invoice.date
+
+        if include_order_id:
+            try:
+                include_order_id = int(include_order_id)
+            except (TypeError, ValueError):
+                include_order_id = None
+
         # Use service layer to get invoiceable orders
-        orders_data = get_invoiceable_orders_for_client(client, as_dict=True)
+        if not emitted_at:
+            return JsonResponse({'orders': []})
+
+        orders_data = get_invoiceable_orders_for_client(
+            client=client,
+            emitted_at=emitted_at,
+            include_order_id=include_order_id,
+            as_dict=True,
+        )
 
         return JsonResponse({'orders': orders_data})
 

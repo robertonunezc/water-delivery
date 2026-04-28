@@ -6,23 +6,30 @@ from django.contrib.auth.decorators import login_required
 
 @login_required
 def invoiceable_orders(request, client_pk):
-    from orders.services import get_client_order_without_bill
+    from invoice.services import get_invoiceable_orders_for_client
+    from invoice.models import Invoice
     from clients.models import Client
 
     client = get_object_or_404(Client, pk=client_pk)
-    orders = get_client_order_without_bill(client)
+    invoice_id = request.GET.get('invoice_id')
 
-    orders_data = [
-        {
-            'id': order.id,
-            'order_date': order.order_date,
-            'total_amount': order.total_amount,
-            # Add other relevant fields as needed
-        }
-        for order in orders
-    ]
+    invoice = None
+    if invoice_id:
+        invoice = Invoice.objects.filter(pk=invoice_id).first()
 
-    return JsonResponse({'orders': orders_data}, safe=False)
+    emitted_at = None
+    if invoice:
+        emitted_at = invoice.emmited_at or invoice.date
+
+    if not emitted_at:
+        return JsonResponse({'orders': []})
+
+    orders_data = get_invoiceable_orders_for_client(
+        client=client,
+        emitted_at=emitted_at,
+        as_dict=True,
+    )
+    return JsonResponse({'orders': orders_data})
 
 
 @login_required

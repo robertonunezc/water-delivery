@@ -86,13 +86,6 @@ def calculate_order_total(order) -> Decimal:
         order.subtotal_amount = subtotal
     return total
 
-def get_client_order_without_bill(client: Client, no_limit: Optional[int] = None) -> List[OrderData]:
-    if no_limit:
-        orders = Order.objects.filter(client=client, invoice_links__isnull=True).order_by('-created_at')[:no_limit]
-    else:
-        orders = Order.objects.filter(client=client, invoice_links__isnull=True).order_by('-created_at')[:10]
-    return orders
-
 def get_logger(name: str):
     """Return a logger for the orders module.
 

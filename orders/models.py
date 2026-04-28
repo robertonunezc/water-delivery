@@ -62,18 +62,22 @@ class OrderQuerySet(models.QuerySet):
         Returns:
             QuerySet of unbilled orders for the client
         """
-        qs = self.for_client(client)
-
-        if invoice_date:
-            qs = qs.filter(order_date__gte=invoice_date)
+        # Billable orders must be completed and not linked to another invoice.
+        # When editing, keep the currently linked order selectable even if it no
+        # longer matches the billable filters.
+        billable_filter = Q(
+            status=OrderStatus.COMPLETED.value,
+            invoice_links__isnull=True,
+        )
 
         if exclude_order_id:
-            # Include the current order if we're editing an existing invoice link.
-            qs = qs.filter(Q(invoice_links__isnull=True) | Q(pk=exclude_order_id)).distinct()
+            qs = self.for_client(client).filter(
+                billable_filter | Q(pk=exclude_order_id)
+            )
         else:
-            qs = qs.filter(invoice_links__isnull=True).distinct()
+            qs = self.for_client(client).filter(billable_filter)
 
-        return qs.order_by('-order_date')
+        return qs.distinct().order_by('-order_date')
 
     def today_orders(self, user=None):
         """
