@@ -16,7 +16,8 @@ class InvoiceOrderLinkInlineAdmin(StackedInline):
     model = InvoiceOrderLink
     extra = 0
     fields = ('order', 'is_paid', 'partially_paid')
-    autocomplete_fields = ('order',)
+    # Keep a regular select in inline rows so the form queryset filtering is
+    # respected per-invoice client and status.
     can_delete = False
     show_change_link = True
     # Custom form and formset to enforce queryset filtering and validation

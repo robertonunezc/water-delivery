@@ -112,7 +112,7 @@
         let queryParam = billingRecordId ? `?invoice_id=${billingRecordId}` : "";
 
         // Use the Invoice admin's endpoint for inline context
-        const url = `/admin/invoice/invoice/invoiceable-orders/${clientId}/${queryParam}`;
+        const url = `/admin/billing/invoice/invoiceable-orders/${clientId}/${queryParam}`;
         console.log("Fetching billable orders from:", url);
 
         return fetch(url, {
