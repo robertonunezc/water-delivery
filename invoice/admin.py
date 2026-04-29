@@ -23,6 +23,9 @@ class InvoiceOrderLinkInlineAdmin(StackedInline):
     form = None  # set below after form class definition
     formset = None  # set below after formset class definition
 
+    class Media:
+        js = ('admin/js/billing_record_inline_orders.js',)
+
 class InvoiceOrderLinkAdminForm(forms.ModelForm):
     class Meta:
         model = InvoiceOrderLink
@@ -61,10 +64,8 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
             current_order_id = getattr(self.instance, 'order_id', None)
             from invoice.services import get_invoiceable_orders_for_client
 
-            emitted_at = invoice.emmited_at or invoice.date
             self.fields['order'].queryset = get_invoiceable_orders_for_client(
                 client=invoice.client,
-                emitted_at=emitted_at,
                 include_order_id=current_order_id,
                 as_dict=False,
             )
@@ -124,6 +125,39 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
     ordering = ('-date',)
     inlines = [InvoiceOrderLinkInlineAdmin]
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                'invoiceable-orders/<int:client_pk>/',
+                self.admin_site.admin_view(self.billable_orders_json),
+                name='invoice_invoice_invoiceable_orders',
+            ),
+        ]
+        return custom_urls + urls
+
+    def billable_orders_json(self, request, client_pk):
+        """Return invoiceable orders for a given client as JSON (used by inline JS)."""
+        from invoice.services import get_invoiceable_orders_for_client
+        from clients.models import Client
+        from django.shortcuts import get_object_or_404
+
+        client = get_object_or_404(Client, pk=client_pk)
+
+        include_order_id = request.GET.get('include_order_id')
+        if include_order_id:
+            try:
+                include_order_id = int(include_order_id)
+            except (TypeError, ValueError):
+                include_order_id = None
+
+        orders_data = get_invoiceable_orders_for_client(
+            client=client,
+            include_order_id=include_order_id,
+            as_dict=True,
+        )
+        return JsonResponse({'orders': orders_data})
+
 
 class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
     list_display = ('id', 'invoice', 'order', 'is_paid', 'partially_paid')
@@ -162,27 +196,14 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
         invoice_id = request.GET.get('invoice_id')
         include_order_id = request.GET.get('include_order_id')
 
-        invoice = None
-        if invoice_id:
-            invoice = Invoice.objects.filter(pk=invoice_id).first()
-
-        emitted_at = None
-        if invoice:
-            emitted_at = invoice.emmited_at or invoice.date
-
         if include_order_id:
             try:
                 include_order_id = int(include_order_id)
             except (TypeError, ValueError):
                 include_order_id = None
 
-        # Use service layer to get invoiceable orders
-        if not emitted_at:
-            return JsonResponse({'orders': []})
-
         orders_data = get_invoiceable_orders_for_client(
             client=client,
-            emitted_at=emitted_at,
             include_order_id=include_order_id,
             as_dict=True,
         )

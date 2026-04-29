@@ -51,7 +51,7 @@ class OrderQuerySet(models.QuerySet):
             return self.filter(client=client)
         return self.filter(client_id=client)
 
-    def unbilled_for_client(self, client, exclude_order_id=None, invoice_date=None):
+    def unbilled_for_client(self, client, exclude_order_id=None):
         """
         Get unbilled orders for a specific client.
 
@@ -138,8 +138,8 @@ class OrderManager(models.Manager):
     def for_client(self, client):
         return self.get_queryset().for_client(client)
 
-    def unbilled_for_client(self, client, exclude_order_id=None, invoice_date=None):
-        return self.get_queryset().unbilled_for_client(client, exclude_order_id, invoice_date)
+    def unbilled_for_client(self, client, exclude_order_id=None):
+        return self.get_queryset().unbilled_for_client(client, exclude_order_id)
 
     def today_orders(self, user=None):
         return self.get_queryset().today_orders(user)

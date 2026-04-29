@@ -16,9 +16,4 @@ urlpatterns = [
         views.invoice_client,
         name='invoiceorderlink_invoice_client',
     ),
-    path(
-        'admin/invoice/invoice/invoiceable-orders/<int:client_pk>/',
-        views.invoiceable_orders,
-        name='invoice_invoiceable_orders',
-    ),
 ]

@@ -51,8 +51,8 @@
         console.log("Found", orderSelects.length, "order selects to update");
 
         if (!clientId) {
-            // Clear all order selects if no client selected
-            orderSelects.forEach(select => clearOrderSelect(select));
+            // Clear all order selects and show placeholder if no client selected
+            orderSelects.forEach(select => clearOrderSelect(select, true));
             return;
         }
 
@@ -92,6 +92,8 @@
                                 .then(orders => {
                                     populateOrderSelect(newOrderSelect, orders, null);
                                 });
+                        } else if (newOrderSelect && !clientSelect.value) {
+                            clearOrderSelect(newOrderSelect, true);
                         }
                     }
                 });
@@ -138,25 +140,20 @@
     }
 
     /**
-     * Clear all options from select except the empty first one
+     * Clear all options from select except the empty first one.
+     * @param {HTMLSelectElement} selectElement
+     * @param {boolean} showNoClientMessage - show a disabled placeholder when no client is selected
      */
-    function clearOrderSelect(selectElement) {
-        const currentValue = selectElement.value;
-        
-        // Keep track of the empty option text
-        const emptyOptionText = selectElement.options[0]
-            ? selectElement.options[0].textContent
-            : "---------";
-
-        // Clear all options
+    function clearOrderSelect(selectElement, showNoClientMessage = false) {
         selectElement.innerHTML = "";
 
-        // Add back the empty option
-        const emptyOption = document.createElement("option");
-        emptyOption.value = "";
-        emptyOption.textContent = emptyOptionText;
-        selectElement.appendChild(emptyOption);
-
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = showNoClientMessage
+            ? "— Seleccione un cliente primero —"
+            : "---------";
+        placeholder.disabled = showNoClientMessage;
+        selectElement.appendChild(placeholder);
         selectElement.selectedIndex = 0;
     }
 
