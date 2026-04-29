@@ -177,17 +177,19 @@ def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=N
     """
     from invoice.models import InvoiceOrderLink
 
-    # Calculate sum of existing orders (excluding current if editing)
-    existing_orders = InvoiceOrderLink.objects.filter(
-        invoice=invoice
-    )
+    # Unsaved invoices have no existing links yet. Avoid filtering by an unsaved
+    # model instance because Django raises ValueError for related filters.
+    if getattr(invoice, 'pk', None):
+        existing_orders = InvoiceOrderLink.objects.filter(invoice=invoice)
 
-    if exclude_invoice_order_link_id:
-        existing_orders = existing_orders.exclude(pk=exclude_invoice_order_link_id)
+        if exclude_invoice_order_link_id:
+            existing_orders = existing_orders.exclude(pk=exclude_invoice_order_link_id)
 
-    total_existing = existing_orders.aggregate(
-        total=Sum('order__total_amount')
-    )['total'] or Decimal('0')
+        total_existing = existing_orders.aggregate(
+            total=Sum('order__total_amount')
+        )['total'] or Decimal('0')
+    else:
+        total_existing = Decimal('0')
 
     new_amount = order.total_amount or Decimal('0')
     max_amount = invoice.amount

@@ -10,6 +10,7 @@ from clients.models import Client
 from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
+from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 
 
@@ -189,6 +190,27 @@ class BillingOrderAdminFormTests(TestCase):
 			)
 
 			self.assertTrue(form.is_valid())
+
+		def test_validation_handles_unsaved_invoice_instance(self):
+			unsaved_invoice = Invoice(
+				client=self.client_a,
+				amount=Decimal('100.00'),
+				identifier='SER-006',
+				folio='FOL-006',
+				emmited_at=timezone.now(),
+			)
+
+			new_order = Order.objects.create(
+				client=self.client_a,
+				total_amount=Decimal('30.00'),
+				status='COMPLETED',
+			)
+			self._set_datetime(new_order, 'order_date', timezone.now() - timedelta(hours=6))
+
+			try:
+				validate_invoice_order_total(invoice=unsaved_invoice, order=new_order)
+			except ValueError as exc:
+				self.fail(f"Unexpected ValueError for unsaved invoice: {exc}")
 
 
 class InvoiceableOrdersViewTests(TestCase):
