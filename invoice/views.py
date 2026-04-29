@@ -10,7 +10,19 @@ def invoiceable_orders(request, client_pk):
     from clients.models import Client
 
     client = get_object_or_404(Client, pk=client_pk)
-    orders_data = get_invoiceable_orders_for_client(client=client, as_dict=True)
+
+    include_order_id = request.GET.get('include_order_id')
+    if include_order_id:
+        try:
+            include_order_id = int(include_order_id)
+        except (TypeError, ValueError):
+            include_order_id = None
+
+    orders_data = get_invoiceable_orders_for_client(
+        client=client,
+        include_order_id=include_order_id,
+        as_dict=True,
+    )
     return JsonResponse({'orders': orders_data})
 
 

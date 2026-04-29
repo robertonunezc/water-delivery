@@ -191,7 +191,7 @@ class Order(TimeStampedModel):
         return self.total_paid >= self.total_amount
 
     def __str__(self):
-        return f"Order {self.id} for {self.client.name} - {self.status} ({self.total_amount})"
+        return f"{self.client.name} - Pedido #{self.id} - {self.get_status_display()} (${self.total_amount})"
 
 class OrderProduct(TimeStampedModel):
     order = models.ForeignKey('Order', related_name='items', on_delete=models.CASCADE)

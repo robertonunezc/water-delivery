@@ -16,21 +16,27 @@
       return; // not on InvoiceOrderLink admin form
     }
 
+    if (orderSelect.value) {
+      orderSelect.dataset.initialValue = orderSelect.value;
+    }
+
     const handleInvoiceChange = (invoiceId) => {
       if (!invoiceId) {
         clearOrderSelect(orderSelect);
         return;
       }
 
+      const preserveValue = orderSelect.value || orderSelect.dataset.initialValue || null;
+
       fetchClientId(invoiceId)
         .then((clientId) => {
           if (clientId) {
-            return fetchBillableOrders(clientId, invoiceId);
+            return fetchBillableOrders(clientId, invoiceId, preserveValue);
           }
           return [];
         })
         .then((orders) => {
-          populateOrderSelect(orderSelect, orders);
+          populateOrderSelect(orderSelect, orders, preserveValue);
         })
         .catch((error) => {
           console.error("Error loading billable orders:", error);
@@ -72,12 +78,18 @@
       });
   }
 
-  function fetchBillableOrders(clientId, invoiceId) {
+  function fetchBillableOrders(clientId, invoiceId, includeOrderId) {
     let url = `/admin/invoice/invoiceorderlink/invoiceable-orders/${clientId}/`;
+    const params = new URLSearchParams();
 
-    // Add invoice_id as query param for date filtering
     if (invoiceId) {
-      url += `?invoice_id=${invoiceId}`;
+      params.set("invoice_id", invoiceId);
+    }
+    if (includeOrderId) {
+      params.set("include_order_id", includeOrderId);
+    }
+    if (params.toString()) {
+      url += `?${params.toString()}`;
     }
     
     console.log("fetchBillableOrders: requesting", url);
@@ -109,11 +121,16 @@
     selectElement.selectedIndex = 0;
   }
 
-  function populateOrderSelect(selectElement, orders) {
+  function populateOrderSelect(selectElement, orders, preserveValue) {
     console.log("populateOrderSelect called with", orders.length, "orders");
+
+    const valueToPreserve = preserveValue || selectElement.dataset.initialValue || null;
+    const preservedText = valueToPreserve ? getOptionText(selectElement, valueToPreserve) : null;
     
     // Clear existing options except the first (empty) one
     clearOrderSelect(selectElement);
+
+    let foundPreservedValue = false;
 
     // Add new options
     orders.forEach((order) => {
@@ -122,14 +139,34 @@
       option.textContent = order.display || `Order #${order.id}`;
       selectElement.appendChild(option);
       console.log("Added option:", order.id, option.textContent);
+
+      if (String(order.id) === String(valueToPreserve)) {
+        foundPreservedValue = true;
+      }
     });
 
+    if (valueToPreserve && !foundPreservedValue && preservedText) {
+      const option = document.createElement("option");
+      option.value = valueToPreserve;
+      option.textContent = preservedText;
+      selectElement.appendChild(option);
+    }
+
+    if (valueToPreserve) {
+      selectElement.value = valueToPreserve;
+    }
+
     // If only one order is available, auto-select it
-    if (orders.length === 1) {
+    if (orders.length === 1 && !valueToPreserve) {
       console.log("Auto-selecting single order");
       selectElement.selectedIndex = 1;
     }
     
     console.log("populateOrderSelect complete. Select now has", selectElement.options.length, "options");
+  }
+
+  function getOptionText(selectElement, value) {
+    const option = Array.from(selectElement.options).find((opt) => String(opt.value) === String(value));
+    return option ? option.textContent : null;
   }
 })();

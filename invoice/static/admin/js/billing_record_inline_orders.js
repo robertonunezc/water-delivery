@@ -56,14 +56,18 @@
             return;
         }
 
-        // Fetch billable orders for this client
-        fetchBillableOrdersForClient(clientId)
-            .then(orders => {
-                console.log("Fetched", orders.length, "orders for client", clientId);
-                orderSelects.forEach(select => {
-                    const currentValue = select.value;
-                    populateOrderSelect(select, orders, currentValue);
+        const invoiceId = getBillingRecordId();
+        const refreshes = Array.from(orderSelects).map((select) => {
+            const preservedValue = getPreservedValue(select);
+            return fetchBillableOrdersForClient(clientId, invoiceId, preservedValue)
+                .then((orders) => {
+                    populateOrderSelect(select, orders, preservedValue);
                 });
+        });
+
+        Promise.all(refreshes)
+            .then(() => {
+                console.log("Updated", orderSelects.length, "order selects for client", clientId);
             })
             .catch(error => {
                 console.error("Error fetching orders:", error);
@@ -88,10 +92,14 @@
                         
                         if (newOrderSelect && clientSelect.value) {
                             console.log("New inline row added, updating order select");
-                            fetchBillableOrdersForClient(clientSelect.value)
+                            fetchBillableOrdersForClient(clientSelect.value, getBillingRecordId(), null)
                                 .then(orders => {
                                     populateOrderSelect(newOrderSelect, orders, null);
-                                });
+                                    })
+                                    .catch(err => {
+                                        console.error("Error loading orders for new row:", err);
+                                        clearOrderSelect(newOrderSelect, true);
+                                    });
                         } else if (newOrderSelect && !clientSelect.value) {
                             clearOrderSelect(newOrderSelect, true);
                         }
@@ -106,13 +114,18 @@
     /**
      * Fetch billable orders for a specific client
      */
-    function fetchBillableOrdersForClient(clientId) {
-        // For filtering, we might want to get the billing record ID if editing
-        const billingRecordId = getBillingRecordId();
-        let queryParam = billingRecordId ? `?invoice_id=${billingRecordId}` : "";
+    function fetchBillableOrdersForClient(clientId, invoiceId, includeOrderId) {
+        const params = new URLSearchParams();
+        if (invoiceId) {
+            params.set("invoice_id", invoiceId);
+        }
+        if (includeOrderId) {
+            params.set("include_order_id", includeOrderId);
+        }
 
-        // Use the Invoice admin's endpoint for inline context
-        const url = `/admin/billing/invoice/invoiceable-orders/${clientId}/${queryParam}`;
+        // Use InvoiceAdmin endpoint that powers inline rows.
+        const queryString = params.toString();
+        const url = `/admin/billing/invoice/invoiceable-orders/${clientId}/${queryString ? `?${queryString}` : ""}`;
         console.log("Fetching billable orders from:", url);
 
         return fetch(url, {
@@ -128,6 +141,10 @@
                 return response.json();
             })
             .then(data => data.orders || []);
+    }
+
+    function getPreservedValue(selectElement) {
+        return selectElement.value || selectElement.dataset.initialValue || null;
     }
 
     /**
@@ -164,6 +181,7 @@
         // Store any currently selected value that should be preserved
         // (for existing BillingOrders being edited)
         const valueToPreserve = preserveValue || selectElement.dataset.initialValue;
+        const preservedOptionText = valueToPreserve ? getOptionText(selectElement, valueToPreserve) : null;
         
         // Get the empty option text
         const emptyOptionText = selectElement.options[0]
@@ -194,21 +212,13 @@
             }
         });
 
-        // If the preserved value isn't in the new list but was set,
-        // we might need to add it (for already-associated orders)
+        // If preserved value isn't present in response, keep the visible option
+        // to avoid losing the current row selection.
         if (valueToPreserve && !foundPreservedValue) {
-            // The order might already be associated with this BillingOrder
-            // In that case, we need to include it even though it's not "billable"
-            // This is handled server-side in the form's queryset, but we need
-            // to keep the option visible in JS
-            const existingOption = Array.from(document.querySelectorAll(
-                `option[value="${valueToPreserve}"]`
-            )).find(opt => opt.closest('select') !== selectElement);
-            
-            if (existingOption) {
+            if (preservedOptionText) {
                 const option = document.createElement("option");
                 option.value = valueToPreserve;
-                option.textContent = existingOption.textContent;
+                option.textContent = preservedOptionText;
                 selectElement.appendChild(option);
             }
         }
@@ -219,6 +229,11 @@
         }
 
         console.log("Populated select with", orders.length, "orders, preserved value:", valueToPreserve);
+    }
+
+    function getOptionText(selectElement, value) {
+        const option = Array.from(selectElement.options).find((opt) => String(opt.value) === String(value));
+        return option ? option.textContent : null;
     }
 
     /**

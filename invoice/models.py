@@ -49,7 +49,7 @@ class Invoice(TimeStampedModel):
     date = models.DateTimeField(auto_now_add=True)
     description = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
-    emmited_at = models.DateTimeField(blank=True, null=True, verbose_name="Fecha de emisión")
+    emmited_at = models.DateField(blank=True, null=True, verbose_name="Fecha de emisión")
     def __str__(self):
         return f"Factura #{self.id} para {self.client.name} - {self.amount}"
     class Meta:

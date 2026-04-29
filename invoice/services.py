@@ -16,7 +16,6 @@ from calendar import monthrange
 
 from invoice.models import InvoiceSchedule
 from clients.models import Client, InvoiceData
-from clients.services import client_service
 from core.utils import get_first_last_day_of_month
 from orders.models import Order
 
@@ -236,7 +235,7 @@ def get_invoiceable_orders_for_client(
             'id': order.id,
             'order_date': order.order_date.isoformat(),
             'total_amount': str(order.total_amount),
-            'display': f"Order #{order.id} - {order.order_date.strftime('%Y-%m-%d')} - ${order.total_amount}"
+            'display': f"Order #{order.id} - {order.order_date.strftime('%Y-%m-%d')} - ${order.total_amount} - {order.get_status_display()}"
         }
         for order in orders
     ]
