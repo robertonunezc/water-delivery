@@ -1,9 +1,9 @@
-from django.contrib.admin import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
+from unfold.sites import UnfoldAdminSite
 
 
-class PublicAdminSite(AdminSite):
+class PublicAdminSite(UnfoldAdminSite):
     """Admin site served only on the public schema (root domain).
     Handles tenant and domain management. Not accessible from tenant subdomains."""
     site_header = "PuriGest — Gestión de Tenants"

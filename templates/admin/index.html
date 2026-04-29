@@ -47,39 +47,45 @@
       <p>{% trans "Accesos rápidos para las tareas diarias." %}</p>
     </div>
     <div class="hero-actions">
-      {% if perms.clients.add_client %}
-        <a class="pill-btn" href="{% url 'admin:clients_client_add' %}">+ {% trans "Nuevo cliente" %}</a>
+      {% url 'admin:clients_client_add' as clients_add_url %}
+      {% if perms.clients.add_client and clients_add_url %}
+        <a class="pill-btn" href="{{ clients_add_url }}">+ {% trans "Nuevo cliente" %}</a>
       {% endif %}
-      {% if perms.orders.add_order %}
-        <a class="pill-btn" href="{% url 'admin:orders_order_add' %}">+ {% trans "Crear pedido" %}</a>
+      {% url 'admin:orders_order_add' as orders_add_url %}
+      {% if perms.orders.add_order and orders_add_url %}
+        <a class="pill-btn" href="{{ orders_add_url }}">+ {% trans "Crear pedido" %}</a>
       {% endif %}
     </div>
   </div>
 
   <div class="card-grid">
-    {% if perms.clients.view_client %}
-      <a class="feature-card" href="{% url 'admin:clients_client_changelist' %}">
+    {% url 'admin:clients_client_changelist' as clients_list_url %}
+    {% if perms.clients.view_client and clients_list_url %}
+      <a class="feature-card" href="{{ clients_list_url }}">
         <p class="feature-meta">{% trans "Clientes" %}</p>
         <p class="feature-title">{% trans "Gestionar clientes" %}</p>
         <p class="feature-note">{% trans "Altas, ediciones y vistas rápidas." %}</p>
       </a>
     {% endif %}
-    {% if perms.orders.view_order %}
-      <a class="feature-card" href="{% url 'admin:orders_order_changelist' %}">
+    {% url 'admin:orders_order_changelist' as orders_list_url %}
+    {% if perms.orders.view_order and orders_list_url %}
+      <a class="feature-card" href="{{ orders_list_url }}">
         <p class="feature-meta">{% trans "Pedidos" %}</p>
         <p class="feature-title">{% trans "Ordenes abiertas" %}</p>
         <p class="feature-note">{% trans "Consulta y gestiona pedidos." %}</p>
       </a>
     {% endif %}
-    {% if perms.billing.view_invoicefrequencyreport %}
-      <a class="feature-card" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">
+    {% url 'admin:billing_invoicefrequencyreport_changelist' as billing_list_url %}
+    {% if perms.billing.view_invoicefrequencyreport and billing_list_url %}
+      <a class="feature-card" href="{{ billing_list_url }}">
         <p class="feature-meta">{% trans "Reportes" %}</p>
         <p class="feature-title">{% trans "Frecuencia de facturación" %}</p>
         <p class="feature-note">{% trans "Revisa clientes listos para facturar." %}</p>
       </a>
     {% endif %}
-    {% if perms.payment.view_payment %}
-      <a class="feature-card" href="{% url 'admin:payment_payment_changelist' %}">
+    {% url 'admin:payment_payment_changelist' as payment_list_url %}
+    {% if perms.payment.view_payment and payment_list_url %}
+      <a class="feature-card" href="{{ payment_list_url }}">
         <p class="feature-meta">{% trans "Pagos" %}</p>
         <p class="feature-title">{% trans "Cobros y conciliación" %}</p>
         <p class="feature-note">{% trans "Monitorea y registra pagos." %}</p>
@@ -87,11 +93,11 @@
     {% endif %}
   </div>
 
-  {% if perms.billing.view_invoicefrequencyreport %}
+  {% if perms.billing.view_invoicefrequencyreport and billing_list_url %}
     <div class="reports">
       <h2>{% trans "Reportes comunes" %}</h2>
       <div class="report-links">
-        <a class="report-tile" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">{% trans "Reporte de frecuencia de facturación" %}</a>
+        <a class="report-tile" href="{{ billing_list_url }}">{% trans "Reporte de frecuencia de facturación" %}</a>
       </div>
     </div>
   {% endif %}

@@ -15,7 +15,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),  # Tenant-specific admin
     path('clients/', include('clients.urls')),
     path('orders/', include('orders.urls')),
-    path('billing/', include('billing.urls')),
+    path('billing/', include('invoice.urls')),
     path('payments/', include('payment.urls')),
     path('routes/', include('routes.urls')),
     path('notifications/', include('notification.urls')),

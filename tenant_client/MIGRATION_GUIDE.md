@@ -43,7 +43,7 @@ The tenant management interface has been secured with superuser-only access cont
 
 ### 1. Update Bookmarks/Documentation
 
-If you have bookmarked URLs, update them:
+If you have **bookmarked** URLs, update them:
 
 ```
 OLD: https://yourdomain.com/tenant/list/
