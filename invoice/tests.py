@@ -116,15 +116,16 @@ class BillingOrderAdminFormTests(TestCase):
 			qs = form.fields['order'].queryset
 			self.assertIn(current_order, qs)
 
-		def test_validation_fails_when_sum_exceeds_billing_amount(self):
+		def test_cap_validation_fails_when_sum_exceeds_manual_invoice_amount(self):
+			"""Manual invoices (auto_amount=False) enforce sum-of-orders <= amount cap."""
 			br = Invoice.objects.create(
 				client=self.client_a,
 				amount=Decimal('100.00'),
+				auto_amount=False,
 				identifier='SER-004',
 				folio='FOL-004',
 				emmited_at=timezone.now(),
 			)
-
 			existing_order = Order.objects.create(
 				client=self.client_a,
 				total_amount=Decimal('80.00'),
@@ -132,27 +133,45 @@ class BillingOrderAdminFormTests(TestCase):
 			)
 			self._set_datetime(existing_order, 'order_date', timezone.now() - timedelta(days=1))
 			InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
-
 			new_order = Order.objects.create(
 				client=self.client_a,
 				total_amount=Decimal('30.00'),
 				status='COMPLETED',
 			)
 			self._set_datetime(new_order, 'order_date', timezone.now() - timedelta(hours=12))
-
 			form = InvoiceOrderLinkAdminForm(
-				data={
-					'invoice': br.id,
-					'order': new_order.id,
-					'is_paid': False,
-					'partially_paid': False,
-					'amount_paid': '0',
-					'payment_date': '',
-				}
+				data={'invoice': br.id, 'order': new_order.id, 'is_paid': False, 'partially_paid': False, 'amount_paid': '0', 'payment_date': ''},
 			)
-
 			self.assertFalse(form.is_valid())
 			self.assertIn('order', form.errors)
+
+		def test_cap_validation_skipped_for_auto_amount_invoices(self):
+			"""Action-created invoices (auto_amount=True) have no cap — amount is derived from orders."""
+			br = Invoice.objects.create(
+				client=self.client_a,
+				amount=Decimal('100.00'),
+				auto_amount=True,
+				identifier='SER-004B',
+				folio='FOL-004B',
+				emmited_at=timezone.now(),
+			)
+			existing_order = Order.objects.create(
+				client=self.client_a,
+				total_amount=Decimal('80.00'),
+				status='COMPLETED',
+			)
+			self._set_datetime(existing_order, 'order_date', timezone.now() - timedelta(days=1))
+			InvoiceOrderLink.objects.create(invoice=br, order=existing_order)
+			new_order = Order.objects.create(
+				client=self.client_a,
+				total_amount=Decimal('30.00'),
+				status='COMPLETED',
+			)
+			self._set_datetime(new_order, 'order_date', timezone.now() - timedelta(hours=12))
+			form = InvoiceOrderLinkAdminForm(
+				data={'invoice': br.id, 'order': new_order.id, 'is_paid': False, 'partially_paid': False, 'amount_paid': '0', 'payment_date': ''},
+			)
+			self.assertTrue(form.is_valid())
 
 		def test_validation_passes_at_boundary_equal_to_billing_amount(self):
 			br = Invoice.objects.create(
@@ -348,3 +367,154 @@ class GetInvoiceableOrdersServiceTests(TestCase):
 
 		qs = get_invoiceable_orders_for_client(client=self.client_a)
 		self.assertIn(future_order, qs)
+
+
+class CreateInvoiceFromOrdersServiceTests(TestCase):
+	"""Tests for the create_invoice_from_orders and sync_invoice_amount services."""
+
+	def setUp(self):
+		self.client_a = Client.objects.create(name='Client A')
+		self.client_b = Client.objects.create(name='Client B')
+
+	def _completed_order(self, client, amount):
+		return Order.objects.create(client=client, total_amount=Decimal(str(amount)), status='COMPLETED')
+
+	def test_creates_invoice_with_summed_amount(self):
+		from invoice.services import create_invoice_from_orders
+
+		order_a = self._completed_order(self.client_a, '50.00')
+		order_b = self._completed_order(self.client_a, '30.00')
+
+		invoice = create_invoice_from_orders(orders=[order_a, order_b], client=self.client_a)
+
+		self.assertEqual(invoice.amount, Decimal('80.00'))
+		self.assertEqual(invoice.client, self.client_a)
+		self.assertEqual(invoice.invoice_links.count(), 2)
+		self.assertTrue(invoice.auto_amount)
+
+	def test_creates_invoice_order_links_for_each_order(self):
+		from invoice.services import create_invoice_from_orders
+
+		order_a = self._completed_order(self.client_a, '40.00')
+		order_b = self._completed_order(self.client_a, '60.00')
+
+		invoice = create_invoice_from_orders(orders=[order_a, order_b], client=self.client_a)
+
+		linked_order_ids = set(invoice.invoice_links.values_list('order_id', flat=True))
+		self.assertIn(order_a.id, linked_order_ids)
+		self.assertIn(order_b.id, linked_order_ids)
+
+	def test_raises_if_orders_empty(self):
+		from invoice.services import create_invoice_from_orders
+		from django.core.exceptions import ValidationError
+
+		with self.assertRaises(ValidationError):
+			create_invoice_from_orders(orders=[], client=self.client_a)
+
+	def test_raises_if_orders_from_different_clients(self):
+		from invoice.services import create_invoice_from_orders
+		from django.core.exceptions import ValidationError
+
+		order_a = self._completed_order(self.client_a, '50.00')
+		order_b = self._completed_order(self.client_b, '50.00')
+
+		with self.assertRaises(ValidationError):
+			create_invoice_from_orders(orders=[order_a, order_b], client=self.client_a)
+
+	def test_sync_invoice_amount_recalculates_from_linked_orders(self):
+		from invoice.services import create_invoice_from_orders, sync_invoice_amount
+
+		order_a = self._completed_order(self.client_a, '50.00')
+		invoice = create_invoice_from_orders(orders=[order_a], client=self.client_a)
+
+		# Manually add another order link (simulates user adding via inline)
+		order_b = self._completed_order(self.client_a, '25.00')
+		InvoiceOrderLink.objects.create(invoice=invoice, order=order_b)
+
+		sync_invoice_amount(invoice)
+
+		self.assertEqual(invoice.amount, Decimal('75.00'))
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.amount, Decimal('75.00'))
+
+	def test_sync_invoice_amount_with_no_links_sets_zero(self):
+		from invoice.services import create_invoice_from_orders, sync_invoice_amount
+
+		order_a = self._completed_order(self.client_a, '50.00')
+		invoice = create_invoice_from_orders(orders=[order_a], client=self.client_a)
+		invoice.invoice_links.all().delete()
+
+		sync_invoice_amount(invoice)
+
+		self.assertEqual(invoice.amount, Decimal('0'))
+
+
+class CrearFacturaActionTests(TestCase):
+	"""Tests for the crear_factura admin action on OrderAdmin."""
+
+	def setUp(self):
+		self.superuser = User.objects.create_superuser(username='admin', password='pass')
+		self.client_a = Client.objects.create(name='Client A')
+		self.client_b = Client.objects.create(name='Client B')
+		self.test_client = self.__class__._default_client  # avoid name clash with Client model
+		self.test_client.force_login(self.superuser)
+
+	def _completed_order(self, client, amount='50.00'):
+		return Order.objects.create(client=client, total_amount=Decimal(amount), status='COMPLETED')
+
+	def _post_action(self, order_ids):
+		return self.test_client.post(
+			'/admin/orders/order/',
+			{
+				'action': 'crear_factura',
+				'_selected_action': order_ids,
+			},
+		)
+
+	def test_action_creates_invoice_and_redirects_to_change_page(self):
+		order_a = self._completed_order(self.client_a, '40.00')
+		order_b = self._completed_order(self.client_a, '60.00')
+
+		response = self._post_action([order_a.id, order_b.id])
+
+		invoice = Invoice.objects.filter(client=self.client_a).first()
+		self.assertIsNotNone(invoice)
+		self.assertEqual(invoice.amount, Decimal('100.00'))
+		self.assertEqual(invoice.invoice_links.count(), 2)
+		self.assertRedirects(
+			response,
+			f'/admin/billing/invoice/{invoice.id}/change/',
+			fetch_redirect_response=False,
+		)
+
+	def test_action_rejects_non_completed_orders(self):
+		order_pending = Order.objects.create(
+			client=self.client_a, total_amount=Decimal('30.00'), status='PENDING'
+		)
+
+		response = self._post_action([order_pending.id])
+
+		self.assertEqual(Invoice.objects.count(), 0)
+		self.assertEqual(response.status_code, 302)  # redirects back to changelist with error msg
+
+	def test_action_rejects_mixed_client_orders(self):
+		order_a = self._completed_order(self.client_a)
+		order_b = self._completed_order(self.client_b)
+
+		self._post_action([order_a.id, order_b.id])
+
+		self.assertEqual(Invoice.objects.count(), 0)
+
+	def test_action_rejects_already_billed_orders(self):
+		order = self._completed_order(self.client_a)
+		existing_invoice = Invoice.objects.create(
+			client=self.client_a,
+			amount=Decimal('50.00'),
+			identifier='S-EXIST',
+			folio='F-EXIST',
+		)
+		InvoiceOrderLink.objects.create(invoice=existing_invoice, order=order)
+
+		self._post_action([order.id])
+
+		self.assertEqual(Invoice.objects.count(), 1)  # only the pre-existing one

@@ -50,6 +50,11 @@ class Invoice(TimeStampedModel):
     description = models.TextField(blank=True, null=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
     emmited_at = models.DateField(blank=True, null=True, verbose_name="Fecha de emisión")
+    auto_amount = models.BooleanField(
+        default=False,
+        verbose_name="Monto automático",
+        help_text="Si está activo, el monto se calcula automáticamente como la suma de los pedidos vinculados.",
+    )
     def __str__(self):
         return f"Factura #{self.id} para {self.client.name} - {self.amount}"
     class Meta:

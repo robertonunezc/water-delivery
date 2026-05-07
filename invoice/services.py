@@ -325,3 +325,69 @@ def disable_billing_for_client(client_id: int) -> None:
     """
     delete_billing_frequency_for_client(client_id)
     delete_billing_data_for_client(client_id)
+
+
+def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.Invoice':
+    """
+    Create an Invoice from a list of Order instances.
+
+    The invoice amount is set to the sum of all order total_amounts.
+    Each order gets an InvoiceOrderLink connecting it to the new invoice.
+    Identifier and folio are auto-generated placeholders for the user to update.
+
+    Args:
+        orders: List of Order instances (must be COMPLETED and unbilled)
+        client: Client the invoice belongs to
+
+    Returns:
+        The newly created Invoice instance
+
+    Raises:
+        ValidationError: If orders list is empty or orders belong to different clients
+    """
+    import uuid
+    from django.db import transaction
+    from invoice.models import Invoice, InvoiceOrderLink
+
+    if not orders:
+        raise ValidationError("Debe seleccionar al menos un pedido.")
+
+    client_ids = {o.client_id for o in orders}
+    if len(client_ids) > 1:
+        raise ValidationError("Todos los pedidos deben pertenecer al mismo cliente.")
+
+    total = sum(o.total_amount for o in orders)
+    short_id = uuid.uuid4().hex[:8].upper()
+
+    with transaction.atomic():
+        invoice = Invoice.objects.create(
+            client=client,
+            amount=total,
+            auto_amount=True,
+            identifier=f'BORRADOR-{short_id}',
+            folio=f'BORRADOR-{short_id}',
+        )
+        for order in orders:
+            InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+    return invoice
+
+
+def sync_invoice_amount(invoice: 'invoice.models.Invoice') -> None:
+    """
+    Recalculate Invoice.amount from the sum of all currently linked order total_amounts.
+
+    Intended to be called from InvoiceAdmin.save_related() so every edit to the
+    inline order links keeps the invoice amount automatically consistent.
+
+    Args:
+        invoice: Invoice instance whose amount will be updated in-place and in the DB
+    """
+    from invoice.models import InvoiceOrderLink
+
+    total = InvoiceOrderLink.objects.filter(invoice=invoice).aggregate(
+        total=Sum('order__total_amount')
+    )['total'] or Decimal('0')
+
+    type(invoice).objects.filter(pk=invoice.pk).update(amount=total)
+    invoice.amount = total
