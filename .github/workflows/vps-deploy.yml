@@ -58,7 +58,7 @@ jobs:
       - name: Run tests
         working-directory: .
         run: |
-          python -m pytest clients
+          python -m pytest clients orders payment invoice
   container_healthcheck:
     runs-on: ubuntu-latest
     needs: test
