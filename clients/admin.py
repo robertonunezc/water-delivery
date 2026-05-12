@@ -381,17 +381,17 @@ class BalanceTransactionAdmin(ModelAdmin):
 		return format_html(summary)
 	get_transaction_summary.short_description = 'Resumen'
 	
-	# def has_add_permission(self, request):
-	# 	# Prevent manual creation of transactions
-	# 	return False
+	def has_add_permission(self, request):
+		# Prevent manual creation of transactions
+		return False
 	
-	# def has_change_permission(self, request, obj=None):
-	# 	# Prevent editing of transactions
-	# 	return False
+	def has_change_permission(self, request, obj=None):
+		# Prevent editing of transactions
+		return False
 	
-	# def has_delete_permission(self, request, obj=None):
-	# 	# Prevent deletion of transactions
-	# 	return False
+	def has_delete_permission(self, request, obj=None):
+		# Prevent deletion of transactions
+		return False
 
 
 @admin.register(models.CreditTransaction)
@@ -474,9 +474,9 @@ class CreditTransactionAdmin(admin.ModelAdmin):
 		return format_html(summary)
 	get_transaction_summary.short_description = 'Resumen'
 	
-	# def has_add_permission(self, request):
-	# 	# Prevent manual creation of transactions
-	# 	return False
+	def has_add_permission(self, request):
+		# Prevent manual creation of transactions
+		return False
 	
 	def has_change_permission(self, request, obj=None):
 		# Prevent editing of transactions
