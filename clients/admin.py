@@ -110,7 +110,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	inlines = [InvoiceFrequencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
-		'balance', 'current_debt', 'get_available_credit',
+		'current_debt', 'get_available_credit',
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
 		'get_billing_frequency_and_address',
@@ -232,7 +232,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if not obj.requires_billing:
 			filtered_inlines = [
 				inline for inline in all_inlines
-			if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
+			if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
 		]
 			return filtered_inlines
 
@@ -240,7 +240,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if obj.type == 'branch' and not obj.billing_override_enabled:
 			filtered_inlines = [
 				inline for inline in all_inlines
-				if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
+				if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
 			]
 			return filtered_inlines
 		
@@ -320,7 +320,7 @@ class InvoiceDataAdmin(admin.ModelAdmin):
 	client_name.short_description = 'client'
 
 @admin.register(models.BalanceTransaction)
-class BalanceTransactionAdmin(admin.ModelAdmin):
+class BalanceTransactionAdmin(ModelAdmin):
 	list_display = ('client', 'transaction_type', 'amount', 'balance_before', 'balance_after', 'created_at', 'created_by')
 	list_filter = ('transaction_type', 'created_at', 'client')
 	search_fields = ('client',)
@@ -335,7 +335,6 @@ class BalanceTransactionAdmin(admin.ModelAdmin):
 				('client', 'transaction_type'),
 				('amount', 'get_balance_change'),
 				('balance_before', 'balance_after'),
-				'description'
 			)
 		}),
 		('Referencias', {
@@ -357,6 +356,8 @@ class BalanceTransactionAdmin(admin.ModelAdmin):
 	
 	def get_balance_change(self, obj):
 		"""Display the balance change with color coding"""
+		if obj.balance_before is None or obj.balance_after is None:
+			return '-'
 		change = obj.balance_after - obj.balance_before
 		color = 'green' if change > 0 else 'red' if change < 0 else 'blue'
 		symbol = '+' if change > 0 else ''
@@ -380,17 +381,17 @@ class BalanceTransactionAdmin(admin.ModelAdmin):
 		return format_html(summary)
 	get_transaction_summary.short_description = 'Resumen'
 	
-	def has_add_permission(self, request):
-		# Prevent manual creation of transactions
-		return False
+	# def has_add_permission(self, request):
+	# 	# Prevent manual creation of transactions
+	# 	return False
 	
-	def has_change_permission(self, request, obj=None):
-		# Prevent editing of transactions
-		return False
+	# def has_change_permission(self, request, obj=None):
+	# 	# Prevent editing of transactions
+	# 	return False
 	
-	def has_delete_permission(self, request, obj=None):
-		# Prevent deletion of transactions
-		return False
+	# def has_delete_permission(self, request, obj=None):
+	# 	# Prevent deletion of transactions
+	# 	return False
 
 
 @admin.register(models.CreditTransaction)
@@ -473,9 +474,9 @@ class CreditTransactionAdmin(admin.ModelAdmin):
 		return format_html(summary)
 	get_transaction_summary.short_description = 'Resumen'
 	
-	def has_add_permission(self, request):
-		# Prevent manual creation of transactions
-		return False
+	# def has_add_permission(self, request):
+	# 	# Prevent manual creation of transactions
+	# 	return False
 	
 	def has_change_permission(self, request, obj=None):
 		# Prevent editing of transactions
