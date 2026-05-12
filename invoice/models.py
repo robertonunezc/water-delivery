@@ -60,8 +60,8 @@ class Invoice(TimeStampedModel):
     class Meta:
         db_table = 'billing_billingrecord'
         ordering = ['-date']
-        verbose_name = 'Factura'
-        verbose_name_plural = 'Facturas Emitidas'
+        verbose_name = 'Facturacion'
+        verbose_name_plural = 'Facturas'
 
 class InvoiceOrderLink(TimeStampedModel):
     invoice = models.ForeignKey('billing.Invoice', on_delete=models.CASCADE, related_name='invoice_links', verbose_name='Factura', db_column='billing_record_id')

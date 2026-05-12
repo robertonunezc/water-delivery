@@ -245,8 +245,7 @@ def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=N
 
     if total_existing + new_amount > max_amount:
         raise ValidationError(
-            f"La suma de montos de las ventas asociadas ({total_existing}) más el monto "
-            f"de la venta actual ({new_amount}), ({total_existing + new_amount}) "
+            f"La suma de montos de las ventas asociadas"
             f"excede el monto de la factura ({max_amount}). Considere dividir un pedido grande en varios o aumentar el monto de la factura."
         )
 

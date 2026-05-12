@@ -149,6 +149,7 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 	exclude = ('deleted_at',)
 	ordering = ('-date',)
 	inlines = [InvoiceOrderLinkInlineAdmin]
+	
 
 	def get_readonly_fields(self, request, obj=None):
 		# For auto_amount invoices, amount is computed — prevent manual override.
@@ -156,8 +157,29 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 			return ('amount', 'auto_amount')
 		return ('auto_amount',)
 
+	def _force_delete_marked_inline_links(self, formsets) -> None:
+		"""Ensure inline rows marked with DELETE are soft-deleted."""
+		for formset in formsets:
+			if not isinstance(formset, InvoiceOrderLinkInlineFormSet):
+				continue
+
+			# Prefer Django's computed deleted_objects when available.
+			for obj in getattr(formset, 'deleted_objects', []):
+				if obj and obj.pk and obj.deleted_at is None:
+					obj.delete()
+
+			# Fallback: enforce DELETE from cleaned_data for safety.
+			for inline_form in getattr(formset, 'forms', []):
+				cleaned_data = getattr(inline_form, 'cleaned_data', None)
+				instance = getattr(inline_form, 'instance', None)
+				if not cleaned_data or not cleaned_data.get('DELETE'):
+					continue
+				if instance and instance.pk and instance.deleted_at is None:
+					instance.delete()
+
 	def save_related(self, request, form, formsets, change):
 		super().save_related(request, form, formsets, change)
+		self._force_delete_marked_inline_links(formsets)
 		if form.instance.auto_amount:
 			from invoice.services import sync_invoice_amount
 			sync_invoice_amount(form.instance)
@@ -445,4 +467,4 @@ class InvoiceScheduleAdmin(ModelAdmin):
 
 
 admin.site.register(Invoice, InvoiceAdmin)
-admin.site.register(InvoiceOrderLink, InvoiceOrderLinkAdmin)
+# admin.site.register(InvoiceOrderLink, InvoiceOrderLinkAdmin)
