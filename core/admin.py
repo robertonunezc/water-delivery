@@ -1,6 +1,8 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.admin.sites import NotRegistered
+from django.apps import apps
 from .models import Employee, Transport, NonWorkingDay
 from unfold.admin import ModelAdmin
 from .admin_mixins import SoftDeleteAdminMixin
@@ -98,3 +100,17 @@ class NonWorkingDayAdmin(SoftDeleteAdminMixin, ModelAdmin):
 # Unregister the original User admin and register our (inline-free) UserAdmin
 admin.site.unregister(User)
 admin.site.register(User, UserAdmin)
+
+
+def _unregister_app_admin_models(app_label: str) -> None:
+    """Remove all models from the Django admin for a given app."""
+    app_config = apps.get_app_config(app_label)
+    for model in app_config.get_models():
+        try:
+            admin.site.unregister(model)
+        except NotRegistered:
+            continue
+
+
+_unregister_app_admin_models('django_celery_beat')
+_unregister_app_admin_models('django_celery_results')
