@@ -11,14 +11,14 @@
             this.observer = null;
             this.retryTimeouts = [];
             this.selectors = {
-                frequency: '#id_billing_frecuency-0-frequency',
-                billingDate: '#id_billing_frecuency-0-billing_date',
+                frequency: 'select[name$="-frequency"], #id_invoiceschedule-frequency, #id_frequency',
+                billingDate: 'select[name$="-billing_date"], #id_invoiceschedule-billing_date, #id_billing_date',
                 specificDate: '.field-specific_day',
                 weekday: '.field-weekday',
                 occurrence: '.field-occurrence',
-                billingDateField: '.field-billing_date',
-                frequencyField: '.field-frequency'
+                billingDateField: '.field-billing_date'
             };
+            this.inlineFieldSelector = '.inline-related, .inline-group, .module';
             this.eventNamespace = 'billingFrequency';
             this.logPrefix = '[BillingFrequency]';
         }
@@ -56,13 +56,48 @@
          * Get form elements
          */
         getFormElements() {
+            const frequencySelect = this.getActiveSelect('frequency');
+            const billingDateSelect = this.getActiveSelect('billing_date');
+            const inlineContainer = this.getInlineContainer(frequencySelect, billingDateSelect);
+
             return {
-                frequencySelect: this.$(this.selectors.frequency),
-                billingDateSelect: this.$(this.selectors.billingDate),
-                containerSpecificDate: this.$(this.selectors.specificDate),
-                containerWeekday: this.$(this.selectors.weekday),
-                containerOccurrence: this.$(this.selectors.occurrence)
+                frequencySelect,
+                billingDateSelect,
+                billingDateField: this.getFieldContainer(this.selectors.billingDateField, inlineContainer),
+                containerSpecificDate: this.getFieldContainer(this.selectors.specificDate, inlineContainer),
+                containerWeekday: this.getFieldContainer(this.selectors.weekday, inlineContainer),
+                containerOccurrence: this.getFieldContainer(this.selectors.occurrence, inlineContainer)
             };
+        }
+
+        getActiveSelect(fieldName) {
+            const selector = fieldName === 'frequency' ? this.selectors.frequency : this.selectors.billingDate;
+            const fields = this.$(selector).filter((_, element) => {
+                const $element = this.$(element);
+                return !$element.closest('.empty-form').length;
+            });
+
+            return fields.first();
+        }
+
+        getInlineContainer(frequencySelect, billingDateSelect) {
+            const sourceElement = frequencySelect.length ? frequencySelect : billingDateSelect;
+            if (!sourceElement.length) {
+                return this.$();
+            }
+
+            return sourceElement.closest(this.inlineFieldSelector).first();
+        }
+
+        getFieldContainer(selector, inlineContainer) {
+            if (inlineContainer && inlineContainer.length) {
+                const scoped = inlineContainer.find(selector).first();
+                if (scoped.length) {
+                    return scoped;
+                }
+            }
+
+            return this.$(selector).not('.empty-form *').first();
         }
 
         /**
@@ -94,7 +129,7 @@
             this.log('Current values - Frequency:', frequency, 'Billing Date:', billingDate);
 
             // Toggle billing_date field visibility based on frequency
-            this.toggleBillingDateFieldVisibility(frequency);
+            this.toggleBillingDateFieldVisibility(frequency, elements);
 
             // Hide specific date and weekday occurrence fieldsets initially
             elements.containerSpecificDate.hide();
@@ -107,8 +142,8 @@
         /**
          * Toggle billing_date field visibility based on frequency value
          */
-        toggleBillingDateFieldVisibility(frequency) {
-            const billingDateFieldContainer = this.$(this.selectors.billingDateField);
+        toggleBillingDateFieldVisibility(frequency, elements) {
+            const billingDateFieldContainer = elements.billingDateField;
             
             if (frequency === 'when_delivery' || frequency === 'weekly') {
                 this.log('Frequency hides billing_date field');
@@ -141,7 +176,7 @@
             }
 
             if (frequency === 'monthly') {
-                this.handleMonthlyFrequency();
+                this.handleMonthlyFrequency(elements);
             }
 
             this.applyFieldVisibility(shouldHide, frequency, billingDate, elements);
@@ -152,7 +187,7 @@
          */
         handleWeeklyFrequency(elements) {
             this.log('Weekly selected - hiding billing date field');
-            this.$(this.selectors.billingDateField).hide(300);
+            elements.billingDateField.hide(300);
             elements.billingDateSelect.val('');
         }
 
@@ -161,7 +196,7 @@
          */
         handleBiweeklyFrequency(elements) {
             this.log('Biweekly selected - hiding billing date field');
-            this.$(this.selectors.billingDateField).hide(300);
+            elements.billingDateField.hide(300);
             // Reset the billingDate dropdown to first option, which is empty or non value
             elements.billingDateSelect.val('');
         }
@@ -169,9 +204,9 @@
         /**
          * Handle monthly frequency selection
          */
-        handleMonthlyFrequency() {
+        handleMonthlyFrequency(elements) {
             this.log('Monthly selected - showing billing date field');
-            this.$(this.selectors.billingDateField).show(300);
+            elements.billingDateField.show(300);
         }
 
         /**
@@ -248,8 +283,9 @@
          * Setup event delegation for dynamic forms
          */
         setupEventDelegation() {
+            const delegatedSelectors = 'select[name$="-frequency"], select[name$="-billing_date"], #id_frequency, #id_billing_date, #id_invoiceschedule-frequency, #id_invoiceschedule-billing_date';
             this.$(document).on('change', 
-                `${this.selectors.frequency}, ${this.selectors.billingDate}`, 
+                delegatedSelectors,
                 (e) => {
                     this.log('Change detected via delegation on:', e.target.id);
                     this.toggleFieldsets();
@@ -264,7 +300,7 @@
             // Watch for Django admin inline formset events
             this.$(document).on('formset:added', (event, $row, formsetName) => {
                 this.log('Formset added:', formsetName);
-                if (formsetName && formsetName.includes('billing_frecuency')) {
+                if (formsetName && (formsetName.includes('invoiceschedule') || formsetName.includes('billing_frecuency'))) {
                     setTimeout(() => this.attachEventListeners(), 100);
                 }
             });
@@ -283,7 +319,7 @@
             this.observer = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                     if (mutation.addedNodes.length > 0) {
-                        const frequencySelect = this.$(this.selectors.frequency);
+                        const frequencySelect = this.getActiveSelect('frequency');
                         if (frequencySelect.length > 0 && !frequencySelect.data('listeners-attached')) {
                             this.log('Elements detected via MutationObserver');
                             frequencySelect.data('listeners-attached', true);

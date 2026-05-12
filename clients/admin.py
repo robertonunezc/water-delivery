@@ -64,23 +64,7 @@ class AddressInline(StackedInline):
 	)
 	tab = True
 
-class ClientBillingFrecuencyInline(StackedInline):
-	model = models.InvoiceSchedule
-	extra = 0
-	verbose_name = "Frecuencia de Facturación"
-	verbose_name_plural = "Frecuencias de Facturación"
-	classes = ('tab-billing-frequency',)
-	fields = (
-		('frequency', 'is_active'),
-		'billing_date',
-		'specific_day',
-		('weekday', 'occurrence'),
-		'notes'
-	)
-	exclude = ('deleted_at',)
-	tab = True
-
-class BillingFrecuencyInline(StackedInline):
+class InvoiceFrequencyInline(StackedInline):
 	model = models.InvoiceSchedule
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
@@ -123,7 +107,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	change_list_template = 'admin/clients/client_change_list.html'
-	inlines = [BillingFrecuencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
+	inlines = [InvoiceFrequencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
 		'balance', 'current_debt', 'get_available_credit',
