@@ -64,23 +64,7 @@ class AddressInline(StackedInline):
 	)
 	tab = True
 
-class ClientBillingFrecuencyInline(StackedInline):
-	model = models.InvoiceSchedule
-	extra = 0
-	verbose_name = "Frecuencia de Facturación"
-	verbose_name_plural = "Frecuencias de Facturación"
-	classes = ('tab-billing-frequency',)
-	fields = (
-		('frequency', 'is_active'),
-		'billing_date',
-		'specific_day',
-		('weekday', 'occurrence'),
-		'notes'
-	)
-	exclude = ('deleted_at',)
-	tab = True
-
-class BillingFrecuencyInline(StackedInline):
+class InvoiceFrequencyInline(StackedInline):
 	model = models.InvoiceSchedule
 	extra = 0
 	verbose_name = "Frecuencia de Facturación"
@@ -123,10 +107,10 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
 	change_list_template = 'admin/clients/client_change_list.html'
-	inlines = [BillingFrecuencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
+	inlines = [InvoiceFrequencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
 		'created_at', 'updated_at',
-		'balance', 'current_debt', 'get_available_credit',
+		'current_debt', 'get_available_credit',
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
 		'get_billing_frequency_and_address',
@@ -248,7 +232,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if not obj.requires_billing:
 			filtered_inlines = [
 				inline for inline in all_inlines
-			if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
+			if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
 		]
 			return filtered_inlines
 
@@ -256,7 +240,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if obj.type == 'branch' and not obj.billing_override_enabled:
 			filtered_inlines = [
 				inline for inline in all_inlines
-				if not isinstance(inline, (BillingFrecuencyInline, ClientInvoiceDataInline))
+				if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
 			]
 			return filtered_inlines
 		
@@ -351,7 +335,6 @@ class BalanceTransactionAdmin(ModelAdmin):
 				('client', 'transaction_type'),
 				('amount', 'get_balance_change'),
 				('balance_before', 'balance_after'),
-				'description'
 			)
 		}),
 		('Referencias', {
@@ -373,6 +356,8 @@ class BalanceTransactionAdmin(ModelAdmin):
 	
 	def get_balance_change(self, obj):
 		"""Display the balance change with color coding"""
+		if obj.balance_before is None or obj.balance_after is None:
+			return '-'
 		change = obj.balance_after - obj.balance_before
 		color = 'green' if change > 0 else 'red' if change < 0 else 'blue'
 		symbol = '+' if change > 0 else ''

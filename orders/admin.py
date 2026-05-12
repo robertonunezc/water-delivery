@@ -165,7 +165,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     ordering = ('-order_date', '-id')
     list_per_page = 25
     
-    actions = ['mark_as_completed', 'mark_as_cancelled', 'mark_as_pending', 'split_order_action', 'export_to_csv']
+    actions = ['split_order_action', 'export_to_csv', 'crear_factura']
     
     class Media:
         css = {
@@ -586,6 +586,57 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     
     split_order_action.short_description = '✂️ Dividir orden (solo completadas)'
     
+    def crear_factura(self, request, queryset):
+        """Create an invoice from selected completed, unbilled orders."""
+        from invoice.services import create_invoice_from_orders
+        from invoice.models import InvoiceOrderLink
+
+        orders = list(queryset)
+
+        non_completed = [o for o in orders if o.status != OrderStatus.COMPLETED.value]
+        if non_completed:
+            ids = ', '.join(f'#{o.id}' for o in non_completed)
+            self.message_user(
+                request,
+                f'Solo se pueden facturar pedidos completados. Pedidos no completados: {ids}',
+                level='error',
+            )
+            return
+
+        client_ids = {o.client_id for o in orders}
+        if len(client_ids) > 1:
+            self.message_user(
+                request,
+                'Todos los pedidos seleccionados deben pertenecer al mismo cliente.',
+                level='error',
+            )
+            return
+
+        already_billed_ids = list(
+            InvoiceOrderLink.objects.filter(order__in=orders).values_list('order_id', flat=True)
+        )
+        if already_billed_ids:
+            ids = ', '.join(f'#{oid}' for oid in already_billed_ids)
+            self.message_user(
+                request,
+                f'Los siguientes pedidos ya están facturados: {ids}',
+                level='error',
+            )
+            return
+
+        client = orders[0].client
+        invoice = create_invoice_from_orders(orders=orders, client=client)
+
+        self.message_user(
+            request,
+            f'Factura #{invoice.id} creada para {client.name} por ${invoice.amount}. '
+            f'Actualiza el identificador y folio antes de emitirla.',
+        )
+        url = reverse('admin:billing_invoice_change', args=[invoice.id])
+        return redirect(url)
+
+    crear_factura.short_description = 'Crear factura'
+
     def export_to_csv(self, request, queryset):
         """Export selected orders to CSV"""
         response = HttpResponse(content_type='text/csv')

@@ -1,6 +1,5 @@
 from django.contrib import admin
 from django import forms
-from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
 from django.http import JsonResponse, HttpResponse
 from django.urls import path
@@ -16,9 +15,7 @@ class InvoiceOrderLinkInlineAdmin(StackedInline):
 	model = InvoiceOrderLink
 	extra = 0
 	fields = ('order', 'is_paid', 'partially_paid')
-	# Keep a regular select in inline rows so the form queryset filtering is
-	# respected per-invoice client and status.
-	can_delete = False
+	can_delete = True
 	show_change_link = True
 	# Custom form and formset to enforce queryset filtering and validation
 	form = None  # set below after form class definition
@@ -87,6 +84,7 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 
 	def clean(self):
 		from invoice.services import validate_invoice_order_total
+		from django.core.exceptions import ValidationError
 
 		cleaned = super().clean()
 
@@ -97,13 +95,14 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 		)
 		order = cleaned.get('order') or getattr(self.instance, 'order', None)
 
-		if invoice and order:
-			# Use service layer for validation
+		# Cap validation only applies to manually-created invoices (auto_amount=False).
+		# For action-created invoices the amount is derived from orders, so no cap.
+		if invoice and order and not getattr(invoice, 'auto_amount', False):
 			try:
 				validate_invoice_order_total(
 					invoice=invoice,
 					order=order,
-					exclude_invoice_order_link_id=self.instance.pk
+					exclude_invoice_order_link_id=self.instance.pk,
 				)
 			except ValidationError as e:
 				raise ValidationError({'order': str(e)})
@@ -128,6 +127,18 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 	exclude = ('deleted_at',)
 	ordering = ('-date',)
 	inlines = [InvoiceOrderLinkInlineAdmin]
+
+	def get_readonly_fields(self, request, obj=None):
+		# For auto_amount invoices, amount is computed — prevent manual override.
+		if obj is not None and obj.auto_amount:
+			return ('amount', 'auto_amount')
+		return ('auto_amount',)
+
+	def save_related(self, request, form, formsets, change):
+		super().save_related(request, form, formsets, change)
+		if form.instance.auto_amount:
+			from invoice.services import sync_invoice_amount
+			sync_invoice_amount(form.instance)
 
 	def get_urls(self):
 		urls = super().get_urls()
