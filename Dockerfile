@@ -10,12 +10,12 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        postgresql-client=17 \
-        curl=8.14.1 \
-        gcc=4:14.2 \
-        python3-dev=3.13 \
-        libpq-dev=17.9 \
-        netcat-traditional=1.10 \
+        postgresql-client=17+278 \
+        curl=8.14.1-2+deb13u2 \
+        gcc=4:14.2.0-1 \
+        python3-dev=3.13.5-1 \
+        libpq-dev=17.9-0+deb13u1 \
+        netcat-traditional=1.10-50 \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip
