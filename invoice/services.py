@@ -163,6 +163,55 @@ def set_billing_date_to_clients() -> Optional[date]:
 # Billing Order Validation Services
 
 
+def add_order_to_invoice(
+    invoice: 'invoice.models.Invoice',
+    order: Order,
+    exclude_invoice_order_link_id: Optional[int] = None,
+) -> 'invoice.models.InvoiceOrderLink':
+    """
+    Add an order to an invoice with business rule validation.
+
+    This is the single source of truth for adding orders to invoices.
+    Validates that total won't exceed invoice amount (when auto_amount=False).
+
+    Args:
+        invoice: Invoice instance (must have PK)
+        order: Order instance to add
+        exclude_invoice_order_link_id: Optional ID of invoice order link being edited
+
+    Returns:
+        The newly created InvoiceOrderLink instance
+
+    Raises:
+        ValidationError: If invoice has no PK or total would exceed invoice amount
+    """
+    from invoice.models import InvoiceOrderLink
+    from django.db import transaction
+
+    if not invoice.pk:
+        raise ValidationError("La factura debe guardarse primero antes de añadir ventas.")
+
+    validate_invoice_order_total(
+        invoice=invoice,
+        order=order,
+        exclude_invoice_order_link_id=exclude_invoice_order_link_id,
+    )
+
+    with transaction.atomic():
+        link = InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+    return link
+
+
+def validate_invoice_orders_total_limit(invoice_amount: Decimal, order_amounts: List[Decimal]) -> None:
+    """Validate that the sum of selected orders does not exceed invoice amount."""
+    total_selected = sum(order_amounts, Decimal('0'))
+    if total_selected > invoice_amount:
+        raise ValidationError(
+            f"La suma de montos de las ventas asociadas ({total_selected}) "
+            f"excede el monto de la factura ({invoice_amount})."
+        )
+
+
 def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=None) -> None:
     """
     Validate that adding an order to an invoice won't exceed the invoice amount.
@@ -196,9 +245,8 @@ def validate_invoice_order_total(invoice, order, exclude_invoice_order_link_id=N
 
     if total_existing + new_amount > max_amount:
         raise ValidationError(
-            f"La suma de montos de las ventas asociadas ({total_existing}) más el monto "
-            f"de la venta actual ({new_amount}), ({total_existing + new_amount}) "
-            f"excede el monto de la factura ({max_amount})."
+            f"La suma de montos de las ventas asociadas"
+            f"excede el monto de la factura ({max_amount}). Considere dividir un pedido grande en varios o aumentar el monto de la factura."
         )
 
 

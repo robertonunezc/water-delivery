@@ -17,8 +17,8 @@
         </div>
     {% endif %}
 
-    {% if not original.billing_info.is_complete and original.requires_billing %}
-        {# Show warning when client requires billing but has no billing address #}
+    {% if original.requires_billing and not original.billing_info.effective.has_address %}
+        {# Show warning only when the effective fiscal address is missing #}
         <div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
             <strong>⚠️ Advertencia:</strong>
             <p style="margin: 10px 0 0 0;">

@@ -204,6 +204,7 @@ class AdminActionsMixin:
 		"""Add custom URLs for manual transactions"""
 		urls = super().get_urls()
 		custom_urls = [
+			path('add-balance/', self.admin_site.admin_view(self.add_balance_view), name='clients_client_add_balance'),
 			path('add-credit/', self.admin_site.admin_view(self.add_credit_view), name='clients_client_add_credit'),
 			path('bulk-deposit/', self.admin_site.admin_view(self.bulk_deposit_view), name='clients_client_bulk_deposit'),
 			path('import-csv/', self.admin_site.admin_view(self.import_clients_csv_view), name='clients_client_import_csv'),
@@ -236,6 +237,62 @@ class AdminActionsMixin:
 		)
 	
 	add_credit_action.short_description = "Gestionar crédito del cliente seleccionado"
+
+	def add_balance_view(self, request):
+		"""View for manually adding balance to a client."""
+		from . import models
+		from .forms import ManualBalanceTransactionForm
+
+		client_id = request.GET.get('client_id')
+		initial_data = {}
+
+		if client_id:
+			try:
+				client = models.Client.objects.get(id=client_id)
+				initial_data['client'] = client
+			except models.Client.DoesNotExist:
+				messages.error(request, "Cliente no encontrado.")
+				return redirect('admin:clients_client_changelist')
+
+		if request.method == 'POST':
+			form = ManualBalanceTransactionForm(request.POST)
+			if form.is_valid():
+				client = form.cleaned_data['client']
+				amount = form.cleaned_data['amount']
+				transaction_type = form.cleaned_data['transaction_type']
+				description = form.cleaned_data['description']
+				notes = form.cleaned_data['notes']
+
+				try:
+					from clients.services import balance_service
+
+					balance_service.add_balance(
+						client=client,
+						amount=amount,
+						transaction_type=transaction_type,
+						user=request.user,
+						notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}",
+					)
+
+					messages.success(
+						request,
+						f"Saldo actualizado. {client.name} ahora tiene ${client.balance:.2f}.",
+					)
+					return redirect('admin:clients_client_changelist')
+
+				except Exception as e:
+					messages.error(request, f"Error al agregar saldo: {str(e)}")
+		else:
+			form = ManualBalanceTransactionForm(initial=initial_data)
+
+		context = {
+			'form': form,
+			'title': 'Agregar Saldo Manualmente',
+			'opts': self.model._meta,
+			'has_view_permission': True,
+			'client': models.Client.objects.get(id=client_id) if client_id else None,
+		}
+		return render(request, 'admin/clients/add_balance.html', context)
 	
 	def add_credit_view(self, request):
 		"""View for manually managing client credit"""
