@@ -97,7 +97,8 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 
 		# Cap validation only applies to manually-created invoices (auto_amount=False).
 		# For action-created invoices the amount is derived from orders, so no cap.
-		if invoice and order and not getattr(invoice, 'auto_amount', False):
+		# Only validate if invoice is already saved (has PK)
+		if invoice and order and invoice.pk and not getattr(invoice, 'auto_amount', False):
 			try:
 				validate_invoice_order_total(
 					invoice=invoice,
@@ -115,12 +116,33 @@ class InvoiceOrderLinkInlineFormSet(BaseInlineFormSet):
 		kwargs['invoice'] = self.instance
 		return super()._construct_form(i, **kwargs)
 
+	def clean(self):
+		"""Validate all invoice-order links before saving."""
+		from invoice.services import validate_invoice_orders_total_limit
+
+		super().clean()
+
+		invoice = self.instance
+		if invoice.auto_amount:
+			return
+
+		order_amounts = []
+		for form in self.forms:
+			if not form.cleaned_data or form.cleaned_data.get('DELETE'):
+				continue
+			order = form.cleaned_data.get('order')
+			if order is None:
+				continue
+			order_amounts.append(order.total_amount)
+
+		validate_invoice_orders_total_limit(invoice.amount, order_amounts)
+
 # Wire custom form and formset into the inline admin
 InvoiceOrderLinkInlineAdmin.form = InvoiceOrderLinkAdminForm
 InvoiceOrderLinkInlineAdmin.formset = InvoiceOrderLinkInlineFormSet
 
 class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
-	list_display = ('id', 'identifier', 'client', 'amount', 'date', 'description')
+	list_display = ('id', 'identifier', 'client', 'amount', 'date')
 	list_filter = ('date', 'client')
 	search_fields = ('client__name', 'description', 'identifier')
 	autocomplete_fields = ('client',)
