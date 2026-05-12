@@ -109,7 +109,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	change_list_template = 'admin/clients/client_change_list.html'
 	inlines = [InvoiceFrequencyInline,ClientInvoiceDataInline,AddressInline ,ContactInline, ClientCreditConfigInline, ClientRouteInline]
 	readonly_fields = (
-		'created_at', 'updated_at',
+		'created_at', 'updated_at', 'balance',
 		'current_debt', 'get_available_credit',
 		'get_balance_status', 'get_billing_data_button',
 		'get_effective_billing_info',
