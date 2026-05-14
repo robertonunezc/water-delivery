@@ -12,9 +12,19 @@ from invoice.models import Invoice, InvoiceOrderLink
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
+from tenant_client.test_utils import FastTenantTestCase
 
 
-class BillingOrderAdminFormTests(TestCase):
+class InvoiceTenantTestCase(FastTenantTestCase):
+	@classmethod
+	def setup_tenant(cls, tenant):
+		tenant.name = 'Test Tenant'
+		tenant.paid_until = timezone.now().date() + timedelta(days=30)
+		tenant.on_trial = False
+		return tenant
+
+
+class BillingOrderAdminFormTests(InvoiceTenantTestCase):
 		def setUp(self):
 			self.client_a = Client.objects.create(name="Client A")
 			self.client_b = Client.objects.create(name="Client B")
@@ -232,7 +242,7 @@ class BillingOrderAdminFormTests(TestCase):
 				self.fail(f"Unexpected ValueError for unsaved invoice: {exc}")
 
 
-class InvoiceableOrdersViewTests(TestCase):
+class InvoiceableOrdersViewTests(InvoiceTenantTestCase):
 	"""Tests for the invoiceable_orders and invoice_client views."""
 
 	def setUp(self):
@@ -345,7 +355,7 @@ class InvoiceableOrdersViewTests(TestCase):
 			invoice_client(request, invoice_id=99999)
 
 
-class GetInvoiceableOrdersServiceTests(TestCase):
+class GetInvoiceableOrdersServiceTests(InvoiceTenantTestCase):
 	"""Documents the intent: no date-based upper-bound filtering is applied."""
 
 	def setUp(self):
@@ -369,7 +379,7 @@ class GetInvoiceableOrdersServiceTests(TestCase):
 		self.assertIn(future_order, qs)
 
 
-class CreateInvoiceFromOrdersServiceTests(TestCase):
+class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 	"""Tests for the create_invoice_from_orders and sync_invoice_amount services."""
 
 	def setUp(self):
