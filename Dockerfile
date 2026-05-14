@@ -32,8 +32,8 @@ COPY . /app/
 COPY entrypoint.sh /app/
 RUN chmod +x /app/entrypoint.sh
 
-# Create staticfiles directory
-RUN mkdir -p /app/staticfiles
+# Create runtime directories
+RUN mkdir -p /app/staticfiles /app/logs
 
 # Expose port
 EXPOSE 80

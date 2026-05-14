@@ -21,6 +21,8 @@ python manage.py migrate_schemas
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
+mkdir -p /app/logs
+
 echo "Starting Gunicorn server..."
 exec gunicorn --bind 0.0.0.0:8000 \
          --workers 3 \

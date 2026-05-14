@@ -111,10 +111,16 @@ jobs:
       - name: Verify /health/ endpoint in container
         run: |
           set -euxo pipefail
-          ATTEMPTS=30
+          ATTEMPTS=120
           SLEEP_SECONDS=3
 
           for i in $(seq 1 "$ATTEMPTS"); do
+            if [ "$(docker inspect -f '{{.State.Running}}' web-ci)" != "true" ]; then
+              echo "web-ci container exited before becoming healthy"
+              docker logs web-ci || true
+              exit 1
+            fi
+
             if RESPONSE=$(curl -fsS http://localhost:8000/health/); then
               echo "Container health check passed on attempt $i"
               echo "Response: $RESPONSE"
