@@ -14,7 +14,7 @@ RUN apt-get update \
         curl=8.14.1-2+deb13u2 \
         gcc=4:14.2.0-1 \
         python3-dev=3.13.5-1 \
-        libpq-dev=17.9-0+deb13u1 \
+        libpq-dev=17.10-0+deb13u1 \
         netcat-traditional=1.10-50 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -30,7 +30,7 @@ COPY . /app/
 
 # Copy and make entrypoint script executable
 COPY entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Create runtime directories
 RUN mkdir -p /app/staticfiles /app/logs
