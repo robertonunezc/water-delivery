@@ -1,19 +1,345 @@
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum, Count, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
+from django.forms import inlineformset_factory
+from django.urls import reverse
 from datetime import date, datetime, timedelta
 from calendar import monthrange
-from .models import Client
-from .forms import ManualCreditTransactionForm
+from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
+from .forms import (
+    ManualCreditTransactionForm,
+    ClientCoreForm,
+    ClientCreditPolicyForm,
+    ContactForm,
+    InvoiceDataForm,
+    InvoiceScheduleForm,
+    ClientCreditConfigForm,
+    AddressInlineForm,
+)
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from orders.models import Order
+from product.services import ensure_client_product_prices
+
+
+def _is_admin_user(user) -> bool:
+    return user.is_authenticated and user.is_staff
+
+
+def _billing_tab_enabled(client: Client) -> bool:
+    if not client.requires_billing:
+        return False
+    if client.type == 'branch' and not client.billing_override_enabled:
+        return False
+    return True
+
+
+def _get_address_formset(*, data=None, instance=None):
+    formset_cls = inlineformset_factory(
+        Client,
+        Address,
+        form=AddressInlineForm,
+        extra=1,
+        can_delete=True,
+    )
+    return formset_cls(data=data, instance=instance, prefix='addresses')
+
+
+def _get_contact_formset(*, data=None, instance=None):
+    formset_cls = inlineformset_factory(
+        Client,
+        Contact,
+        form=ContactForm,
+        extra=1,
+        can_delete=True,
+    )
+    return formset_cls(data=data, instance=instance, prefix='contacts')
+
+
+def _copy_delivery_to_billing_if_missing(client: Client) -> bool:
+    if client.addresses.filter(type='billing').exists():
+        return False
+
+    delivery_address = client.addresses.filter(type='delivery').order_by('id').first()
+    if not delivery_address:
+        return False
+
+    Address.objects.create(
+        client=client,
+        type='billing',
+        street=delivery_address.street,
+        exterior_number=delivery_address.exterior_number,
+        interior_number=delivery_address.interior_number,
+        locality=delivery_address.locality,
+        municipality=delivery_address.municipality,
+        state=delivery_address.state,
+        zip_code=delivery_address.zip_code,
+        country=delivery_address.country,
+        reference=delivery_address.reference,
+        active=delivery_address.active,
+    )
+    return True
+
+
+def _submission_has_billing_address(formset) -> bool:
+    for form in formset.forms:
+        cleaned_data = getattr(form, 'cleaned_data', None)
+        if not cleaned_data:
+            continue
+        if cleaned_data.get('DELETE', False):
+            continue
+        if cleaned_data.get('type') == 'billing':
+            return True
+    return False
+
+
+def _submission_deletes_billing_address(formset) -> bool:
+    for form in formset.forms:
+        cleaned_data = getattr(form, 'cleaned_data', None)
+        if not cleaned_data:
+            continue
+        if not cleaned_data.get('DELETE', False):
+            continue
+
+        instance = form.instance
+        if instance and instance.pk and instance.type == 'billing':
+            return True
+    return False
+
+
+def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_override=None):
+    forms_override = forms_override or {}
+
+    core_form = forms_override.get('core_form') or ClientCoreForm(instance=client)
+    credit_policy_form = forms_override.get('credit_policy_form') or ClientCreditPolicyForm(instance=client)
+
+    address_formset = forms_override.get('address_formset')
+    if address_formset is None and client is not None:
+        address_formset = _get_address_formset(instance=client)
+
+    contact_formset = forms_override.get('contact_formset')
+    if contact_formset is None and client is not None:
+        contact_formset = _get_contact_formset(instance=client)
+
+    invoice_data_instance = getattr(client, 'invoice_data', None) if client else None
+    invoice_schedule_instance = getattr(client, 'invoice_schedule', None) if client else None
+    if client and invoice_schedule_instance is None:
+        invoice_schedule_instance = InvoiceSchedule(client=client)
+    credit_config_instance = getattr(client, 'credit_config', None) if client else None
+
+    invoice_data_form = forms_override.get('invoice_data_form') or InvoiceDataForm(instance=invoice_data_instance, prefix='invoice_data')
+    invoice_schedule_form = forms_override.get('invoice_schedule_form') or InvoiceScheduleForm(instance=invoice_schedule_instance, prefix='invoice_schedule')
+    credit_config_form = forms_override.get('credit_config_form') or ClientCreditConfigForm(instance=credit_config_instance, prefix='credit_config')
+
+    billing_enabled = bool(client and _billing_tab_enabled(client))
+    billing_read_only = bool(
+        client
+        and client.type == 'branch'
+        and not client.billing_override_enabled
+        and client.requires_billing
+    )
+    billing_disabled = not billing_enabled
+
+    if billing_disabled:
+        for form in [invoice_data_form, invoice_schedule_form]:
+            for field in form.fields.values():
+                field.disabled = True
+
+    return {
+        'client': client,
+        'active_tab': active_tab,
+        'core_form': core_form,
+        'credit_policy_form': credit_policy_form,
+        'address_formset': address_formset,
+        'contact_formset': contact_formset,
+        'invoice_data_form': invoice_data_form,
+        'invoice_schedule_form': invoice_schedule_form,
+        'credit_config_form': credit_config_form,
+        'billing_enabled': billing_enabled,
+        'billing_read_only': billing_read_only,
+        'billing_disabled': billing_disabled,
+        'effective_billing_data': client.billing_info.effective.data if client else None,
+        'effective_billing_frequency': client.billing_info.effective.frequency if client else None,
+    }
 
 @login_required
 def create(request):
-    return render(request, 'create_client.html')
+    return redirect('clients:create_v2')
+
+
+@user_passes_test(_is_admin_user)
+def create_v2(request):
+    active_tab = 'basic'
+    if request.method == 'POST':
+        form = ClientCoreForm(request.POST)
+        if form.is_valid():
+            client = form.save()
+            pricing_summary = ensure_client_product_prices(client)
+            if pricing_summary.get('created_count', 0):
+                messages.info(
+                    request,
+                    f"Se crearon {pricing_summary['created_count']} precios de producto para el cliente.",
+                )
+            messages.success(request, 'Cliente creado correctamente. Ahora puede completar las demás pestañas.')
+            edit_url = reverse('clients:edit_v2', kwargs={'pk': client.pk})
+            return redirect(f"{edit_url}?tab=basic")
+
+        context = {
+            'client': None,
+            'active_tab': active_tab,
+            'core_form': form,
+            'is_create': True,
+        }
+        return render(request, 'clients/client_form_v2.html', context)
+
+    form = ClientCoreForm(
+        initial={
+            'active': True,
+            'type': 'branch',
+            'can_pay_with_credit': True,
+            'requires_note_for_credit': False,
+            'requires_billing': False,
+            'billing_override_enabled': False,
+        }
+    )
+    context = {
+        'client': None,
+        'active_tab': active_tab,
+        'core_form': form,
+        'is_create': True,
+    }
+    return render(request, 'clients/client_form_v2.html', context)
+
+
+@user_passes_test(_is_admin_user)
+def edit_v2(request, pk):
+    client = get_object_or_404(Client, pk=pk)
+    active_tab = request.GET.get('tab', 'basic')
+
+    if request.method == 'POST':
+        section = request.POST.get('section', 'basic')
+        active_tab = section
+
+        if section == 'basic':
+            core_form = ClientCoreForm(request.POST, instance=client)
+            if core_form.is_valid():
+                core_form.save()
+                messages.success(request, 'Datos básicos actualizados correctamente.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=basic")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab=active_tab,
+                forms_override={'core_form': core_form},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'addresses':
+            address_formset = _get_address_formset(data=request.POST, instance=client)
+            if address_formset.is_valid():
+                wants_copy = request.POST.get('copy_address_for_all_inlines') == 'on'
+                submission_has_billing = _submission_has_billing_address(address_formset)
+                submission_deletes_billing = _submission_deletes_billing_address(address_formset)
+
+                address_formset.save()
+                if wants_copy and not submission_has_billing and not submission_deletes_billing:
+                    if _copy_delivery_to_billing_if_missing(client):
+                        messages.success(request, 'Se creó una dirección fiscal copiando la primera dirección de entrega.')
+                elif wants_copy and submission_deletes_billing:
+                    messages.info(request, 'No se creó dirección fiscal automática porque en esta operación se eliminó una dirección fiscal.')
+                messages.success(request, 'Direcciones actualizadas correctamente.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=addresses")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab=active_tab,
+                forms_override={'address_formset': address_formset},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'contacts':
+            contact_formset = _get_contact_formset(data=request.POST, instance=client)
+            if contact_formset.is_valid():
+                contact_formset.save()
+                messages.success(request, 'Contactos actualizados correctamente.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=contacts")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab=active_tab,
+                forms_override={'contact_formset': contact_formset},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section in ['billing_data', 'billing_frequency']:
+            if not _billing_tab_enabled(client):
+                messages.warning(request, 'No se puede editar facturación mientras esté deshabilitada o heredada.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+
+            if section == 'billing_data':
+                form = InvoiceDataForm(request.POST, instance=getattr(client, 'invoice_data', None), prefix='invoice_data')
+                if form.is_valid():
+                    invoice_data = form.save(commit=False)
+                    invoice_data.client = client
+                    invoice_data.save()
+                    messages.success(request, 'Datos de facturación actualizados correctamente.')
+                    return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+                context = _build_client_v2_context(
+                    request,
+                    client=client,
+                    active_tab='billing',
+                    forms_override={'invoice_data_form': form},
+                )
+                return render(request, 'clients/client_form_v2.html', context)
+
+            schedule_instance = getattr(client, 'invoice_schedule', None)
+            if schedule_instance is None:
+                schedule_instance = InvoiceSchedule(client=client)
+            form = InvoiceScheduleForm(request.POST, instance=schedule_instance, prefix='invoice_schedule')
+            if form.is_valid():
+                schedule = form.save(commit=False)
+                schedule.client = client
+                schedule.save()
+                messages.success(request, 'Frecuencia de facturación actualizada correctamente.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab='billing',
+                forms_override={'invoice_schedule_form': form},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'credit':
+            credit_policy_form = ClientCreditPolicyForm(request.POST, instance=client, prefix='credit_policy')
+            credit_config_form = ClientCreditConfigForm(
+                request.POST,
+                instance=getattr(client, 'credit_config', None),
+                prefix='credit_config',
+            )
+            if credit_policy_form.is_valid() and credit_config_form.is_valid():
+                credit_policy_form.save()
+                credit_config = credit_config_form.save(commit=False)
+                credit_config.client = client
+                credit_config.save()
+                messages.success(request, 'Configuración de crédito actualizada correctamente.')
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=credit")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab='credit',
+                forms_override={
+                    'credit_policy_form': credit_policy_form,
+                    'credit_config_form': credit_config_form,
+                },
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+    context = _build_client_v2_context(request, client=client, active_tab=active_tab)
+    context['is_create'] = False
+    return render(request, 'clients/client_form_v2.html', context)
 @login_required
 def list_admin(request):
     context = get_clients(request)

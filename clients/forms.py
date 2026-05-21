@@ -1,7 +1,16 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from decimal import Decimal
-from .models import Client, Address, BalanceTransaction, CreditTransaction
+from .models import (
+    Client,
+    Address,
+    BalanceTransaction,
+    CreditTransaction,
+    Contact,
+    InvoiceData,
+    ClientCreditConfig,
+    InvoiceSchedule,
+)
 
 
 class ManualBalanceTransactionForm(forms.Form):
@@ -335,6 +344,21 @@ class AddressInlineForm(forms.ModelForm):
         model = Address
         exclude = ('deleted_at',)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for name, field in self.fields.items():
+            if name in ['active', 'same_as_previous', 'DELETE']:
+                css_class = 'form-check-input'
+            elif name == 'type':
+                css_class = 'form-select'
+            else:
+                css_class = 'form-control'
+
+            existing = field.widget.attrs.get('class', '')
+            if css_class not in existing.split():
+                field.widget.attrs['class'] = f"{existing} {css_class}".strip()
+
     def clean_type(self):
         """Normalize legacy shipping type to delivery for backward compatibility."""
         address_type = self.cleaned_data.get('type')
@@ -356,3 +380,120 @@ class ClientsCSVImportForm(forms.Form):
         if not csv_file.name.lower().endswith(".csv"):
             raise ValidationError("El archivo debe tener extensión .csv")
         return csv_file
+
+
+class ClientCoreForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = [
+            'name',
+            'active',
+            'external_id',
+            'type',
+            'corporate',
+            'note',
+            'address_link',
+            'can_pay_with_credit',
+            'requires_note_for_credit',
+            'credit_limit',
+            'requires_billing',
+            'billing_override_enabled',
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'external_id': forms.TextInput(attrs={'class': 'form-control'}),
+            'type': forms.Select(attrs={'class': 'form-select'}),
+            'corporate': forms.Select(attrs={'class': 'form-select'}),
+            'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'address_link': forms.URLInput(attrs={'class': 'form-control'}),
+            'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'requires_note_for_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'billing_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['corporate'].queryset = Client.objects.filter(type='corporate', active=True).order_by('name')
+
+    def clean(self):
+        cleaned_data = super().clean()
+        client_type = cleaned_data.get('type')
+        corporate = cleaned_data.get('corporate')
+
+        if client_type == 'corporate':
+            cleaned_data['corporate'] = None
+            cleaned_data['billing_override_enabled'] = False
+
+        if client_type == 'branch' and not corporate:
+            self.add_error('corporate', 'Cliente sucursal debe tener un cliente corporativo asociado.')
+
+        return cleaned_data
+
+
+class ClientCreditPolicyForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = ['can_pay_with_credit', 'requires_note_for_credit', 'credit_limit']
+        widgets = {
+            'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'requires_note_for_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+        }
+
+
+class ContactForm(forms.ModelForm):
+    class Meta:
+        model = Contact
+        fields = ['name', 'email', 'phone', 'position']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'position': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class InvoiceDataForm(forms.ModelForm):
+    class Meta:
+        model = InvoiceData
+        fields = ['rfc', 'razon_social', 'curp']
+        widgets = {
+            'rfc': forms.TextInput(attrs={'class': 'form-control'}),
+            'razon_social': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'curp': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class InvoiceScheduleForm(forms.ModelForm):
+    class Meta:
+        model = InvoiceSchedule
+        fields = ['frequency', 'billing_date', 'specific_day', 'weekday', 'occurrence', 'is_active', 'notes']
+        widgets = {
+            'frequency': forms.Select(attrs={'class': 'form-select'}),
+            'billing_date': forms.Select(attrs={'class': 'form-select'}),
+            'specific_day': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '31'}),
+            'weekday': forms.Select(attrs={'class': 'form-select'}),
+            'occurrence': forms.Select(attrs={'class': 'form-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+
+class ClientCreditConfigForm(forms.ModelForm):
+    class Meta:
+        model = ClientCreditConfig
+        fields = [
+            'max_payment_days',
+            'first_notification_days',
+            'second_notification_days',
+            'overdue_notification_days',
+        ]
+        widgets = {
+            'max_payment_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'first_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'second_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+            'overdue_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+        }

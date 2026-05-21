@@ -96,7 +96,7 @@ def list_orders(request):
 
 
 @staff_member_required
-def list_orders_dashboard(request):
+def list_orders_admin(request):
     """List orders for the custom administrador dashboard view."""
     if request.method == 'POST':
         return _handle_orders_dashboard_bulk_action(request)

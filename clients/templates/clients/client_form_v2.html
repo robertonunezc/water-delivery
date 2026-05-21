@@ -1,0 +1,368 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+	.dashboard-card {
+		border: 0;
+		border-radius: 14px;
+		box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+	}
+
+	.form-section-title {
+		font-size: 1rem;
+		font-weight: 700;
+		margin-bottom: 0.75rem;
+	}
+
+	.section-muted {
+		font-size: 0.85rem;
+		color: #64748b;
+	}
+
+	.status-pill {
+		font-size: 0.75rem;
+		font-weight: 700;
+		padding: 0.3rem 0.55rem;
+		border-radius: 999px;
+		display: inline-block;
+	}
+
+	.status-active { background: #dcfce7; color: #166534; }
+	.status-inactive { background: #fee2e2; color: #991b1b; }
+
+	.tab-pane {
+		padding-top: 1rem;
+	}
+
+	.field-hidden {
+		display: none;
+	}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3 mb-4">
+	<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+		<div>
+			<h1 class="h3 mb-1">{% if client %}Editar Cliente{% else %}Crear Cliente{% endif %}</h1>
+			<p class="text-muted mb-0">Flujo personalizado v2 con guardado por pestaña.</p>
+		</div>
+		<div class="d-flex align-items-center gap-2">
+			{% if client %}
+				<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
+					{% if client.active %}Activo{% else %}Inactivo{% endif %}
+				</span>
+			{% endif %}
+			<a href="{% url 'admin_clients' %}" class="btn btn-outline-secondary">Volver a lista</a>
+		</div>
+	</div>
+
+	{% if not client %}
+		<div class="alert alert-info">
+			Primero guarda los datos básicos del cliente. Después se habilitan Direcciones, Contactos, Facturación y Crédito.
+		</div>
+	{% endif %}
+
+	<div class="card dashboard-card">
+		<div class="card-body">
+			<ul class="nav nav-tabs" role="tablist">
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'basic' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'addresses' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-addresses" type="button" role="tab">Direcciones</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'contacts' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button" role="tab">Contactos</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'billing' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button" role="tab">Facturación</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'credit' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-credit" type="button" role="tab">Crédito</button>
+				</li>
+			</ul>
+
+			<div class="tab-content">
+				<div class="tab-pane fade {% if active_tab == 'basic' %}show active{% endif %}" id="tab-basic" role="tabpanel">
+					<form method="post">
+						{% csrf_token %}
+						<input type="hidden" name="section" value="basic">
+						<div class="row g-3">
+							<div class="col-md-6">
+								<label class="form-label">{{ core_form.name.label }}</label>
+								{{ core_form.name }}
+								{{ core_form.name.errors }}
+							</div>
+							<div class="col-md-3">
+								<label class="form-label">{{ core_form.type.label }}</label>
+								{{ core_form.type }}
+								{{ core_form.type.errors }}
+							</div>
+							<div class="col-md-3">
+								<label class="form-label">{{ core_form.corporate.label }}</label>
+								{{ core_form.corporate }}
+								{{ core_form.corporate.errors }}
+							</div>
+
+							<div class="col-md-4">
+								<label class="form-label">{{ core_form.external_id.label }}</label>
+								{{ core_form.external_id }}
+								{{ core_form.external_id.errors }}
+							</div>
+							<div class="col-md-8">
+								<label class="form-label">{{ core_form.address_link.label }}</label>
+								{{ core_form.address_link }}
+								{{ core_form.address_link.errors }}
+							</div>
+
+							<div class="col-12">
+								<label class="form-label">{{ core_form.note.label }}</label>
+								{{ core_form.note }}
+								{{ core_form.note.errors }}
+							</div>
+
+							<div class="col-md-3 form-check">
+								{{ core_form.active }}
+								<label class="form-check-label">{{ core_form.active.label }}</label>
+							</div>
+							<div class="col-md-3 form-check">
+								{{ core_form.can_pay_with_credit }}
+								<label class="form-check-label">{{ core_form.can_pay_with_credit.label }}</label>
+							</div>
+							<div class="col-md-3 form-check">
+								{{ core_form.requires_note_for_credit }}
+								<label class="form-check-label">{{ core_form.requires_note_for_credit.label }}</label>
+							</div>
+							<div class="col-md-3">
+								<label class="form-label">{{ core_form.credit_limit.label }}</label>
+								{{ core_form.credit_limit }}
+								{{ core_form.credit_limit.errors }}
+							</div>
+
+							<div class="col-md-3 form-check">
+								{{ core_form.requires_billing }}
+								<label class="form-check-label">{{ core_form.requires_billing.label }}</label>
+							</div>
+							<div class="col-md-4 form-check">
+								{{ core_form.billing_override_enabled }}
+								<label class="form-check-label">{{ core_form.billing_override_enabled.label }}</label>
+							</div>
+						</div>
+						{% if core_form.non_field_errors %}
+							<div class="alert alert-danger mt-3 mb-0">{{ core_form.non_field_errors }}</div>
+						{% endif %}
+						<div class="mt-3 d-flex justify-content-end">
+							<button type="submit" class="btn btn-primary">{% if client %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
+						</div>
+					</form>
+				</div>
+
+				<div class="tab-pane fade {% if active_tab == 'addresses' %}show active{% endif %}" id="tab-addresses" role="tabpanel">
+					{% if client %}
+						<form method="post">
+							{% csrf_token %}
+							<input type="hidden" name="section" value="addresses">
+							{{ address_formset.management_form }}
+							{% if address_formset.non_form_errors %}
+								<div class="alert alert-danger">{{ address_formset.non_form_errors }}</div>
+							{% endif %}
+							<div class="row g-3">
+								{% for form in address_formset.forms %}
+									<div class="col-12 border rounded p-3">
+										<div class="row g-2">
+											{{ form.errors }}
+											<div class="col-md-2">{{ form.type.label_tag }}{{ form.type }}</div>
+											<div class="col-md-4">{{ form.street.label_tag }}{{ form.street }}</div>
+											<div class="col-md-2">{{ form.exterior_number.label_tag }}{{ form.exterior_number }}</div>
+											<div class="col-md-2">{{ form.interior_number.label_tag }}{{ form.interior_number }}</div>
+											<div class="col-md-2">{{ form.zip_code.label_tag }}{{ form.zip_code }}</div>
+											<div class="col-md-3">{{ form.locality.label_tag }}{{ form.locality }}</div>
+											<div class="col-md-3">{{ form.municipality.label_tag }}{{ form.municipality }}</div>
+											<div class="col-md-3">{{ form.state.label_tag }}{{ form.state }}</div>
+											<div class="col-md-3">{{ form.country.label_tag }}{{ form.country }}</div>
+											<div class="col-md-10">{{ form.reference.label_tag }}{{ form.reference }}</div>
+											<div class="col-md-1 mt-4"><div class="form-check">{{ form.active }} <label class="form-check-label">Activo</label></div></div>
+											{% if form.DELETE %}<div class="col-md-1 mt-4"><div class="form-check">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div></div>{% endif %}
+											{{ form.id }}
+										</div>
+										{{ form.non_field_errors }}
+									</div>
+								{% endfor %}
+							</div>
+							<div class="form-check mt-3">
+								<input class="form-check-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
+								<label class="form-check-label" for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
+							</div>
+							<div class="mt-3 d-flex justify-content-end">
+								<button type="submit" class="btn btn-primary">Guardar Direcciones</button>
+							</div>
+						</form>
+					{% endif %}
+				</div>
+
+				<div class="tab-pane fade {% if active_tab == 'contacts' %}show active{% endif %}" id="tab-contacts" role="tabpanel">
+					{% if client %}
+						<form method="post">
+							{% csrf_token %}
+							<input type="hidden" name="section" value="contacts">
+							{{ contact_formset.management_form }}
+							<div class="row g-3">
+								{% for form in contact_formset.forms %}
+									<div class="col-12 border rounded p-3">
+										<div class="row g-2">
+											<div class="col-md-3">{{ form.name.label_tag }}{{ form.name }}</div>
+											<div class="col-md-3">{{ form.email.label_tag }}{{ form.email }}</div>
+											<div class="col-md-3">{{ form.phone.label_tag }}{{ form.phone }}</div>
+											<div class="col-md-2">{{ form.position.label_tag }}{{ form.position }}</div>
+											{% if form.DELETE %}<div class="col-md-1 form-check mt-4">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div>{% endif %}
+											{{ form.id }}
+										</div>
+										{{ form.non_field_errors }}
+									</div>
+								{% endfor %}
+							</div>
+							<div class="mt-3 d-flex justify-content-end">
+								<button type="submit" class="btn btn-primary">Guardar Contactos</button>
+							</div>
+						</form>
+					{% endif %}
+				</div>
+
+				<div class="tab-pane fade {% if active_tab == 'billing' %}show active{% endif %}" id="tab-billing" role="tabpanel">
+					{% if client %}
+						{% if not client.requires_billing %}
+							<div class="alert alert-secondary">El cliente no requiere facturación. Active "Requiere facturación" en Datos Básicos para habilitar edición.</div>
+						{% endif %}
+						{% if billing_read_only %}
+							<div class="alert alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
+						{% endif %}
+
+						<div class="row g-3">
+							<div class="col-lg-6">
+								<div class="border rounded p-3 h-100">
+									<div class="form-section-title">Datos de Facturación</div>
+									<form method="post">
+										{% csrf_token %}
+										<input type="hidden" name="section" value="billing_data">
+										<div class="mb-2">{{ invoice_data_form.rfc.label_tag }}{{ invoice_data_form.rfc }}{{ invoice_data_form.rfc.errors }}</div>
+										<div class="mb-2">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
+										<div class="mb-2">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
+										<div class="d-flex justify-content-end">
+											<button type="submit" class="btn btn-primary" {% if billing_disabled %}disabled{% endif %}>Guardar Datos</button>
+										</div>
+									</form>
+								</div>
+							</div>
+							<div class="col-lg-6">
+								<div class="border rounded p-3 h-100">
+									<div class="form-section-title">Frecuencia de Facturación</div>
+									<form method="post">
+										{% csrf_token %}
+										<input type="hidden" name="section" value="billing_frequency">
+										<div class="mb-2">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
+										<div class="mb-2">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
+										<div class="mb-2" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
+										<div class="mb-2" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
+										<div class="mb-2" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
+										<div class="form-check mb-2">{{ invoice_schedule_form.is_active }} <label class="form-check-label">{{ invoice_schedule_form.is_active.label }}</label></div>
+										<div class="mb-2">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
+										<div class="d-flex justify-content-end">
+											<button type="submit" class="btn btn-primary" {% if billing_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
+										</div>
+									</form>
+								</div>
+							</div>
+						</div>
+
+						{% if billing_read_only %}
+							<div class="mt-3 p-3 border rounded bg-light">
+								<div class="form-section-title">Información Efectiva Heredada</div>
+								<div class="section-muted">
+									{% if effective_billing_data %}
+										RFC: <strong>{{ effective_billing_data.rfc }}</strong> · Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong>
+									{% else %}
+										Sin datos de facturación efectivos disponibles.
+									{% endif %}
+								</div>
+							</div>
+						{% endif %}
+					{% endif %}
+				</div>
+
+				<div class="tab-pane fade {% if active_tab == 'credit' %}show active{% endif %}" id="tab-credit" role="tabpanel">
+					{% if client %}
+						<form method="post">
+							{% csrf_token %}
+							<input type="hidden" name="section" value="credit">
+							<div class="row g-3">
+								<div class="col-lg-6">
+									<div class="border rounded p-3 h-100">
+										<div class="form-section-title">Política de Crédito</div>
+										<div class="form-check mb-2">{{ credit_policy_form.can_pay_with_credit }} <label class="form-check-label">{{ credit_policy_form.can_pay_with_credit.label }}</label></div>
+										<div class="form-check mb-2">{{ credit_policy_form.requires_note_for_credit }} <label class="form-check-label">{{ credit_policy_form.requires_note_for_credit.label }}</label></div>
+										<div class="mb-2">{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}{{ credit_policy_form.credit_limit.errors }}</div>
+									</div>
+								</div>
+								<div class="col-lg-6">
+									<div class="border rounded p-3 h-100">
+										<div class="form-section-title">Configuración de Notificaciones</div>
+										<div class="mb-2">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
+										<div class="mb-2">{{ credit_config_form.first_notification_days.label_tag }}{{ credit_config_form.first_notification_days }}{{ credit_config_form.first_notification_days.errors }}</div>
+										<div class="mb-2">{{ credit_config_form.second_notification_days.label_tag }}{{ credit_config_form.second_notification_days }}{{ credit_config_form.second_notification_days.errors }}</div>
+										<div class="mb-2">{{ credit_config_form.overdue_notification_days.label_tag }}{{ credit_config_form.overdue_notification_days }}{{ credit_config_form.overdue_notification_days.errors }}</div>
+									</div>
+								</div>
+							</div>
+							<div class="mt-3 d-flex justify-content-end">
+								<button type="submit" class="btn btn-primary">Guardar Configuración de Crédito</button>
+							</div>
+						</form>
+					{% endif %}
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+	class InvoiceFrequencyFieldController {
+		constructor() {
+			this.billingDateSelect = document.getElementById('id_invoice_schedule-billing_date');
+			this.specificDayWrapper = document.getElementById('invoice-specific-day-wrapper');
+			this.weekdayWrapper = document.getElementById('invoice-weekday-wrapper');
+			this.occurrenceWrapper = document.getElementById('invoice-occurrence-wrapper');
+
+			if (!this.billingDateSelect || !this.specificDayWrapper || !this.weekdayWrapper || !this.occurrenceWrapper) {
+				return;
+			}
+
+			this.billingDateSelect.addEventListener('change', () => this.updateVisibility());
+			this.updateVisibility();
+		}
+
+		updateVisibility() {
+			const selected = this.billingDateSelect.value;
+
+			this.specificDayWrapper.classList.add('field-hidden');
+			this.weekdayWrapper.classList.add('field-hidden');
+			this.occurrenceWrapper.classList.add('field-hidden');
+
+			if (selected === 'specific_date') {
+				this.specificDayWrapper.classList.remove('field-hidden');
+			}
+
+			if (selected === 'weekday_occurrence') {
+				this.weekdayWrapper.classList.remove('field-hidden');
+				this.occurrenceWrapper.classList.remove('field-hidden');
+			}
+		}
+	}
+
+	document.addEventListener('DOMContentLoaded', () => {
+		new InvoiceFrequencyFieldController();
+	});
+</script>
+{% endblock %}
