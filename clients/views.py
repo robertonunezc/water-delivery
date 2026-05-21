@@ -12,50 +12,17 @@ from .services import get_upcoming_route_orders, get_recent_completed_route_orde
 from orders.models import Order
 
 @login_required
+def create(request):
+    return render(request, 'create_client.html')
+@login_required
+def list_dashboard(request):
+    context = get_clients(request)
+    return render(request, 'dashboard_clients.html', context)
+
+@login_required
 def list(request):
     # Get search query from request
-    search_query = request.GET.get('search', '').strip()
-    
-    # Start with all clients
-    clients_queryset = Client.objects.select_related().prefetch_related(
-        'contacts', 'addresses'
-    ).order_by('-created_at', 'name')
-    
-    # Apply search filter if query exists
-    if search_query:
-        clients_queryset = clients_queryset.filter(
-            Q(name__icontains=search_query) |
-            Q(note__icontains=search_query) |
-            Q(contacts__name__icontains=search_query) |
-            Q(contacts__phone__icontains=search_query) |
-            Q(contacts__email__icontains=search_query) |
-            Q(addresses__street__icontains=search_query) |
-            Q(addresses__municipality__icontains=search_query) |
-            Q(addresses__state__icontains=search_query) |
-            Q(invoice_data__rfc__icontains=search_query) |
-            Q(invoice_data__razon_social__icontains=search_query)
-        ).distinct()
-    
-    # Pagination
-    paginator = Paginator(clients_queryset, 10)  # Show 10 clients per page
-    page = request.GET.get('page')
-    
-    try:
-        clients = paginator.page(page)
-    except PageNotAnInteger:
-        # If page is not an integer, deliver first page.
-        clients = paginator.page(1)
-    except EmptyPage:
-        # If page is out of range (e.g. 9999), deliver last page of results.
-        clients = paginator.page(paginator.num_pages)
-    
-    context = {
-        'clients': clients,
-        'search_query': search_query,
-        'total_clients': paginator.count,
-        'has_search': bool(search_query),
-    }
-    
+    context = get_clients(request)
     return render(request, 'list_clients.html', context)
 
 @login_required
@@ -287,6 +254,49 @@ def update_client(request, pk):
             status=500
         )
 
+def get_clients(request):
+    search_query = request.GET.get('search', '').strip()
+    
+    # Start with all clients
+    clients_queryset = Client.objects.select_related().prefetch_related(
+        'contacts', 'addresses'
+    ).order_by('-created_at', 'name')
+    
+    # Apply search filter if query exists
+    if search_query:
+        clients_queryset = clients_queryset.filter(
+            Q(name__icontains=search_query) |
+            Q(note__icontains=search_query) |
+            Q(contacts__name__icontains=search_query) |
+            Q(contacts__phone__icontains=search_query) |
+            Q(contacts__email__icontains=search_query) |
+            Q(addresses__street__icontains=search_query) |
+            Q(addresses__municipality__icontains=search_query) |
+            Q(addresses__state__icontains=search_query) |
+            Q(invoice_data__rfc__icontains=search_query) |
+            Q(invoice_data__razon_social__icontains=search_query)
+        ).distinct()
+    
+    # Pagination
+    paginator = Paginator(clients_queryset, 10)  # Show 10 clients per page
+    page = request.GET.get('page')
+    
+    try:
+        clients = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        clients = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        clients = paginator.page(paginator.num_pages)
+    
+    context = {
+        'clients': clients,
+        'search_query': search_query,
+        'total_clients': paginator.count,
+        'has_search': bool(search_query),
+    }
+    return context
 @login_required
 def pay_credit(request, pk):
     """View for paying credit (reducing debt) for a client"""

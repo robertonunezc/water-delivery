@@ -19,8 +19,11 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 
+from orders import views as order_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('administrador/pedidos/', order_views.list_orders_dashboard, name='admin_orders'),
     path(
         'admin/invoice/invoiceschedule/add/',
         RedirectView.as_view(pattern_name='admin:billing_invoiceschedule_add', permanent=False, query_string=True),

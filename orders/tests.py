@@ -12,6 +12,7 @@ from orders.models import Order, OrderProduct, OrderStatus
 from orders import services
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
+from invoice.models import Invoice
 
 
 class UpdateOrderTestCase(TestCase):
@@ -434,6 +435,93 @@ class CancelOrderViewTestCase(TestCase):
         payload = response.json()
         self.assertFalse(payload.get('success'))
         self.assertIn('error', payload)
+
+
+class OrdersDashboardBulkActionTestCase(TestCase):
+    """Tests for the dashboard bulk actions UI endpoint."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username="dashboard_user",
+            password="testpass",
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+
+        self.customer = Client.objects.create(name="Bulk Client")
+        self.other_customer = Client.objects.create(name="Other Bulk Client")
+
+        self.completed_order_1 = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("50.00"),
+        )
+        self.completed_order_2 = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("30.00"),
+        )
+        self.pending_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.PENDING.value,
+            total_amount=Decimal("20.00"),
+        )
+        self.other_client_order = Order.objects.create(
+            client=self.other_customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("40.00"),
+        )
+
+    def test_dashboard_bulk_create_invoice_creates_invoice(self) -> None:
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'create_invoice',
+                'selected_orders': [self.completed_order_1.pk, self.completed_order_2.pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        invoice = Invoice.objects.get(client=self.customer)
+        self.assertEqual(invoice.amount, Decimal('80.00'))
+        self.assertEqual(invoice.invoice_links.count(), 2)
+        linked_order_ids = set(invoice.invoice_links.values_list('order_id', flat=True))
+        self.assertSetEqual(
+            linked_order_ids,
+            {self.completed_order_1.id, self.completed_order_2.id},
+        )
+
+    def test_dashboard_bulk_create_invoice_rejects_non_completed_orders(self) -> None:
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'create_invoice',
+                'selected_orders': [self.completed_order_1.pk, self.pending_order.pk],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.exists())
+        self.assertContains(response, 'Solo se pueden facturar pedidos completados')
+
+    def test_dashboard_bulk_status_update_uses_service_layer(self) -> None:
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'mark_pending',
+                'selected_orders': [self.completed_order_1.pk],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.completed_order_1.refresh_from_db()
+        self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
 
 class CalculateOrderTotalTestCase(TestCase):
     """Tests for the calculate_order_total service function."""

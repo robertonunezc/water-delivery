@@ -124,10 +124,37 @@
   </div>
 
   <div class="card dashboard-card">
+    <div class="card-header bg-white border-0 pt-3 pb-2">
+      <form id="bulk-orders-form" method="post" action="{{ request.get_full_path }}">
+        {% csrf_token %}
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4 col-lg-3">
+            <label class="form-label" for="bulk-action">Acciones masivas</label>
+            <select id="bulk-action" name="bulk_action" class="form-select">
+              <option value="">Selecciona una acción</option>
+              {% for action in bulk_actions %}
+                <option value="{{ action.value }}">{{ action.label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-4 col-lg-3">
+            <button type="submit" id="bulk-action-submit" class="btn btn-dark w-100" disabled>
+              Ejecutar acción
+            </button>
+          </div>
+          <div class="col-md-4 col-lg-6 text-md-end">
+            <small class="text-muted d-block mt-md-4" id="bulk-selection-summary">0 pedidos seleccionados</small>
+          </div>
+        </div>
+      </form>
+    </div>
     <div class="table-responsive">
       <table class="table table-hover align-middle mb-0">
         <thead class="table-light">
           <tr>
+            <th style="width: 48px;">
+              <input type="checkbox" id="select-all-orders" class="form-check-input">
+            </th>
             <th>ID</th>
             <th>Cliente</th>
             <th>Fecha</th>
@@ -139,6 +166,15 @@
         <tbody>
           {% for order in orders %}
             <tr>
+              <td>
+                <input
+                  type="checkbox"
+                  class="form-check-input order-select-checkbox"
+                  name="selected_orders"
+                  value="{{ order.id }}"
+                  form="bulk-orders-form"
+                >
+              </td>
               <td>#{{ order.id }}</td>
               <td>{{ order.client.name }}</td>
               <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
@@ -146,6 +182,9 @@
               <td><span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span></td>
               <td class="text-end">
                 <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-sm btn-outline-primary">Cliente</a>
+                {% if order.status == 'COMPLETED' %}
+                  <a href="{% url 'orders:split_order' order.id %}" class="btn btn-sm btn-outline-secondary">Dividir</a>
+                {% endif %}
                 {% if order.status == 'PENDING' %}
                   <a href="{% url 'orders:create_order' order.client.pk %}" class="btn btn-sm btn-warning">Editar</a>
                 {% endif %}
@@ -153,7 +192,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="6" class="text-center py-4 text-muted">No hay pedidos para mostrar.</td>
+              <td colspan="7" class="text-center py-4 text-muted">No hay pedidos para mostrar.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -187,4 +226,64 @@
     {% endif %}
   </div>
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const form = document.getElementById('bulk-orders-form');
+    const actionSelect = document.getElementById('bulk-action');
+    const submitButton = document.getElementById('bulk-action-submit');
+    const selectAll = document.getElementById('select-all-orders');
+    const checkboxes = Array.from(document.querySelectorAll('.order-select-checkbox'));
+    const summary = document.getElementById('bulk-selection-summary');
+
+    function selectedCount() {
+      return checkboxes.filter((checkbox) => checkbox.checked).length;
+    }
+
+    function syncState() {
+      const count = selectedCount();
+      const hasAction = actionSelect.value !== '';
+      submitButton.disabled = !hasAction || count === 0;
+      summary.textContent = `${count} pedido${count === 1 ? '' : 's'} seleccionado${count === 1 ? '' : 's'}`;
+      if (selectAll) {
+        selectAll.checked = count > 0 && count === checkboxes.length;
+        selectAll.indeterminate = count > 0 && count < checkboxes.length;
+      }
+    }
+
+    selectAll?.addEventListener('change', function () {
+      checkboxes.forEach((checkbox) => {
+        checkbox.checked = selectAll.checked;
+      });
+      syncState();
+    });
+
+    checkboxes.forEach((checkbox) => {
+      checkbox.addEventListener('change', syncState);
+    });
+
+    actionSelect.addEventListener('change', syncState);
+
+    form.addEventListener('submit', function (event) {
+      const count = selectedCount();
+      if (!actionSelect.value || count === 0) {
+        event.preventDefault();
+        return;
+      }
+
+      const messages = {
+        create_invoice: `¿Crear una factura con ${count} pedido(s) seleccionado(s)?`,
+        mark_completed: `¿Marcar ${count} pedido(s) como completados?`,
+        mark_pending: `¿Marcar ${count} pedido(s) como pendientes?`,
+        mark_cancelled: `¿Marcar ${count} pedido(s) como cancelados?`,
+      };
+
+      const confirmation = messages[actionSelect.value];
+      if (confirmation && !window.confirm(confirmation)) {
+        event.preventDefault();
+      }
+    });
+
+    syncState();
+  });
+</script>
 {% endblock %}

@@ -1,10 +1,13 @@
 from datetime import date, timedelta
 from botocore import client
+from django.contrib import messages
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_http_methods
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, Count, Prefetch
@@ -19,6 +22,25 @@ from orders import services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
 
 log = services.get_logger(__name__)
+
+ORDER_DASHBOARD_BULK_ACTIONS = (
+    {
+        'value': 'create_invoice',
+        'label': 'Crear factura',
+    },
+    {
+        'value': 'mark_completed',
+        'label': 'Marcar como completados',
+    },
+    {
+        'value': 'mark_pending',
+        'label': 'Marcar como pendientes',
+    },
+    {
+        'value': 'mark_cancelled',
+        'label': 'Marcar como cancelados',
+    },
+)
 
 
 def calculate_payment_breakdown(order_total, client_balance):
@@ -73,11 +95,115 @@ def list_orders(request):
     return render(request, 'orders/list_order.html', context)
 
 
-@login_required
+@staff_member_required
 def list_orders_dashboard(request):
     """List orders for the custom administrador dashboard view."""
+    if request.method == 'POST':
+        return _handle_orders_dashboard_bulk_action(request)
+
     context = _build_orders_list_context(request, per_page=15)
     return render(request, 'dasboard/pedidos_list.html', context)
+
+
+def _handle_orders_dashboard_bulk_action(request):
+    """Handle bulk actions submitted from the dashboard order list."""
+    action = request.POST.get('bulk_action', '')
+    selected_ids = request.POST.getlist('selected_orders')
+    redirect_to = request.get_full_path() or reverse('admin_orders')
+
+    if not action:
+        messages.error(request, 'Selecciona una acción para continuar.')
+        return redirect(redirect_to)
+
+    if not selected_ids:
+        messages.error(request, 'Selecciona al menos un pedido.')
+        return redirect(redirect_to)
+
+    selected_orders = list(
+        Order.objects.filter(pk__in=selected_ids)
+        .select_related('client')
+        .prefetch_related('items', 'payments')
+    )
+
+    if not selected_orders:
+        messages.error(request, 'No se encontraron pedidos válidos para procesar.')
+        return redirect(redirect_to)
+
+    if action == 'create_invoice':
+        return _handle_create_invoice_action(request, selected_orders, redirect_to)
+
+    if action == 'mark_completed':
+        result = services.mark_orders_as_completed(selected_orders, user=request.user)
+        messages.success(
+            request,
+            f"{result['updated']} pedido(s) marcados como completados."
+            + (f" {result['skipped']} ya estaban completados." if result['skipped'] else ''),
+        )
+        return redirect(redirect_to)
+
+    if action == 'mark_pending':
+        result = services.mark_orders_as_pending(selected_orders, user=request.user)
+        messages.success(
+            request,
+            f"{result['updated']} pedido(s) marcados como pendientes."
+            + (f" {result['skipped']} ya estaban pendientes." if result['skipped'] else ''),
+        )
+        return redirect(redirect_to)
+
+    if action == 'mark_cancelled':
+        result = services.cancel_orders(selected_orders, user=request.user)
+        messages.success(
+            request,
+            f"{result['updated']} pedido(s) marcados como cancelados."
+            + (f" {result['skipped']} ya estaban cancelados." if result['skipped'] else ''),
+        )
+        return redirect(redirect_to)
+
+    messages.error(request, 'Acción no reconocida.')
+    return redirect(redirect_to)
+
+
+def _handle_create_invoice_action(request, selected_orders, redirect_to):
+    """Validate selected orders and create an invoice from them."""
+    from invoice.models import InvoiceOrderLink
+    from invoice.services import create_invoice_from_orders
+
+    non_completed = [order for order in selected_orders if order.status != OrderStatus.COMPLETED.value]
+    if non_completed:
+        ids = ', '.join(f'#{order.id}' for order in non_completed)
+        messages.error(
+            request,
+            f'Solo se pueden facturar pedidos completados. Pedidos no completados: {ids}',
+        )
+        return redirect(redirect_to)
+
+    client_ids = {order.client_id for order in selected_orders}
+    if len(client_ids) > 1:
+        messages.error(request, 'Todos los pedidos seleccionados deben pertenecer al mismo cliente.')
+        return redirect(redirect_to)
+
+    already_billed_ids = list(
+        InvoiceOrderLink.objects.filter(order__in=selected_orders).values_list('order_id', flat=True)
+    )
+    if already_billed_ids:
+        ids = ', '.join(f'#{order_id}' for order_id in already_billed_ids)
+        messages.error(request, f'Los siguientes pedidos ya están facturados: {ids}')
+        return redirect(redirect_to)
+
+    client = selected_orders[0].client
+
+    try:
+        invoice = create_invoice_from_orders(orders=selected_orders, client=client)
+    except ValidationError as exc:
+        messages.error(request, str(exc))
+        return redirect(redirect_to)
+
+    messages.success(
+        request,
+        f'Factura #{invoice.id} creada para {client.name} por ${invoice.amount}. '
+        'Actualiza el identificador y folio antes de emitirla.',
+    )
+    return redirect(reverse('admin:billing_invoice_change', args=[invoice.id]))
 
 
 def _build_orders_list_context(request, per_page: int = 15) -> dict:
@@ -161,6 +287,7 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
     return {
         'orders': orders_page,
         'status_choices': ORDER_STATUS_CHOICES,
+        'bulk_actions': ORDER_DASHBOARD_BULK_ACTIONS,
         'all_clients': all_clients,
         'filters': {
             'status': status_filter,
