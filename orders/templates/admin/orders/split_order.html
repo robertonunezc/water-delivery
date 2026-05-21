@@ -1,9 +1,8 @@
-{% extends "admin/base_site.html" %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
 
-{% block extrastyle %}
+{% block extra_css %}
     {{ block.super }}
     <style>
         .split-order-container {
@@ -181,7 +180,7 @@
 
 {% block content %}
 <div class="split-order-container">
-    <h1>{{ title }}</h1>
+    <h3>{{ title }}</h3>
     
     <div class="order-info">
         <h2>📋 Información de la Orden Original</h2>

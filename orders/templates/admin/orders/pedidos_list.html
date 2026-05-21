@@ -158,7 +158,10 @@
             <th>ID</th>
             <th>Cliente</th>
             <th>Fecha</th>
+            <th>Subtotal</th>
+            <th>Descuento</th>
             <th>Total</th>
+            <th>Productos</th>
             <th>Estado</th>
             <th class="text-end">Acciones</th>
           </tr>
@@ -178,7 +181,17 @@
               <td>#{{ order.id }}</td>
               <td>{{ order.client.name }}</td>
               <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
+              <td>${{ order.subtotal|floatformat:2 }}</td>
+              <td>${{ order.discount|floatformat:2 }}</td>
               <td>${{ order.total_amount|floatformat:2 }}</td>
+              <td>
+  <small>
+                          {% for item in order.items.all %}
+                            {{ item.product.name }} ({{ item.quantity }})<br>
+                          {% endfor %}
+                        </small>
+
+              </td>
               <td><span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span></td>
               <td class="text-end">
                 <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-sm btn-outline-primary">Cliente</a>
@@ -192,7 +205,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="7" class="text-center py-4 text-muted">No hay pedidos para mostrar.</td>
+              <td colspan="10" class="text-center py-4 text-muted">No hay pedidos para mostrar.</td>
             </tr>
           {% endfor %}
         </tbody>

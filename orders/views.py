@@ -102,7 +102,7 @@ def list_orders_dashboard(request):
         return _handle_orders_dashboard_bulk_action(request)
 
     context = _build_orders_list_context(request, per_page=15)
-    return render(request, 'dasboard/pedidos_list.html', context)
+    return render(request, 'admin/orders/pedidos_list.html', context)
 
 
 def _handle_orders_dashboard_bulk_action(request):
@@ -187,7 +187,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
     )
     if already_billed_ids:
         ids = ', '.join(f'#{order_id}' for order_id in already_billed_ids)
-        messages.error(request, f'Los siguientes pedidos ya están facturados: {ids}')
+        messages.error(request, f'Los siguientes pedidos yaaa están facturados: {ids}')
         return redirect(redirect_to)
 
     client = selected_orders[0].client
