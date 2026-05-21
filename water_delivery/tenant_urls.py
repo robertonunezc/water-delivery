@@ -15,8 +15,9 @@ from orders import views as order_views
 from clients import views as client_views
 urlpatterns = [
     path('admin/', admin.site.urls),  # Tenant-specific admin
-    path('adminstrador/pedidos/', order_views.list_orders_dashboard, name='dashboard_orders'),
-    path('adminstrador/clientes/', client_views.list, name='dashboard_clients'),
+    path('adminstrador/pedidos/', order_views.list_orders_admin, name='admin_orders'),
+    path('adminstrador/clientes/', client_views.list_admin, name='admin_clients'),
+    path('adminstrador/clientes/crear', client_views.create_admin, name='admin_create_client'),
 
     path('clients/', include('clients.urls')),
     path('orders/', include('orders.urls')),

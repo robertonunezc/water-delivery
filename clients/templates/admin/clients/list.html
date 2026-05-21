@@ -1,0 +1,210 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+	.dashboard-kpi {
+		border-radius: 12px;
+		color: #fff;
+		padding: 1rem;
+		height: 100%;
+	}
+
+	.dashboard-kpi h6 {
+		margin-bottom: 0.25rem;
+		font-size: 0.85rem;
+		font-weight: 700;
+		opacity: 0.9;
+	}
+
+	.dashboard-kpi .value {
+		font-size: 1.5rem;
+		font-weight: 800;
+		line-height: 1.1;
+	}
+
+	.kpi-blue { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
+	.kpi-amber { background: linear-gradient(135deg, #b45309, #d97706); }
+	.kpi-emerald { background: linear-gradient(135deg, #047857, #059669); }
+	.kpi-slate { background: linear-gradient(135deg, #334155, #475569); }
+
+	.dashboard-card {
+		border: 0;
+		border-radius: 14px;
+		box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+	}
+
+	.type-pill,
+	.status-pill {
+		font-size: 0.75rem;
+		font-weight: 700;
+		padding: 0.3rem 0.55rem;
+		border-radius: 999px;
+		display: inline-block;
+	}
+
+	.type-corporate { background: #dbeafe; color: #1e40af; }
+	.type-branch { background: #ecfeff; color: #155e75; }
+	.status-active { background: #dcfce7; color: #166534; }
+	.status-inactive { background: #fee2e2; color: #991b1b; }
+	.client-name { font-weight: 600; }
+	.client-note { max-width: 260px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+	<div class="d-flex justify-content-between align-items-center mb-3">
+		<div>
+			<h1 class="h3 mb-1">Clientes</h1>
+			<p class="text-muted mb-0">Vista administrativa con búsqueda y paginador.</p>
+		</div>
+		<a href="{% url 'clients:create' %}" class="btn btn-primary">Nuevo Cliente</a>
+	</div>
+
+	<div class="row g-3 mb-3">
+		<div class="col-md-3">
+			<div class="dashboard-kpi kpi-blue">
+				<h6>Total clientes</h6>
+				<div class="value">{{ total_clients|default:0 }}</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="dashboard-kpi kpi-amber">
+				<h6>Clientes en página</h6>
+				<div class="value">{{ clients|length }}</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="dashboard-kpi kpi-emerald">
+				<h6>Con búsqueda</h6>
+				<div class="value">{% if has_search %}Sí{% else %}No{% endif %}</div>
+			</div>
+		</div>
+		<div class="col-md-3">
+			<div class="dashboard-kpi kpi-slate">
+				<h6>Hoy</h6>
+				<div class="value">{% now 'd/m/Y' %}</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="card dashboard-card mb-3">
+		<div class="card-body">
+			<form method="get" class="row g-2 align-items-end" action="{% url 'clients:list' %}">
+				<div class="col-md-10">
+					<label class="form-label" for="search">Buscar</label>
+					<input
+						id="search"
+						name="search"
+						value="{{ search_query }}"
+						class="form-control"
+						placeholder="Nombre, contacto, dirección, RFC, razón social..."
+					>
+				</div>
+				<div class="col-md-2 d-grid">
+					<button type="submit" class="btn btn-primary">Filtrar</button>
+				</div>
+			</form>
+			<div class="mt-2">
+				<a href="{% url 'clients:list' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+			</div>
+		</div>
+	</div>
+
+	<div class="card dashboard-card">
+		<div class="table-responsive">
+			<table class="table table-hover align-middle mb-0">
+				<thead class="table-light">
+					<tr>
+						<th>ID</th>
+						<th>Nombre</th>
+						<th>Tipo</th>
+						<th>Corporativo</th>
+						<th>Contacto</th>
+						<th>Saldo</th>
+						<th>Deuda</th>
+						<th>Estado</th>
+						<th class="text-end">Acciones</th>
+					</tr>
+				</thead>
+				<tbody>
+					{% for client in clients %}
+						<tr>
+							<td>#{{ client.id }}</td>
+							<td>
+								<div class="client-name">{{ client.name }}</div>
+								{% if client.note %}
+									<small class="text-muted d-inline-block text-truncate client-note">{{ client.note }}</small>
+								{% endif %}
+							</td>
+							<td>
+								<span class="type-pill {% if client.type == 'corporate' %}type-corporate{% else %}type-branch{% endif %}">
+									{{ client.get_type_display }}
+								</span>
+							</td>
+							<td>
+								{% if client.corporate %}
+									{{ client.corporate.name }}
+								{% else %}
+									<span class="text-muted">-</span>
+								{% endif %}
+							</td>
+							<td>
+								{% for contact in client.contacts.all %}
+									{% if forloop.first %}
+										<div>{{ contact.name }}</div>
+										<small class="text-muted">{{ contact.phone|default:'Sin teléfono' }}</small>
+									{% endif %}
+								{% empty %}
+									<span class="text-muted">Sin contacto</span>
+								{% endfor %}
+							</td>
+							<td>${{ client.balance|floatformat:2 }}</td>
+							<td>${{ client.current_debt|floatformat:2 }}</td>
+							<td>
+								<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
+									{% if client.active %}Activo{% else %}Inactivo{% endif %}
+								</span>
+							</td>
+							<td class="text-end">
+								<a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-outline-primary">Ver</a>
+								<a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-secondary">Pedido</a>
+							</td>
+						</tr>
+					{% empty %}
+						<tr>
+							<td colspan="9" class="text-center py-4 text-muted">No hay clientes para mostrar.</td>
+						</tr>
+					{% endfor %}
+				</tbody>
+			</table>
+		</div>
+
+		{% if clients.has_other_pages %}
+			<div class="card-footer bg-white">
+				<nav>
+					<ul class="pagination justify-content-center mb-0">
+						{% if clients.has_previous %}
+							<li class="page-item">
+								<a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients.previous_page_number }}">Anterior</a>
+							</li>
+						{% else %}
+							<li class="page-item disabled"><span class="page-link">Anterior</span></li>
+						{% endif %}
+
+						<li class="page-item disabled"><span class="page-link">Página {{ clients.number }} de {{ clients.paginator.num_pages }}</span></li>
+
+						{% if clients.has_next %}
+							<li class="page-item">
+								<a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients.next_page_number }}">Siguiente</a>
+							</li>
+						{% else %}
+							<li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+						{% endif %}
+					</ul>
+				</nav>
+			</div>
+		{% endif %}
+	</div>
+</div>
+{% endblock %}

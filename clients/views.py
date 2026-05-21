@@ -15,9 +15,9 @@ from orders.models import Order
 def create(request):
     return render(request, 'create_client.html')
 @login_required
-def list_dashboard(request):
+def list_admin(request):
     context = get_clients(request)
-    return render(request, 'dashboard_clients.html', context)
+    return render(request, 'admin/clients/list.html', context)
 
 @login_required
 def list(request):
@@ -380,3 +380,7 @@ def pay_credit(request, pk):
     }
     
     return render(request, 'pay_credit.html', context)
+
+@login_required
+def create_admin(request):
+    return render(request, 'admin/clients/create.html')
