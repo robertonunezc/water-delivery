@@ -68,7 +68,20 @@ def calculate_payment_breakdown(order_total, client_balance):
 
 @login_required
 def list_orders(request):
-    """List all orders with comprehensive filtering options"""
+    """List all orders with comprehensive filtering options."""
+    context = _build_orders_list_context(request, per_page=15)
+    return render(request, 'orders/list_order.html', context)
+
+
+@login_required
+def list_orders_dashboard(request):
+    """List orders for the custom administrador dashboard view."""
+    context = _build_orders_list_context(request, per_page=15)
+    return render(request, 'dasboard/pedidos_list.html', context)
+
+
+def _build_orders_list_context(request, per_page: int = 15) -> dict:
+    """Build context for order listing views with shared filters and pagination."""
     # Base queryset with optimized queries
     orders = Order.objects.select_related('client').prefetch_related(
         Prefetch('items', queryset=OrderProduct.objects.select_related('product')),
@@ -131,7 +144,7 @@ def list_orders(request):
     total_orders = orders.count()
     
     # Pagination
-    paginator = Paginator(orders, 15)  # Show 15 orders per page
+    paginator = Paginator(orders, per_page)
     page_number = request.GET.get('page', 1)
     orders_page = paginator.get_page(page_number)
     
@@ -145,7 +158,7 @@ def list_orders(request):
     else:
         page_stats = {'total_amount': 0, 'count': 0}
     
-    context = {
+    return {
         'orders': orders_page,
         'status_choices': ORDER_STATUS_CHOICES,
         'all_clients': all_clients,
@@ -161,8 +174,6 @@ def list_orders(request):
         'page_stats': page_stats,
         'today': date.today(),
     }
-    
-    return render(request, 'orders/list_order.html', context)
 
 
 @login_required

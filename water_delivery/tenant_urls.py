@@ -11,8 +11,11 @@ from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
 
+from orders import views as order_views
+
 urlpatterns = [
     path('admin/', admin.site.urls),  # Tenant-specific admin
+    path('adminstrador/pedidos/', order_views.list_orders_dashboard, name='dashboard_orders'),
     path('clients/', include('clients.urls')),
     path('orders/', include('orders.urls')),
     path('billing/', include('invoice.urls')),

@@ -128,22 +128,14 @@ python manage.py shell
 
 from tenant_client.services import create_tenant_with_domain
 from datetime import date, timedelta
-
-tenants = [
-    ('Agua Pura', 'agua_pura', 'aguapura.yourdomain.com'),
-    ('Cristal', 'cristal', 'cristal.yourdomain.com'),
-    ('H2O Express', 'h2o_express', 'h2o.yourdomain.com'),
-]
-
-for name, schema, domain in tenants:
-    tenant, dom = create_tenant_with_domain(
-        name=name,
-        schema_name=schema,
-        domain_name=domain,
-        paid_until=date.today() + timedelta(days=365),
-        on_trial=True
-    )
-    print(f"✓ Created: {tenant.name}")
+tenant, dom = create_tenant_with_domain(
+    name="ana",
+    schema_name="ana",
+    domain_name="ana.gestionpurificadora.com",
+    paid_until=date.today() + timedelta(days=365),
+    on_trial=True
+)
+print(f"✓ Created: {tenant.name}")
 ```
 
 ### Editing Tenant Details
@@ -161,7 +153,7 @@ Two ways to edit:
 from tenant_client.models import ClientTenant
 from datetime import date, timedelta
 
-tenant = ClientTenant.objects.get(schema_name='agua_cristalina')
+tenant = ClientTenant.objects.get(schema_name='ana')
 tenant.paid_until = date.today() + timedelta(days=365)
 tenant.on_trial = False
 tenant.save()

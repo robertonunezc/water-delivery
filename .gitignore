@@ -136,3 +136,4 @@ override.tf.json
 .terraformrc
 terraform.rc
 observability/.env.local
+html_template/*
