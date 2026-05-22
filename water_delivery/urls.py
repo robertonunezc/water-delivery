@@ -18,12 +18,17 @@ from django.contrib import admin
 from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic.base import RedirectView
 
 from orders import views as order_views
+from routes import views as route_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('administrador/pedidos/', order_views.list_orders_dashboard, name='admin_orders'),
+    path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
+    path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),
+    path('administrador/rutas/<int:pk>/editar/', route_views.update_admin, name='admin_update_route'),
     path(
         'admin/invoice/invoiceschedule/add/',
         RedirectView.as_view(pattern_name='admin:billing_invoiceschedule_add', permanent=False, query_string=True),

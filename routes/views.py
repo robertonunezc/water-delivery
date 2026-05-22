@@ -1,15 +1,202 @@
 from django.shortcuts import redirect, render, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django import forms as django_forms
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.db.models import Count
+from django.forms import inlineformset_factory
+from django.urls import reverse
+from django.db.models import Count, Q
 from django.utils import timezone
 from datetime import date, datetime
 from .models import Route, RouteClient, RouteClientOrder
+from .forms import RouteClientInlineForm, RouteForm
 from .services import get_route_detail_payload
 from core.models import Employee, Transport
 from clients.models import Client
+
+
+def _is_admin_user(user) -> bool:
+    return user.is_authenticated and user.is_staff
+
+
+def _apply_route_form_styles(route_form: RouteForm) -> RouteForm:
+    for field in route_form.fields.values():
+        widget = field.widget
+        if isinstance(widget, django_forms.CheckboxInput):
+            widget.attrs['class'] = 'form-check-input'
+            continue
+
+        default_class = 'form-select' if isinstance(widget, django_forms.Select) else 'form-control'
+        existing_classes = widget.attrs.get('class', '')
+        widget.attrs['class'] = f"{existing_classes} {default_class}".strip()
+
+    return route_form
+
+
+def _get_route_client_formset(*, data=None, instance=None):
+    formset_cls = inlineformset_factory(
+        Route,
+        RouteClient,
+        form=RouteClientInlineForm,
+        extra=1,
+        can_delete=True,
+    )
+    return formset_cls(data=data, instance=instance, prefix='route_clients')
+
+
+def _apply_route_client_formset_styles(route_client_formset):
+    forms_to_style = list(route_client_formset.forms) + [route_client_formset.empty_form]
+    for route_client_form in forms_to_style:
+        for field in route_client_form.fields.values():
+            widget = field.widget
+            if isinstance(widget, django_forms.CheckboxInput):
+                existing_classes = widget.attrs.get('class', '')
+                widget.attrs['class'] = f"{existing_classes} form-check-input".strip()
+                continue
+
+            default_class = 'form-select' if isinstance(widget, django_forms.Select) else 'form-control'
+            existing_classes = widget.attrs.get('class', '')
+            widget.attrs['class'] = f"{existing_classes} {default_class}".strip()
+
+    return route_client_formset
+
+
+def _build_route_admin_context(*, route=None, active_tab='basic', forms_override=None):
+    forms_override = forms_override or {}
+
+    default_route_form = RouteForm(
+        instance=route,
+        initial={
+            'is_active': True,
+            'weekday': 'monday',
+        },
+    )
+    route_form = forms_override.get('route_form') or default_route_form
+    route_form = _apply_route_form_styles(route_form)
+
+    route_client_formset = forms_override.get('route_client_formset')
+    if route is not None and route_client_formset is None:
+        route_client_formset = _get_route_client_formset(instance=route)
+    if route_client_formset is not None:
+        route_client_formset = _apply_route_client_formset_styles(route_client_formset)
+
+    return {
+        'route': route,
+        'active_tab': active_tab,
+        'route_form': route_form,
+        'route_client_formset': route_client_formset,
+        'is_create': route is None,
+    }
+
+
+def _get_admin_routes_context(request):
+    search_query = request.GET.get('search', '').strip()
+
+    routes_queryset = (
+        Route.objects.select_related('transportation')
+        .annotate(
+            active_clients_count=Count(
+                'route_clients',
+                filter=Q(route_clients__is_active=True),
+            )
+        )
+        .order_by('-created_at', 'name')
+    )
+
+    if search_query:
+        routes_queryset = routes_queryset.filter(
+            Q(name__icontains=search_query)
+            | Q(description__icontains=search_query)
+            | Q(transportation__license_plate__icontains=search_query)
+            | Q(transportation__model__icontains=search_query)
+            | Q(weekday__icontains=search_query)
+        )
+
+    paginator = Paginator(routes_queryset, 10)
+    routes = paginator.get_page(request.GET.get('page'))
+
+    return {
+        'routes': routes,
+        'search_query': search_query,
+        'has_search': bool(search_query),
+        'total_routes': paginator.count,
+        'active_routes_count': Route.objects.filter(is_active=True).count(),
+    }
+
+
+@user_passes_test(_is_admin_user)
+def list_admin(request):
+    context = _get_admin_routes_context(request)
+    return render(request, 'admin/routes/list.html', context)
+
+
+@user_passes_test(_is_admin_user)
+def create_admin(request):
+    active_tab = 'basic'
+
+    if request.method == 'POST':
+        route_form = RouteForm(request.POST)
+        route_form = _apply_route_form_styles(route_form)
+        if route_form.is_valid():
+            route = route_form.save()
+            messages.success(request, 'Ruta creada correctamente. Ahora puede asignar clientes.')
+            return redirect(f"{reverse('admin_update_route', kwargs={'pk': route.pk})}?tab=clients")
+
+        context = _build_route_admin_context(
+            route=None,
+            active_tab=active_tab,
+            forms_override={'route_form': route_form},
+        )
+        return render(request, 'admin/routes/form.html', context)
+
+    context = _build_route_admin_context(route=None, active_tab=active_tab)
+    return render(request, 'admin/routes/form.html', context)
+
+
+@user_passes_test(_is_admin_user)
+def update_admin(request, pk):
+    route = get_object_or_404(Route, pk=pk)
+    active_tab = request.GET.get('tab', 'basic')
+
+    if request.method == 'POST':
+        section = request.POST.get('section', 'basic')
+        active_tab = section
+
+        if section == 'basic':
+            route_form = RouteForm(request.POST, instance=route)
+            route_form = _apply_route_form_styles(route_form)
+            if route_form.is_valid():
+                route_form.save()
+                messages.success(request, 'Datos básicos de la ruta actualizados correctamente.')
+                return redirect(f"{reverse('admin_update_route', kwargs={'pk': route.pk})}?tab=basic")
+
+            context = _build_route_admin_context(
+                route=route,
+                active_tab='basic',
+                forms_override={'route_form': route_form},
+            )
+            return render(request, 'admin/routes/form.html', context)
+
+        if section == 'clients':
+            route_client_formset = _get_route_client_formset(data=request.POST, instance=route)
+            route_client_formset = _apply_route_client_formset_styles(route_client_formset)
+
+            if route_client_formset.is_valid():
+                route_client_formset.save()
+                messages.success(request, 'Clientes de la ruta actualizados correctamente.')
+                return redirect(f"{reverse('admin_update_route', kwargs={'pk': route.pk})}?tab=clients")
+
+            context = _build_route_admin_context(
+                route=route,
+                active_tab='clients',
+                forms_override={'route_client_formset': route_client_formset},
+            )
+            return render(request, 'admin/routes/form.html', context)
+
+    context = _build_route_admin_context(route=route, active_tab=active_tab)
+    return render(request, 'admin/routes/form.html', context)
 
 
 @login_required
