@@ -13,6 +13,7 @@ from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 from tenant_client.test_utils import FastTenantTestCase
+from django.urls import reverse
 
 
 class InvoiceTenantTestCase(FastTenantTestCase):
@@ -457,6 +458,70 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 		sync_invoice_amount(invoice)
 
 		self.assertEqual(invoice.amount, Decimal('0'))
+
+
+class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
+	def setUp(self):
+		super().setUp()
+		self.superuser = User.objects.create_superuser(username='admin_staff', password='pass_staff')
+		self.client_obj = Client.objects.create(name='Test Client A')
+		self.invoice = Invoice.objects.create(
+			client=self.client_obj,
+			amount=Decimal('200.00'),
+			identifier='SER-T1',
+			folio='FOL-T1',
+			auto_amount=False
+		)
+		self.client.force_login(self.superuser)
+
+	def test_list_invoices_admin_view(self):
+		url = reverse('admin_invoices')
+		response = self.client.get(url)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'Test Client A')
+		self.assertContains(response, 'SER-T1')
+
+	def test_create_invoice_admin_view_get(self):
+		url = reverse('admin_create_invoice')
+		response = self.client.get(url)
+		self.assertEqual(response.status_code, 200)
+
+	def test_create_invoice_admin_view_post(self):
+		url = reverse('admin_create_invoice')
+		data = {
+			'client': self.client_obj.id,
+			'identifier': 'SER-NEW',
+			'folio': 'FOL-NEW',
+			'amount': '150.00',
+			'auto_amount': False
+		}
+		response = self.client.post(url, data)
+		self.assertEqual(response.status_code, 302) # Redirect to edit page
+		self.assertTrue(Invoice.objects.filter(identifier='SER-NEW').exists())
+
+	def test_edit_invoice_admin_view_get(self):
+		url = reverse('admin_edit_invoice', args=[self.invoice.id])
+		response = self.client.get(url)
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'SER-T1')
+
+	def test_edit_invoice_admin_view_post_link_order(self):
+		# Create completed order
+		order = Order.objects.create(
+			client=self.client_obj,
+			total_amount=Decimal('50.00'),
+			status='COMPLETED'
+		)
+
+		url = reverse('admin_edit_invoice', args=[self.invoice.id])
+		data = {
+			'add_order_link': 'true',
+			'order': order.id
+		}
+		response = self.client.post(url, data)
+		self.assertEqual(response.status_code, 302) # Redirect to edit page
+		self.assertTrue(InvoiceOrderLink.objects.filter(invoice=self.invoice, order=order).exists())
+
 
 
 # class CrearFacturaActionTests(TestCase):

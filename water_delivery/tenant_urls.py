@@ -14,6 +14,7 @@ from django.conf.urls.static import static
 from orders import views as order_views
 from clients import views as client_views
 from routes import views as route_views
+from invoice import views as invoice_views
 urlpatterns = [
     path('admin/', admin.site.urls),  # Tenant-specific admin
     path('adminstrador/pedidos/', order_views.list_orders_admin, name='admin_orders'),
@@ -22,6 +23,10 @@ urlpatterns = [
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),
     path('administrador/rutas/<int:pk>/editar/', route_views.update_admin, name='admin_update_route'),
+    path('administrador/facturas/', invoice_views.list_invoices_admin, name='admin_invoices'),
+    path('administrador/facturas/crear/', invoice_views.create_invoice_admin, name='admin_create_invoice'),
+    path('administrador/facturas/<int:pk>/editar/', invoice_views.edit_invoice_admin, name='admin_edit_invoice'),
+    path('administrador/facturas/<int:pk>/eliminar-pedido/<int:link_pk>/', invoice_views.remove_order_link_admin, name='admin_remove_invoice_order_link'),
 
     path('clients/', include('clients.urls')),
     path('orders/', include('orders.urls')),

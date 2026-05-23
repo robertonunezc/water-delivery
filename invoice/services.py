@@ -20,6 +20,25 @@ from core.utils import get_first_last_day_of_month
 from orders.models import Order
 
 
+def get_clients_with_invoices() -> 'django.db.models.QuerySet':
+    """
+    Return a queryset of active clients that have at least one invoice.
+
+    Used for filter dropdowns in the invoice admin list view.
+
+    Returns:
+        QuerySet[Client]: Ordered by name, distinct, pre-filtered to clients
+        that have been invoiced at least once.
+    """
+    return (
+        Client.objects
+        .filter(invoices__isnull=False)
+        .distinct()
+        .order_by('name')
+    )
+
+
+
 def get_clients_needing_billing(
     start_date: date,
     end_date: date,

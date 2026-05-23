@@ -203,7 +203,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
         f'Factura #{invoice.id} creada para {client.name} por ${invoice.amount}. '
         'Actualiza el identificador y folio antes de emitirla.',
     )
-    return redirect(reverse('admin:billing_invoice_change', args=[invoice.id]))
+    return redirect(reverse('admin_edit_invoice', args=[invoice.id]))
 
 
 def _build_orders_list_context(request, per_page: int = 15) -> dict:

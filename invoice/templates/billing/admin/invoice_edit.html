@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+<style>
+  .detail-card {
+    border: 0;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
+  }
+  .detail-card-header {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    color: white;
+    border-radius: 14px 14px 0 0 !important;
+    padding: 1.25rem 1.5rem;
+  }
+  .linked-orders-header {
+    background: linear-gradient(135deg, #0f766e 0%, #115e59 100%);
+    color: white;
+    border-radius: 14px 14px 0 0 !important;
+    padding: 1.25rem 1.5rem;
+  }
+  .form-label {
+    font-weight: 600;
+    color: #475569;
+    font-size: 0.875rem;
+    margin-bottom: 0.35rem;
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .order-item-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.50rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .order-item-card:hover {
+    transform: translateX(2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-3">
+  <div class="mb-3 d-flex justify-content-between align-items-center">
+    <a href="{% url 'admin_invoices' %}" class="text-decoration-none">← Back to Invoices</a>
+    <span class="badge bg-secondary">Invoice ID: #{{ invoice.id }}</span>
+  </div>
+
+  {% if messages %}
+    <div class="row mb-3">
+      <div class="col-12">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="row g-4">
+    <!-- Left Column: Edit Form -->
+    <div class="col-lg-5">
+      <div class="card detail-card">
+        <div class="card-header form-card-header detail-card-header">
+          <h2 class="h5 mb-0">Invoice Details</h2>
+          <p class="text-white-50 small mb-0 mt-1">General credentials, files, and calculation mode.</p>
+        </div>
+        <div class="card-body p-4">
+          <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+
+            <div class="row g-3">
+              <!-- Client (Read-Only) -->
+              <div class="col-md-12">
+                <label class="form-label">Client</label>
+                <input class="form-control" type="text" value="{{ invoice.client.name }}" disabled>
+                <div style="display:none;">{{ form.client }}</div> <!-- Hidden field for form processing -->
+              </div>
+
+              <!-- Serie / Folio -->
+              <div class="col-md-6">
+                <label for="{{ form.identifier.id_for_label }}" class="form-label">Serie (Identifier) *</label>
+                {{ form.identifier }}
+              </div>
+              <div class="col-md-6">
+                <label for="{{ form.folio.id_for_label }}" class="form-label">Folio *</label>
+                {{ form.folio }}
+              </div>
+
+              <!-- Emit Date -->
+              <div class="col-md-6">
+                <label for="{{ form.emmited_at.id_for_label }}" class="form-label">Emit Date</label>
+                {{ form.emmited_at }}
+              </div>
+
+              <!-- Auto Amount Checkbox -->
+              <div class="col-md-6">
+                <label class="form-label">Calculation Mode</label>
+                <div class="card p-2 border shadow-sm">
+                  <div class="form-check form-switch d-flex align-items-center gap-2">
+                    {{ form.auto_amount }}
+                    <label class="form-check-label fw-bold" for="{{ form.auto_amount.id_for_label }}">
+                      Auto Amount
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Amount -->
+              <div class="col-md-12">
+                <label for="{{ form.amount.id_for_label }}" class="form-label">Amount ($) *</label>
+                <div class="input-group">
+                  <span class="input-group-text">$</span>
+                  {{ form.amount }}
+                </div>
+                {% if invoice.auto_amount %}
+                  <div class="form-text text-info">
+                    Amount is locked to auto-calculation (sum of linked sales). To manually enter an amount, uncheck "Auto Amount".
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- File Download / Upload -->
+              <div class="col-md-12">
+                <div class="card p-3 border shadow-sm">
+                  <label for="{{ form.file.id_for_label }}" class="form-label fw-bold">Invoice PDF/XML File</label>
+                  {% if invoice.file %}
+                    <div class="mb-2 p-2 bg-light rounded d-flex justify-content-between align-items-center border">
+                      <span class="text-truncate small">📄 {{ invoice.file.name|slice:"14:" }}</span>
+                      <a href="{{ invoice.file.url }}" class="btn btn-sm btn-outline-primary" target="_blank">Download</a>
+                    </div>
+                  {% endif %}
+                  {{ form.file }}
+                  <small class="text-muted mt-2">Upload a new document to replace/attach the digital proof.</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 mt-4">
+              <a href="{% url 'admin_invoices' %}" class="btn btn-outline-secondary">Cancel</a>
+              <button type="submit" class="btn btn-primary">Save Details</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Linked Orders / Sales -->
+    <div class="col-lg-7">
+      <div class="card detail-card h-100">
+        <div class="card-header form-card-header linked-orders-header">
+          <h2 class="h5 mb-0">Linked Sales (Ventas Vinculadas)</h2>
+          <p class="text-white-50 small mb-0 mt-1">Associate or dissociate completed sales to this invoice.</p>
+        </div>
+        <div class="card-body p-4 d-flex flex-column justify-content-between">
+          <div>
+            <!-- Linked Orders List -->
+            <h6 class="fw-bold mb-3">Linked Orders List</h6>
+            {% if linked_orders %}
+              <div class="mb-4">
+                {% for link in linked_orders %}
+                  <div class="order-item-card d-flex justify-content-between align-items-center">
+                    <div>
+                      <div class="fw-bold">Order #{{ link.order.id }}</div>
+                      <small class="text-muted">
+                        Placed on: {{ link.order.order_date|date:'d/m/Y H:i' }} | Status: <span class="badge bg-success">{{ link.order.get_status_display }}</span>
+                      </small>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                      <strong class="text-success">${{ link.order.total_amount|floatformat:2 }}</strong>
+                      <form method="post" action="{% url 'admin_remove_invoice_order_link' invoice.id link.id %}" onsubmit="return confirm('Are you sure you want to decouple Order #{{ link.order.id }} from this invoice?');">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Unlink</button>
+                      </form>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="alert alert-warning py-3 text-center mb-4">
+                No orders are linked to this invoice. Sum of sales: <strong>$0.00</strong>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Add Order Form -->
+          <div class="card p-3 border shadow-sm bg-light mt-auto">
+            <h6 class="fw-bold mb-2">Vincular Nueva Venta (Link Completed Sale)</h6>
+            {% if billable_orders %}
+              <form method="post" id="add-order-link-form">
+                {% csrf_token %}
+                <input type="hidden" name="add_order_link" value="true">
+                
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-9">
+                    <label class="form-label" for="{{ link_form.order.id_for_label }}">Select completed, unbilled order:</label>
+                    {{ link_form.order }}
+                  </div>
+                  <div class="col-md-3 d-grid">
+                    <button type="submit" class="btn btn-teal text-white fw-bold bg-dark" id="submit-link-btn">
+                      Link Sale
+                    </button>
+                  </div>
+                </div>
+                
+                <!-- Dynamic feedback element -->
+                <div id="dynamic-js-feedback" class="mt-2 small text-danger fw-bold" style="display:none;"></div>
+              </form>
+            {% else %}
+              <div class="text-muted small py-2">
+                There are no more completed, unbilled orders for this client ({{ invoice.client.name }}) available to link.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+  // OOP-style interactive Javascript manager for dynamic invoice & validation controls
+  class InvoiceEditManager {
+    constructor() {
+      // Configuration
+      this.invoiceAmount = parseFloat("{{ invoice.amount }}") || 0.0;
+      this.autoAmount = "{{ invoice.auto_amount }}" === "True";
+      this.currentSum = parseFloat("{% if linked_orders %}{{ invoice.amount }}{% else %}0.0{% endif %}") || 0.0;
+      
+      // Select orders array parsed from serialized context
+      this.billableOrders = JSON.parse('{{ billable_orders|safe|escapejs }}') || [];
+
+      // DOM Elements
+      this.orderSelector = document.getElementById('{{ link_form.order.id_for_label }}');
+      this.submitBtn = document.getElementById('submit-link-btn');
+      this.feedbackEl = document.getElementById('dynamic-js-feedback');
+
+      this.init();
+    }
+
+    init() {
+      if (this.orderSelector && this.submitBtn) {
+        this.orderSelector.addEventListener('change', () => this.validateSelection());
+        this.validateSelection();
+      }
+    }
+
+    validateSelection() {
+      const selectedValue = this.orderSelector.value;
+      if (!selectedValue) {
+        this.submitBtn.disabled = true;
+        this.hideFeedback();
+        return;
+      }
+
+      this.submitBtn.disabled = false;
+      this.hideFeedback();
+
+      // If invoice calculation is manual, validate adding this order won't exceed overall amount
+      if (!this.autoAmount) {
+        const orderId = parseInt(selectedValue);
+        const selectedOrder = this.billableOrders.find(o => o.id === orderId);
+
+        if (selectedOrder) {
+          const selectedAmount = parseFloat(selectedOrder.total_amount) || 0.0;
+          const newSum = this.currentSum + selectedAmount;
+
+          if (newSum > this.invoiceAmount) {
+            this.showFeedback(
+              `Warning: Adding this order (${selectedOrder.total_amount}) would bring the sum of linked sales to $${newSum.toFixed(2)}, which exceeds the invoice limit of $${this.invoiceAmount.toFixed(2)}. Please divide this order or increase the invoice limit.`
+            );
+            this.submitBtn.disabled = true;
+          }
+        }
+      }
+    }
+
+    showFeedback(message) {
+      if (this.feedbackEl) {
+        this.feedbackEl.textContent = message;
+        this.feedbackEl.style.display = 'block';
+      }
+    }
+
+    hideFeedback() {
+      if (this.feedbackEl) {
+        this.feedbackEl.style.display = 'none';
+        this.feedbackEl.textContent = '';
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    new InvoiceEditManager();
+  });
+</script>
+{% endblock %}
+
+{% endblock %}
