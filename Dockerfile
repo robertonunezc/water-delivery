@@ -11,7 +11,7 @@ WORKDIR /app
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         postgresql-client=17+278 \
-        curl=8.14 \
+        curl \
         gcc=4:14.2.0-1 \
         python3-dev=3.13.5-1 \
         libpq-dev=17.10-0+deb13u1 \
