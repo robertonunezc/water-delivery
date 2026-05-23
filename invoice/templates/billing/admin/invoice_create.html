@@ -29,13 +29,13 @@
 {% block content %}
 <div class="container mt-4" style="max-width: 800px;">
   <div class="mb-3">
-    <a href="{% url 'admin_invoices' %}" class="text-decoration-none">← Back to Invoices</a>
+    <a href="{% url 'admin_invoices' %}" class="text-decoration-none">← Volver a facturas</a>
   </div>
 
   <div class="card form-card">
     <div class="card-header form-card-header">
-      <h2 class="h5 mb-0">Create New Invoice (Nueva Factura)</h2>
-      <p class="text-white-50 small mb-0 mt-1">Specify client details, Serie/Folio parameters, and calculation type.</p>
+      <h2 class="h5 mb-0">Crear nueva factura</h2>
+      <p class="text-white-50 small mb-0 mt-1">Especifica los datos del cliente, la serie/folio y el tipo de cálculo.</p>
     </div>
     <div class="card-body p-4">
       <form method="post" enctype="multipart/form-data" id="invoice-create-form" novalidate>
@@ -43,7 +43,7 @@
 
         {% if form.errors %}
           <div class="alert alert-danger">
-            <h6 class="alert-heading fw-bold mb-1">Please correct the following errors:</h6>
+            <h6 class="alert-heading fw-bold mb-1">Por favor corrige los siguientes errores:</h6>
             <ul class="mb-0 small">
               {% for field, errors in form.errors.items %}
                 {% for error in errors %}
@@ -57,7 +57,7 @@
         <div class="row g-3">
           <!-- Client Selection -->
           <div class="col-md-12">
-            <label for="{{ form.client.id_for_label }}" class="form-label">Client *</label>
+            <label for="{{ form.client.id_for_label }}" class="form-label">Cliente *</label>
             {{ form.client }}
             {% if form.client.help_text %}
               <div class="form-text">{{ form.client.help_text }}</div>
@@ -66,7 +66,7 @@
 
           <!-- Serie / Folio -->
           <div class="col-md-6">
-            <label for="{{ form.identifier.id_for_label }}" class="form-label">Serie (Identifier) *</label>
+            <label for="{{ form.identifier.id_for_label }}" class="form-label">Serie (Identificador) *</label>
             {{ form.identifier }}
           </div>
           <div class="col-md-6">
@@ -76,11 +76,11 @@
 
           <!-- Calculation Mode / Amount -->
           <div class="col-md-6">
-            <label for="{{ form.amount.id_for_label }}" class="form-label">Amount ($)</label>
+            <label for="{{ form.amount.id_for_label }}" class="form-label">Importe ($)</label>
             {{ form.amount }}
           </div>
           <div class="col-md-6">
-            <label for="{{ form.emmited_at.id_for_label }}" class="form-label">Emit Date</label>
+            <label for="{{ form.emmited_at.id_for_label }}" class="form-label">Fecha de emisión</label>
             {{ form.emmited_at }}
           </div>
 
@@ -90,11 +90,11 @@
               <div class="form-check form-switch d-flex align-items-center gap-2">
                 {{ form.auto_amount }}
                 <label class="form-check-label fw-bold" for="{{ form.auto_amount.id_for_label }}">
-                  Automatic Amount Calculation
+                  Cálculo automático del importe
                 </label>
               </div>
               <small class="text-muted mt-2">
-                If enabled, the invoice total will be calculated automatically by summing all linked sales.
+                Si está activado, el total de la factura se calculará automáticamente sumando todas las ventas vinculadas.
               </small>
             </div>
           </div>
@@ -102,18 +102,18 @@
           <!-- File Upload -->
           <div class="col-md-6">
             <div class="card p-3 border shadow-sm h-100">
-              <label for="{{ form.file.id_for_label }}" class="form-label">Upload XML/PDF Invoice File</label>
+              <label for="{{ form.file.id_for_label }}" class="form-label">Subir archivo XML/PDF de la factura</label>
               {{ form.file }}
               <small class="text-muted mt-2">
-                Upload the invoice digital proof (PDF or XML representation).
+                Sube el comprobante digital de la factura (PDF o XML).
               </small>
             </div>
           </div>
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-4">
-          <a href="{% url 'admin_invoices' %}" class="btn btn-outline-secondary">Cancel</a>
-          <button type="submit" class="btn btn-primary">Create Invoice & Proceed</button>
+          <a href="{% url 'admin_invoices' %}" class="btn btn-outline-secondary">Cancelar</a>
+          <button type="submit" class="btn btn-primary">Crear factura y continuar</button>
         </div>
       </form>
     </div>
@@ -144,7 +144,7 @@
       if (isAuto) {
         this.amountInput.value = '';
         this.amountInput.disabled = true;
-        this.amountInput.placeholder = 'Automatically calculated from sales';
+        this.amountInput.placeholder = 'Calculado automáticamente a partir de ventas';
       } else {
         this.amountInput.disabled = false;
         this.amountInput.placeholder = '0.00';
