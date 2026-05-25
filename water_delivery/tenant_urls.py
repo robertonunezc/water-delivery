@@ -20,6 +20,8 @@ urlpatterns = [
     path('adminstrador/pedidos/', order_views.list_orders_admin, name='admin_orders'),
     path('adminstrador/clientes/', client_views.list_admin, name='admin_clients'),
     path('adminstrador/clientes/crear', client_views.create_admin, name='admin_create_client'),
+    path('adminstrador/clientes/editar', client_views.edit_v2   , name='admin_edit_client_v2'),
+
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),
     path('administrador/rutas/<int:pk>/editar/', route_views.update_admin, name='admin_update_route'),

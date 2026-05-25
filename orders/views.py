@@ -177,9 +177,18 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
         )
         return redirect(redirect_to)
 
-    client_ids = {order.client_id for order in selected_orders}
-    if len(client_ids) > 1:
-        messages.error(request, 'Todos los pedidos seleccionados deben pertenecer al mismo cliente.')
+    clients = {order.client for order in selected_orders}
+    #Validate if all clients are corporate and if are branches they must belong to the same corporate
+    clients_corporate = []
+    
+    for client in clients:
+        if client.corporate is not None:
+            clients_corporate.append(client.corporate)
+        else:
+            clients_corporate.append(client)
+
+    if len(set(clients_corporate)) > 1:
+        messages.error(request, 'Todos los pedidos seleccionados deben pertenecer al mismo cliente corporativo.')
         return redirect(redirect_to)
 
     already_billed_ids = list(
@@ -187,7 +196,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
     )
     if already_billed_ids:
         ids = ', '.join(f'#{order_id}' for order_id in already_billed_ids)
-        messages.error(request, f'Los siguientes pedidos yaaa están facturados: {ids}')
+        messages.error(request, f'Los siguientes pedidos ya están facturados: {ids}')
         return redirect(redirect_to)
 
     client = selected_orders[0].client

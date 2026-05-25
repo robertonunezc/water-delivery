@@ -419,9 +419,18 @@ def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.
     if not orders:
         raise ValidationError("Debe seleccionar al menos un pedido.")
 
-    client_ids = {o.client_id for o in orders}
-    if len(client_ids) > 1:
-        raise ValidationError("Todos los pedidos deben pertenecer al mismo cliente.")
+    clients = {order.client for order in orders}
+    #Validate if all clients are corporate and if are branches they must belong to the same corporate
+    clients_corporate = []
+    
+    for client in clients:
+        if client.corporate is not None:
+            clients_corporate.append(client.corporate)
+        else:
+            clients_corporate.append(client)
+
+    if len(set(clients_corporate)) > 1:
+        raise ValidationError("Todos los pedidos deben pertenecer al mismo cliente corporativo.")
 
     total = sum(o.total_amount for o in orders)
     short_id = uuid.uuid4().hex[:8].upper()

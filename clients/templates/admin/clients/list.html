@@ -168,10 +168,11 @@
 							</td>
 							<td class="text-end">
 								<a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-outline-primary">Ver</a>
+								<a href="{% url 'clients:edit_v2' client.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
 								<a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-secondary">Pedido</a>
 							</td>
 						</tr>
-					{% empty %}
+					{% empty %}	
 						<tr>
 							<td colspan="9" class="text-center py-4 text-muted">No hay clientes para mostrar.</td>
 						</tr>

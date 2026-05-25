@@ -1,6 +1,7 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
 from typing import Optional, List
+# pyrefly: ignore [missing-import]
 from django.conf import settings
 from django.db import models
 from django.core.exceptions import ObjectDoesNotExist
