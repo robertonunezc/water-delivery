@@ -63,90 +63,13 @@ jobs:
           python -m pytest clients orders payment invoice
 
       - name: Skip tests (temporary)
-        if: env.SKIP_TESTS == 'true'
+        if: env.SKIP_TESTS == 'false'
         run: |
-          echo "Skipping test execution temporarily (SKIP_TESTS=true)."
-  container_healthcheck:
-    if: ${{ false }}
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build image for health check
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: water-delivery:ci-health
-
-      - name: Start dependencies and app container
-        run: |
-          set -euxo pipefail
-          docker network create water-ci-net
-
-          docker run -d --name postgres-ci --network water-ci-net \
-            -e POSTGRES_DB=water_delivery \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD="${{ secrets.CI_POSTGRES_PASSWORD }}" \
-            postgres:16
-
-          docker run -d --name redis-ci --network water-ci-net redis:7-alpine
-
-          docker run -d --name web-ci --network water-ci-net -p 8000:8000 \
-            -e DJANGO_SETTINGS_MODULE=water_delivery.settings \
-            -e SECRET_KEY=dummy-ci-secret-key \
-            -e POSTGRES_DB=water_delivery \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD="${{ secrets.CI_POSTGRES_PASSWORD }}" \
-            -e POSTGRES_HOST=postgres-ci \
-            -e POSTGRES_PORT=5432 \
-            -e REDIS_HOST=redis-ci \
-            -e REDIS_PORT=6379 \
-            -e REDIS_PASSWORD= \
-            water-delivery:ci-health
-
-      - name: Verify /health/ endpoint in container
-        run: |
-          set -euxo pipefail
-          ATTEMPTS=30
-          SLEEP_SECONDS=3
-
-          for i in $(seq 1 "$ATTEMPTS"); do
-            if [ "$(docker inspect -f '{{.State.Running}}' web-ci)" != "true" ]; then
-              echo "web-ci container exited before becoming healthy"
-              docker logs web-ci || true
-              exit 1
-            fi
-
-            if RESPONSE=$(curl -fsS http://localhost:8000/health/); then
-              echo "Container health check passed on attempt $i"
-              echo "Response: $RESPONSE"
-              exit 0
-            fi
-
-            echo "Attempt $i/$ATTEMPTS failed, waiting ${SLEEP_SECONDS}s..."
-            docker logs web-ci --tail 30 || true
-            sleep "$SLEEP_SECONDS"
-          done
-
-          echo "Container health check failed after $ATTEMPTS attempts"
-          docker logs web-ci || true
-          exit 1
-
-      - name: Cleanup containers
-        if: always()
-        run: |
-          set -euxo pipefail
-          docker rm -f web-ci redis-ci postgres-ci || true
-          docker network rm water-ci-net || true
+          echo "Skipping test execution temporarily (SKIP_TESTS=false)."
   build_and_push:
-    if: always() && needs.test.result == 'success' && (needs.container_healthcheck.result == 'success' || needs.container_healthcheck.result == 'skipped')
+    if: always() && needs.test.result == 'success'
     runs-on: ubuntu-latest
-    needs: [test, container_healthcheck]
+    needs: [test]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -206,15 +129,15 @@ jobs:
           PORT="${SSH_PORT:-22}"
           scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             docker-compose.prod.yml \
-            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/docker-compose.prod.yml"
+            "${{ secrets.EC2_USER }}@$HOST:projects/purigest/docker-compose.prod.yml"
 
           ssh -p "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             "${{ secrets.EC2_USER }}@$HOST" \
-            "mkdir -p projects/water-delivery/observability"
+            "mkdir -p projects/purigest/observability"
 
           scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             observability/docker-compose.logging.yml \
-            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/observability/docker-compose.logging.yml"
+            "${{ secrets.EC2_USER }}@$HOST:projects/purigest/observability/docker-compose.logging.yml"
           
       - name: Deploy to VPS
         env:
@@ -257,19 +180,19 @@ jobs:
 
           scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             "$ENV_FILE" \
-            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/.env.production"
+            "${{ secrets.EC2_USER }}@$HOST:projects/purigest/.env.production"
 
           scp -P "$PORT" -o StrictHostKeyChecking=yes -i ~/.ssh/id_rsa \
             "$LOGGING_ENV_FILE" \
-            "${{ secrets.EC2_USER }}@$HOST:projects/water-delivery/observability/.env.production"
+            "${{ secrets.EC2_USER }}@$HOST:projects/purigest/observability/.env.production"
 
           rm -f "$ENV_FILE"
           rm -f "$LOGGING_ENV_FILE"
 
           ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" << 'EOF'
             set -euo pipefail
-            echo "Deploying water-delivery application..."
-            cd projects/water-delivery
+            echo "Deploying purigest application..."
+            cd projects/purigest
 
             chmod 600 .env.production
             chmod 600 observability/.env.production
@@ -375,7 +298,7 @@ jobs:
           done
 
           MESSAGE=$(printf '%s\n' \
-            "<b>Water Delivery Deployment ${OVERALL}</b>" \
+            "<b>Purigest Deployment ${OVERALL}</b>" \
             "" \
             "<b>Repository:</b> ${{ github.repository }}" \
             "<b>Branch:</b> ${{ github.ref_name }}" \

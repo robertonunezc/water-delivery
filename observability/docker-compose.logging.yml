@@ -3,11 +3,11 @@ version: "3.8"
 services:
   alloy:
     image: grafana/alloy:latest
-    container_name: water_delivery_alloy
+    container_name: purigest_alloy
     restart: unless-stopped
     env_file:
       - ./.env.production
-    command:
+    command:  
       - run
       - /etc/alloy/config.alloy
       - --server.http.listen-addr=0.0.0.0:12345
