@@ -63,9 +63,9 @@ jobs:
           python -m pytest clients orders payment invoice
 
       - name: Skip tests (temporary)
-        if: env.SKIP_TESTS == 'false'
+        if: env.SKIP_TESTS == 'true'
         run: |
-          echo "Skipping test execution temporarily (SKIP_TESTS=false)."
+          echo "Skipping test execution temporarily (SKIP_TESTS=true)."
   build_and_push:
     if: always() && needs.test.result == 'success'
     runs-on: ubuntu-latest
@@ -264,7 +264,7 @@ jobs:
 
   notify:
     runs-on: ubuntu-latest
-    needs: [test, container_healthcheck, build_and_push, deploy]
+    needs: [test, build_and_push, deploy]
     if: always()
     steps:
       - name: Send Telegram notification
@@ -290,7 +290,7 @@ jobs:
           }
 
           OVERALL="SUCCESS"
-          for result in "${{ needs.test.result }}" "${{ needs.container_healthcheck.result }}" "${{ needs.build_and_push.result }}" "${{ needs.deploy.result }}"; do
+          for result in "${{ needs.test.result }}" "${{ needs.build_and_push.result }}" "${{ needs.deploy.result }}"; do
             if [ "$result" != "success" ]; then
               OVERALL="FAILED"
               break
@@ -307,7 +307,6 @@ jobs:
             "" \
             "<b>Jobs:</b>" \
             "- test: $(status_label '${{ needs.test.result }}')" \
-            "- container_healthcheck: $(status_label '${{ needs.container_healthcheck.result }}')" \
             "- build_and_push: $(status_label '${{ needs.build_and_push.result }}')" \
             "- deploy: $(status_label '${{ needs.deploy.result }}')" \
             "" \
