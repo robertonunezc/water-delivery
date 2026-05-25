@@ -10,7 +10,7 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: water_delivery
+          POSTGRES_DB: purigest
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
         ports:
@@ -27,7 +27,7 @@ jobs:
       SKIP_TESTS: "true"
       DJANGO_SETTINGS_MODULE: water_delivery.settings
       SECRET_KEY: dummy-ci-secret-key
-      POSTGRES_DB: water_delivery
+      POSTGRES_DB: purigest
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
       POSTGRES_HOST: localhost
