@@ -18,8 +18,8 @@ services:
       - ./media:/app/media
       - ./logs:/app/logs
     # Expose port internally only - nginx will proxy
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     depends_on:
       - postgres
       - redis
