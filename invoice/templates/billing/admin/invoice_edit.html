@@ -46,8 +46,8 @@
 {% block content %}
 <div class="container-fluid mt-3">
   <div class="mb-3 d-flex justify-content-between align-items-center">
-    <a href="{% url 'admin_invoices' %}" class="text-decoration-none">← Back to Invoices</a>
-    <span class="badge bg-secondary">Invoice ID: #{{ invoice.id }}</span>
+    <a href="{% url 'admin_invoices' %}" class="text-decoration-none">← Regresar</a>
+    <span class="badge bg-secondary">Factura ID: #{{ invoice.id }}</span>
   </div>
 
   {% if messages %}
@@ -68,8 +68,8 @@
     <div class="col-lg-5">
       <div class="card detail-card">
         <div class="card-header form-card-header detail-card-header">
-          <h2 class="h5 mb-0">Invoice Details</h2>
-          <p class="text-white-50 small mb-0 mt-1">General credentials, files, and calculation mode.</p>
+          <h2 class="h5 mb-0">  Detalles de la Factura</h2>
+          <p class="text-white-50 small mb-0 mt-1">Información general, archivos y modo de cálculo.</p>
         </div>
         <div class="card-body p-4">
           <form method="post" enctype="multipart/form-data" novalidate>
@@ -178,6 +178,7 @@
                         {% csrf_token %}
                         <button type="submit" class="btn btn-sm btn-outline-danger">Desvincular</button>
                       </form>
+                      <a href="{% url 'orders:split_order' link.order.id %}" class="btn btn-sm btn-outline-success">Dividir</a>
                     </div>
                   </div>
                 {% endfor %}
