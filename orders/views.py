@@ -412,6 +412,7 @@ def cancel_order(request, order_pk):
 def split_order(request, order_id):
     """View to split an order into two orders"""
     order = get_object_or_404(Order.objects.prefetch_related('items__product'), pk=order_id)
+    order_items = order.items.all()
     
     if request.method == 'POST':
         form = SplitOrderForm(request.POST, order=order)
@@ -433,18 +434,24 @@ def split_order(request, order_id):
             new_total = Decimal('0.00')
             
             # Process each item
-            for item in order.items.all():
+            new_order_products = []
+            items_to_update = []
+            items_to_delete = []
+
+            for item in order_items:
                 field_name = f'quantity_{item.id}'
                 quantity_to_move = form.cleaned_data.get(field_name, 0)
                 
                 if quantity_to_move > 0:
-                    # Create item in new order
-                    OrderProduct.objects.create(
-                        order=new_order,
-                        product=item.product,
-                        quantity=quantity_to_move,
-                        unit_price=item.unit_price,
-                        note=item.note
+                    # Collect item for new order
+                    new_order_products.append(
+                        OrderProduct(
+                            order=new_order,
+                            product=item.product,
+                            quantity=quantity_to_move,
+                            unit_price=item.unit_price,
+                            note=item.note
+                        )
                     )
                     
                     # Calculate amounts
@@ -454,12 +461,21 @@ def split_order(request, order_id):
                     remaining_quantity = item.quantity - quantity_to_move
                     if remaining_quantity > 0:
                         item.quantity = remaining_quantity
-                        item.save()
+                        items_to_update.append(item)
                         original_total += remaining_quantity * item.unit_price
                     else:
-                        # Remove item if quantity is 0
-                        item.delete()
+                        # Collect item to remove if quantity is 0
+                        items_to_delete.append(item.id)
+
+            if new_order_products:
+                OrderProduct.objects.bulk_create(new_order_products)
             
+            if items_to_update:
+                OrderProduct.objects.bulk_update(items_to_update, ['quantity'])
+
+            if items_to_delete:
+                OrderProduct.objects.filter(id__in=items_to_delete).delete()
+
             # Update totals
             order.total_amount = original_total
             new_order.total_amount = new_total
@@ -542,7 +558,7 @@ def split_order(request, order_id):
     
     # Create a list pairing items with their form fields
     items_with_fields = []
-    for item in order.items.all():
+    for item in order_items:
         field_name = f'quantity_{item.id}'
         items_with_fields.append({
             'item': item,
@@ -552,7 +568,7 @@ def split_order(request, order_id):
     context = {
         'form': form,
         'order': order,
-        'items': order.items.all(),
+        'items': order_items,
         'items_with_fields': items_with_fields,
         'title': f'Dividir Orden #{order.id}',
     }
