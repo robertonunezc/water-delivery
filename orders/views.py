@@ -315,12 +315,14 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
 @login_required
 def get_or_create_order(request, client_pk=None, order_id=None):
     if order_id is not None:
-        order = services.get_or_create_order(order_id=order_id)
-        client = order.client
+        order_data = services.get_or_create_order(order_id=order_id)
+        client = get_object_or_404(Client, pk=order_data.client_id)
+        order = get_object_or_404(Order, pk=order_data.id)
     else:
         client = get_object_or_404(Client, pk=client_pk)
         owner = request.user
-        order = services.get_or_create_order(client, owner=owner)
+        order_data = services.get_or_create_order(client, owner=owner)
+        order = get_object_or_404(Order, pk=order_data.id)
 
     owner = request.user
     client_products = client.get_products()
