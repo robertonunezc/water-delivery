@@ -64,8 +64,21 @@ def update_order(order: Order, quantity: int, product, client: Client, discount:
         order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
         return order
 
-    order_product, created = OrderProduct.objects.get_or_create(order=order, product=product, defaults={'quantity': 0, 'unit_price': unit_price})
-
+    # Handle potential duplicates due to race conditions or previous bugs
+    order_products = list(OrderProduct.objects.filter(order=order, product=product))
+    if order_products:
+        order_product = order_products[0]
+        if len(order_products) > 1:
+            # Delete duplicates
+            duplicate_ids = [op.pk for op in order_products[1:]]
+            OrderProduct.objects.filter(pk__in=duplicate_ids).delete()
+    else:
+        order_product = OrderProduct.objects.create(
+            order=order, 
+            product=product, 
+            quantity=0, 
+            unit_price=unit_price
+        )
     order_product.quantity = int(quantity)
     order_product.unit_price = unit_price
     order_product.save()
