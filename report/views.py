@@ -371,7 +371,7 @@ def orders_report_csv(request):
 
     # Header
     writer.writerow([
-        'ID', 'Fecha', 'Cliente', 'Total', 'Status', 'Empleado', 'Notas', 'Método de pago', 'Facturado'
+        'NoPedido', 'Fecha', 'Cliente','Producto',  'Tipo de pago','Estado', 'Total'
     ])
 
     for order in orders_queryset:
@@ -379,16 +379,15 @@ def orders_report_csv(request):
         payment_methods = ', '.join(set([
             str(p.method) for p in order.payments.all()
         ]))
+        products = ', '.join(set([str(item) for item in order.items.all()]))
         writer.writerow([
             smart_str(order.id),
             order.order_date.strftime('%Y-%m-%d %H:%M'),
             smart_str(order.client.name if order.client else ''),
-            str(order.total_amount),
-            smart_str(order.status),
-            smart_str(order.owner.get_full_name() if order.owner else ''),
-            smart_str(order.notes or ''),
+            products,
             payment_methods,
-            'Sí' if order.invoice_links.exists() else 'No',
+            order.get_status_display(),
+            str(order.total_amount),
         ])
     return response
 

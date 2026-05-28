@@ -147,10 +147,8 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 				continue
 
 			if address.type == 'billing':
-				messages.error(
-					request,
-					"No puede crear dos direcciones de tipo 'billing'. Debe crear una dirección de tipo 'delivery' y, si la casilla está marcada, se generará automáticamente una dirección de tipo 'billing'."
-				)
+				# The user explicitly created a billing address, so we don't need to copy anything.
+				# Gracefully ignore the checkbox for this form instead of showing an error.
 				continue
 
 			# Always set type to delivery for the original address
