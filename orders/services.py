@@ -22,24 +22,51 @@ class OrderData:
     items: List = None
 
 
-def get_or_create_order(client=None, order_id=None, owner=None) -> Order:
-    #TODO: decouple this logic from QuerySet and use dataclasses or similar
+def get_or_create_order(client=None, order_id=None, owner=None) -> OrderData:
     if not client and not order_id:
         raise ValueError("Se requiere un cliente o un ID de orden para obtener o crear una orden.")
     if order_id:
         try:
-            return Order.objects.get(pk=order_id)
+            order = Order.objects.get(pk=order_id)
+            return OrderData(
+                id=order.id,
+                client_id=order.client_id,
+                total_amount=order.total_amount,
+                status=order.status,
+                created_at=order.created_at,
+                items=list(order.items.all())
+            )
         except Order.DoesNotExist:
             pass
-    if get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).exists():
-        return get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client).first()
+
+    existing_orders = get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client)
+    if existing_orders:
+        return existing_orders[0]
+
     order = Order.objects.create(client=client, total_amount=Decimal('0.00'), owner=owner)
-    return order
+    return OrderData(
+        id=order.id,
+        client_id=order.client_id,
+        total_amount=order.total_amount,
+        status=order.status,
+        created_at=order.created_at,
+        items=list(order.items.all())
+    )
 
 
 def get_client_orders(date: date, status: OrderStatus, client: Client) -> List[OrderData]:
     orders = Order.objects.filter(client=client, created_at__date=date, status=status.value)
-    return orders
+    return [
+        OrderData(
+            id=order.id,
+            client_id=order.client_id,
+            total_amount=order.total_amount,
+            status=order.status,
+            created_at=order.created_at,
+            items=list(order.items.all())
+        )
+        for order in orders
+    ]
 
 
 def get_product_price_for_client(product, client):
