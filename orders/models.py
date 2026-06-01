@@ -147,6 +147,15 @@ class OrderManager(models.Manager):
     def today_orders(self, user=None):
         return self.get_queryset().today_orders(user)
 
+    def with_payment_totals(self):
+        return self.get_queryset().with_payment_totals()
+
+    def paid(self):
+        return self.get_queryset().paid()
+
+    def unpaid(self):
+        return self.get_queryset().unpaid()
+
 
 # Create your models here.
 class Order(TimeStampedModel):
@@ -183,10 +192,16 @@ class Order(TimeStampedModel):
     @property
     def total_paid(self) -> Decimal:
         """Sum of all completed payments. Uses prefetch cache when available."""
+        if hasattr(self, '_annotated_total_paid'):
+            return self._annotated_total_paid
         return sum(
             (p.amount for p in self.payments.all() if p.status == 'completed'),
             Decimal('0'),
         )
+
+    @total_paid.setter
+    def total_paid(self, value):
+        self._annotated_total_paid = value
 
     @property
     def is_paid(self) -> bool:

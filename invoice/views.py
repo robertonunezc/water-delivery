@@ -50,7 +50,7 @@ def list_invoices_admin(request):
     from datetime import date
 
     # Base queryset
-    invoices = Invoice.objects.select_related('client').prefetch_related('invoice_links__order')
+    invoices = Invoice.objects.select_related('client').prefetch_related('invoice_links__order__payments')
 
     # Apply filters
     client_filter = request.GET.get('client', '')

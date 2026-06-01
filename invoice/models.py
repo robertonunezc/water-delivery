@@ -57,6 +57,21 @@ class Invoice(TimeStampedModel):
 
     def __str__(self):
         return f"Factura #{self.id} para {self.client.name} - {self.amount}"
+
+    @property
+    def payment_status(self):
+        links = self.invoice_links.all()
+        if not links:
+            return "Sin órdenes"
+        
+        all_paid = True
+        for link in links:
+            if not getattr(link.order, 'is_paid', False):
+                all_paid = False
+                break
+                
+        return "Pagada" if all_paid else "No Pagada"
+
     class Meta:
         db_table = 'billing_billingrecord'
         ordering = ['-date']

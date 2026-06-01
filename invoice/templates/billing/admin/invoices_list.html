@@ -141,6 +141,7 @@
             <th>Serie (Identifier)</th>
             <th>Folio</th>
             <th>Emit Date</th>
+            <th>Estado de Pago</th>
             <th>Calculation</th>
             <th>File Attachments</th>
             <th>Amount</th>
@@ -160,6 +161,15 @@
               <td><code>{{ invoice.identifier }}</code></td>
               <td><code>{{ invoice.folio }}</code></td>
               <td>{{ invoice.emmited_at|date:'d/m/Y'|default:'-' }}</td>
+              <td>
+                {% if invoice.payment_status == "Pagada" %}
+                  <span class="status-pill kpi-emerald">Pagada</span>
+                {% elif invoice.payment_status == "No Pagada" %}
+                  <span class="status-pill status-no-file">No Pagada</span>
+                {% else %}
+                  <span class="status-pill status-manual">Sin órdenes</span>
+                {% endif %}
+              </td>
               <td>
                 {% if invoice.auto_amount %}
                   <span class="status-pill status-auto">Automático</span>
