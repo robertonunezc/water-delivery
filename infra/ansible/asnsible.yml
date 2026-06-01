@@ -1,0 +1,15 @@
+---
+- name: Basic Ansible Playbook
+  hosts: all
+  become: yes
+  vars:
+    example_message: "Hello from Ansible"
+  tasks:
+    - name: Ensure /tmp/example.txt exists
+      file:
+        path: /tmp/example.txt
+        state: touch
+
+    - name: Print a debug message
+      debug:
+        msg: "{{ example_message }}"
