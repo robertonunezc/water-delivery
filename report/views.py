@@ -516,3 +516,42 @@ def breakdown_payment_method_csv(request):
         ])
     
     return response
+
+@login_required
+def pending_payments_report(request):
+    """
+    Report showing all clients with pending payments (overdue orders) based on their ClientCreditConfig.
+    """
+    from clients.services.pending_payment_service import get_clients_with_pending_payments
+    
+    clients_data = get_clients_with_pending_payments()
+    
+    # Calculate overall stats
+    total_overdue = sum(item['total_overdue_amount'] for item in clients_data)
+    total_clients = len(clients_data)
+    
+    search_query = request.GET.get('search', '').strip()
+    if search_query:
+        search_query_lower = search_query.lower()
+        clients_data = [item for item in clients_data if search_query_lower in item['client'].name.lower()]
+    
+    # Pagination
+    paginator = Paginator(clients_data, 15)
+    page = request.GET.get('page')
+    
+    try:
+        clients_page = paginator.page(page)
+    except PageNotAnInteger:
+        clients_page = paginator.page(1)
+    except EmptyPage:
+        clients_page = paginator.page(paginator.num_pages)
+        
+    context = {
+        'clients_data': clients_page,
+        'search_query': search_query,
+        'total_overdue': total_overdue,
+        'total_clients': total_clients,
+        'has_search': bool(search_query),
+    }
+    
+    return render(request, 'report/pending_payments_report.html', context)

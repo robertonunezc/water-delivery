@@ -455,6 +455,10 @@ def detail(request, pk):
     recent_completed_routes = get_recent_completed_route_orders(client, limit=5)
     billing_frequency = client.billing_info.effective.frequency
     billing_data = client.billing_info.effective.data
+    # Get pending payment data
+    from clients.services.pending_payment_service import get_overdue_orders_for_client
+    pending_payment_data = get_overdue_orders_for_client(client)
+
     context = {
         'client': client,
         'date_since': first_day_of_month,
@@ -474,7 +478,8 @@ def detail(request, pk):
             'total_spent': total_spent,
             'pending_orders': pending_orders,
             'completed_orders': completed_orders,
-        }
+        },
+        'pending_payment_data': pending_payment_data,
     }
     
     return render(request, 'client_detail.html', context)

@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <style>
+    .search-results-info {
+      background-color: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 0.375rem;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .debt-stats-card {
+      background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+      color: white;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .debt-stat-item {
+      text-align: center;
+      padding: 1rem;
+    }
+    
+    .debt-stat-value {
+      font-size: 1.8rem;
+      font-weight: bold;
+      margin-bottom: 0.5rem;
+    }
+    
+    .debt-stat-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+    }
+    
+    .debt-amount {
+      font-weight: bold;
+      color: #dc3545;
+    }
+    
+    .filter-form {
+      background-color: #f8f9fa;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .pagination .page-link {
+      color: #0d6efd;
+    }
+    
+    .pagination .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+    
+    .last-payment-info {
+      font-size: 0.85rem;
+    }
+    
+    .no-payment {
+      color: #6c757d;
+      font-style: italic;
+    }
+    
+    .table th {
+      background-color: #f8f9fa;
+      border-top: none;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <!-- Header Section -->
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1><i class="fas fa-exclamation-triangle me-2 text-danger"></i>Reporte de Pagos Vencidos</h1>
+        {% if has_search %}
+          <p class="text-muted mb-0">
+            Resultados para: <strong>"{{ search_query }}"</strong>
+          </p>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{% url 'clients:list' %}" class="btn btn-outline-primary">
+          <i class="fas fa-users"></i> Ver Todos los Clientes
+        </a>
+      </div>
+    </div>
+
+    <!-- Debt Statistics Summary -->
+    {% if total_overdue > 0 %}
+      <div class="debt-stats-card">
+        <div class="row">
+          <div class="col-md-6 debt-stat-item">
+            <div class="debt-stat-value">${{ total_overdue|floatformat:2 }}</div>
+            <div class="debt-stat-label">Total Vencido Global</div>
+          </div>
+          <div class="col-md-6 debt-stat-item">
+            <div class="debt-stat-value">{{ total_clients }}</div>
+            <div class="debt-stat-label">Clientes con Atraso</div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Filter Form -->
+    <div class="filter-form">
+      <form method="get" action="{% url 'report:pending_payments' %}">
+        <div class="row align-items-end">
+          <div class="col-md-8">
+            <label for="search" class="form-label">Buscar Cliente:</label>
+            <input type="search" 
+                   class="form-control" 
+                   id="search"
+                   name="search" 
+                   value="{{ search_query }}" 
+                   placeholder="Nombre del cliente...">
+          </div>
+          <div class="col-md-4">
+            <div class="d-grid gap-2 d-md-block">
+              <button class="btn btn-primary" type="submit">
+                <i class="fas fa-search me-1"></i>Buscar
+              </button>
+              {% if has_search %}
+                <a href="{% url 'report:pending_payments' %}" class="btn btn-outline-secondary">
+                  <i class="fas fa-times me-1"></i>Limpiar
+                </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Results Info -->
+    {% if total_clients > 0 %}
+      <div class="search-results-info">
+        <div class="row align-items-center">
+          <div class="col-md-8">
+            <i class="fas fa-info-circle me-2"></i>
+            Se encontraron <strong>{{ total_clients }}</strong> cliente{{ total_clients|pluralize }} con pagos vencidos
+          </div>
+          <div class="col-md-4 text-md-end">
+            <small class="text-muted">
+              {% if clients_data.has_other_pages %}
+                Página {{ clients_data.number }} de {{ clients_data.paginator.num_pages }}
+                ({{ clients_data.start_index }}-{{ clients_data.end_index }} de {{ total_clients }})
+              {% endif %}
+            </small>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Clients Debt Table -->
+    {% if clients_data %}
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Cliente</th>
+                  <th scope="col" class="text-end">Monto Vencido</th>
+                  <th scope="col" class="text-center">Días de Atraso (Máx)</th>
+                  <th scope="col" class="text-center">Órdenes Atrasadas</th>
+                  <th scope="col" class="text-center">Último Pago</th>
+                  <th scope="col" class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in clients_data %}
+                  <tr>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div>
+                          <h6 class="mb-0">
+                            <a href="{% url 'clients:detail' item.client.pk %}" class="text-decoration-none fw-bold">
+                              {{ item.client.name }}
+                            </a>
+                          </h6>
+                          <small class="text-muted">
+                            Límite de Días: {{ item.client.credit_config.max_payment_days }}
+                          </small>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="text-end">
+                      <span class="debt-amount">
+                        ${{ item.total_overdue_amount|floatformat:2 }}
+                      </span>
+                    </td>
+                    <td class="text-center">
+                      <span class="badge bg-danger fs-6">{{ item.days_overdue }} días</span>
+                    </td>
+                    <td class="text-center">
+                      <span class="fw-bold">{{ item.missing_payment_orders|length }}</span> orden(es)
+                    </td>
+                    <td class="text-center">
+                      {% if item.last_payment_date %}
+                        <div class="last-payment-info">
+                          <small class="text-muted">{{ item.last_payment_date|date:"d/m/Y H:i" }}</small>
+                          <br><small class="text-muted">{{ item.last_payment_date|timesince }} atrás</small>
+                        </div>
+                      {% else %}
+                        <span class="no-payment">
+                          <i class="fas fa-minus-circle me-1"></i>Sin pagos
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      <a href="{% url 'clients:detail' item.client.pk %}" 
+                         class="btn btn-sm btn-outline-danger" 
+                         title="Ver detalles y cobrar">
+                        <i class="fas fa-hand-holding-usd"></i> Ver y Cobrar
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      {% if clients_data.has_other_pages %}
+        <div class="row mt-4">
+          <div class="col-12">
+            <nav aria-label="Navegación de páginas del reporte">
+              <ul class="pagination justify-content-center">
+                {% if clients_data.has_previous %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients_data.previous_page_number }}">
+                      <i class="fas fa-angle-left"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                  </li>
+                {% endif %}
+
+                {% for page_num in clients_data.paginator.page_range %}
+                  {% if page_num == clients_data.number %}
+                    <li class="page-item active">
+                      <span class="page-link">{{ page_num }}</span>
+                    </li>
+                  {% else %}
+                    <li class="page-item">
+                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    </li>
+                  {% endif %}
+                {% endfor %}
+
+                {% if clients_data.has_next %}
+                  <li class="page-item">
+                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients_data.next_page_number }}">
+                      <i class="fas fa-angle-right"></i>
+                    </a>
+                  </li>
+                {% else %}
+                  <li class="page-item disabled">
+                    <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                  </li>
+                {% endif %}
+              </ul>
+            </nav>
+          </div>
+        </div>
+      {% endif %}
+
+    {% else %}
+      <!-- Empty State -->
+      <div class="text-center py-5">
+        {% if has_search %}
+          <i class="fas fa-search fa-4x text-muted mb-3"></i>
+          <h4 class="text-muted">No se encontraron resultados</h4>
+          <p class="text-muted">
+            No hay clientes con pagos vencidos que coincidan con la búsqueda.
+          </p>
+          <div class="mt-3">
+            <a href="{% url 'report:pending_payments' %}" class="btn btn-outline-primary me-2">
+              <i class="fas fa-arrow-left me-2"></i>Ver todos los clientes
+            </a>
+          </div>
+        {% else %}
+          <i class="fas fa-smile fa-4x text-success mb-3"></i>
+          <h4 class="text-success">¡Excelente!</h4>
+          <p class="text-muted">No hay clientes con pagos vencidos en este momento.</p>
+          <a href="{% url 'clients:list' %}" class="btn btn-primary">
+            <i class="fas fa-users me-2"></i>Ver Todos los Clientes
+          </a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}

@@ -157,6 +157,54 @@ Desde {{date_since}}</small>
   </div>
   {% endif %}
 
+  <!-- Pending Payments Indicator -->
+  {% if pending_payment_data.total_overdue_amount > 0 %}
+  <div class="row mb-4">
+    <div class="col-md-12">
+      <div class="alert alert-danger shadow-sm border-danger">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+          <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle fa-3x text-danger me-3"></i>
+            <div>
+              <h4 class="alert-heading mb-1 text-danger">¡Atención! Pagos Vencidos</h4>
+              <p class="mb-0">
+                El cliente tiene un total de <strong>${{ pending_payment_data.total_overdue_amount|floatformat:2 }}</strong> en pagos vencidos.
+                El atraso máximo es de <strong>{{ pending_payment_data.days_overdue }} días</strong>.
+              </p>
+            </div>
+          </div>
+        </div>
+        <hr>
+        <p class="mb-2"><strong>Órdenes con pago pendiente:</strong></p>
+        <div class="table-responsive bg-white rounded">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-danger">
+              <tr>
+                <th>Orden #</th>
+                <th>Fecha de Creación</th>
+                <th>Días Vencidos</th>
+                <th>Total de la Orden</th>
+                <th>Monto Pendiente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for overdue_order in pending_payment_data.overdue_orders %}
+              <tr>
+                <td><a href="{% url 'orders:get_order' overdue_order.id %}" class="text-danger fw-bold">#{{ overdue_order.id }}</a></td>
+                <td>{{ overdue_order.order_date|date:"d/m/Y H:i" }}</td>
+                <td><span class="badge bg-danger">{{ overdue_order.days_overdue }} días</span></td>
+                <td>${{ overdue_order.total_amount|floatformat:2 }}</td>
+                <td class="fw-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="row">
     <!-- Client Information Column -->
     <div class="col-md-3">
