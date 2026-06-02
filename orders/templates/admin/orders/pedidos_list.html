@@ -163,6 +163,7 @@
             <th>Total</th>
             <th>Productos</th>
             <th>Estado</th>
+            <th>Pagado</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -192,7 +193,18 @@
                         </small>
 
               </td>
-              <td><span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span></td>
+              <td>
+                <span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span>
+                
+              </td>
+              <td>
+                {% if order.is_paid %}
+                  <span class="badge bg-success ms-1">Pagado</span>
+                {%else %}
+                  <span class="badge bg-warning ms-1">Pendiente</span>
+
+                {% endif %}
+              </td>
               <td class="text-end">
                 <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-sm btn-outline-primary">Cliente</a>
                 {% if order.status == 'COMPLETED' %}
@@ -200,6 +212,10 @@
                 {% endif %}
                 {% if order.status == 'PENDING' %}
                   <a href="{% url 'orders:create_order' order.client.pk %}" class="btn btn-sm btn-warning">Editar</a>
+                {% endif %}
+                {% if not order.is_paid %}
+                  <a href="{% url 'orders:create_payment_for_order' order.id %}" class="btn btn-sm btn-success">Pagar</a>
+
                 {% endif %}
               </td>
             </tr>

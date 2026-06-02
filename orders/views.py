@@ -87,6 +87,50 @@ def calculate_payment_breakdown(order_total, client_balance):
             'message': f'Saldo: ${client_balance:.2f} + Otro método: ${remaining:.2f}'
         }
 
+@login_required
+@require_http_methods(["GET", "POST"])
+def create_payment_for_order(request, order_pk):
+    order = get_object_or_404(Order, pk=order_pk)
+    
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body.decode('utf-8') or '{}')
+        except json.JSONDecodeError:
+            return HttpResponseBadRequest('Invalid JSON')
+
+        amount = Decimal(str(data.get('amount', '0')))
+        if amount <= 0:
+            return JsonResponse({'success': False, 'error': 'El monto debe ser mayor a 0.'}, status=400)
+        
+        payment_method = data.get('payment_method', 'cash')
+        valid_payment_methods = [value for value, label in PAYMENT_METHOD_CHOICES]
+        if payment_method not in valid_payment_methods:
+            return JsonResponse({'success': False, 'error': 'Método de pago inválido.'}, status=400)
+
+        try:
+            result = services.create_payment_for_order(client=order.client, order=order, payment_method=payment_method, user=request.user)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+        if not result.get('success'):
+            return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo crear el pago.')}, status=400)
+        
+        return JsonResponse({'success': True, 'message': 'Pago creado exitosamente.'})
+        
+    # GET request
+    payment_breakdown = calculate_payment_breakdown(order.total_amount, order.client.balance)
+    payment_types = [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value not in {'pending_credit'}
+    ]
+    context = {
+        'order': order,
+        'payment_breakdown': payment_breakdown,
+        'payment_types': payment_types,
+    }
+    return render(request, 'admin/orders/pay.html', context)
+
 
 @login_required
 def list_orders(request):
@@ -233,7 +277,12 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
     
     # Status filter
     if status_filter:
-        orders = orders.filter(status=status_filter)
+        if status_filter == 'PAID':
+            orders = orders.paid()
+        elif status_filter == 'UNPAID':
+            orders = orders.unpaid()
+        else:
+            orders = orders.filter(status=status_filter)
     
     # Client filter
     if client_filter:
@@ -293,9 +342,16 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
     else:
         page_stats = {'total_amount': 0, 'count': 0}
     
+    # Extend status choices with virtual statuses
+    extended_status_choices = list(ORDER_STATUS_CHOICES)
+    extended_status_choices.extend([
+        ('PAID', 'Pagados'),
+        ('UNPAID', 'No pagados')
+    ])
+    
     return {
         'orders': orders_page,
-        'status_choices': ORDER_STATUS_CHOICES,
+        'status_choices': extended_status_choices,
         'bulk_actions': ORDER_DASHBOARD_BULK_ACTIONS,
         'all_clients': all_clients,
         'filters': {

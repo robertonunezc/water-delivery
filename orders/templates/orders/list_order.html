@@ -226,6 +226,9 @@
                       <span class="badge status-badge {{ order.status }} badge-sm">
                         {{ order.get_status_display_fixed }}
                       </span>
+                      {% if order.is_paid %}
+                        <span class="badge bg-success ms-2 badge-sm">Pagado</span>
+                      {% endif %}
                     </div>
                     <h6 class="mb-1">
                       <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none">
