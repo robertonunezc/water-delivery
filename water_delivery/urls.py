@@ -23,10 +23,14 @@ from django.views.generic.base import RedirectView
 from orders import views as order_views
 from routes import views as route_views
 from invoice import views as invoice_views
+from clients import views as client_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('administrador/pedidos/', order_views.list_orders_dashboard, name='admin_orders'),
+    path('administrador/clientes/', client_views.list_admin, name='admin_clients'),
+    path('administrador/clientes/crear/', client_views.create_v2, name='admin_create_client'),
+    path('administrador/clientes/<int:pk>/editar/', client_views.edit_v2, name='admin_edit_client'),
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),
     path('administrador/rutas/<int:pk>/editar/', route_views.update_admin, name='admin_update_route'),

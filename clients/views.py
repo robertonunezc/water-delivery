@@ -183,7 +183,10 @@ def create_v2(request):
                     f"Se crearon {pricing_summary['created_count']} precios de producto para el cliente.",
                 )
             messages.success(request, 'Cliente creado correctamente. Ahora puede completar las demás pestañas.')
-            edit_url = reverse('clients:edit_v2', kwargs={'pk': client.pk})
+            if request.path.startswith('/administrador/'):
+                edit_url = reverse('admin_edit_client', kwargs={'pk': client.pk})
+            else:
+                edit_url = reverse('clients:edit_v2', kwargs={'pk': client.pk})
             return redirect(f"{edit_url}?tab=basic")
 
         context = {
@@ -227,6 +230,8 @@ def edit_v2(request, pk):
             if core_form.is_valid():
                 core_form.save()
                 messages.success(request, 'Datos básicos actualizados correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=basic")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=basic")
             context = _build_client_v2_context(
                 request,
@@ -250,6 +255,8 @@ def edit_v2(request, pk):
                 elif wants_copy and submission_deletes_billing:
                     messages.info(request, 'No se creó dirección fiscal automática porque en esta operación se eliminó una dirección fiscal.')
                 messages.success(request, 'Direcciones actualizadas correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=addresses")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=addresses")
             context = _build_client_v2_context(
                 request,
@@ -264,6 +271,8 @@ def edit_v2(request, pk):
             if contact_formset.is_valid():
                 contact_formset.save()
                 messages.success(request, 'Contactos actualizados correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=contacts")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=contacts")
             context = _build_client_v2_context(
                 request,
@@ -276,6 +285,8 @@ def edit_v2(request, pk):
         if section in ['billing_data', 'billing_frequency']:
             if not _billing_tab_enabled(client):
                 messages.warning(request, 'No se puede editar facturación mientras esté deshabilitada o heredada.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
 
             if section == 'billing_data':
@@ -285,6 +296,8 @@ def edit_v2(request, pk):
                     invoice_data.client = client
                     invoice_data.save()
                     messages.success(request, 'Datos de facturación actualizados correctamente.')
+                    if request.path.startswith('/administrador/'):
+                        return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
                     return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
                 context = _build_client_v2_context(
                     request,
@@ -303,6 +316,8 @@ def edit_v2(request, pk):
                 schedule.client = client
                 schedule.save()
                 messages.success(request, 'Frecuencia de facturación actualizada correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
             context = _build_client_v2_context(
                 request,
@@ -325,6 +340,8 @@ def edit_v2(request, pk):
                 credit_config.client = client
                 credit_config.save()
                 messages.success(request, 'Configuración de crédito actualizada correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=credit")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=credit")
             context = _build_client_v2_context(
                 request,

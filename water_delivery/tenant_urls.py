@@ -17,10 +17,10 @@ from routes import views as route_views
 from invoice import views as invoice_views
 urlpatterns = [
     path('admin/', admin.site.urls),  # Tenant-specific admin
-    path('adminstrador/pedidos/', order_views.list_orders_admin, name='admin_orders'),
-    path('adminstrador/clientes/', client_views.list_admin, name='admin_clients'),
-    path('adminstrador/clientes/crear', client_views.create_admin, name='admin_create_client'),
-    path('adminstrador/clientes/editar', client_views.edit_v2   , name='admin_edit_client_v2'),
+    path('administrador/pedidos/', order_views.list_orders_admin, name='admin_orders'),
+    path('administrador/clientes/', client_views.list_admin, name='admin_clients'),
+    path('administrador/clientes/crear/', client_views.create_v2, name='admin_create_client'),
+    path('administrador/clientes/<int:pk>/editar/', client_views.edit_v2, name='admin_edit_client'),
 
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),

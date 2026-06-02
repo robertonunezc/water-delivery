@@ -116,7 +116,6 @@ def create_payment_for_order(request, order_pk):
             return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo crear el pago.')}, status=400)
         
         return JsonResponse({'success': True, 'message': 'Pago creado exitosamente.'})
-        
     # GET request
     payment_breakdown = calculate_payment_breakdown(order.total_amount, order.client.balance)
     payment_types = [
@@ -130,7 +129,6 @@ def create_payment_for_order(request, order_pk):
         'payment_types': payment_types,
     }
     return render(request, 'admin/orders/pay.html', context)
-
 
 @login_required
 def list_orders(request):
