@@ -207,6 +207,11 @@ class Order(TimeStampedModel):
     def is_paid(self) -> bool:
         """True when total completed payments cover the order total."""
         return self.total_paid >= self.total_amount
+    
+    @property
+    def is_closed(self) -> bool:
+        """True when the order is completed and paid."""
+        return self.status == OrderStatus.COMPLETED.value and self.is_paid
 
     def __str__(self):
         return f"{self.client.name} - Pedido #{self.id} - {self.get_status_display()} (${self.total_amount})"

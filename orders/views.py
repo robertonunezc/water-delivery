@@ -18,10 +18,11 @@ from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, Orde
 from .forms import SplitOrderForm
 from product.models import Product, ProductClientPrice
 from clients.models import Client
-from orders import services
+from .  import services as order_services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
+from payment import services as payment_services
 
-log = services.get_logger(__name__)
+log = order_services.get_logger(__name__)
 
 ORDER_DASHBOARD_BULK_ACTIONS = (
     {
@@ -108,7 +109,7 @@ def create_payment_for_order(request, order_pk):
             return JsonResponse({'success': False, 'error': 'Método de pago inválido.'}, status=400)
 
         try:
-            result = services.create_payment_for_order(client=order.client, order=order, payment_method=payment_method, user=request.user)
+            result = payment_services.process_single_payment(client=order.client, order=order, payment_method=payment_method, amount=amount, user=request.user)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
@@ -175,7 +176,7 @@ def _handle_orders_dashboard_bulk_action(request):
         return _handle_create_invoice_action(request, selected_orders, redirect_to)
 
     if action == 'mark_completed':
-        result = services.mark_orders_as_completed(selected_orders, user=request.user)
+        result = order_services.mark_orders_as_completed(selected_orders, user=request.user)
         messages.success(
             request,
             f"{result['updated']} pedido(s) marcados como completados."
@@ -184,7 +185,7 @@ def _handle_orders_dashboard_bulk_action(request):
         return redirect(redirect_to)
 
     if action == 'mark_pending':
-        result = services.mark_orders_as_pending(selected_orders, user=request.user)
+        result = order_services.mark_orders_as_pending(selected_orders, user=request.user)
         messages.success(
             request,
             f"{result['updated']} pedido(s) marcados como pendientes."
@@ -193,7 +194,7 @@ def _handle_orders_dashboard_bulk_action(request):
         return redirect(redirect_to)
 
     if action == 'mark_cancelled':
-        result = services.cancel_orders(selected_orders, user=request.user)
+        result = order_services.cancel_orders(selected_orders, user=request.user)
         messages.success(
             request,
             f"{result['updated']} pedido(s) marcados como cancelados."
@@ -369,13 +370,13 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
 @login_required
 def get_or_create_order(request, client_pk=None, order_id=None):
     if order_id is not None:
-        order_data = services.get_or_create_order(order_id=order_id)
+        order_data = order_services.get_or_create_order(order_id=order_id)
         client = get_object_or_404(Client, pk=order_data.client_id)
         order = get_object_or_404(Order, pk=order_data.id)
     else:
         client = get_object_or_404(Client, pk=client_pk)
         owner = request.user
-        order_data = services.get_or_create_order(client, owner=owner)
+        order_data = order_services.get_or_create_order(client, owner=owner)
         order = get_object_or_404(Order, pk=order_data.id)
 
     owner = request.user
@@ -425,11 +426,11 @@ def update_order(request, order_pk):
     product_id = data.get('product_id')
     if not product_id:
         order.discount = discount
-        order.total_amount = services.calculate_order_total(order)
+        order.total_amount = order_services.calculate_order_total(order)
         order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
     else:
         product = get_object_or_404(Product, pk=product_id)
-        order = services.update_order(order, quantity, product, order.client, discount)
+        order = order_services.update_order(order, quantity, product, order.client, discount)
 
     client = order.client
     order_total = order.total_amount
@@ -450,7 +451,7 @@ def update_order(request, order_pk):
 @require_http_methods(["POST"])
 def cancel_order(request, order_pk):
     order = get_object_or_404(Order, pk=order_pk)
-    result = services.cancel_pending_order(order=order, user=request.user)
+    result = order_services.cancel_pending_order(order=order, user=request.user)
 
     if not result.get('success'):
         return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo cancelar el pedido.')}, status=400)

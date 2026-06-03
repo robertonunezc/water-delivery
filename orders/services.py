@@ -189,7 +189,7 @@ def cancel_pending_order(order: Order, user=None) -> Dict[str, object]:
 def process_order_payment(
     client: Client,
     order_amount: Decimal,
-    preferred_method: str = "auto",
+    payment_method: str = "auto",
     order: Optional[Order] = None,
     user=None,
     credit_note: Optional[str] = None,
@@ -203,7 +203,7 @@ def process_order_payment(
     Args:
         client: Client making the payment
         order_amount: Amount to process
-        preferred_method: 'auto', 'balance', 'credit', 'mixed'
+        payment_method: 'auto', 'balance', 'credit', 'mixed'
         order: Order object for transaction reference
         user: User performing the operation
         credit_note: Required note when using credit if client requires it
@@ -216,8 +216,8 @@ def process_order_payment(
     remaining_amount = order_amount
     balance_used = Decimal("0")
     credit_used = Decimal("0")
-
-    if preferred_method == "balance":
+    print("preferred method", payment_method)
+    if payment_method == "balance":
         # Try to pay entirely with balance
         if client.balance >= order_amount:
             balance_used = order_amount
@@ -231,7 +231,7 @@ def process_order_payment(
                 "credit_used": Decimal("0"),
             }
 
-    elif preferred_method == "credit":
+    elif payment_method == "credit":
         # Check if client can use credit
         if not client.can_use_credit_for_payment():
             return {
@@ -264,7 +264,7 @@ def process_order_payment(
                 "balance_used": Decimal("0"),
                 "credit_used": Decimal("0"),
             }
-
+    
     else:  # 'auto' or 'mixed'
         # First, use available balance
         balance_used = min(client.balance, remaining_amount)
@@ -346,7 +346,7 @@ def process_order_payment(
 def create_payment_for_order(
     client: Client,
     order: Order,
-    payment_method: str = "auto",
+    payment_method: str = "cash",
     user=None,
     credit_note: Optional[str] = None,
 ) -> dict:
@@ -369,7 +369,7 @@ def create_payment_for_order(
     payment_result = process_order_payment(
         client=client,
         order_amount=order_amount,
-        preferred_method=payment_method,
+        payment_method=payment_method,
         order=order,
         user=user,
         credit_note=credit_note,
