@@ -164,6 +164,7 @@
             <th>Productos</th>
             <th>Estado</th>
             <th>Pagado</th>
+            <th>Facturado</th>
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -205,18 +206,34 @@
 
                 {% endif %}
               </td>
-              <td class="text-end">
-                <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-sm btn-outline-primary">Cliente</a>
-                {% if order.status == 'COMPLETED' %}
-                  <a href="{% url 'orders:split_order' order.id %}" class="btn btn-sm btn-outline-secondary">Dividir</a>
-                {% endif %}
-                {% if order.status == 'PENDING' %}
-                  <a href="{% url 'orders:create_order' order.client.pk %}" class="btn btn-sm btn-warning">Editar</a>
-                {% endif %}
-                {% if not order.is_paid %}
-                  <a href="{% url 'orders:create_payment_for_order' order.id %}" class="btn btn-sm btn-success">Pagar</a>
+              <td>
+                {% if order.invoice_links.all %}
+                  {%for  link in order.invoice_links.all %}
+                      <a href="{% url 'admin_edit_invoice' link.invoice.pk %}">Ver factura</a>
+                  {% endfor %}
+                {%else %}
+                  <span class="badge bg-warning ms-1">No facturado</span>
 
                 {% endif %}
+              </td>
+              <td class="text-end">
+                <div class="dropdown">
+                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                    Opciones
+                  </button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'clients:detail' order.client.pk %}">Cliente</a></li>
+                    {% if order.status == 'COMPLETED' %}
+                      <li><a class="dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
+                    {% endif %}
+                    {% if order.status == 'PENDING' %}
+                      <li><a class="dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
+                    {% endif %}
+                    {% if not order.is_paid %}
+                      <li><a class="dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
+                    {% endif %}
+                  </ul>
+                </div>
               </td>
             </tr>
           {% empty %}
