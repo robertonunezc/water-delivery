@@ -524,6 +524,8 @@ class AmountFieldManager {
       alertElement.style.display = 'none';
       if (otherAlert) otherAlert.style.display = 'none';
     }
+
+    document.dispatchEvent(new CustomEvent('amount-validation-changed'));
   }
 
   syncValues(source, target) {
@@ -737,6 +739,31 @@ class PaymentController {
     this.configureOrderTypeUI();
     this.finishButton?.addEventListener('click', () => this.handleFinish());
     this.finishButtonMobile?.addEventListener('click', () => this.handleFinish());
+
+    //document.addEventListener('amount-validation-changed', () => this.validateFinishButtonState());
+    //this.validateFinishButtonState();
+  }
+
+  validateFinishButtonState() {
+    const orderType = this.getOrderType();
+    let isValid = false;
+
+    if (orderType === 'credito') {
+      isValid = true;
+    } else {
+      const cantidadCobrada = this.getCantidadCobrada() || 0;
+      const orderTotal = this.getOrderTotal();
+      if (cantidadCobrada >= orderTotal - 0.01) {
+        isValid = true;
+      }
+    }
+
+    if (this.finishButton && !this.finishButton.innerHTML.includes('spinner-border')) {
+      this.finishButton.disabled = !isValid;
+    }
+    if (this.finishButtonMobile && !this.finishButtonMobile.innerHTML.includes('spinner-border')) {
+      this.finishButtonMobile.disabled = !isValid;
+    }
   }
 
   bindOrderTypeSync() {
@@ -812,6 +839,8 @@ class PaymentController {
         ? '<i class="fas fa-hourglass-half me-2"></i>Pendiente'
         : '<i class="fas fa-check-circle me-2"></i>Terminar';
     }
+
+    //this.validateFinishButtonState();
   }
 
   syncPaymentMethodSelectionForCredit(isCredit) {
@@ -913,6 +942,7 @@ class PaymentController {
       this.finishButtonMobile.disabled = false;
       this.finishButtonMobile.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar';
     }
+    this.validateFinishButtonState();
   }
 
   async handleFinish() {

@@ -1,6 +1,6 @@
 from decimal import Decimal
 from typing import Optional
-
+from dataclasses import dataclass, asdict
 from django.contrib.auth.models import User
 from django.db import transaction
 
@@ -19,21 +19,32 @@ VALID_SETTLEMENT_METHODS = {
     'bank_transfer',
 }
 
+@dataclass
+class PaymentRequestData:
+    payments_data: Optional[list[dict]] = None
+    payment_method: Optional[str] = None
+    cantidad_cobrada: Optional[Decimal] = None
+    order_type: Optional[str] = None
+    amount: Optional[Decimal] = None
+    credit_note: Optional[str] = None
+
 
 def process_payment_request(
     order: Order,
-    data: dict,
+    data: PaymentRequestData,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process a payment request payload in either multi or legacy format."""
-    requested_type = data.get('order_type')
+    if data.cantidad_cobrada is not None and Decimal(str(data.cantidad_cobrada)) < order.total_amount:
+        raise ValueError(f'Cantidad a cobrar menor que el total de la orden: ${data.cantidad_cobrada} < ${order.total_amount}')
+    requested_type = data.order_type
     _apply_order_type(order=order, requested_type=requested_type)
 
     if order.type == 'credito':
         return _process_credit_order_flow(order=order, data=data, request_user=request_user)
 
-    payments_data = data.get('payments')
-    cantidad_cobrada = data.get('cantidad_cobrada')
+    payments_data = data.payments_data
+    cantidad_cobrada = data.cantidad_cobrada
 
     if payments_data and isinstance(payments_data, list):
         return process_multiple_payments(
@@ -160,14 +171,17 @@ def process_multiple_payments(
 
 def process_legacy_payment(
     order: Order,
-    data: dict,
+    data: PaymentRequestData,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process single-payment payload in legacy format."""
-    payment_method = data.get('payment_method')
-    amount = data.get('amount')
-    cantidad_cobrada = data.get('cantidad_cobrada')
-    credit_note = data.get('credit_note')
+    payment_method = data.payment_method
+    if not payment_method and data.payments_data and isinstance(data.payments_data, list):
+        payment_method = data.payments_data[0]
+        
+    amount = data.amount
+    cantidad_cobrada = data.cantidad_cobrada
+    credit_note = data.credit_note
 
     if not payment_method:
         return {'error': 'Missing payment_method'}, 400
@@ -275,13 +289,13 @@ def _apply_order_type(order: Order, requested_type: Optional[str]) -> None:
 
 def _process_credit_order_flow(
     order: Order,
-    data: dict,
+    data: PaymentRequestData,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process credit-order lifecycle: debt registration and later settlement."""
     pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').first()
 
-    payments_data = data.get('payments')
+    payments_data = data.payments_data
     if pending_credit_payment and payments_data:
         return _settle_pending_credit_order(
             order=order,
