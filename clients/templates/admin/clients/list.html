@@ -160,7 +160,14 @@
 								{% endfor %}
 							</td>
 							<td>${{ client.balance|floatformat:2 }}</td>
-							<td>${{ client.current_debt|floatformat:2 }}</td>
+							<td>
+								{% if client.current_debt > 0 %}
+									<span class="text-danger">${{ client.current_debt|floatformat:2 }}</span>
+									
+								{% else %}
+									<span class="text-success">${{ client.current_debt|floatformat:2 }}</span>
+								{% endif %}
+							</td>
 							<td>
 								<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
 									{% if client.active %}Activo{% else %}Inactivo{% endif %}
