@@ -263,7 +263,7 @@ class OrderPaymentHandler {
             
             if (response.ok && data.success) {
                 // Success, redirect back to order
-                window.location.href = `/admin/orders/order/${this.orderId}/change/`;
+                window.location.href = `/administrador/pedidos/`;
             } else {
                 this.showError(data.error || 'Ocurrió un error al procesar el pago.');
             }

@@ -109,11 +109,11 @@ def create_payment_for_order(request, order_pk):
             return JsonResponse({'success': False, 'error': 'Método de pago inválido.'}, status=400)
 
         try:
-            result = payment_services.process_single_payment(client=order.client, order=order, payment_method=payment_method, amount=amount, user=request.user)
+            result = payment_services.process_single_payment(order=order, payment_method=payment_method, amount=amount, request_user=request.user)
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-
-        if not result.get('success'):
+        print(result)
+        if not result[0]:
             return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo crear el pago.')}, status=400)
         
         return JsonResponse({'success': True, 'message': 'Pago creado exitosamente.'})
