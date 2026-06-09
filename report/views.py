@@ -456,10 +456,18 @@ def breakdown_payment_method_csv(request):
     Includes summary statistics and detailed order information
     by payment method.
     """
-    today = datetime.now().date()
+    date_str = request.GET.get('date', '')
+    print(date_str)
+    try:
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+    except ValueError:
+        selected_date = timezone.now().date()
     owner = request.user
-    orders = Order.objects.today_orders(owner)
-    
+    orders = Order.objects.filter(
+        owner=owner,
+        order_date__date=selected_date
+    )
+    print(orders)
     # Calculate overall statistics
     total_orders = orders.count()
     total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
@@ -467,12 +475,12 @@ def breakdown_payment_method_csv(request):
 
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="reporte_hoy_{today}.csv"'
+    response['Content-Disposition'] = f'attachment; filename="reporte_hoy_{selected_date}.csv"'
     
     writer = csv.writer(response, delimiter=',', quoting=csv.QUOTE_ALL)
     
     # Write header section with summary statistics
-    writer.writerow(['Reporte de Órdenes del Día', today.strftime('%d/%m/%Y')])
+    writer.writerow(['Reporte de Órdenes del Día', selected_date.strftime('%d/%m/%Y')])
     writer.writerow([])  # Blank row
     writer.writerow(['RESUMEN ESTADÍSTICO'])
     writer.writerow(['Total de Órdenes', total_orders])
