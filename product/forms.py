@@ -1,6 +1,58 @@
 from decimal import Decimal
 from django import forms
+from django.forms import inlineformset_factory
+from .models import Product, ProductClientPrice
 
+
+class ProductForm(forms.ModelForm):
+    add_to_all_clients = forms.BooleanField(
+        required=False,
+        initial=False,
+        label="Agregar para todos los clientes existentes",
+        help_text="Si se activa, este producto se asignará a todos los clientes existentes con el precio base configurado.",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+    )
+
+    class Meta:
+        model = Product
+        fields = [
+            'name',
+            'presentation',
+            'unit_of_measure',
+            'price',
+            'category',
+            'note',
+            'active'
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'presentation': forms.TextInput(attrs={'class': 'form-control'}),
+            'unit_of_measure': forms.Select(attrs={'class': 'form-select'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
+            'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
+class ProductClientPriceForm(forms.ModelForm):
+    class Meta:
+        model = ProductClientPrice
+        fields = ['client', 'price', 'active', 'note']
+        widgets = {
+            'client': forms.Select(attrs={'class': 'form-select'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'note': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+ProductClientPriceFormSet = inlineformset_factory(
+    Product,
+    ProductClientPrice,
+    form=ProductClientPriceForm,
+    extra=1,
+    can_delete=True
+)
 
 class BulkProductPriceUpdateForm(forms.Form):
     MODE_CHOICES = (

@@ -44,6 +44,43 @@ def ensure_client_product_prices(client: Client) -> Dict[str, object]:
     return summary
 
 
+def ensure_product_for_all_clients(product: Product, user=None) -> Dict[str, object]:
+    """Create missing ProductClientPrice rows for the given product across all clients."""
+    created_clients: List[str] = []
+    existing_clients: List[str] = []
+
+    with transaction.atomic():
+        for client in Client.objects.all().only("id", "name"):
+            _, created = ProductClientPrice.objects.get_or_create(
+                product=product,
+                client=client,
+                price=product.price,
+            )
+            if created:
+                created_clients.append(client.name)
+            else:
+                existing_clients.append(client.name)
+
+    summary: Dict[str, object] = {
+        "created_count": len(created_clients),
+        "existing_count": len(existing_clients),
+        "created_clients": created_clients,
+        "existing_clients": existing_clients,
+    }
+
+    logger.info(
+        "Ensured product for all clients", extra={
+            "product_id": product.id,
+            "product_name": product.name,
+            "created_count": summary["created_count"],
+            "existing_count": summary["existing_count"],
+            "user": getattr(user, 'username', None),
+        }
+    )
+
+    return summary
+
+
 def bulk_increase_product_client_prices(
     *,
     product: Product,
