@@ -403,7 +403,8 @@ def detail(request, pk):
             'order_id': payment.order.id if payment.order else None,
             'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
             'is_positive': True,  # Regular payments are always positive from client perspective
-            'object': payment
+            'object': payment,
+            'created_by': payment.created_by if hasattr(payment,'created_by') else None,
         })
     
     # Add balance transactions  
@@ -425,7 +426,8 @@ def detail(request, pk):
             'order_id': balance_tx.reference_order.id if balance_tx.reference_order else None,
             'description': balance_tx.notes or balance_tx.get_transaction_type_display(),
             'is_positive': is_positive,
-            'object': balance_tx
+            'object': balance_tx,
+            'created_by': balance_tx.created_by if hasattr(balance_tx,'created_by') else None,
         })
     
     # Add credit transactions
@@ -447,8 +449,9 @@ def detail(request, pk):
             'order_id': credit_tx.reference_order.id if credit_tx.reference_order else None,
             'description': credit_tx.notes or credit_tx.get_transaction_type_display(),
             'is_positive': is_positive,
-            'object': credit_tx
-        })
+            'object': credit_tx,
+            'created_by': credit_tx.created_by if hasattr(credit_tx,'created_by') else None,
+            })
     
     # Sort all payment data by date (most recent first)
     all_payment_data.sort(key=lambda x: x['date'], reverse=True)
@@ -748,7 +751,6 @@ def add_balance(request, pk):
         if form.is_valid():
             amount = form.cleaned_data['amount']
             transaction_type = form.cleaned_data['transaction_type']
-            description = form.cleaned_data['description']
             notes = form.cleaned_data['notes']
             
             try:
@@ -759,7 +761,7 @@ def add_balance(request, pk):
                     amount=amount,
                     transaction_type=transaction_type,
                     user=request.user,
-                    notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}"
+                    notes=f"[MANUAL]. Transacción manual realizada por {request.user.username}. {notes}"
                 )
 
                 messages.success(

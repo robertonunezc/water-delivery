@@ -705,7 +705,7 @@ Desde {{date_since}}</small>
                     <th>Método/Tipo</th>
                     <th>Estado</th>
                     <th>Pagado</th>
-                    <th>Descripción</th>
+                    <th>Por</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -749,7 +749,7 @@ Desde {{date_since}}</small>
                          
                 
                       <td>
-                        <small class="text-muted">{{ payment_data.description|truncatechars:50 }}</small>
+                        <small class="text-muted">{{ payment_data.created_by }}</small>
                       </td>
                     </tr>
                   {% endfor %}

@@ -50,16 +50,6 @@ class ManualBalanceTransactionForm(forms.Form):
         })
     )
     
-    description = forms.CharField(
-        max_length=255,
-        label="Descripción",
-        help_text="Breve descripción de la transacción",
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Ej: Depósito bancario por transferencia'
-        })
-    )
-    
     notes = forms.CharField(
         required=True,
         label="Notas detalladas",
