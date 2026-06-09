@@ -235,6 +235,11 @@
 						{% if not client.requires_billing %}
 							<div class="alert alert-secondary">El cliente no requiere facturación. Active "Requiere facturación" en Datos Básicos para habilitar edición.</div>
 						{% endif %}
+						{% if client.requires_billing and not client.billing_info.effective.has_address %}
+							<div class="alert alert-warning">
+								<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
+							</div>
+						{% endif %}
 						{% if billing_read_only %}
 							<div class="alert alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
 						{% endif %}

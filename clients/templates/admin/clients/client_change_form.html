@@ -19,12 +19,45 @@
 
     {% if original.requires_billing and not original.billing_info.effective.has_address %}
         {# Show warning only when the effective fiscal address is missing #}
-        <div style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
+        <div id="fiscal-warning-banner" style="margin: 20px 0; padding: 15px; background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404;">
             <strong>⚠️ Advertencia:</strong>
             <p style="margin: 10px 0 0 0;">
                 Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b>.
             </p>
         </div>
+        <script>
+            // Move the warning banner to the Facturacion tab
+            document.addEventListener('DOMContentLoaded', function() {
+                var banner = document.getElementById('fiscal-warning-banner');
+                if (!banner) return;
+                
+                // Unfold admin renders inlines and fieldsets as tabs if configured.
+                // We'll look for the Datos de Facturacion inline group or the Información de Facturación fieldset.
+                var targetTab = document.getElementById('invoice_data-group') || 
+                                document.getElementById('invoicedata_set-group');
+                
+                if (!targetTab) {
+                    // Try to find the fieldset containing "Información de Facturación"
+                    var h2s = document.querySelectorAll('fieldset h2');
+                    for (var i = 0; i < h2s.length; i++) {
+                        if (h2s[i].textContent.includes('Facturación')) {
+                            targetTab = h2s[i].parentElement;
+                            break;
+                        }
+                    }
+                }
+                
+                if (targetTab) {
+                    // Insert right after the h2 title if it exists, otherwise at the top
+                    var h2 = targetTab.querySelector('h2');
+                    if (h2 && h2.nextSibling) {
+                        targetTab.insertBefore(banner, h2.nextSibling);
+                    } else {
+                        targetTab.insertBefore(banner, targetTab.firstChild);
+                    }
+                }
+            });
+        </script>
     {% endif %}
 
     {{ block.super }}

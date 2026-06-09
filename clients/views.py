@@ -231,6 +231,8 @@ def edit_v2(request, pk):
             if core_form.is_valid():
                 core_form.save()
                 messages.success(request, 'Datos básicos actualizados correctamente.')
+                if client.requires_billing and not client.billing_info.effective.has_address:
+                    messages.warning(request, '⚠️ Advertencia: El cliente requiere facturación pero no se encontró un domicilio de tipo FISCAL.')
                 if request.path.startswith('/administrador/'):
                     return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=basic")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=basic")
@@ -256,6 +258,8 @@ def edit_v2(request, pk):
                 elif wants_copy and submission_deletes_billing:
                     messages.info(request, 'No se creó dirección fiscal automática porque en esta operación se eliminó una dirección fiscal.')
                 messages.success(request, 'Direcciones actualizadas correctamente.')
+                if client.requires_billing and not client.billing_info.effective.has_address:
+                    messages.warning(request, '⚠️ Advertencia: El cliente requiere facturación pero no se encontró un domicilio de tipo FISCAL.')
                 if request.path.startswith('/administrador/'):
                     return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=addresses")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=addresses")

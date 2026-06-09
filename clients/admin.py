@@ -181,6 +181,15 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 
 	def save_related(self, request, form, formsets, change):
 		super().save_related(request, form, formsets, change)
+		
+		# Warn if billing is required but fiscal address is missing after saving all inlines
+		client = form.instance
+		if client.requires_billing and not client.billing_info.effective.has_address:
+			messages.warning(
+				request,
+				"⚠️ Advertencia: El cliente requiere facturación pero no se encontró un domicilio de tipo FISCAL."
+			)
+
 		if request.POST.get('copy_address_for_all_inlines') != 'on':
 			return
 		for formset in formsets:
