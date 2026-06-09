@@ -146,6 +146,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.log_context.LogContextMiddleware',
 ]
 
 import sentry_sdk
@@ -288,15 +289,15 @@ except Exception:
     LOG_DIR = BASE_DIR
 
 
-JSON_FMT_PROD = "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s"
-JSON_FMT_DEV = "%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d"
+JSON_FMT_PROD = "%(asctime)s %(levelname)s %(name)s %(message)s %(request_id)s %(tenant)s %(user)s"
+JSON_FMT_DEV = "%(asctime)s %(levelname)s %(name)s %(message)s %(pathname)s %(lineno)d %(request_id)s %(tenant)s %(user)s"
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
     "filters": {
-        "request_id": {
-            "()": "core.logging.RequestIdFilter",
+        "log_context": {
+            "()": "core.logging.LogContextFilter",
         },
     },
     "formatters": {
@@ -308,7 +309,7 @@ LOGGING = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "filters": ["request_id"],   # ← THIS LINE IS REQUIRED
+            "filters": ["log_context"],   # ← THIS LINE IS REQUIRED
             "formatter": "json",
         },
     },
