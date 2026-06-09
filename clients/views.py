@@ -11,6 +11,7 @@ from calendar import monthrange
 from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
 from .forms import (
     ManualCreditTransactionForm,
+    ManualBalanceTransactionForm,
     ClientCoreForm,
     ClientCreditPolicyForm,
     ContactForm,
@@ -732,3 +733,52 @@ def pay_credit(request, pk):
 @login_required
 def create_admin(request):
     return render(request, 'admin/clients/create.html')
+
+@login_required
+def add_balance(request, pk):
+    """View for manually adding balance to a client outside of Django admin"""
+    client = get_object_or_404(Client, pk=pk)
+    
+    if request.method == 'POST':
+        form = ManualBalanceTransactionForm(request.POST)
+        if form.is_valid():
+            amount = form.cleaned_data['amount']
+            transaction_type = form.cleaned_data['transaction_type']
+            description = form.cleaned_data['description']
+            notes = form.cleaned_data['notes']
+            
+            try:
+                from clients.services import balance_service
+
+                balance_service.add_balance(
+                    client=client,
+                    amount=amount,
+                    transaction_type=transaction_type,
+                    user=request.user,
+                    notes=f"[MANUAL] {description}. Transacción manual realizada por {request.user.username}. {notes}"
+                )
+
+                messages.success(
+                    request,
+                    f"Saldo actualizado exitosamente. {client.name} ahora tiene ${client.balance:.2f} de saldo."
+                )
+                
+                if request.path.startswith('/administrador/'):
+                    return redirect('admin_clients')
+                return redirect('clients:detail', pk=client.pk)
+                
+            except Exception as e:
+                messages.error(request, f"Error al procesar la transacción: {str(e)}")
+    else:
+        # Initialize form with the client pre-selected and default to 'deposit'
+        form = ManualBalanceTransactionForm(initial={'client': client, 'transaction_type': 'deposit'})
+        # Make client field readonly by disabling it
+        form.fields['client'].widget.attrs['disabled'] = True
+        form.fields['client'].required = False
+    
+    context = {
+        'form': form,
+        'client': client,
+    }
+    
+    return render(request, 'add_balance.html', context)

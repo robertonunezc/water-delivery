@@ -21,6 +21,7 @@ urlpatterns = [
     path('administrador/clientes/', client_views.list_admin, name='admin_clients'),
     path('administrador/clientes/crear/', client_views.create_v2, name='admin_create_client'),
     path('administrador/clientes/<int:pk>/editar/', client_views.edit_v2, name='admin_edit_client'),
+    path('administrador/clientes/<int:pk>/saldo/', client_views.add_balance, name='admin_add_balance'),
 
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),

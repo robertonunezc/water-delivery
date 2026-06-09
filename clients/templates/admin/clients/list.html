@@ -174,9 +174,18 @@
 								</span>
 							</td>
 							<td class="text-end">
-								<a href="{% url 'clients:detail' client.pk %}" class="btn btn-sm btn-outline-primary">Ver</a>
-								<a href="{% url 'admin_edit_client' client.pk %}" class="btn btn-sm btn-outline-secondary">Editar</a>
-								<a href="{% url 'orders:create_order' client.pk %}" class="btn btn-sm btn-outline-secondary">Pedido</a>
+								<div class="dropdown">
+									<button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+										Acciones
+									</button>
+									<ul class="dropdown-menu" aria-labelledby="dropdownMenuButton">
+										<li><a class="dropdown-item" href="{% url 'clients:detail' client.pk %}">Ver</a></li>
+										<li><a class="dropdown-item" href="{% url 'admin_edit_client' client.pk %}">Editar</a></li>
+										<li><a class="dropdown-item" href="{% url 'orders:create_order' client.pk %}">Pedido</a></li>
+										<li><a class="dropdown-item" href="{% url 'admin_add_balance' client.pk %}">Gestionar saldo</a></li>
+										<li><a class="dropdown-item" href="{% url 'clients:pay_credit' client.pk%}">Gestionar credito</a></li>
+									</ul>
+								</div>
 							</td>
 						</tr>
 					{% empty %}	
