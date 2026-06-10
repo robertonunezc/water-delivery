@@ -17,7 +17,7 @@ def ensure_client_product_prices(client: Client) -> Dict[str, object]:
             _, created = ProductClientPrice.objects.get_or_create(
                 product=product,
                 client=client,
-                price=product.price,
+                defaults={"price": product.price},
             )
             if created:
                 created_products.append(product.name)
@@ -46,15 +46,16 @@ def ensure_client_product_prices(client: Client) -> Dict[str, object]:
 
 def ensure_product_for_all_clients(product: Product, user=None) -> Dict[str, object]:
     """Create missing ProductClientPrice rows for the given product across all clients."""
+    from clients.services import client_service
     created_clients: List[str] = []
     existing_clients: List[str] = []
 
     with transaction.atomic():
-        for client in Client.objects.all().only("id", "name"):
+        for client in client_service.get_all_clients().only("id", "name"):
             _, created = ProductClientPrice.objects.get_or_create(
                 product=product,
                 client=client,
-                price=product.price,
+                defaults={"price": product.price},
             )
             if created:
                 created_clients.append(client.name)

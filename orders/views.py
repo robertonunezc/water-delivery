@@ -29,18 +29,18 @@ ORDER_DASHBOARD_BULK_ACTIONS = (
         'value': 'create_invoice',
         'label': 'Crear factura',
     },
-    {
-        'value': 'mark_completed',
-        'label': 'Marcar como completados',
-    },
-    {
-        'value': 'mark_pending',
-        'label': 'Marcar como pendientes',
-    },
-    {
-        'value': 'mark_cancelled',
-        'label': 'Marcar como cancelados',
-    },
+    # {
+    #     'value': 'mark_completed',
+    #     'label': 'Marcar como completados',
+    # },
+    # {
+    #     'value': 'mark_pending',
+    #     'label': 'Marcar como pendientes',
+    # },
+    # {
+    #     'value': 'mark_cancelled',
+    #     'label': 'Marcar como cancelados',
+    # },
 )
 
 

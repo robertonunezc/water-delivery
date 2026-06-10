@@ -1,6 +1,7 @@
 from datetime import date
 from invoice import services as invoice_service
 
+
 def get_upcoming_route_orders(client, limit=10):
     """
     Get upcoming route client orders (specific deliveries) for a client.
@@ -22,6 +23,8 @@ def get_upcoming_route_orders(client, limit=10):
         'order'
     ).order_by('visit_date')[:limit]
 
+def get_all_clients():
+    return Client.objects.all().filter(active=True)
 
 def get_recent_completed_route_orders(client, limit=5):
     """
