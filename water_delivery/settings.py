@@ -11,7 +11,6 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-from celery.schedules import crontab
 
 import os
 from dotenv import load_dotenv
@@ -233,15 +232,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 4
 CELERY_WORKER_MAX_TASKS_PER_CHILD = 1000
 CELERY_RESULT_EXPIRES = 3600
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
-CELERY_BEAT_SCHEDULE = {
-    'populate-billing-dates-monthly': {
-        'task': 'clients.populate_billing_dates',
-        'schedule': crontab(hour=0, minute=0, day_of_month=1),
-        'options': {
-            'expires': 3600,
-        },
-    },
-}
+from .celery_schedule import SCHEDULE as CELERY_BEAT_SCHEDULE
 
 
 # Password validation

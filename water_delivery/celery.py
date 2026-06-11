@@ -215,24 +215,3 @@ def run_for_all_tenants(task_path: str, *args, **kwargs):
         'tasks': queued_tasks
     }
 
-
-# =============================================================================
-# Periodic Task Configuration (Multi-Tenant)
-# =============================================================================
-
-@app.on_after_configure.connect
-def setup_periodic_tasks(sender, **kwargs):
-    """
-    Configure periodic tasks to run for all tenants.
-
-    This function is called after Celery configuration is complete.
-    It sets up the beat schedule for multi-tenant periodic tasks.
-    """
-    # Monthly billing date population for all tenants
-    sender.add_periodic_task(
-        crontab(hour=0, minute=0, day_of_month=1),  # 1st of month at midnight
-        run_for_all_tenants.s('clients.services.populate_billing_dates'),
-        name='populate-billing-dates-all-tenants'
-    )
-
-    logger.info("Multi-tenant periodic tasks configured")
