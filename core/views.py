@@ -4,15 +4,20 @@ import os
 import redis
 from django.http import JsonResponse
 from django.shortcuts import render
-
+from invoice import services as invoice_services
+from datetime import date
 
 logger = logging.getLogger(__name__)
 
+
 def home(request):
     """Home page view - shows dashboard for authenticated users, welcome page for anonymous users"""
+    today_invoices = invoice_services.get_clients_needing_billing(start_date=date.today(), end_date=date.today())
+    print(today_invoices)
     context = {
         'is_authenticated': request.user.is_authenticated,
         'user': request.user if request.user.is_authenticated else None,
+        'today_invoices_count': len(today_invoices),
     }
     return render(request, 'home.html', context)
 

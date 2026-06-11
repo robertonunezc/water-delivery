@@ -8,7 +8,13 @@
             <h1 class="mb-4">Panel Principal</h1>
             <div class="alert alert-info">
                 <i class="fas fa-user me-2"></i>
-                Bienvenido, <strong>{{ user.get_full_name|default:user.username }}</strong>
+                Bienvenido, <strong>{{ user.get_full_name|default:user.username }}. </strong>
+                {% if today_invoices_count > 0 and user.is_staff %}
+                Tiene <strong>{{ today_invoices_count }}</strong> facturas pendientes. 
+                <a href="/admin/billing/invoicefrequencyreport/?date_preset=&start_date={{ "now"|date:"Y-m-d" }}&end_date={{ "now"|date:"Y-m-d" }}">Revisar</a>
+                {% else %}
+                No tiene facturas pendientes.
+                {% endif %}
             </div>
         </div>
     </div>

@@ -196,6 +196,7 @@ Desde {{date_since}}</small>
                 <th>Días Vencidos</th>
                 <th>Total de la Orden</th>
                 <th>Monto Pendiente</th>
+                <th>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -206,6 +207,10 @@ Desde {{date_since}}</small>
                 <td><span class="badge bg-danger">{{ overdue_order.days_overdue }} días</span></td>
                 <td>${{ overdue_order.total_amount|floatformat:2 }}</td>
                 <td class="fw-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
+                <td>
+                                     <a href="{% url 'orders:get_order' overdue_order.id %}" class="btn btn-sm btn-danger">Pagar</a>
+
+                </td>
               </tr>
               {% endfor %}
             </tbody>

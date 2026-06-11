@@ -4,7 +4,7 @@ Celery tasks for the clients app.
 from celery import shared_task
 from django.core.management import call_command
 import logging
-
+from invoice.services import set_billing_date_to_clients
 logger = logging.getLogger(__name__)
 
 
@@ -19,7 +19,7 @@ def populate_billing_dates_task():
     logger.info("Starting populate_billing_dates_task")
     
     try:
-        call_command('populate_clients_billing_date')
+        set_billing_date_to_clients()
         logger.info("Successfully completed populate_billing_dates_task")
         return "Billing dates updated successfully"
     except Exception as e:

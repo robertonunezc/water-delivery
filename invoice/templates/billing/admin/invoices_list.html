@@ -125,7 +125,7 @@
         </div>
       </form>
       <div class="mt-2">
-        <a href="{% url 'admin_invoices' %}" class="btn btn-sm btn-outline-secondary">Clear Filters</a>
+        <a href="{% url 'admin_invoices' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
       </div>
     </div>
   </div>
@@ -137,15 +137,15 @@
         <thead class="table-light">
           <tr>
             <th style="width: 80px;">ID</th>
-            <th>Client</th>
-            <th>Serie (Identifier)</th>
+            <th>Cliente</th>
+            <th>Serie</th>
             <th>Folio</th>
-            <th>Emit Date</th>
+            <th>Emitida</th>
             <th>Estado de Pago</th>
-            <th>Calculation</th>
-            <th>File Attachments</th>
-            <th>Amount</th>
-            <th class="text-end">Actions</th>
+            <!-- <th>Calculation</th> -->
+            <th>Archivos</th>
+            <th>Total</th>
+            <th class="text-end">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -170,13 +170,13 @@
                   <span class="status-pill status-manual">Sin órdenes</span>
                 {% endif %}
               </td>
-              <td>
+              <!-- <td>
                 {% if invoice.auto_amount %}
                   <span class="status-pill status-auto">Automático</span>
                 {% else %}
                   <span class="status-pill status-manual">Manual</span>
                 {% endif %}
-              </td>
+              </td> -->
               <td>
                 {% if invoice.file %}
                   <a href="{{ invoice.file.url }}" class="status-pill status-has-file text-decoration-none" target="_blank">

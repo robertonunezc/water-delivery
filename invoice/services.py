@@ -174,9 +174,11 @@ def set_billing_date_to_clients() -> Optional[date]:
         'invoice_schedule',
         'invoice_data'
     )
-
+    print('Total clients to update:', queryset.count())
     for client in queryset:
         client.invoice_schedule.save()  # Triggers save logic to update next_billing_date
+    print('Billing dates updated successfully')
+    return queryset
 
 
 # Billing Order Validation Services

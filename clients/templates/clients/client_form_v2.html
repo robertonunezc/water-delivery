@@ -281,18 +281,19 @@
 							</div>
 						</div>
 
-						{% if billing_read_only %}
 							<div class="mt-3 p-3 border rounded bg-light">
-								<div class="form-section-title">Información Efectiva Heredada</div>
+								<div class="form-section-title">Información Facturacion</div>
 								<div class="section-muted">
 									{% if effective_billing_data %}
-										RFC: <strong>{{ effective_billing_data.rfc }}</strong> · Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong>
+										RFC: <strong>{{ effective_billing_data.rfc }}</strong><br>
+										Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong><br>
+										Frecuencia: <strong>{{effective_billing_frequency}}</strong><br>
 									{% else %}
 										Sin datos de facturación efectivos disponibles.
 									{% endif %}
 								</div>
+
 							</div>
-						{% endif %}
 					{% endif %}
 				</div>
 
