@@ -113,6 +113,3 @@ def _unregister_app_admin_models(app_label: str) -> None:
         except NotRegistered:
             continue
 
-
-_unregister_app_admin_models('django_celery_beat')
-_unregister_app_admin_models('django_celery_results')
