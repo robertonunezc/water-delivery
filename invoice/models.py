@@ -1,7 +1,7 @@
 from calendar import monthrange
 from datetime import date, timedelta
 from typing import Optional, List
-
+from django.db.models import Sum
 from django.db import models
 from django.forms import ValidationError
 
@@ -71,6 +71,15 @@ class Invoice(TimeStampedModel):
                 break
                 
         return "Pagada" if all_paid else "No Pagada"
+
+    @property
+    def total_payments(self):
+        """Calcula el total pagado de la factura sumando todos los pagos de las órdenes vinculadas"""
+        payments = self.invoice_links.aggregate(
+            total=Sum('order__payments__amount')
+        )['total']
+        return payments or 0.00
+    
 
     class Meta:
         db_table = 'billing_billingrecord'

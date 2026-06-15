@@ -3,6 +3,11 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db import transaction
+from invoice.models import Invoice
+from clients.models import Client
+from django.core.paginator import Paginator
+from django.db.models import Sum, Q, Count
+from datetime import date
 
 # Existing API Views
 
@@ -43,12 +48,6 @@ def invoice_client(request, invoice_id):
 
 @staff_member_required
 def list_invoices_admin(request):
-    from invoice.models import Invoice
-    from clients.models import Client
-    from django.core.paginator import Paginator
-    from django.db.models import Sum, Q, Count
-    from datetime import date
-
     # Base queryset
     invoices = Invoice.objects.select_related('client').prefetch_related('invoice_links__order__payments')
 
@@ -101,16 +100,6 @@ def list_invoices_admin(request):
     page_number = request.GET.get('page', 1)
     invoices_page = paginator.get_page(page_number)
 
-    # Calculate page-specific stats
-    invoices_on_page = invoices_page.object_list
-    if invoices_on_page:
-        page_stats = invoices_on_page.aggregate(
-            total_amount=Sum('amount'),
-            count=Count('id')
-        )
-    else:
-        page_stats = {'total_amount': 0, 'count': 0}
-
     context = {
         'invoices': invoices_page,
         'all_clients': all_clients,
@@ -122,7 +111,6 @@ def list_invoices_admin(request):
         },
         'has_filters': any([client_filter, date_from, date_to, search_query]),
         'total_invoices': total_invoices,
-        'page_stats': page_stats,
         'today': date.today(),
     }
     return render(request, 'billing/admin/invoices_list.html', context)
