@@ -75,10 +75,24 @@ class Invoice(TimeStampedModel):
     @property
     def total_payments(self):
         """Calcula el total pagado de la factura sumando todos los pagos de las órdenes vinculadas"""
+        from django.db.models import Sum, Q
         payments = self.invoice_links.aggregate(
-            total=Sum('order__payments__amount')
+            total=Sum(
+                'order__payments__amount',
+                filter=Q(order__payments__status='completed')
+            )
         )['total']
         return payments or 0.00
+    @property
+    def pending_amount(self):
+        return float(self.amount) - float(self.total_payments)
+
+    @property
+    def pending_orders(self):
+        from django.db.models import Q
+        return self.invoice_links.filter(
+            Q(order__status='pending') | Q(order__status='in_progress')
+        ).count()
     
 
     class Meta:

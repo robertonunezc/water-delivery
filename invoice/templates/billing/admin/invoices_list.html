@@ -146,6 +146,8 @@
             <th>Archivos</th>
             <th>Total</th>
             <th>Total Pagado</th>
+            <th>Saldo pendiente</th>
+            
             <th class="text-end">Acciones</th>
           </tr>
         </thead>
@@ -154,7 +156,11 @@
             <tr>
               <td><strong>#{{ invoice.id }}</strong></td>
               <td>
-                <div class="fw-bold">{{ invoice.client.name }}</div>
+                <div class="fw-bold">
+                  <a href="{% url 'clients:detail' invoice.client.id %}">
+                    {{ invoice.client.name }}
+                  </a>
+                </div>
                 {% if invoice.client.rfc %}
                   <small class="text-muted">RFC: {{ invoice.client.rfc }}</small>
                 {% endif %}
@@ -195,6 +201,13 @@
                   <strong class="text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
                 {% else %}
                   <strong class="text-danger">${{ invoice.total_payments|floatformat:2 }}</strong>
+                {% endif %}
+              </td>
+              <td>
+                {% if invoice.pending_amount > 0 %}
+                  <span class="status-pill status-no-file">${{ invoice.pending_amount|floatformat:2 }}</span>
+                {% else %}
+                  <span class="status-pill status-has-file">${{ invoice.pending_amount|floatformat:2 }}</span>
                 {% endif %}
               </td>
               <td class="text-end">
