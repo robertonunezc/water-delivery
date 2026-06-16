@@ -90,7 +90,7 @@
 
 	<div class="card dashboard-card mb-3">
 		<div class="card-body">
-			<form method="get" class="row g-2 align-items-end" action="{% url 'clients:list' %}">
+			<form method="get" class="row g-2 align-items-end" action="{% url 'admin_clients' %}">
 				<div class="col-md-10">
 					<label class="form-label" for="search">Buscar</label>
 					<input
@@ -106,7 +106,7 @@
 				</div>
 			</form>
 			<div class="mt-2">
-				<a href="{% url 'clients:list' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+				<a href="{% url 'admin_clients' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
 			</div>
 		</div>
 	</div>
