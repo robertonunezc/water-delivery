@@ -27,6 +27,7 @@ class PaymentRequestData:
     order_type: Optional[str] = None
     amount: Optional[Decimal] = None
     credit_note: Optional[str] = None
+    notes: Optional[str] = None
 
 
 def process_payment_request(
@@ -37,6 +38,9 @@ def process_payment_request(
     """Process a payment request payload in either multi or legacy format."""
     if data.cantidad_cobrada is not None and Decimal(str(data.cantidad_cobrada)) < order.total_amount:
         raise ValueError(f'Cantidad a cobrar menor que el total de la orden: ${data.cantidad_cobrada} < ${order.total_amount}')
+    if data.notes is not None:
+        order.notes = data.notes.strip() or None
+        order.save(update_fields=['notes', 'updated_at'])
     requested_type = data.order_type
     _apply_order_type(order=order, requested_type=requested_type)
 

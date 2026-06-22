@@ -590,6 +590,93 @@ class OrderApi {
   }
 }
 
+class OrderNotesController {
+  constructor(api, alertManager) {
+    this.api = api;
+    this.alertManager = alertManager;
+    this.desktopInput = document.getElementById('order-notes-desktop');
+    this.mobileInput = document.getElementById('order-notes-mobile');
+    this.hiddenInput = document.getElementById('id_notes');
+    this.desktopStatus = document.getElementById('order-notes-status');
+    this.mobileStatus = document.getElementById('order-notes-status-mobile');
+    this.saveTimer = null;
+    this.lastSavedValue = this.getCurrentValue();
+  }
+
+  init() {
+    this.syncAll(this.lastSavedValue);
+    this.bindInput(this.desktopInput, this.mobileInput);
+    this.bindInput(this.mobileInput, this.desktopInput);
+  }
+
+  bindInput(source, target) {
+    if (!source) {
+      return;
+    }
+
+    source.addEventListener('input', () => {
+      const value = source.value;
+      if (target && target.value !== value) {
+        target.value = value;
+      }
+      this.syncHidden(value);
+      this.setStatus('Guardando...');
+      window.clearTimeout(this.saveTimer);
+      this.saveTimer = window.setTimeout(() => this.persist(value), 500);
+    });
+
+    source.addEventListener('blur', () => {
+      const value = source.value;
+      this.syncHidden(value);
+      this.persist(value);
+    });
+  }
+
+  syncAll(value) {
+    if (this.desktopInput) this.desktopInput.value = value;
+    if (this.mobileInput) this.mobileInput.value = value;
+    this.syncHidden(value);
+  }
+
+  syncHidden(value) {
+    if (this.hiddenInput) {
+      this.hiddenInput.value = value;
+    }
+  }
+
+  getCurrentValue() {
+    return this.desktopInput?.value || this.mobileInput?.value || this.hiddenInput?.value || '';
+  }
+
+  getValue() {
+    return this.getCurrentValue().trim();
+  }
+
+  setStatus(message) {
+    if (this.desktopStatus) this.desktopStatus.textContent = message;
+    if (this.mobileStatus) this.mobileStatus.textContent = message;
+  }
+
+  async persist(value) {
+    const normalized = value.trim();
+    if (normalized === this.lastSavedValue.trim()) {
+      this.setStatus(normalized ? 'Guardado' : 'Sin nota');
+      return;
+    }
+
+    try {
+      const data = await this.api.updateOrder({ notes: value });
+      this.lastSavedValue = data.notes || '';
+      this.syncAll(this.lastSavedValue);
+      this.setStatus(this.lastSavedValue ? 'Guardado' : 'Sin nota');
+    } catch (error) {
+      this.setStatus('Error al guardar');
+      this.alertManager.show('danger', 'Error', 'No se pudo guardar la nota del pedido.', 4000);
+      console.error('Order notes save error', error);
+    }
+  }
+}
+
 class NavigationController {
   constructor(api, alertManager) {
     this.api = api;
@@ -723,13 +810,14 @@ class QuantityController {
 }
 
 class PaymentController {
-  constructor(config, api, alertManager, paymentBreakdown, amountManager, discountManager) {
+  constructor(config, api, alertManager, paymentBreakdown, amountManager, discountManager, orderNotesController) {
     this.config = config;
     this.api = api;
     this.alertManager = alertManager;
     this.paymentBreakdown = paymentBreakdown;
     this.amountManager = amountManager;
     this.discountManager = discountManager;
+    this.orderNotesController = orderNotesController;
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
   }
@@ -957,7 +1045,8 @@ class PaymentController {
     if (orderType === 'credito') {
       const payload = {
         order_id: this.config.orderId,
-        order_type: 'credito'
+        order_type: 'credito',
+        notes: this.orderNotesController?.getValue() || ''
       };
 
       try {
@@ -980,7 +1069,12 @@ class PaymentController {
     if (!payments) return;
 
     const cantidadCobrada = this.getCantidadCobrada();
-    const payload = { order_id: this.config.orderId, order_type: orderType, payments };
+    const payload = {
+      order_id: this.config.orderId,
+      order_type: orderType,
+      payments,
+      notes: this.orderNotesController?.getValue() || ''
+    };
     if (cantidadCobrada !== null && cantidadCobrada > 0) payload.cantidad_cobrada = cantidadCobrada;
 
     try {
@@ -1071,6 +1165,7 @@ class OrderPageApp {
     this.summaryManager = new OrderSummaryManager();
     this.amountFieldManager = new AmountFieldManager();
     this.api = new OrderApi(this.config);
+    this.orderNotesController = new OrderNotesController(this.api, this.alertManager);
     this.navigationController = new NavigationController(this.api, this.alertManager);
     this.discountManager = new DiscountManager(() => this.getCurrentOrderTotal(), amount => this.handleDiscountChange(amount));
     this.quantityController = new QuantityController(
@@ -1090,12 +1185,14 @@ class OrderPageApp {
       this.alertManager,
       this.paymentBreakdownManager,
       this.amountFieldManager,
-      this.discountManager
+      this.discountManager,
+      this.orderNotesController
     );
   }
 
   init() {
     this.navigationController.init();
+    this.orderNotesController.init();
     this.discountManager.init();
     if (this.config.initialDiscount) {
       this.discountManager.setAmount(this.config.initialDiscount);

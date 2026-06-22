@@ -435,20 +435,45 @@ def update_order(request, order_pk):
     except json.JSONDecodeError:
         return HttpResponseBadRequest('Invalid JSON')
 
+    quantity = None
+    discount = None
+    product_id = data.get('product_id')
+    notes = data.get('notes')
+
     try:
-        quantity = int(data.get('quantity', 0))
-        discount = Decimal(str(data.get('discount', '0')))
+        if 'quantity' in data:
+            quantity = int(data.get('quantity', 0))
+        if 'discount' in data:
+            discount = Decimal(str(data.get('discount', '0')))
     except (TypeError, ValueError):
         return HttpResponseBadRequest('Invalid quantity or discount format')
 
-    product_id = data.get('product_id')
-    if not product_id:
+    if notes is not None:
+        order.notes = notes.strip() or None
+
+    if product_id:
+        if quantity is None:
+            return HttpResponseBadRequest('Missing quantity')
+        product = get_object_or_404(Product, pk=product_id)
+        effective_discount = discount if discount is not None else order.discount
+        order = order_services.update_order(
+            order,
+            quantity,
+            product,
+            order.client,
+            effective_discount,
+        )
+        if notes is not None:
+            order.save(update_fields=['notes', 'updated_at'])
+    elif discount is not None:
         order.discount = discount
         order.total_amount = order_services.calculate_order_total(order)
-        order.save(update_fields=['discount', 'subtotal_amount', 'total_amount'])
-    else:
-        product = get_object_or_404(Product, pk=product_id)
-        order = order_services.update_order(order, quantity, product, order.client, discount)
+        update_fields = ['discount', 'subtotal_amount', 'total_amount']
+        if notes is not None:
+            update_fields.append('notes')
+        order.save(update_fields=update_fields)
+    elif notes is not None:
+        order.save(update_fields=['notes', 'updated_at'])
 
     client = order.client
     order_total = order.total_amount
@@ -461,6 +486,7 @@ def update_order(request, order_pk):
         'subtotal': str(order.subtotal_amount),
         'client_balance': str(client_balance),
         'discount': str(order.discount),
+        'notes': order.notes or '',
         'payment_breakdown': payment_breakdown
     })
 

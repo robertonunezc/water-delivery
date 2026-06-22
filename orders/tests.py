@@ -320,6 +320,36 @@ class UpdateOrderViewTestCase(TestCase):
         self.assertEqual(self.order.subtotal_amount, Decimal("50.00"))
         self.assertEqual(self.order.total_amount, Decimal("38.00"))
 
+    def test_update_endpoint_notes_only_keeps_existing_totals(self) -> None:
+        response = self._post_update(
+            {
+                "notes": "Entregar antes de las 5 pm",
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.notes, "Entregar antes de las 5 pm")
+        self.assertEqual(self.order.discount, Decimal("0.00"))
+        self.assertEqual(self.order.subtotal_amount, Decimal("50.00"))
+        self.assertEqual(self.order.total_amount, Decimal("50.00"))
+
+    def test_update_endpoint_product_change_can_persist_notes(self) -> None:
+        response = self._post_update(
+            {
+                "quantity": 3,
+                "product_id": str(self.product_1.pk),
+                "discount": "0.00",
+                "notes": "Cliente solicita tocar el timbre",
+            }
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.notes, "Cliente solicita tocar el timbre")
+        self.assertEqual(self.order.subtotal_amount, Decimal("70.00"))
+        self.assertEqual(self.order.total_amount, Decimal("70.00"))
+
 
 class CancelOrderServiceTestCase(TestCase):
     """Tests for cancel_pending_order service function."""

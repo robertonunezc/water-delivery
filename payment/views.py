@@ -41,6 +41,7 @@ def create_payment(request):
             amount=data.get('amount'),
             credit_note=data.get('credit_note'),
             order_type=data.get('order_type'),
+            notes=data.get('notes'),
         )
         response_data, status_code = services.process_payment_request(
             order=order,
