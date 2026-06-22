@@ -88,6 +88,24 @@
     .financial-toggle-btn:focus {
       box-shadow: none;
     }
+
+    .financial-summary-card {
+      padding: 0.85rem 1rem;
+    }
+
+    .financial-summary-label {
+      font-size: 0.8rem;
+    }
+
+    .financial-summary-amount {
+      font-size: 1.6rem;
+      line-height: 1.1;
+    }
+
+    .financial-summary-help {
+      font-size: 0.78rem;
+      line-height: 1.2;
+    }
   </style>
 {% endblock %}
 
@@ -134,7 +152,7 @@
               <h5 class="mb-0">
                 <i class="fas fa-wallet me-2"></i>Estado Financiero del Cliente
               </h5>
-              <button class="btn btn-sm btn-outline-light d-md-none financial-toggle-btn"
+              <button class="btn btn-sm btn-outline-light financial-toggle-btn"
                       type="button"
                       data-bs-toggle="collapse"
                       data-bs-target="#client-financial-status-collapse"
@@ -143,105 +161,69 @@
                 <i class="fas fa-chevron-down me-1"></i>Ver detalle
               </button>
             </div>
-            <div class="card-body py-2 d-md-none border-bottom">
-              <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted">Poder de compra total</small>
-                <strong class="text-primary">${{ client.balance|add:client.get_available_credit|floatformat:2 }}</strong>
-              </div>
-              <div class="d-flex justify-content-between mt-1">
-                <small class="text-muted">Saldo: <strong>${{ client.balance|floatformat:2 }}</strong></small>
-                <small class="text-muted">Deuda: <strong>${{ client.current_debt|floatformat:2 }}</strong></small>
+            <div class="card-body py-3 border-bottom">
+              <div class="row g-3 align-items-stretch">
+                <div class="col-12 col-md-6">
+                  <div class="h-100 bg-light rounded border financial-summary-card">
+                    <div class="text-muted mb-1 financial-summary-label">Saldo disponible</div>
+                    <div class="fw-bold financial-summary-amount {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
+                      ${{ client.balance|floatformat:2 }}
+                    </div>
+                    <div class="text-muted financial-summary-help">Disponible para cubrir el pedido de inmediato.</div>
+                  </div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <div class="h-100 bg-light rounded border financial-summary-card">
+                    <div class="d-flex justify-content-between align-items-start">
+                      <div>
+                        <div class="text-muted mb-1 financial-summary-label">Crédito disponible</div>
+                        <div class="fw-bold financial-summary-amount {% if client.can_pay_with_credit and client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}">
+                          {% if client.can_pay_with_credit %}
+                            ${{ client.get_available_credit|floatformat:2 }}
+                          {% else %}
+                            No disponible
+                          {% endif %}
+                        </div>
+                      </div>
+                      <div id="affordability-status" class="ms-3 text-end"></div>
+                    </div>
+                    <div class="text-muted financial-summary-help">
+                      {% if client.can_pay_with_credit %}
+                        {% if client.get_available_credit > 0 %}Puede apoyar ventas cuando el saldo no alcance.{% else %}Sin crédito utilizable en este momento.{% endif %}
+                      {% else %}
+                        El cliente no puede comprar con crédito.
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-            <div id="client-financial-status-collapse" class="collapse d-md-block">
+            <div id="client-financial-status-collapse" class="collapse">
               <div class="card-body">
-              <div class="row g-3">
-                <!-- Balance Card -->
-                <div class="col-md-4">
-                  <div class="d-flex align-items-center p-3 bg-light rounded">
-                    <div class="me-3">
-                      <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                      <h6 class="mb-1 text-muted">Saldo Disponible</h6>
-                      <h4 class="mb-0 {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
-                        ${{ client.balance|floatformat:2 }}
-                      </h4>
-                      {% if client.balance > 0 %}
-                        <small class="text-success"><i class="fas fa-check-circle"></i> Puede usar saldo</small>
-                      {% elif client.balance == 0 %}
-                        <small class="text-muted">Sin saldo disponible</small>
-                      {% else %}
-                        <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Debt/Credit Card -->
-                <div class="col-md-4">
-                  <div class="d-flex align-items-center p-3 bg-light rounded">
-                    <div class="me-3">
-                      <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                      <h6 class="mb-1 text-muted">Deuda Actual</h6>
-                      <h4 class="mb-0 {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <div class="p-3 bg-light rounded border h-100">
+                      <div class="small text-muted">Deuda actual</div>
+                      <div class="fs-5 fw-bold {% if client.current_debt > 0 %}text-warning{% else %}text-success{% endif %}">
                         ${{ client.current_debt|floatformat:2 }}
-                      </h4>
-                      {% if client.current_debt > 0 %}
-                        <small class="text-warning"><i class="fas fa-exclamation-circle"></i> Debe dinero</small>
-                      {% else %}
-                        <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Available Credit Card -->
-                <div class="col-md-4">
-                  <div class="d-flex align-items-center p-3 bg-light rounded">
-                    <div class="me-3">
-                      <i class="fas fa-hand-holding-usd fa-2x {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}"></i>
-                    </div>
-                    <div class="flex-grow-1">
-                      <h6 class="mb-1 text-muted">Crédito Disponible</h6>
-                      <h4 class="mb-0 {% if client.get_available_credit > 0 %}text-info{% else %}text-secondary{% endif %}">
-                        ${{ client.get_available_credit|floatformat:2 }}
-                      </h4>
-                      {% if client.credit_limit > 0 %}
-                        {% if client.get_available_credit > 0 %}
-                          <small class="text-info"><i class="fas fa-check-circle"></i> Puede usar crédito</small>
-                        {% else %}
-                          <small class="text-danger"><i class="fas fa-times-circle"></i> Sin crédito disponible</small>
-                        {% endif %}
-                      {% else %}
-                        <small class="text-muted">Sin límite de crédito</small>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Total Purchasing Power -->
-              <div class="row mt-3">
-                <div class="col-12">
-                  <div class="alert alert-primary d-flex align-items-center" role="alert">
-                    <i class="fas fa-calculator fa-lg me-3"></i>
-                    <div class="flex-grow-1">
-                      <strong>Poder de Compra Total: ${{ client.balance|add:client.get_available_credit|floatformat:2 }}</strong>
-                      <div class="mt-1">
-                        <small>
-                          Saldo (${{ client.balance|floatformat:2 }}) + Crédito Disponible (${{ client.get_available_credit|floatformat:2 }})
-                        </small>
                       </div>
                     </div>
-                    <div id="affordability-status" class="ms-3">
-                      <!-- Will be updated by JavaScript -->
+                  </div>
+                  <div class="col-md-4">
+                    <div class="p-3 bg-light rounded border h-100">
+                      <div class="small text-muted">Límite de crédito</div>
+                      <div class="fs-5 fw-bold text-secondary">${{ client.credit_limit|floatformat:2 }}</div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="p-3 bg-light rounded border h-100">
+                      <div class="small text-muted">Tipo de compra</div>
+                      <div class="fs-6 fw-semibold">
+                        {% if client.can_pay_with_credit %}Saldo y crédito{% else %}Solo saldo / pago directo{% endif %}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
               </div>
             </div>
           </div>
@@ -377,6 +359,14 @@
               </div>
             </div>
 
+            <div id="order-finalization-empty-state" class="card shadow-sm mb-4" {% if order.total_amount > 0 %}hidden{% endif %}>
+              <div class="card-body text-center text-muted py-4">
+                <i class="fas fa-arrow-left fa-2x mb-2 d-block"></i>
+                Agregue productos para habilitar el cobro y el cierre del pedido.
+              </div>
+            </div>
+
+            <div id="order-finalization-section" {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
             <!-- Payment Breakdown Card (Balance First) -->
             <div class="card shadow-sm mb-4" id="payment-breakdown-card">
               <div class="card-header bg-success text-white">
@@ -411,19 +401,6 @@
                       </div>
                     </div>
                     
-                    <!-- Secondary Payment Method Select -->
-                    <div class="mt-2" id="secondary-payment-method-container">
-                      <label for="secondary-payment-method" class="form-label small text-muted">
-                        <i class="fas fa-credit-card me-1"></i>Método de pago para el restante:
-                      </label>
-                      <select class="form-select form-select-sm" id="secondary-payment-method">
-                        {% for value, label in payment_types %}
-                          {% if value != 'balance' %}
-                            <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
-                          {% endif %}
-                        {% endfor %}
-                      </select>
-                    </div>
                   </div>
                   
                   <!-- Full Payment Without Balance -->
@@ -470,7 +447,10 @@
                     Las órdenes a crédito registran deuda y quedan pendientes hasta liquidarse.
                   </div>
                 </div>
-                <div class="mb-3">
+                <div class="mb-3" id="payment-method-select-container">
+                  <label for="payment-method-select" class="form-label" id="payment-method-select-label">
+                    <i class="fas fa-credit-card me-1"></i>Método de pago
+                  </label>
                   <select class="form-select" id="payment-method-select" name="payment_type">
                     {% for value, label in payment_types %}
                       <option value="{{ value }}" {% if value == 'cash' %}selected{% endif %}>{{ label }}</option>
@@ -502,26 +482,27 @@
                     <span id="balance-addition-text"></span>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <div class="card shadow-sm mb-4">
-              <div class="card-header bg-light">
-                <h5 class="mb-0">
-                  <i class="fas fa-sticky-note me-2 text-secondary"></i>Notas
-                </h5>
-              </div>
-              <div class="card-body">
-                <label for="order-notes-desktop" class="form-label">Notas del pedido</label>
-                <textarea
-                  class="form-control"
-                  id="order-notes-desktop"
-                  rows="4"
-                  maxlength="1000"
-                  placeholder="Agregue una nota opcional para este pedido">{{ order.notes|default_if_none:"" }}</textarea>
-                <div class="d-flex justify-content-between align-items-center mt-2">
-                  <div class="form-text mb-0">Use este espacio para observaciones generales del pedido.</div>
-                  <small class="text-muted" id="order-notes-status">Sin nota</small>
+                <div class="pt-2 border-top">
+                  <button class="btn btn-sm btn-outline-secondary"
+                          type="button"
+                          data-bs-toggle="collapse"
+                          data-bs-target="#order-notes-desktop-collapse"
+                          aria-expanded="{% if order.notes %}true{% else %}false{% endif %}"
+                          aria-controls="order-notes-desktop-collapse">
+                    <i class="fas fa-sticky-note me-1"></i>{% if order.notes %}Editar nota{% else %}Agregar nota{% endif %}
+                  </button>
+                  <div class="collapse {% if order.notes %}show{% endif %} mt-2" id="order-notes-desktop-collapse">
+                    <textarea
+                      class="form-control"
+                      id="order-notes-desktop"
+                      rows="2"
+                      maxlength="1000"
+                      placeholder="Agregue una nota opcional para este pedido">{{ order.notes|default_if_none:"" }}</textarea>
+                    <div class="d-flex justify-content-between align-items-center mt-2">
+                      <div class="form-text mb-0">Observaciones generales del pedido.</div>
+                      <small class="text-muted" id="order-notes-status">Sin nota</small>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -529,11 +510,11 @@
             <!-- Total Card -->
             <div class="card shadow-sm mb-4">
               <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex justify-content-between align-items-center small mb-1">
                   <span class="text-muted">Subtotal</span>
                   <span class="fw-semibold" id="summary-subtotal">${{ order.total_amount|default:"0.00" }}</span>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex justify-content-between align-items-center small mb-2">
                   <div class="d-flex align-items-center gap-2">
                     <span class="text-muted">Descuento</span>
                     <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#discountModal">
@@ -544,9 +525,9 @@
                 </div>
                 <hr class="my-2">
                 <div class="d-flex justify-content-between align-items-center">
-                  <span class="fs-5">Total</span>
-                  <span class="fs-4 text-success fw-bold">
-                    $<span class="badge bg-success fs-4 p-2" id="summary-total">{{ order.total_amount|default:"0.00" }}</span>
+                  <span class="fw-semibold">Total</span>
+                  <span class="fs-5 text-success fw-bold">
+                    $<span class="badge bg-success fs-6 p-2" id="summary-total">{{ order.total_amount|default:"0.00" }}</span>
                   </span>
                 </div>
               </div>
@@ -562,11 +543,16 @@
                 <i class="fas fa-check-circle me-2"></i>Terminar Pedido
               </button>
             </div>
+            </div>
           </div>
         </div>
 
         <!-- Mobile Order Summary (Fixed Bottom) -->
         <div class="d-lg-none order-summary-mobile">
+          <div id="mobile-finalization-empty-state" class="text-center text-muted small py-2" {% if order.total_amount > 0 %}hidden{% endif %}>
+            <i class="fas fa-arrow-up me-1"></i>Agregue productos para continuar
+          </div>
+          <div id="mobile-finalization-section" {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
           <div class="row mb-2">
             <div class="col-6">
               <select class="form-select mb-2" id="order-type-select-mobile" name="order_type_mobile">
@@ -648,6 +634,7 @@
                 <i class="fas fa-check-circle me-2"></i>Terminar
               </button>
             </div>
+          </div>
           </div>
         </div>
       </div>

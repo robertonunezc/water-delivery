@@ -209,10 +209,15 @@ class PaymentBreakdownManager {
     this.noBalanceSection = document.getElementById('no-balance-payment-section');
     this.summaryMessage = document.getElementById('payment-breakdown-message');
     this.paymentMethodCard = document.querySelector('#payment-method-select')?.closest('.card');
+    this.paymentMethodSelectContainer = document.getElementById('payment-method-select-container');
+    this.paymentMethodLabel = document.getElementById('payment-method-select-label');
     this.balanceAmount = document.getElementById('balance-payment-amount');
     this.remainingAmount = document.getElementById('remaining-payment-amount');
     this.fullPaymentAmount = document.getElementById('full-payment-amount');
-    this.secondaryPaymentMethod = document.getElementById('secondary-payment-method');
+    this.paymentMethodSelects = [
+      document.getElementById('payment-method-select'),
+      document.getElementById('payment-method-select-mobile'),
+    ];
   }
 
   calculateFallbackBreakdown(orderTotal) {
@@ -267,6 +272,38 @@ class PaymentBreakdownManager {
     return this.currentBreakdown;
   }
 
+  lockPaymentMethodToBalance() {
+    this.paymentMethodSelects.forEach(select => {
+      if (!select) return;
+      const balanceOption = select.querySelector('option[value="balance"]');
+      if (balanceOption) {
+        select.value = 'balance';
+      }
+      select.disabled = true;
+    });
+  }
+
+  unlockPaymentMethodSelection() {
+    this.paymentMethodSelects.forEach(select => {
+      if (!select) return;
+      select.disabled = false;
+    });
+  }
+
+  setPaymentMethodLabel(isMixedPayment) {
+    if (this.paymentMethodLabel) {
+      this.paymentMethodLabel.innerHTML = isMixedPayment
+        ? '<i class="fas fa-credit-card me-1"></i>Método para cubrir el restante'
+        : '<i class="fas fa-credit-card me-1"></i>Método de pago';
+    }
+  }
+
+  showPaymentMethodSelector(visible) {
+    if (this.paymentMethodSelectContainer) {
+      this.paymentMethodSelectContainer.style.display = visible ? 'block' : 'none';
+    }
+  }
+
   updateUI(breakdown, orderTotal) {
     this.setBreakdown(breakdown);
     this.hideSections();
@@ -277,7 +314,22 @@ class PaymentBreakdownManager {
         this.summaryMessage.innerHTML = '<i class="fas fa-info-circle me-1"></i>Agregue productos para ver el desglose de pago';
       }
       if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'block';
+      if (this.balanceSection) this.balanceSection.style.display = 'none';
+      if (this.remainingSection) this.remainingSection.style.display = 'none';
+      if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
+      this.setPaymentMethodLabel(false);
+      this.showPaymentMethodSelector(true);
+      this.unlockPaymentMethodSelection();
       return;
+    }
+
+    const shouldShowCard = breakdown.use_balance && !breakdown.balance_covers_order;
+    if (this.paymentMethodCard) {
+      this.paymentMethodCard.style.display = 'block';
+    }
+    const breakdownCard = document.getElementById('payment-breakdown-card');
+    if (breakdownCard) {
+      breakdownCard.style.display = shouldShowCard ? 'block' : 'none';
     }
 
     if (breakdown.use_balance) {
@@ -287,13 +339,20 @@ class PaymentBreakdownManager {
       }
 
       if (breakdown.balance_covers_order) {
+        this.lockPaymentMethodToBalance();
+        this.setPaymentMethodLabel(false);
+        this.showPaymentMethodSelector(false);
         if (this.summaryMessage) {
           this.summaryMessage.innerHTML = `
             <i class="fas fa-check-circle text-success me-1"></i>
             <strong class="text-success">${breakdown.message}</strong>
           `;
         }
+        if (this.balanceSection) this.balanceSection.style.display = 'none';
       } else {
+        this.unlockPaymentMethodSelection();
+        this.setPaymentMethodLabel(true);
+        this.showPaymentMethodSelector(true);
         if (this.remainingSection) {
           this.remainingSection.style.display = 'block';
           if (this.remainingAmount) this.remainingAmount.textContent = '$' + parseFloat(breakdown.remaining_amount).toFixed(2);
@@ -306,16 +365,11 @@ class PaymentBreakdownManager {
         }
       }
     } else {
-      if (this.noBalanceSection) {
-        this.noBalanceSection.style.display = 'block';
-        if (this.fullPaymentAmount) this.fullPaymentAmount.textContent = '$' + total.toFixed(2);
-      }
-      if (this.summaryMessage) {
-        this.summaryMessage.innerHTML = `
-          <i class="fas fa-info-circle text-secondary me-1"></i>
-          <span class="text-muted">${breakdown.message}</span>
-        `;
-      }
+      this.unlockPaymentMethodSelection();
+      this.setPaymentMethodLabel(false);
+      this.showPaymentMethodSelector(true);
+      if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
+      if (this.summaryMessage) this.summaryMessage.innerHTML = '';
       if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'block';
     }
   }
@@ -483,7 +537,7 @@ class AmountFieldManager {
   }
 
   getCurrentOrderTotal() {
-    const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
+    const totalElement = document.querySelector('#summary-total, .total-mobile');
     if (!totalElement) return 0;
     const totalText = totalElement.textContent || totalElement.innerText;
     return parseFloat(totalText.replace(/[^\d.-]/g, '')) || 0;
@@ -791,7 +845,7 @@ class QuantityController {
       this.applyTotals(data);
     } else {
       if (data.order_total) {
-        const totalElement = document.querySelector('.badge.bg-success.fs-4');
+        const totalElement = document.getElementById('summary-total');
         const totalMobile = document.querySelector('.total-mobile');
         if (totalElement) totalElement.textContent = data.order_total;
         if (totalMobile) totalMobile.textContent = data.order_total;
@@ -908,7 +962,9 @@ class PaymentController {
       if (container) container.style.display = isCredit ? 'none' : 'block';
     }
 
-    if (paymentBreakdownCard) paymentBreakdownCard.style.display = isCredit ? 'none' : 'block';
+    if (paymentBreakdownCard && isCredit) {
+      paymentBreakdownCard.style.display = 'none';
+    }
 
     if (helpText) {
       helpText.textContent = isCreditRegistration
@@ -926,6 +982,11 @@ class PaymentController {
       this.finishButtonMobile.innerHTML = isCreditRegistration
         ? '<i class="fas fa-hourglass-half me-2"></i>Pendiente'
         : '<i class="fas fa-check-circle me-2"></i>Terminar';
+    }
+
+    if (!isCredit) {
+      const orderTotal = this.getOrderTotal();
+      this.paymentBreakdown.updateUI(this.paymentBreakdown.getBreakdown(), orderTotal);
     }
 
     //this.validateFinishButtonState();
@@ -960,7 +1021,7 @@ class PaymentController {
   }
 
   getOrderTotal() {
-    const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
+    const totalElement = document.querySelector('#summary-total, .total-mobile');
     const orderTotalStr = totalElement ? totalElement.textContent : '0.00';
     return parseFloat(orderTotalStr.replace(/[^\d.-]/g, '')) || 0;
   }
@@ -993,9 +1054,8 @@ class PaymentController {
 
       const remainingAmount = parseFloat(breakdown.remaining_amount) || 0;
       if (remainingAmount > 0) {
-        const secondaryPaymentSelect = document.getElementById('secondary-payment-method');
-        const method = secondaryPaymentSelect?.value || 'cash';
-          payments.push({ amount: remainingAmount, payment_method: method });
+        const method = this.getPaymentMethod() || 'cash';
+        payments.push({ amount: remainingAmount, payment_method: method });
       }
     } else {
       const method = this.getPaymentMethod();
@@ -1202,6 +1262,7 @@ class OrderPageApp {
     const startingTotal = this.config.initialOrderTotal || this.getCurrentOrderTotal();
     this.amountFieldManager.init(startingTotal);
     this.affordabilityStatusManager.update(startingTotal);
+    this.updateFinalizationVisibility(startingTotal);
     this.updateSummaryTotals(startingTotal, this.config.initialDiscount, this.config.initialSubtotal);
 
     const hasBalance = (parseFloat(this.config.clientBalance) || 0) > 0;
@@ -1229,13 +1290,14 @@ class OrderPageApp {
   applyServerTotals(data) {
     if (!data) return;
     if (data.order_total) {
-      const totalElement = document.querySelector('.badge.bg-success.fs-4');
+      const totalElement = document.getElementById('summary-total');
       const totalMobile = document.querySelector('.total-mobile');
       if (totalElement) totalElement.textContent = data.order_total;
       if (totalMobile) totalMobile.textContent = data.order_total;
       this.affordabilityStatusManager.update(data.order_total);
       const numericTotal = parseFloat(data.order_total.replace(/[^\d.-]/g, '')) || 0;
       this.amountFieldManager.updateFields(numericTotal, true);
+      this.updateFinalizationVisibility(numericTotal);
       const discountAmount = data.discount ? parseFloat(data.discount) : this.discountManager.getAmount();
       const subtotal = data.subtotal ? parseFloat(data.subtotal) : undefined;
       if (data.discount) this.discountManager.setAmount(discountAmount);
@@ -1262,8 +1324,32 @@ class OrderPageApp {
     if (totalEl) totalEl.textContent = orderTotalNumber.toFixed(2);
   }
 
+  updateFinalizationVisibility(orderTotalNumber) {
+    const total = typeof orderTotalNumber === 'number'
+      ? orderTotalNumber
+      : parseFloat(String(orderTotalNumber).replace(/[^\d.-]/g, '')) || 0;
+    const hasProducts = total > 0;
+    const desktopSection = document.getElementById('order-finalization-section');
+    const desktopEmptyState = document.getElementById('order-finalization-empty-state');
+    const mobileSection = document.getElementById('mobile-finalization-section');
+    const mobileEmptyState = document.getElementById('mobile-finalization-empty-state');
+
+    if (desktopSection) {
+      desktopSection.hidden = !hasProducts;
+    }
+    if (desktopEmptyState) {
+      desktopEmptyState.hidden = hasProducts;
+    }
+    if (mobileSection) {
+      mobileSection.hidden = !hasProducts;
+    }
+    if (mobileEmptyState) {
+      mobileEmptyState.hidden = hasProducts;
+    }
+  }
+
   getCurrentOrderTotal() {
-    const totalElement = document.querySelector('.badge.bg-success.fs-4, .total-mobile');
+    const totalElement = document.querySelector('#summary-total, .total-mobile');
     if (!totalElement) return 0;
     const totalText = totalElement.textContent || totalElement.innerText;
     return parseFloat(totalText.replace(/[^\d.-]/g, '')) || 0;
