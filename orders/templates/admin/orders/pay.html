@@ -162,7 +162,7 @@
             </div>
             <div class="info-item">
                 <div class="info-label">Total a Pagar</div>
-                <div class="info-value" style="color: #28a745; font-weight: bold;">${{ order.total_amount }}</div>
+                <div class="info-value" style="color: #28a745; font-weight: bold;">${{ payment_amount }}</div>
             </div>
         </div>
     </div>
@@ -182,8 +182,8 @@
         
         <div class="form-group">
             <label for="amount">Monto (Total del pedido)</label>
-            <input type="number" id="amount" value="{{ order.total_amount }}" step="0.01" min="0.01" readonly style="background: #f8f9fa;">
-            <small style="color: #666; display: block; margin-top: 5px;">El pago debe ser por el total de la orden.</small>
+            <input type="number" id="amount" value="{{ payment_amount }}" step="0.01" min="0.01" readonly style="background: #f8f9fa;">
+            <small style="color: #666; display: block; margin-top: 5px;">El pago debe cubrir el saldo pendiente de la orden.</small>
         </div>
 
         <div class="form-group">

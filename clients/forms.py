@@ -383,9 +383,6 @@ class ClientCoreForm(forms.ModelForm):
             'corporate',
             'note',
             'address_link',
-            'can_pay_with_credit',
-            'requires_note_for_credit',
-            'credit_limit',
             'requires_billing',
             'billing_override_enabled',
         ]
@@ -396,10 +393,7 @@ class ClientCoreForm(forms.ModelForm):
             'corporate': forms.Select(attrs={'class': 'form-select'}),
             'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'address_link': forms.URLInput(attrs={'class': 'form-control'}),
-            'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
             'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'requires_note_for_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'billing_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
@@ -427,6 +421,13 @@ class ClientCreditPolicyForm(forms.ModelForm):
     class Meta:
         model = Client
         fields = ['can_pay_with_credit', 'requires_note_for_credit', 'credit_limit']
+        help_texts = {
+            'can_pay_with_credit': 'Habilita o deshabilita el uso de crédito.',
+            'requires_note_for_credit': (
+                'Obliga a capturar una nota al realizar una operación a crédito.'
+            ),
+            'credit_limit': 'Monto máximo de deuda activa autorizado.',
+        }
         widgets = {
             'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'requires_note_for_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -476,14 +477,17 @@ class ClientCreditConfigForm(forms.ModelForm):
     class Meta:
         model = ClientCreditConfig
         fields = [
+            'payment_term_type',
+            'cutoff_day',
             'max_payment_days',
-            'first_notification_days',
-            'second_notification_days',
-            'overdue_notification_days',
         ]
         widgets = {
+            'payment_term_type': forms.Select(attrs={'class': 'form-select'}),
+            'cutoff_day': forms.Select(attrs={'class': 'form-select'}),
             'max_payment_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
-            'first_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-            'second_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
-            'overdue_notification_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '0'}),
+        }
+        labels = {
+            'max_payment_days': (
+                'Días naturales posteriores a la emisión de la factura'
+            ),
         }

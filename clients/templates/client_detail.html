@@ -10,6 +10,28 @@
     .stat-card:hover {
       transform: translateY(-2px);
     }
+    .stat-card .card-body {
+      padding: 1rem 1.1rem;
+    }
+    .stat-card .metric-icon {
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: 0.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .stat-card .metric-label {
+      font-size: 0.78rem;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+    }
+    .stat-card .metric-value {
+      font-size: 1.2rem;
+      line-height: 1.1;
+    }
     .section-header {
       border-bottom: 2px solid #007bff;
       margin-bottom: 1rem;
@@ -60,113 +82,153 @@
   </div>
 
   <!-- Statistics Cards -->
-  <div class="row mb-4">
-    <div class="col-md-3">
-      <div class="card stat-card h-100 border-primary">
-        <div class="card-body text-center">
-          <i class="fas fa-shopping-cart fa-2x text-primary mb-2"></i>
-          <h5 class="card-title">{{ stats.total_orders }}</h5>
-          <p class="card-text text-muted">Total Ventas</p>
-                        <small class="text-muted">
-Desde {{date_since}}</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
-      <div class="card stat-card h-100 border-info">
-        <div class="card-body text-center">
-          <i class="fas fa-dollar-sign fa-2x text-info mb-2"></i>
-          <h5 class="card-title">${{ stats.total_spent|floatformat:2 }}</h5>
-          <p class="card-text text-muted">Total Gastado</p>
-            <small class="text-muted">
-Desde {{date_since}}</small>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-3">
+  <div class="row g-3 mb-4">
+    <div class="col-md-6 col-xl-4">
       <div class="card stat-card h-100 {% if client.balance > 0 %}border-success{% elif client.balance == 0 %}border-secondary{% else %}border-danger{% endif %}">
-        <div class="card-body text-center">
-          <i class="fas fa-piggy-bank fa-2x {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %} mb-2"></i>
-          <h5 class="card-title {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
-            ${{ client.balance|floatformat:2 }}
-          </h5>
-          <p class="card-text text-muted">Saldo del Prepago</p>
-          {% if client.balance > 0 %}
-            <small class="text-success"><i class="fas fa-check-circle"></i> Saldo disponible</small>
-          {% elif client.balance == 0 %}
-            <small class="text-muted">Sin saldo</small>
-          {% else %}
-            <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-      <div class="col-md-3">
-      <div class="card stat-card h-100 {% if client.current_debt > 0 %}border-danger{% else %}border-success{% endif %}">
-        <div class="card-body text-center">
-          <i class="fas fa-credit-card fa-2x {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %} mb-2"></i>
-          <h5 class="card-title {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %}">
-            ${{ client.current_debt|floatformat:2 }}
-          </h5>
-          <p class="card-text text-muted">Deuda Actual</p>
-          {% if client.current_debt > 0 %}
-            <small class="text-danger"><i class="fas fa-exclamation-circle"></i> Debe ${{ client.current_debt|floatformat:2 }}</small>
-          {% else %}
-            <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
-  <!-- Credit Information -->
-  {% if client.credit_limit > 0 %}
-  <div class="row mb-4">
-    <div class="col-md-12">
-      <div class="card border-info">
-        <div class="card-body">
-          <div class="row align-items-center">
-            <div class="col-md-4 text-center">
-              <i class="fas fa-hand-holding-usd fa-2x text-info mb-2"></i>
-              <h6 class="text-info mb-0">Límite de Crédito</h6>
-              <h5 class="mb-0">${{ client.credit_limit|floatformat:2 }}</h5>
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="metric-icon {% if client.balance > 0 %}bg-success-subtle text-success{% elif client.balance == 0 %}bg-secondary-subtle text-secondary{% else %}bg-danger-subtle text-danger{% endif %}">
+            <i class="fas fa-piggy-bank"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="metric-label text-muted mb-1">Saldo del prepago</div>
+            <div class="metric-value fw-semibold {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
+              ${{ client.balance|floatformat:2 }}
             </div>
-            <div class="col-md-4 text-center">
-              <i class="fas fa-chart-line fa-2x text-success mb-2"></i>
-              <h6 class="text-success mb-0">Crédito Disponible</h6>
-              <h5 class="mb-0">${{ client.get_available_credit|floatformat:2 }}</h5>
-            </div>
-            <div class="col-md-4">
-              <div class="progress mb-2" style="height: 20px;">
-                <div class="progress-bar {% if debt_percentage > 80 and debt_percentage <= 95 %}bg-warning{% elif debt_percentage > 60 and debt_percentage <= 80 %}bg-warning{% elif debt_percentage <= 60 %}bg-success{% else %}bg-danger{% endif %}" 
-                     role="progressbar" 
-                     style="width: {{ debt_percentage }}%"
-                     aria-valuenow="{{ debt_percentage }}" 
-                     aria-valuemin="0" 
-                     aria-valuemax="100">
-                  {{ debt_percentage }}%
-                </div>
-              </div>
-              <small class="text-muted">
-                Uso del crédito: {{ debt_percentage }}%
-                {% if debt_percentage > 80 and debt_percentage <= 95 %}
-                  <span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Límite cercano</span>
-                {% elif debt_percentage > 60 and debt_percentage <= 80 %}
-                  <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Uso moderado</span>
-                {% elif debt_percentage <= 60 %}
-                  <span class="text-success"><i class="fas fa-check-circle"></i> Uso saludable</span>
-                {% elif debt_percentage > 100 %}
-                  <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite excedido</span>
-                {% else %}
-                  <span class="text-success"><i class="fas fa-check-circle"></i> Dentro del límite</span>
-                {% endif %}
-              </small>
-            </div>
+            {% if client.balance > 0 %}
+              <small class="text-success"><i class="fas fa-check-circle"></i> Saldo disponible</small>
+            {% elif client.balance == 0 %}
+              <small class="text-muted">Sin saldo</small>
+            {% else %}
+              <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
+            {% endif %}
           </div>
         </div>
       </div>
     </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="card stat-card h-100 {% if client.current_debt > 0 %}border-danger{% else %}border-success{% endif %}">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="metric-icon {% if client.current_debt > 0 %}bg-danger-subtle text-danger{% else %}bg-success-subtle text-success{% endif %}">
+            <i class="fas fa-credit-card"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="metric-label text-muted mb-1">Deuda actual</div>
+            <div class="metric-value fw-semibold {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %}">
+              ${{ client.current_debt|floatformat:2 }}
+            </div>
+            {% if client.current_debt > 0 %}
+              <small class="text-danger"><i class="fas fa-exclamation-circle"></i> Debe ${{ client.current_debt|floatformat:2 }}</small>
+            {% else %}
+              <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% if client.credit_limit > 0 %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card stat-card h-100 border-info">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="metric-icon bg-info-subtle text-info">
+            <i class="fas fa-hand-holding-usd"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="metric-label text-muted mb-1">Límite de crédito</div>
+            <div class="metric-value fw-semibold text-dark">${{ client.credit_limit|floatformat:2 }}</div>
+            <small class="text-muted">Disponible: ${{ client.get_available_credit|floatformat:2 }}</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="card stat-card h-100 border-info">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="metric-icon bg-info-subtle text-info">
+            <i class="fas fa-calendar-alt"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="metric-label text-muted mb-1">Ciclo de vencimiento</div>
+            {% if client.credit_config.payment_term_type == 'monthly_cutoff' %}
+              <div class="metric-value fw-semibold text-dark">{{ client.credit_config.get_cutoff_day_display }}</div>
+            {% elif client.credit_config.payment_term_type == 'invoice_due' %}
+              <div class="metric-value fw-semibold text-dark">{{ client.credit_config.max_payment_days }} días</div>
+              <small class="text-muted">Después de emitir la factura</small>
+            {% else %}
+              <small class="text-muted">Sin configuración</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="card stat-card h-100 {% if pending_payment_data.nearest_due_is_overdue %}border-danger{% else %}border-primary{% endif %}">
+        <div class="card-body d-flex align-items-center gap-3">
+          <div class="metric-icon {% if pending_payment_data.nearest_due_is_overdue %}bg-danger-subtle text-danger{% else %}bg-primary-subtle text-primary{% endif %}">
+            <i class="fas fa-calendar-day"></i>
+          </div>
+          <div class="flex-grow-1">
+            <div class="metric-label text-muted mb-1">Próximo vencimiento</div>
+            {% if pending_payment_data.nearest_due_date %}
+              <div class="metric-value fw-semibold {% if pending_payment_data.nearest_due_is_overdue %}text-danger{% else %}text-dark{% endif %}">
+                {{ pending_payment_data.nearest_due_date|date:"d/m/Y" }}
+              </div>
+              {% if pending_payment_data.nearest_due_is_overdue %}
+                <small class="text-danger">Crédito vencido</small>
+              {% endif %}
+            {% elif pending_payment_data.awaiting_invoice %}
+              <small class="text-muted">Pendiente de emisión de factura</small>
+            {% else %}
+              <small class="text-muted">Sin créditos pendientes</small>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+      <div class="card stat-card h-100 border-info">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+            <div class="d-flex align-items-center gap-3">
+              <div class="metric-icon {% if debt_percentage > 95 %}bg-danger-subtle text-danger{% elif debt_percentage > 60 %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}">
+                <i class="fas fa-chart-line"></i>
+              </div>
+              <div>
+                <div class="metric-label text-muted mb-1">Uso del crédito</div>
+                <div class="metric-value fw-semibold text-dark">{{ debt_percentage }}%</div>
+              </div>
+            </div>
+            <span class="badge {% if debt_percentage > 95 %}bg-danger{% elif debt_percentage > 60 %}bg-warning text-dark{% else %}bg-success{% endif %}">
+              {{ debt_percentage }}%
+            </span>
+          </div>
+          <div class="progress mb-2" style="height: 10px;">
+            <div class="progress-bar {% if debt_percentage > 80 and debt_percentage <= 95 %}bg-warning{% elif debt_percentage > 60 and debt_percentage <= 80 %}bg-warning{% elif debt_percentage <= 60 %}bg-success{% else %}bg-danger{% endif %}"
+                 role="progressbar"
+                 style="width: {{ debt_percentage }}%"
+                 aria-valuenow="{{ debt_percentage }}"
+                 aria-valuemin="0"
+                 aria-valuemax="100">
+            </div>
+          </div>
+          <small class="text-muted">
+            Disponible: ${{ client.get_available_credit|floatformat:2 }} de ${{ client.credit_limit|floatformat:2 }}
+            {% if debt_percentage > 80 and debt_percentage <= 95 %}
+              <span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Límite cercano</span>
+            {% elif debt_percentage > 60 and debt_percentage <= 80 %}
+              <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Uso moderado</span>
+            {% elif debt_percentage <= 60 %}
+              <span class="text-success"><i class="fas fa-check-circle"></i> Uso saludable</span>
+            {% elif debt_percentage > 100 %}
+              <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite excedido</span>
+            {% else %}
+              <span class="text-success"><i class="fas fa-check-circle"></i> Dentro del límite</span>
+            {% endif %}
+          </small>
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 
   <!-- Pending Payments Indicator -->
   {% if pending_payment_data.total_overdue_amount > 0 %}

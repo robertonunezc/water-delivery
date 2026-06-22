@@ -79,7 +79,10 @@ class Invoice(TimeStampedModel):
         payments = self.invoice_links.aggregate(
             total=Sum(
                 'order__payments__amount',
-                filter=Q(order__payments__status='completed')
+                filter=(
+                    Q(order__payments__status='completed')
+                    & ~Q(order__payments__method='pending_credit')
+                ),
             )
         )['total']
         return payments or 0.00

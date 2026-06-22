@@ -1,152 +1,182 @@
-from datetime import timedelta
+from calendar import monthrange
+from datetime import date, timedelta
 from decimal import Decimal
-from typing import List, Dict, Any
-from django.utils import timezone
+from typing import Any
+
 from django.db.models import Max
-from clients.models import Client, CreditTransaction
+from django.utils import timezone
+
+from clients.models import Client, ClientCreditConfig, CreditTransaction
 from orders.models import Order
 
-def get_overdue_orders_for_client(client: Client) -> Dict[str, Any]:
-    """
-    Get overdue orders for a specific client based on their credit configuration.
-    Returns a dict with:
-    - total_overdue_amount: Decimal
-    - days_overdue: int (max days overdue among orders)
-    - overdue_orders: List[Order]
-    """
-    result = {
-        'total_overdue_amount': Decimal('0.00'),
-        'days_overdue': 0,
-        'overdue_orders': []
-    }
-    
-    if not hasattr(client, 'credit_config') or client.credit_config is None:
-        return result
-        
-    max_payment_days = client.credit_config.max_payment_days
-    current_date = timezone.now().date()
-    
-    unpaid_orders = Order.objects.unpaid().filter(client=client).select_related('client').prefetch_related('invoice_links__invoice')
-    
-    overdue_orders = []
-    max_days = 0
-    total_overdue = Decimal('0.00')
-    
-    requires_billing = client.requires_billing
-    
-    for order in unpaid_orders:
-        is_overdue = False
-        days_overdue = 0
-        
-        total_amount = order.total_amount
-        total_paid = getattr(order, 'total_paid', Decimal('0.00'))
-        remaining_amount = total_amount - total_paid
-        
-        if requires_billing:
-            invoice_links = order.invoice_links.all()
-            for link in invoice_links:
-                if link.invoice and link.invoice.emmited_at:
-                    days_since_emission = (current_date - link.invoice.emmited_at).days
-                    if days_since_emission > max_payment_days:
-                        is_overdue = True
-                        days_overdue = max(days_overdue, days_since_emission - max_payment_days)
-        else:
-            days_since_creation = (current_date - order.order_date.date()).days
-            if days_since_creation > max_payment_days:
-                is_overdue = True
-                days_overdue = max(days_overdue, days_since_creation - max_payment_days)
-                
-        if is_overdue:
-            order.days_overdue = days_overdue
-            order.remaining_amount = remaining_amount
-            overdue_orders.append(order)
-            total_overdue += remaining_amount
-            if days_overdue > max_days:
-                max_days = days_overdue
-                
-    overdue_orders.sort(key=lambda x: x.days_overdue, reverse=True)
-    
-    result['total_overdue_amount'] = total_overdue
-    result['days_overdue'] = max_days
-    result['overdue_orders'] = overdue_orders
-    
-    return result
 
-def get_clients_with_pending_payments() -> List[Dict[str, Any]]:
-    """
-    Get all clients that have pending payments (overdue orders).
-    """
-    clients = Client.objects.filter(active=True, credit_config__isnull=False).select_related('credit_config')
+def _monthly_cutoff_date(reference_date: date, cutoff_day: str) -> date:
+    last_day = monthrange(reference_date.year, reference_date.month)[1]
+    day = last_day if cutoff_day == 'last_day' else min(int(cutoff_day), last_day)
+    cutoff_date = reference_date.replace(day=day)
+    if reference_date <= cutoff_date:
+        return cutoff_date
+
+    next_month = (reference_date.replace(day=1) + timedelta(days=32)).replace(day=1)
+    next_last_day = monthrange(next_month.year, next_month.month)[1]
+    next_day = next_last_day if cutoff_day == 'last_day' else min(int(cutoff_day), next_last_day)
+    return next_month.replace(day=next_day)
+
+
+def get_order_credit_due_date(
+    order: Order,
+    credit_config: ClientCreditConfig,
+) -> date | None:
+    """Return the payment due date for an order under the client's credit terms."""
+    if credit_config.payment_term_type == 'monthly_cutoff':
+        order_date = timezone.localtime(order.order_date).date()
+        return _monthly_cutoff_date(order_date, credit_config.cutoff_day)
+
+    emitted_dates = [
+        link.invoice.emmited_at
+        for link in order.invoice_links.all()
+        if link.invoice and link.invoice.emmited_at
+    ]
+    if not emitted_dates:
+        return None
+    return min(emitted_dates) + timedelta(days=credit_config.max_payment_days)
+
+
+def _overdue_order_data(
+    client: Client,
+    orders: list[Order],
+    current_date: date,
+) -> tuple[list[Order], Decimal, int]:
+    try:
+        credit_config = client.credit_config
+    except ClientCreditConfig.DoesNotExist:
+        return [], Decimal('0.00'), 0
+
+    overdue_orders = []
+    total_overdue = Decimal('0.00')
+    maximum_days_overdue = 0
+
+    for order in orders:
+        due_date = get_order_credit_due_date(order, credit_config)
+        if due_date is None or current_date <= due_date:
+            continue
+
+        days_overdue = (current_date - due_date).days
+        remaining_amount = max(
+            order.total_amount - getattr(order, 'total_paid', Decimal('0.00')),
+            Decimal('0.00'),
+        )
+        order.days_overdue = days_overdue
+        order.remaining_amount = remaining_amount
+        order.credit_due_date = due_date
+        overdue_orders.append(order)
+        total_overdue += remaining_amount
+        maximum_days_overdue = max(maximum_days_overdue, days_overdue)
+
+    overdue_orders.sort(key=lambda order: order.days_overdue, reverse=True)
+    return overdue_orders, total_overdue, maximum_days_overdue
+
+
+def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
+    """Return due-date and overdue information for outstanding credit orders."""
+    credit_order_ids = CreditTransaction.objects.filter(
+        client=client,
+        transaction_type='purchase',
+        reference_order__isnull=False,
+    ).values('reference_order_id')
+    unpaid_orders = list(
+        Order.objects.unpaid()
+        .filter(client=client, pk__in=credit_order_ids)
+        .select_related('client', 'client__credit_config')
+        .prefetch_related('invoice_links__invoice')
+    )
+    current_date = timezone.localdate()
+    overdue_orders, total_overdue, days_overdue = _overdue_order_data(
+        client,
+        unpaid_orders,
+        current_date,
+    )
+    try:
+        credit_config = client.credit_config
+    except ClientCreditConfig.DoesNotExist:
+        credit_config = None
+
+    due_dates = [
+        due_date
+        for order in unpaid_orders
+        if credit_config
+        for due_date in [get_order_credit_due_date(order, credit_config)]
+        if due_date is not None
+    ]
+    nearest_due_date = min(due_dates, default=None)
+    return {
+        'total_overdue_amount': total_overdue,
+        'days_overdue': days_overdue,
+        'overdue_orders': overdue_orders,
+        'nearest_due_date': nearest_due_date,
+        'nearest_due_is_overdue': bool(
+            nearest_due_date and nearest_due_date < current_date
+        ),
+        'awaiting_invoice': bool(
+            unpaid_orders
+            and credit_config
+            and credit_config.payment_term_type == 'invoice_due'
+            and nearest_due_date is None
+        ),
+    }
+
+
+def client_has_overdue_credit(client: Client) -> bool:
+    """Return whether the client has debt past its configured payment date."""
+    return bool(get_overdue_orders_for_client(client)['overdue_orders'])
+
+
+def get_clients_with_pending_payments() -> list[dict[str, Any]]:
+    """Return active clients that have overdue credit orders."""
+    clients = list(
+        Client.objects.filter(active=True, credit_config__isnull=False).select_related(
+            'credit_config',
+        )
+    )
     clients_map = {client.id: client for client in clients}
-    
-    unpaid_orders = Order.objects.unpaid().filter(
-        client_id__in=clients_map.keys()
-    ).select_related('client', 'client__credit_config').prefetch_related('invoice_links__invoice')
-    
-    orders_by_client = {}
+    credit_order_ids = CreditTransaction.objects.filter(
+        client_id__in=clients_map,
+        transaction_type='purchase',
+        reference_order__isnull=False,
+    ).values('reference_order_id')
+    unpaid_orders = (
+        Order.objects.unpaid()
+        .filter(client_id__in=clients_map, pk__in=credit_order_ids)
+        .select_related('client', 'client__credit_config')
+        .prefetch_related('invoice_links__invoice')
+    )
+    orders_by_client: dict[int, list[Order]] = {}
     for order in unpaid_orders:
-        if order.client_id not in orders_by_client:
-            orders_by_client[order.client_id] = []
-        orders_by_client[order.client_id].append(order)
-        
-    current_date = timezone.now().date()
-    clients_data = []
-    
+        orders_by_client.setdefault(order.client_id, []).append(order)
+
     last_payments = CreditTransaction.objects.filter(
-        client_id__in=clients_map.keys(),
-        transaction_type='payment'
+        client_id__in=clients_map,
+        transaction_type='payment',
     ).values('client_id').annotate(last_date=Max('created_at'))
-    
     last_payment_map = {item['client_id']: item['last_date'] for item in last_payments}
 
+    clients_data = []
+    current_date = timezone.localdate()
     for client_id, orders in orders_by_client.items():
-        client = clients_map[client_id]
-        max_payment_days = client.credit_config.max_payment_days
-        requires_billing = client.requires_billing
-        
-        overdue_orders = []
-        max_days = 0
-        total_overdue = Decimal('0.00')
-        
-        for order in orders:
-            is_overdue = False
-            days_overdue = 0
-            
-            total_amount = order.total_amount
-            total_paid = getattr(order, 'total_paid', Decimal('0.00'))
-            remaining_amount = total_amount - total_paid
-            
-            if requires_billing:
-                invoice_links = order.invoice_links.all()
-                for link in invoice_links:
-                    if link.invoice and link.invoice.emmited_at:
-                        days_since_emission = (current_date - link.invoice.emmited_at).days
-                        if days_since_emission > max_payment_days:
-                            is_overdue = True
-                            days_overdue = max(days_overdue, days_since_emission - max_payment_days)
-            else:
-                days_since_creation = (current_date - order.order_date.date()).days
-                if days_since_creation > max_payment_days:
-                    is_overdue = True
-                    days_overdue = max(days_overdue, days_since_creation - max_payment_days)
-                    
-            if is_overdue:
-                order.days_overdue = days_overdue
-                order.remaining_amount = remaining_amount
-                overdue_orders.append(order)
-                total_overdue += remaining_amount
-                if days_overdue > max_days:
-                    max_days = days_overdue
-                    
-        if overdue_orders:
-            overdue_orders.sort(key=lambda x: x.days_overdue, reverse=True)
-            clients_data.append({
-                'client': client,
-                'total_overdue_amount': total_overdue,
-                'days_overdue': max_days,
-                'missing_payment_orders': overdue_orders,
-                'last_payment_date': last_payment_map.get(client_id)
-            })
-            
-    clients_data.sort(key=lambda x: x['total_overdue_amount'], reverse=True)
+        overdue_orders, total_overdue, days_overdue = _overdue_order_data(
+            clients_map[client_id],
+            orders,
+            current_date,
+        )
+        if not overdue_orders:
+            continue
+        clients_data.append({
+            'client': clients_map[client_id],
+            'total_overdue_amount': total_overdue,
+            'days_overdue': days_overdue,
+            'missing_payment_orders': overdue_orders,
+            'last_payment_date': last_payment_map.get(client_id),
+        })
+
+    clients_data.sort(key=lambda item: item['total_overdue_amount'], reverse=True)
     return clients_data

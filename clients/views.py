@@ -114,7 +114,10 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     forms_override = forms_override or {}
 
     core_form = forms_override.get('core_form') or ClientCoreForm(instance=client)
-    credit_policy_form = forms_override.get('credit_policy_form') or ClientCreditPolicyForm(instance=client)
+    credit_policy_form = forms_override.get('credit_policy_form') or ClientCreditPolicyForm(
+        instance=client,
+        prefix='credit_policy',
+    )
 
     address_formset = forms_override.get('address_formset')
     if address_formset is None and client is not None:
@@ -129,6 +132,13 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     if client and invoice_schedule_instance is None:
         invoice_schedule_instance = InvoiceSchedule(client=client)
     credit_config_instance = getattr(client, 'credit_config', None) if client else None
+    if client and credit_config_instance is None:
+        credit_config_instance = ClientCreditConfig(
+            client=client,
+            payment_term_type=(
+                'invoice_due' if client.requires_billing else 'monthly_cutoff'
+            ),
+        )
 
     invoice_data_form = forms_override.get('invoice_data_form') or InvoiceDataForm(instance=invoice_data_instance, prefix='invoice_data')
     invoice_schedule_form = forms_override.get('invoice_schedule_form') or InvoiceScheduleForm(instance=invoice_schedule_instance, prefix='invoice_schedule')
@@ -202,8 +212,6 @@ def create_v2(request):
         initial={
             'active': True,
             'type': 'branch',
-            'can_pay_with_credit': True,
-            'requires_note_for_credit': False,
             'requires_billing': False,
             'billing_override_enabled': False,
         }
@@ -334,9 +342,17 @@ def edit_v2(request, pk):
 
         if section == 'credit':
             credit_policy_form = ClientCreditPolicyForm(request.POST, instance=client, prefix='credit_policy')
+            credit_config_instance = getattr(client, 'credit_config', None)
+            if credit_config_instance is None:
+                credit_config_instance = ClientCreditConfig(
+                    client=client,
+                    payment_term_type=(
+                        'invoice_due' if client.requires_billing else 'monthly_cutoff'
+                    ),
+                )
             credit_config_form = ClientCreditConfigForm(
                 request.POST,
-                instance=getattr(client, 'credit_config', None),
+                instance=credit_config_instance,
                 prefix='credit_config',
             )
             if credit_policy_form.is_valid() and credit_config_form.is_valid():

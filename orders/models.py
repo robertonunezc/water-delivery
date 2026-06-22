@@ -109,6 +109,7 @@ class OrderQuerySet(models.QuerySet):
 
         paid_subquery = (
             Payment.objects.filter(order=OuterRef('pk'), status='completed')
+            .exclude(method='pending_credit')
             .values('order')
             .annotate(total=Sum('amount'))
             .values('total')
@@ -195,7 +196,12 @@ class Order(TimeStampedModel):
         if hasattr(self, '_annotated_total_paid'):
             return self._annotated_total_paid
         return sum(
-            (p.amount for p in self.payments.all() if p.status == 'completed'),
+            (
+                payment.amount
+                for payment in self.payments.all()
+                if payment.status == 'completed'
+                and payment.method != 'pending_credit'
+            ),
             Decimal('0'),
         )
 

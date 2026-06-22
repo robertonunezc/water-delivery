@@ -85,7 +85,8 @@ class ClientCreditConfigInline(StackedInline):
 	verbose_name_plural = "Configuraciones de Crédito"
 	classes = ('tab-balance-credit',)
 	fields = (
-		'max_payment_days',
+		'payment_term_type',
+		('cutoff_day', 'max_payment_days'),
 		('first_notification_days', 'second_notification_days'),
 		'overdue_notification_days'
 	)

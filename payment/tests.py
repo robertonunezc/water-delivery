@@ -154,6 +154,139 @@ class PaymentViewsIntegrationTests(TestCase):
 		payment_instance.link_pending_transaction_references.assert_called_once()
 
 
+class CreditOrderSettlementTests(TestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(
+			username='credit-settlement-user',
+			password='testpass123',
+		)
+		self.customer = Client.objects.create(
+			name='Cliente con crédito pendiente',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('1000.00'),
+			can_pay_with_credit=True,
+		)
+		self.order = Order.objects.create(
+			client=self.customer,
+			total_amount=Decimal('1000.00'),
+			type='credito',
+		)
+		self.pending_credit = Payment(
+			amount=Decimal('1000.00'),
+			method='pending_credit',
+			status='pending',
+			client=self.customer,
+			order=self.order,
+			created_by=self.user,
+		)
+		self.pending_credit.save(apply_accounting=False)
+		self.client.force_login(self.user)
+
+	def test_settlement_reduces_debt_and_restores_available_credit(self):
+		payment, error = services.settle_credit_order_payment(
+			order=self.order,
+			payment_method='cash',
+			amount=Decimal('1000.00'),
+			request_user=self.user,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment.method, 'cash')
+		self.customer.refresh_from_db()
+		self.pending_credit.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
+		self.assertEqual(self.customer.get_available_credit(), 1000.0)
+		self.assertEqual(self.pending_credit.status, 'completed')
+		self.assertTrue(Order.objects.paid().filter(pk=self.order.pk).exists())
+
+	def test_reconciliation_applies_existing_payment_without_duplicate(self):
+		existing_payment = Payment(
+			amount=Decimal('1000.00'),
+			method='cash',
+			status='completed',
+			client=self.customer,
+			order=self.order,
+			created_by=self.user,
+		)
+		existing_payment.save(apply_accounting=False)
+
+		payment, error = services.settle_credit_order_payment(
+			order=self.order,
+			payment_method='cash',
+			amount=Decimal('1000.00'),
+			request_user=self.user,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment.pk, existing_payment.pk)
+		self.assertEqual(
+			self.order.payments.filter(method='cash').count(),
+			1,
+		)
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
+
+	def test_mismatched_existing_payment_requires_manual_review(self):
+		existing_payment = Payment(
+			amount=Decimal('900.00'),
+			method='cash',
+			status='completed',
+			client=self.customer,
+			order=self.order,
+			created_by=self.user,
+		)
+		existing_payment.save(apply_accounting=False)
+
+		with self.assertRaisesRegex(ValueError, 'revisión manual'):
+			services.settle_credit_order_payment(
+				order=self.order,
+				payment_method='cash',
+				amount=Decimal('1000.00'),
+				request_user=self.user,
+			)
+
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('1000.00'))
+		self.assertEqual(self.order.payments.filter(method='cash').count(), 1)
+
+	def test_wrong_settlement_amount_does_not_create_payment(self):
+		payment, error = services.settle_credit_order_payment(
+			order=self.order,
+			payment_method='cash',
+			amount=Decimal('900.00'),
+			request_user=self.user,
+		)
+
+		self.assertIsNone(payment)
+		self.assertIn('debe cubrir el saldo pendiente', error['error'])
+		self.assertFalse(self.order.payments.filter(method='cash').exists())
+
+	def test_completed_pending_marker_is_not_counted_as_money_paid(self):
+		self.pending_credit.status = 'completed'
+		self.pending_credit.save(
+			update_fields=['status', 'updated_at'],
+			apply_accounting=False,
+		)
+
+		self.assertEqual(self.order.total_paid, Decimal('0.00'))
+		self.assertTrue(Order.objects.unpaid().filter(pk=self.order.pk).exists())
+
+	def test_order_payment_endpoint_reduces_credit_debt(self):
+		response = self.client.post(
+			reverse('orders:create_payment_for_order', args=[self.order.pk]),
+			data={
+				'amount': '1000.00',
+				'payment_method': 'cash',
+			},
+			content_type='application/json',
+		)
+
+		self.assertEqual(response.status_code, 200)
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
+		self.assertEqual(self.customer.get_available_credit(), 1000.0)
+
 class MigrateLegacyCreditOrdersCommandTests(TestCase):
 	def setUp(self):
 		self.customer = Client.objects.create(

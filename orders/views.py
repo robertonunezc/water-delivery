@@ -92,6 +92,10 @@ def calculate_payment_breakdown(order_total, client_balance):
 @require_http_methods(["GET", "POST"])
 def create_payment_for_order(request, order_pk):
     order = get_object_or_404(Order, pk=order_pk)
+    pending_credit = order.payments.filter(
+        method='pending_credit',
+        status='pending',
+    ).first()
     
     if request.method == "POST":
         try:
@@ -109,23 +113,37 @@ def create_payment_for_order(request, order_pk):
             return JsonResponse({'success': False, 'error': 'Método de pago inválido.'}, status=400)
 
         try:
-            result = payment_services.process_single_payment(order=order, payment_method=payment_method, amount=amount, request_user=request.user)
+            if pending_credit:
+                payment, error = payment_services.settle_credit_order_payment(
+                    order=order,
+                    payment_method=payment_method,
+                    amount=amount,
+                    request_user=request.user,
+                )
+            else:
+                payment, error = payment_services.process_single_payment(
+                    order=order,
+                    payment_method=payment_method,
+                    amount=amount,
+                    request_user=request.user,
+                )
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=400)
-        print(result)
-        if not result[0]:
-            return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo crear el pago.')}, status=400)
+        if error:
+            return JsonResponse({'success': False, 'error': error['error']}, status=400)
         
         return JsonResponse({'success': True, 'message': 'Pago creado exitosamente.'})
     # GET request
-    payment_breakdown = calculate_payment_breakdown(order.total_amount, order.client.balance)
+    payment_amount = pending_credit.amount if pending_credit else order.total_amount
+    payment_breakdown = calculate_payment_breakdown(payment_amount, order.client.balance)
     payment_types = [
         (value, label)
         for value, label in PAYMENT_METHOD_CHOICES
-        if value not in {'pending_credit'}
+        if value not in {'credit', 'pending_credit', 'other'}
     ]
     context = {
         'order': order,
+        'payment_amount': payment_amount,
         'payment_breakdown': payment_breakdown,
         'payment_types': payment_types,
     }
@@ -647,4 +665,3 @@ def client_order_history(request, client_pk):
     }
     
     return render(request, 'orders/client_order_history.html', context)
-

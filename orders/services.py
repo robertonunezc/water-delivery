@@ -186,6 +186,7 @@ def cancel_pending_order(order: Order, user=None) -> Dict[str, object]:
 # These functions coordinate payment between Client balance/credit and Order
 
 
+@transaction.atomic
 def process_order_payment(
     client: Client,
     order_amount: Decimal,
@@ -308,6 +309,20 @@ def process_order_payment(
             "balance_available": client.balance,
             "credit_available": client.get_available_credit(),
         }
+
+    if credit_used > 0:
+        from clients.services.pending_payment_service import client_has_overdue_credit
+
+        if client_has_overdue_credit(client):
+            return {
+                "success": False,
+                "error": (
+                    "El cliente tiene créditos vencidos y no puede realizar nuevas "
+                    "ventas a crédito."
+                ),
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+            }
 
     # Actually process the payment using balance_service
     if balance_used > 0:

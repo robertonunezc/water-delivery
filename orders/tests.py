@@ -620,7 +620,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="balance",
+            payment_method="balance",
             order=self.order,
         )
 
@@ -637,7 +637,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="balance",
+            payment_method="balance",
             order=self.order,
         )
 
@@ -655,7 +655,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
         )
 
@@ -672,7 +672,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
         )
 
@@ -689,7 +689,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
         )
 
@@ -704,7 +704,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
             credit_note=None,
         )
@@ -725,7 +725,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
             credit_note="Authorized by manager",
         )
@@ -743,7 +743,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="auto",
+            payment_method="auto",
             order=self.order,
         )
 
@@ -766,7 +766,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="auto",
+            payment_method="auto",
             order=self.order,
         )
 
@@ -783,7 +783,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="auto",
+            payment_method="auto",
             order=self.order,
         )
 
@@ -802,7 +802,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="auto",
+            payment_method="auto",
             order=self.order,
         )
 
@@ -997,7 +997,7 @@ class CreatePaymentForOrderTestCase(TestCase):
         mock_process_payment.assert_called_once_with(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="credit",
+            payment_method="credit",
             order=self.order,
             user=None,
             credit_note="Approved by supervisor",
@@ -1030,7 +1030,7 @@ class CreatePaymentForOrderTestCase(TestCase):
         mock_process_payment.assert_called_once_with(
             client=self.client,
             order_amount=Decimal("50.00"),
-            preferred_method="balance",
+            payment_method="balance",
             order=self.order,
             user=user,
             credit_note=None,

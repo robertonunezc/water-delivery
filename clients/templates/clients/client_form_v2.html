@@ -51,6 +51,7 @@
 				<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
 					{% if client.active %}Activo{% else %}Inactivo{% endif %}
 				</span>
+				<a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-primary">Ver detalles</a>
 			{% endif %}
 			<a href="{% url 'admin_clients' %}" class="btn btn-outline-secondary">Volver a lista</a>
 		</div>
@@ -124,19 +125,6 @@
 							<div class="col-md-3 form-check">
 								{{ core_form.active }}
 								<label class="form-check-label">{{ core_form.active.label }}</label>
-							</div>
-							<div class="col-md-3 form-check">
-								{{ core_form.can_pay_with_credit }}
-								<label class="form-check-label">{{ core_form.can_pay_with_credit.label }}</label>
-							</div>
-							<div class="col-md-3 form-check">
-								{{ core_form.requires_note_for_credit }}
-								<label class="form-check-label">{{ core_form.requires_note_for_credit.label }}</label>
-							</div>
-							<div class="col-md-3">
-								<label class="form-label">{{ core_form.credit_limit.label }}</label>
-								{{ core_form.credit_limit }}
-								{{ core_form.credit_limit.errors }}
 							</div>
 
 							<div class="col-md-3 form-check">
@@ -306,18 +294,27 @@
 								<div class="col-lg-6">
 									<div class="border rounded p-3 h-100">
 										<div class="form-section-title">Política de Crédito</div>
-										<div class="form-check mb-2">{{ credit_policy_form.can_pay_with_credit }} <label class="form-check-label">{{ credit_policy_form.can_pay_with_credit.label }}</label></div>
-										<div class="form-check mb-2">{{ credit_policy_form.requires_note_for_credit }} <label class="form-check-label">{{ credit_policy_form.requires_note_for_credit.label }}</label></div>
-										<div class="mb-2">{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}{{ credit_policy_form.credit_limit.errors }}</div>
+										<div class="form-check mb-2">
+											{{ credit_policy_form.can_pay_with_credit }} <label class="form-check-label">{{ credit_policy_form.can_pay_with_credit.label }}</label>
+											<div class="form-text">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
+										</div>
+										<div class="form-check mb-2">
+											{{ credit_policy_form.requires_note_for_credit }} <label class="form-check-label">{{ credit_policy_form.requires_note_for_credit.label }}</label>
+											<div class="form-text">{{ credit_policy_form.requires_note_for_credit.help_text }}</div>
+										</div>
+										<div class="mb-2">
+											{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}
+											<div class="form-text">{{ credit_policy_form.credit_limit.help_text }}</div>
+											{{ credit_policy_form.credit_limit.errors }}
+										</div>
 									</div>
 								</div>
 								<div class="col-lg-6">
 									<div class="border rounded p-3 h-100">
-										<div class="form-section-title">Configuración de Notificaciones</div>
-										<div class="mb-2">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
-										<div class="mb-2">{{ credit_config_form.first_notification_days.label_tag }}{{ credit_config_form.first_notification_days }}{{ credit_config_form.first_notification_days.errors }}</div>
-										<div class="mb-2">{{ credit_config_form.second_notification_days.label_tag }}{{ credit_config_form.second_notification_days }}{{ credit_config_form.second_notification_days.errors }}</div>
-										<div class="mb-2">{{ credit_config_form.overdue_notification_days.label_tag }}{{ credit_config_form.overdue_notification_days }}{{ credit_config_form.overdue_notification_days.errors }}</div>
+										<div class="form-section-title">Condiciones de Pago</div>
+										<div class="mb-2">{{ credit_config_form.payment_term_type.label_tag }}{{ credit_config_form.payment_term_type }}{{ credit_config_form.payment_term_type.errors }}</div>
+										<div class="mb-2" id="credit-cutoff-day-wrapper">{{ credit_config_form.cutoff_day.label_tag }}{{ credit_config_form.cutoff_day }}{{ credit_config_form.cutoff_day.errors }}</div>
+										<div class="mb-2" id="credit-payment-days-wrapper">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
 									</div>
 								</div>
 							</div>
@@ -370,6 +367,21 @@
 
 	document.addEventListener('DOMContentLoaded', () => {
 		new InvoiceFrequencyFieldController();
+
+		const termType = document.getElementById('id_credit_config-payment_term_type');
+		const cutoffWrapper = document.getElementById('credit-cutoff-day-wrapper');
+		const paymentDaysWrapper = document.getElementById('credit-payment-days-wrapper');
+
+		if (termType && cutoffWrapper && paymentDaysWrapper) {
+			const updateCreditTermFields = () => {
+				const usesInvoiceDueDate = termType.value === 'invoice_due';
+				cutoffWrapper.classList.toggle('field-hidden', usesInvoiceDueDate);
+				paymentDaysWrapper.classList.toggle('field-hidden', !usesInvoiceDueDate);
+			};
+
+			termType.addEventListener('change', updateCreditTermFields);
+			updateCreditTermFields();
+		}
 	});
 </script>
 {% endblock %}

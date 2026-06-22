@@ -203,39 +203,43 @@ def add_debt(
         notes: Additional notes
 
     Returns:
-        CreditTransaction if successful, None if exceeds credit limit and not allowed
+        CreditTransaction created for the debt increase.
 
     Raises:
-        ValueError: If amount is not positive
+        ValueError: If amount is invalid or the credit sale is not allowed.
     """
-    from clients.models import CreditTransaction
+    from clients.models import Client, CreditTransaction
+    from clients.services.pending_payment_service import client_has_overdue_credit
 
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
-    new_debt = client.current_debt + amount
-    if new_debt > client.credit_limit:
-        # Only block if client cannot pay with credit
-        if not client.can_pay_with_credit:
-            return None
-        else:
-            # Log warning but allow the transaction for clients who can pay with credit
-            logger.warning(
-                f"Client {client.id} ({client.name}) debt will exceed credit limit. "
-                f"New debt: ${new_debt:.2f}, Credit limit: ${client.credit_limit:.2f}. "
-                f"Allowing due to can_pay_with_credit=True."
-            )
+    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    if transaction_type == 'purchase' and not locked_client.can_use_credit_for_payment():
+        raise ValueError('El cliente no tiene crédito disponible para esta venta.')
+    if transaction_type == 'purchase' and client_has_overdue_credit(locked_client):
+        raise ValueError(
+            'El cliente tiene créditos vencidos y no puede realizar nuevas ventas a crédito.'
+        )
+
+    new_debt = locked_client.current_debt + amount
+    if transaction_type == 'purchase' and new_debt > locked_client.credit_limit:
+        raise ValueError(
+            f'La venta excede el límite de crédito. Disponible: '
+            f'${locked_client.get_available_credit():.2f}.'
+        )
 
     # Store previous values
-    debt_before = client.current_debt
-    credit_limit_before = client.credit_limit
+    debt_before = locked_client.current_debt
+    credit_limit_before = locked_client.credit_limit
 
     # Update debt
-    client.current_debt = new_debt
-    debt_after = client.current_debt
+    locked_client.current_debt = new_debt
+    debt_after = locked_client.current_debt
 
     # Save client
-    client.save(update_fields=["current_debt", "updated_at"])
+    locked_client.save(update_fields=["current_debt", "updated_at"])
+    client.current_debt = locked_client.current_debt
 
     # Create transaction record
     combined_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
@@ -246,7 +250,7 @@ def add_debt(
         debt_before=debt_before,
         debt_after=debt_after,
         credit_limit_before=credit_limit_before,
-        credit_limit_after=client.credit_limit,
+        credit_limit_after=locked_client.credit_limit,
         notes=combined_notes,
         reference_order=reference_order,
         reference_payment=reference_payment,
@@ -282,26 +286,28 @@ def pay_debt(
     Raises:
         ValueError: If amount is not positive
     """
-    from clients.models import CreditTransaction
+    from clients.models import Client, CreditTransaction
 
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
-    payment_amount = min(amount, client.current_debt)
+    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    payment_amount = min(amount, locked_client.current_debt)
 
     if payment_amount == 0:
         return Decimal("0")
 
     # Store previous values
-    debt_before = client.current_debt
-    credit_limit_before = client.credit_limit
+    debt_before = locked_client.current_debt
+    credit_limit_before = locked_client.credit_limit
 
     # Update debt
-    client.current_debt -= payment_amount
-    debt_after = client.current_debt
+    locked_client.current_debt -= payment_amount
+    debt_after = locked_client.current_debt
 
     # Save client
-    client.save(update_fields=["current_debt", "updated_at"])
+    locked_client.save(update_fields=["current_debt", "updated_at"])
+    client.current_debt = locked_client.current_debt
 
     # Create transaction record
     final_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${payment_amount:.2f}"
@@ -312,7 +318,7 @@ def pay_debt(
         debt_before=debt_before,
         debt_after=debt_after,
         credit_limit_before=credit_limit_before,
-        credit_limit_after=client.credit_limit,
+        credit_limit_after=locked_client.credit_limit,
         notes=final_notes,
         reference_order=reference_order,
         reference_payment=reference_payment,

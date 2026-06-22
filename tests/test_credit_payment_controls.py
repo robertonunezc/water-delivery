@@ -69,8 +69,8 @@ def test_credit_payment_controls():
         credit_limit=Decimal('1000.00'),
         current_debt=Decimal('500.00')  # Has available credit
     )
-    print(f"   Client 4 - can_pay_with_credit=False, available_credit=500: {client4.can_use_credit_for_payment()} (should be True)")
-    assert client4.can_use_credit_for_payment() == True
+    print(f"   Client 4 - can_pay_with_credit=False, available_credit=500: {client4.can_use_credit_for_payment()} (should be False)")
+    assert client4.can_use_credit_for_payment() == False
     
     # Client with credit enabled
     client5 = Client.objects.create(
@@ -79,8 +79,8 @@ def test_credit_payment_controls():
         credit_limit=Decimal('1000.00'),
         current_debt=Decimal('1000.00')  # No available credit
     )
-    print(f"   Client 5 - can_pay_with_credit=True: {client5.can_use_credit_for_payment()} (should be True)")
-    assert client5.can_use_credit_for_payment() == True
+    print(f"   Client 5 - can_pay_with_credit=True, available_credit=0: {client5.can_use_credit_for_payment()} (should be False)")
+    assert client5.can_use_credit_for_payment() == False
     
     # Test 4: validate_credit_payment method
     print("\n4. Testing validate_credit_payment method...")
@@ -92,10 +92,11 @@ def test_credit_payment_controls():
     assert result['error_code'] == 'CREDIT_DISABLED'
     
     # Test with insufficient credit
+    client4.can_pay_with_credit = True
     result = client4.validate_credit_payment(Decimal('600.00'))  # Available: 500
     print(f"   Client 4 insufficient credit: {result}")
     assert result['success'] == False
-    assert result['error_code'] == 'INSUFFICIENT_CREDIT'
+    assert result['error_code'] == 'CREDIT_LIMIT_EXCEEDED'
     
     # Test with client requiring note but no note provided
     client6 = Client.objects.create(

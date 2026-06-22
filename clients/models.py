@@ -21,6 +21,15 @@ PAYMENT_METHOD_CHOICES = [
     ('other', 'Otro'),
 ]
 
+PAYMENT_TERM_TYPE_CHOICES = [
+    ('monthly_cutoff', 'Fecha de corte mensual'),
+    ('invoice_due', 'Vencimiento posterior a factura'),
+]
+
+CREDIT_CUTOFF_DAY_CHOICES = [
+    ('last_day', 'Último día del mes'),
+] + [(str(day), f'Día {day}') for day in range(1, 32)]
+
 
 WEEKDAY_CHOICES = [
     (0, 'Lunes'),
@@ -177,6 +186,21 @@ class Client(TimeStampedModel):
         if not self.can_pay_with_credit and self.credit_limit > 0:
             errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'
 
+        try:
+            credit_config = self.credit_config
+        except ObjectDoesNotExist:
+            credit_config = None
+
+        if (
+            credit_config
+            and credit_config.payment_term_type == 'invoice_due'
+            and not self.requires_billing
+        ):
+            errors['requires_billing'] = (
+                'No se puede deshabilitar la facturación mientras el plazo de crédito '
+                'dependa de la emisión de factura.'
+            )
+
         if errors:
             raise ValidationError(errors)
 
@@ -199,12 +223,7 @@ class Client(TimeStampedModel):
             bool: True if client can use credit, False otherwise
         """
         # If credit payment is disabled for this client
-        if not self.can_pay_with_credit:
-            # Only allow if they have available credit (positive balance)
-            return self.get_available_credit() > 0
-        
-        # If credit payment is enabled, they can use it regardless of current balance
-        return True
+        return self.can_pay_with_credit and self.get_available_credit() > 0
     
     def requires_note_for_credit_payment(self):
         """
@@ -242,18 +261,13 @@ class Client(TimeStampedModel):
                 'error_code': 'NOTE_REQUIRED'
             }
         
-        # For clients that can pay with credit, allow payments even if they exceed the credit limit
-        # This allows for negative credit balances when necessary
         available_credit = self.get_available_credit()
         if available_credit < amount:
-            # Log a warning but allow the payment to proceed
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                f'Client {self.id} ({self.name}) credit payment of ${amount:.2f} '
-                f'exceeds available credit of ${available_credit:.2f}. '
-                f'This will result in exceeding credit limit.'
-            )
+            return {
+                'success': False,
+                'error': f'Crédito insuficiente. Disponible: ${available_credit:.2f}.',
+                'error_code': 'CREDIT_LIMIT_EXCEEDED',
+            }
         
         return {'success': True}
     def has_billing_frequency(self):
@@ -601,8 +615,35 @@ class InvoiceData(TimeStampedModel):
     
 class ClientCreditConfig(TimeStampedModel):
     client = models.OneToOneField(Client, related_name='credit_config', on_delete=models.CASCADE)
+    payment_term_type = models.CharField(
+        max_length=20,
+        choices=PAYMENT_TERM_TYPE_CHOICES,
+        default='monthly_cutoff',
+        verbose_name='Modalidad de pago del crédito',
+    )
+    cutoff_day = models.CharField(
+        max_length=10,
+        choices=CREDIT_CUTOFF_DAY_CHOICES,
+        default='last_day',
+        verbose_name='Día de corte mensual',
+    )
     max_payment_days = models.PositiveIntegerField(default=30, verbose_name="Días naturales máximos para pagar")
     first_notification_days = models.PositiveIntegerField(default=5, verbose_name="Días antes del vencimiento para la primera notificación")
     second_notification_days = models.PositiveIntegerField(default=2, verbose_name="Días antes del vencimiento para la segunda notificación")
     overdue_notification_days = models.PositiveIntegerField(default=1, verbose_name="Días después del vencimiento para notificación de morosidad")
 
+    def clean(self):
+        super().clean()
+        if (
+            self.client_id
+            and self.payment_term_type == 'invoice_due'
+            and not self.client.requires_billing
+        ):
+            from django.core.exceptions import ValidationError
+
+            raise ValidationError({
+                'payment_term_type': (
+                    'El vencimiento posterior a factura solo está disponible para '
+                    'clientes que requieren facturación.'
+                ),
+            })

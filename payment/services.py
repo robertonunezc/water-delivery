@@ -100,6 +100,115 @@ def process_single_payment(
     return payment, None
 
 
+@transaction.atomic
+def settle_credit_order_payment(
+    order: Order,
+    payment_method: str,
+    amount: Decimal,
+    request_user: User,
+) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
+    """Record a credit-order payment and reduce the client's debt atomically."""
+    pending_credit = order.payments.select_for_update().filter(
+        method='pending_credit',
+        status='pending',
+    ).first()
+    if pending_credit is None:
+        return None, {'error': 'La orden no tiene crédito pendiente por liquidar.'}
+
+    reconciled_payment = _reconcile_unapplied_credit_payment(
+        order=order,
+        pending_credit=pending_credit,
+        request_user=request_user,
+    )
+    if reconciled_payment:
+        return reconciled_payment, None
+
+    amount_due = Decimal(str(pending_credit.amount))
+    if amount != amount_due:
+        return None, {
+            'error': (
+                f'El pago debe cubrir el saldo pendiente de ${amount_due:.2f}.'
+            ),
+        }
+
+    payment, error = process_single_payment(
+        order=order,
+        payment_method=payment_method,
+        amount=amount,
+        request_user=request_user,
+    )
+    if error:
+        return None, error
+
+    paid_amount = balance_service.pay_debt(
+        client=order.client,
+        amount=amount,
+        transaction_type='payment',
+        user=request_user,
+        reference_order=order,
+        reference_payment=payment,
+        notes=f'Liquidación de orden a crédito #{order.id}',
+    )
+    if paid_amount != amount:
+        raise ValueError('No se pudo aplicar el pago completo a la deuda del cliente.')
+
+    _complete_pending_credit(pending_credit)
+    return payment, None
+
+
+def _reconcile_unapplied_credit_payment(
+    order: Order,
+    pending_credit: Payment,
+    request_user: User,
+) -> Optional[Payment]:
+    """Apply a previously recorded payment that did not reduce credit debt."""
+    accounted_payment_ids = order.client.credit_transactions.filter(
+        reference_order=order,
+        transaction_type='payment',
+        reference_payment__isnull=False,
+    ).values('reference_payment_id')
+    payment = order.payments.filter(
+        status='completed',
+        date__gt=pending_credit.date,
+    ).exclude(
+        method='pending_credit',
+    ).exclude(
+        pk__in=accounted_payment_ids,
+    ).order_by('date').first()
+    if payment is None:
+        return None
+
+    amount_due = Decimal(str(pending_credit.amount))
+    if payment.amount != amount_due:
+        raise ValueError(
+            'Existe un pago previo sin aplicar cuyo monto no coincide con el saldo '
+            'pendiente. Se requiere revisión manual antes de registrar otro pago.'
+        )
+
+    paid_amount = balance_service.pay_debt(
+        client=order.client,
+        amount=payment.amount,
+        transaction_type='payment',
+        user=request_user,
+        reference_order=order,
+        reference_payment=payment,
+        notes=f'Reconciliación de pago de orden a crédito #{order.id}',
+    )
+    if paid_amount != payment.amount:
+        raise ValueError('No se pudo reconciliar el pago con la deuda del cliente.')
+
+    _complete_pending_credit(pending_credit)
+    return payment
+
+
+def _complete_pending_credit(pending_credit: Payment) -> None:
+    pending_credit.status = 'completed'
+    pending_credit.save(
+        update_fields=['status', 'updated_at'],
+        apply_accounting=False,
+    )
+
+
 def process_multiple_payments(
     order: Order,
     payments_data: list,
@@ -308,7 +417,7 @@ def _process_credit_order_flow(
 
 
 def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict, int]:
-    """Create debt transaction and pending payment record for a credit order."""
+    """Apply prepaid balance first, then register the remaining order debt."""
     existing_credit_payment = order.payments.filter(method='pending_credit').first()
     if existing_credit_payment:
         return {
@@ -323,35 +432,58 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
         transaction_type='purchase',
     ).first()
 
-    with transaction.atomic():
-        pending_payment = Payment(
-            amount=order.total_amount,
-            method='pending_credit',
-            client=order.client,
-            order=order,
-            status='pending',
-            created_by=request_user,
-        )
-        pending_payment.save(apply_accounting=False)
+    order_total = Decimal(str(order.total_amount))
+    balance_amount = min(order.client.balance, order_total)
+    credit_amount = order_total - balance_amount
 
-        if not existing_purchase:
-            result = balance_service.add_debt(
-                client=order.client,
-                amount=order.total_amount,
-                transaction_type='purchase',
-                user=request_user,
-                reference_order=order,
-                reference_payment=pending_payment,
-                notes=f'Pedido #{order.id} registrado a crédito y pendiente de pago',
-            )
-            if not result:
-                return {
-                    'error': 'No se pudo registrar la deuda para esta orden a crédito.',
-                }, 400
+    try:
+        with transaction.atomic():
+            if balance_amount > 0:
+                payment, error = process_single_payment(
+                    order=order,
+                    payment_method='balance',
+                    amount=balance_amount,
+                    request_user=request_user,
+                )
+                if error:
+                    raise ValueError(error['error'])
 
-        if order.status != OrderStatus.COMPLETED.value:
-            order.status = OrderStatus.COMPLETED.value
-            order.save(update_fields=['status', 'updated_at'])
+            pending_payment = None
+            if credit_amount > 0:
+                pending_payment = Payment(
+                    amount=credit_amount,
+                    method='pending_credit',
+                    client=order.client,
+                    order=order,
+                    status='pending',
+                    created_by=request_user,
+                )
+                pending_payment.save(apply_accounting=False)
+
+            if credit_amount > 0 and not existing_purchase:
+                balance_service.add_debt(
+                    client=order.client,
+                    amount=credit_amount,
+                    transaction_type='purchase',
+                    user=request_user,
+                    reference_order=order,
+                    reference_payment=pending_payment,
+                    notes=f'Pedido #{order.id} registrado a crédito y pendiente de pago',
+                )
+
+            if order.status != OrderStatus.COMPLETED.value:
+                order.status = OrderStatus.COMPLETED.value
+                order.save(update_fields=['status', 'updated_at'])
+    except ValueError as exc:
+        return {'error': str(exc)}, 400
+
+    if credit_amount == 0:
+        return {
+            'success': True,
+            'order_pending_credit': False,
+            'message': 'Orden pagada completamente con saldo disponible.',
+            'order_status': order.status,
+        }, 200
 
     return {
         'success': True,
@@ -371,18 +503,18 @@ def _settle_pending_credit_order(
     if not payments_data:
         return {'error': 'No payments provided'}, 400
 
-    order_total = Decimal(str(order.total_amount))
+    amount_due = Decimal(str(pending_credit_payment.amount))
     total_payment_amount = Decimal('0.00')
     for payment_item in payments_data:
         if 'amount' not in payment_item or 'payment_method' not in payment_item:
             return {'error': 'Cada transaccion de pago debe tener un metodo de pago asignado'}, 400
         total_payment_amount += Decimal(str(payment_item['amount']))
 
-    if total_payment_amount != order_total:
+    if total_payment_amount != amount_due:
         return {
             'error': (
                 f'La suma de los pagos (${total_payment_amount:.2f}) debe ser igual '
-                f'al total de la orden (${order_total:.2f})'
+                f'al saldo pendiente (${amount_due:.2f})'
             )
         }, 400
 
