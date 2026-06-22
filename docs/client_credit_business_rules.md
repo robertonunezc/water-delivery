@@ -32,7 +32,6 @@ Cuando `billing_override_enabled` está habilitado, la sucursal puede administra
 La política de crédito contiene:
 
 - **Puede pagar con crédito:** habilita o deshabilita el uso de crédito.
-- **Requiere justificación para crédito:** obliga a capturar una nota al realizar una operación a crédito.
 - **Límite de crédito:** monto máximo de deuda activa autorizado.
 
 Estas propiedades se administran en la pestaña **Crédito**, no en **Datos básicos**.
@@ -41,7 +40,6 @@ Reglas:
 
 - Un cliente con crédito deshabilitado no puede realizar ventas a crédito, aunque tenga límite disponible.
 - Un cliente sin crédito disponible no puede realizar una nueva venta a crédito.
-- No se puede exigir justificación si el crédito está deshabilitado.
 - No se puede deshabilitar el crédito mientras el cliente tenga deuda activa.
 - No se puede mantener un límite mayor que cero si el pago con crédito está deshabilitado.
 

@@ -65,7 +65,6 @@ class ClientUpdateData:
     credit_limit: Optional[Decimal] = None
     current_debt: Optional[Decimal] = None
     can_pay_with_credit: Optional[bool] = None
-    requires_note_for_credit: Optional[bool] = None
     address_link: Optional[str] = None
     requires_billing: Optional[bool] = None
     billing_override_enabled: Optional[bool] = None
@@ -125,18 +124,14 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
         client.can_pay_with_credit = update_data.can_pay_with_credit
         updated = True
     
-    if update_data.requires_note_for_credit is not None:
-        client.requires_note_for_credit = update_data.requires_note_for_credit
-        updated = True
-    
     if update_data.address_link is not None:
         client.address_link = update_data.address_link
         updated = True
     
-    # Handle requires_billing changes - must be done BEFORE saving the client
-    # because we need to delete billing data/frequency while client still has requires_billing=True
+    # Handle recurring billing changes before saving the client so any existing
+    # active schedule is disabled when recurring billing is turned off.
     if update_data.requires_billing is not None:
-        # If disabling billing, remove billing data and frequency first
+        # If disabling recurring billing, keep fiscal data but disable schedule.
         if update_data.requires_billing is False and client.requires_billing is True:
             invoice_service.disable_billing_for_client(client.id)
         

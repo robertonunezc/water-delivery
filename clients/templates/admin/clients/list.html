@@ -132,7 +132,11 @@
 						<tr>
 							<td>#{{ client.id }}</td>
 							<td>
-								<div class="client-name">{{ client.name }}</div>
+								<div class="client-name">
+									<a href="{% url 'clients:detail' client.pk %}" class="text-decoration-none">
+										{{ client.name }}
+									</a>
+								</div>
 								{% if client.note %}
 									<small class="text-muted d-inline-block text-truncate client-note">{{ client.note }}</small>
 								{% endif %}

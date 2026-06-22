@@ -207,7 +207,7 @@ def process_order_payment(
         payment_method: 'auto', 'balance', 'credit', 'mixed'
         order: Order object for transaction reference
         user: User performing the operation
-        credit_note: Required note when using credit if client requires it
+        credit_note: Optional note appended to the payment notes
 
     Returns:
         dict with success status and payment breakdown
@@ -242,16 +242,6 @@ def process_order_payment(
                 "credit_used": Decimal("0"),
             }
 
-        # Check if note is required for credit payments
-        if client.requires_note_for_credit_payment() and not credit_note:
-            return {
-                "success": False,
-                "error": "A note is required for credit payments for this client.",
-                "balance_used": Decimal("0"),
-                "credit_used": Decimal("0"),
-                "note_required": True,
-            }
-
         # Try to pay entirely with credit
         available_credit = client.get_available_credit()
         if available_credit >= order_amount:
@@ -283,16 +273,6 @@ def process_order_payment(
                     "credit_used": Decimal("0"),
                     "balance_available": client.balance,
                     "credit_available": Decimal("0"),
-                }
-
-            # Check if note is required for credit payments
-            if client.requires_note_for_credit_payment() and not credit_note:
-                return {
-                    "success": False,
-                    "error": "A note is required for credit payments for this client.",
-                    "balance_used": Decimal("0"),
-                    "credit_used": Decimal("0"),
-                    "note_required": True,
                 }
 
             available_credit = Decimal(str(client.get_available_credit()))
@@ -373,7 +353,7 @@ def create_payment_for_order(
         order: Order to create payment for
         payment_method: 'auto', 'balance', 'credit', 'mixed'
         user: User performing the operation
-        credit_note: Required note when using credit if client requires it
+        credit_note: Optional note appended to the resulting payment
 
     Returns:
         dict with success status, payments created, and payment breakdown

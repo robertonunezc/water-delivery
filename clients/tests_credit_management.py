@@ -41,10 +41,6 @@ class CreditFormFieldTests(SimpleTestCase):
             'Habilita o deshabilita el uso de crédito.',
         )
         self.assertEqual(
-            form.fields['requires_note_for_credit'].help_text,
-            'Obliga a capturar una nota al realizar una operación a crédito.',
-        )
-        self.assertEqual(
             form.fields['credit_limit'].help_text,
             'Monto máximo de deuda activa autorizado.',
         )

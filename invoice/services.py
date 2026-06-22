@@ -20,6 +20,62 @@ from core.utils import get_first_last_day_of_month
 from orders.models import Order
 
 
+def _get_invoice_billing_owner(client: Client) -> Client:
+    """Return the client whose fiscal data must be used for invoice generation."""
+    if client.type == 'branch' and not client.billing_override_enabled:
+        if client.corporate_id is None:
+            raise ValidationError(
+                f'El cliente "{client.name}" no puede facturarse sin un cliente corporativo asociado.'
+            )
+        return client.corporate
+    return client
+
+
+def _get_missing_invoice_data_fields(invoice_data: Optional[InvoiceData]) -> List[str]:
+    """Return required invoice data fields that are missing or blank."""
+    if invoice_data is None:
+        return ['RFC', 'Razón social']
+
+    missing_fields: List[str] = []
+    if not (invoice_data.rfc or '').strip():
+        missing_fields.append('RFC')
+    if not (invoice_data.razon_social or '').strip():
+        missing_fields.append('Razón social')
+    return missing_fields
+
+
+def validate_client_invoice_generation_requirements(client: Client) -> None:
+    """Validate the fiscal requirements needed to generate an invoice for a client."""
+    billing_owner = _get_invoice_billing_owner(client)
+    missing_messages: List[str] = []
+    invoice_data = billing_owner.invoice_data if hasattr(billing_owner, 'invoice_data') else None
+
+    missing_invoice_fields = _get_missing_invoice_data_fields(invoice_data)
+    if missing_invoice_fields:
+        missing_messages.append(
+            f"faltan datos de facturación requeridos ({', '.join(missing_invoice_fields)})"
+        )
+
+    has_billing_address = billing_owner.addresses.filter(
+        type='billing',
+        active=True,
+    ).exists()
+    if not has_billing_address:
+        missing_messages.append('falta un domicilio de tipo fiscal activo')
+
+    if not missing_messages:
+        return
+
+    owner_label = 'el mismo cliente'
+    if billing_owner.pk != client.pk:
+        owner_label = f'el cliente corporativo "{billing_owner.name}"'
+
+    raise ValidationError(
+        f'El cliente "{client.name}" no puede facturarse porque '
+        f"{' y '.join(missing_messages)} en {owner_label}."
+    )
+
+
 def get_clients_with_invoices() -> 'django.db.models.QuerySet':
     """
     Return a queryset of active clients that have at least one invoice.
@@ -68,6 +124,7 @@ def get_clients_needing_billing(
     # Base queryset: active clients with active billing frequency
     queryset = Client.objects.filter(
         active=True,
+        requires_billing=True,
         invoice_schedule__is_active=True
     ).select_related(
         'invoice_schedule',
@@ -169,6 +226,7 @@ def set_billing_date_to_clients() -> Optional[date]:
     first_day, last_day = get_first_last_day_of_month(date.today().year, date.today().month)
     queryset = Client.objects.filter(
         active=True,
+        requires_billing=True,
         invoice_schedule__is_active=True
     ).select_related(
         'invoice_schedule',
@@ -387,13 +445,12 @@ def delete_billing_data_for_client(client_id: int) -> None:
 
 def disable_billing_for_client(client_id: int) -> None:
     """
-    Disable billing for a specific client by setting their billing frequency to inactive.
+    Disable recurring billing for a specific client by setting their billing frequency to inactive.
 
     Args:
         client_id: ID of the client to update
     """
     delete_billing_frequency_for_client(client_id)
-    delete_billing_data_for_client(client_id)
 
 
 def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.Invoice':
@@ -433,6 +490,9 @@ def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.
 
     if len(set(clients_corporate)) > 1:
         raise ValidationError("Todos los pedidos deben pertenecer al mismo cliente corporativo.")
+
+    for order_client in clients:
+        validate_client_invoice_generation_requirements(order_client)
 
     total = sum(o.total_amount for o in orders)
     short_id = uuid.uuid4().hex[:8].upper()

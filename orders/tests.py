@@ -5,7 +5,7 @@ from decimal import Decimal
 from unittest.mock import patch, MagicMock
 import json
 
-from clients.models import Client
+from clients.models import Address, Client, InvoiceData
 
 User = get_user_model()
 from orders.models import Order, OrderProduct, OrderStatus
@@ -450,6 +450,8 @@ class OrdersDashboardBulkActionTestCase(TestCase):
 
         self.customer = Client.objects.create(name="Bulk Client")
         self.other_customer = Client.objects.create(name="Other Bulk Client")
+        self._make_invoice_ready(self.customer)
+        self._make_invoice_ready(self.other_customer)
 
         self.completed_order_1 = Order.objects.create(
             client=self.customer,
@@ -474,6 +476,24 @@ class OrdersDashboardBulkActionTestCase(TestCase):
             owner=self.user,
             status=OrderStatus.COMPLETED.value,
             total_amount=Decimal("40.00"),
+        )
+
+    def _make_invoice_ready(self, client: Client) -> None:
+        rfc_prefix = (client.name.upper().replace(' ', '') + 'XXXX')[:4]
+        InvoiceData.objects.create(
+            client=client,
+            rfc=f'{rfc_prefix}010101AAA',
+            razon_social=f'{client.name} SA de CV',
+        )
+        Address.objects.create(
+            client=client,
+            type='billing',
+            street='Fiscal 123',
+            locality='Centro',
+            municipality='Queretaro',
+            state='Queretaro',
+            zip_code='76000',
+            country='Mexico',
         )
 
     def test_dashboard_bulk_create_invoice_creates_invoice(self) -> None:
@@ -508,6 +528,80 @@ class OrdersDashboardBulkActionTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.exists())
         self.assertContains(response, 'Solo se pueden facturar pedidos completados')
+
+    def test_dashboard_bulk_create_invoice_rejects_client_without_invoice_data(self) -> None:
+        InvoiceData.objects.filter(client=self.customer).delete()
+
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'create_invoice',
+                'selected_orders': [self.completed_order_1.pk, self.completed_order_2.pk],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.exists())
+        self.assertContains(response, 'no puede facturarse')
+        self.assertContains(response, 'RFC')
+
+    def test_dashboard_bulk_create_invoice_rejects_branch_when_corporate_lacks_billing_address(self) -> None:
+        corporate = Client.objects.create(name='Corporate Client', type='corporate')
+        self._make_invoice_ready(corporate)
+        corporate.addresses.filter(type='billing').delete()
+
+        branch = Client.objects.create(
+            name='Branch Client',
+            type='branch',
+            corporate=corporate,
+            billing_override_enabled=False,
+        )
+        order = Order.objects.create(
+            client=branch,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('60.00'),
+        )
+
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={'bulk_action': 'create_invoice', 'selected_orders': [order.pk]},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.filter(client=branch).exists())
+        self.assertContains(response, 'cliente corporativo')
+        self.assertContains(response, 'domicilio de tipo fiscal activo')
+
+    def test_dashboard_bulk_create_invoice_rejects_branch_override_without_own_billing_data(self) -> None:
+        corporate = Client.objects.create(name='Corporate Override', type='corporate')
+        self._make_invoice_ready(corporate)
+
+        branch = Client.objects.create(
+            name='Branch Override',
+            type='branch',
+            corporate=corporate,
+            billing_override_enabled=True,
+        )
+        order = Order.objects.create(
+            client=branch,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('45.00'),
+        )
+
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={'bulk_action': 'create_invoice', 'selected_orders': [order.pk]},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.filter(client=branch).exists())
+        self.assertContains(response, 'el mismo cliente')
+        self.assertContains(response, 'RFC')
 
     def test_dashboard_bulk_status_update_uses_service_layer(self) -> None:
         response = self.client.post(
@@ -696,11 +790,8 @@ class ProcessOrderPaymentTestCase(TestCase):
         self.assertFalse(result["success"])
         self.assertIn("not allowed to pay with credit", result["error"])
 
-    def test_process_order_payment_credit_requires_note_missing(self) -> None:
-        """Test payment fails when credit note is required but not provided."""
-        self.client.requires_note_for_credit = True
-        self.client.save()
-
+    def test_process_order_payment_credit_succeeds_without_note(self) -> None:
+        """Test credit payments no longer require a note."""
         result = services.process_order_payment(
             client=self.client,
             order_amount=Decimal("50.00"),
@@ -709,17 +800,14 @@ class ProcessOrderPaymentTestCase(TestCase):
             credit_note=None,
         )
 
-        self.assertFalse(result["success"])
-        self.assertIn("note is required", result["error"])
-        self.assertTrue(result.get("note_required", False))
+        self.assertTrue(result["success"])
+        self.assertEqual(result["credit_used"], Decimal("50.00"))
 
     @patch("clients.services.balance_service.add_debt")
     def test_process_order_payment_credit_with_note(
         self, mock_add_debt: MagicMock
     ) -> None:
-        """Test payment succeeds when credit note is required and provided."""
-        self.client.requires_note_for_credit = True
-        self.client.save()
+        """Test payment succeeds and preserves optional credit notes."""
         mock_add_debt.return_value = MagicMock()
 
         result = services.process_order_payment(

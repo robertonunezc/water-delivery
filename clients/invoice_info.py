@@ -32,7 +32,7 @@ class InvoiceComponents:
 
     @property
     def is_complete(self) -> bool:
-        return self.has_data and self.has_address and self.has_frequency
+        return self.has_data and self.has_address
 
 
 class InvoiceInfo:
@@ -93,7 +93,7 @@ class InvoiceInfo:
             missing.append("invoice_data")
         if not self.effective.has_address:
             missing.append("billing_address")
-        if not self.effective.has_frequency:
+        if self._client.requires_billing and not self.effective.has_frequency:
             missing.append("billing_frequency")
         return missing
 
@@ -113,7 +113,6 @@ class InvoiceInfo:
             warnings.append("Datos de facturación propios requeridos: debe agregar RFC y Razón Social.")
         if not self.own.has_address:
             warnings.append('Dirección fiscal propia requerida: debe agregar una dirección de tipo "Fiscal".')
-        if not self.own.has_frequency:
+        if self._client.requires_billing and not self.own.has_frequency:
             warnings.append("Frecuencia de facturación propia requerida: debe configurar la frecuencia.")
         return warnings
-

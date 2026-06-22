@@ -6,7 +6,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, RequestFactory
 from django.utils import timezone
 
-from clients.models import Client
+from clients.models import Address, Client, InvoiceData
 from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
@@ -386,6 +386,26 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 	def setUp(self):
 		self.client_a = Client.objects.create(name='Client A')
 		self.client_b = Client.objects.create(name='Client B')
+		self._make_invoice_ready(self.client_a)
+		self._make_invoice_ready(self.client_b)
+
+	def _make_invoice_ready(self, client):
+		rfc_prefix = (client.name.upper().replace(' ', '') + 'XXXX')[:4]
+		InvoiceData.objects.create(
+			client=client,
+			rfc=f'{rfc_prefix}010101AAA',
+			razon_social=f'{client.name} SA de CV',
+		)
+		Address.objects.create(
+			client=client,
+			type='billing',
+			street='Fiscal 123',
+			locality='Centro',
+			municipality='Queretaro',
+			state='Queretaro',
+			zip_code='76000',
+			country='Mexico',
+		)
 
 	def _completed_order(self, client, amount):
 		return Order.objects.create(client=client, total_amount=Decimal(str(amount)), status='COMPLETED')
@@ -431,6 +451,16 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 
 		with self.assertRaises(ValidationError):
 			create_invoice_from_orders(orders=[order_a, order_b], client=self.client_a)
+
+	def test_raises_if_client_lacks_required_invoice_data(self):
+		from invoice.services import create_invoice_from_orders
+		from django.core.exceptions import ValidationError
+
+		InvoiceData.objects.filter(client=self.client_a).delete()
+		order_a = self._completed_order(self.client_a, '50.00')
+
+		with self.assertRaisesMessage(ValidationError, 'RFC'):
+			create_invoice_from_orders(orders=[order_a], client=self.client_a)
 
 	def test_sync_invoice_amount_recalculates_from_linked_orders(self):
 		from invoice.services import create_invoice_from_orders, sync_invoice_amount

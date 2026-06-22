@@ -127,16 +127,14 @@
 								<label class="form-check-label">{{ core_form.active.label }}</label>
 							</div>
 
-							<div class="col-md-3 form-check">
-								{{ core_form.requires_billing }}
-								<label class="form-check-label">{{ core_form.requires_billing.label }}</label>
-							</div>
-							<div class="col-md-4 form-check">
-								{{ core_form.billing_override_enabled }}
-								<label class="form-check-label">{{ core_form.billing_override_enabled.label }}</label>
-								<div class="form-text">Permite configurar datos de facturación específicos para esta sucursal, en lugar de heredar del corporativo.</div>
-								{{ core_form.billing_override_enabled.errors }}
-							</div>
+							{% if core_form.type.value == 'branch' %}
+								<div class="col-md-4 form-check">
+									{{ core_form.billing_override_enabled }}
+									<label class="form-check-label">{{ core_form.billing_override_enabled.label }}</label>
+									<div class="form-text">Permite configurar datos de facturación específicos para esta sucursal, en lugar de heredar del corporativo.</div>
+									{{ core_form.billing_override_enabled.errors }}
+								</div>
+							{% endif %}
 						</div>
 						{% if core_form.non_field_errors %}
 							<div class="alert alert-danger mt-3 mb-0">{{ core_form.non_field_errors }}</div>
@@ -220,10 +218,7 @@
 
 				<div class="tab-pane fade {% if active_tab == 'billing' %}show active{% endif %}" id="tab-billing" role="tabpanel">
 					{% if client %}
-						{% if not client.requires_billing %}
-							<div class="alert alert-secondary">El cliente no requiere facturación. Active "Requiere facturación" en Datos Básicos para habilitar edición.</div>
-						{% endif %}
-						{% if client.requires_billing and not client.billing_info.effective.has_address %}
+						{% if not client.billing_info.effective.has_address %}
 							<div class="alert alert-warning">
 								<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
 							</div>
@@ -231,9 +226,12 @@
 						{% if billing_read_only %}
 							<div class="alert alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
 						{% endif %}
+						{% if not client.requires_billing %}
+							<div class="alert alert-secondary">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
+						{% endif %}
 
 						<div class="row g-3">
-							<div class="col-lg-6">
+							<div class="col-lg-7">
 								<div class="border rounded p-3 h-100">
 									<div class="form-section-title">Datos de Facturación</div>
 									<form method="post">
@@ -243,14 +241,28 @@
 										<div class="mb-2">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
 										<div class="mb-2">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
 										<div class="d-flex justify-content-end">
-											<button type="submit" class="btn btn-primary" {% if billing_disabled %}disabled{% endif %}>Guardar Datos</button>
+											<button type="submit" class="btn btn-primary" {% if billing_data_disabled %}disabled{% endif %}>Guardar Datos</button>
 										</div>
 									</form>
 								</div>
 							</div>
-							<div class="col-lg-6">
+							<div class="col-lg-5">
 								<div class="border rounded p-3 h-100">
 									<div class="form-section-title">Frecuencia de Facturación</div>
+									<div class="mb-3" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
+										<div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-2">
+											<div>
+												<div class="form-check mb-1">
+													{{ recurring_billing_form.requires_billing }}
+													<label class="form-check-label">{{ recurring_billing_form.requires_billing.label }}</label>
+												</div>
+												<div class="form-text">{{ recurring_billing_form.requires_billing.help_text }}</div>
+												{{ recurring_billing_form.requires_billing.errors }}
+											</div>
+										</div>
+										<div id="recurring-billing-feedback" class="mt-2"></div>
+									</div>
+									<hr class="my-3">
 									<form method="post">
 										{% csrf_token %}
 										<input type="hidden" name="section" value="billing_frequency">
@@ -262,7 +274,7 @@
 										<div class="form-check mb-2">{{ invoice_schedule_form.is_active }} <label class="form-check-label">{{ invoice_schedule_form.is_active.label }}</label></div>
 										<div class="mb-2">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
 										<div class="d-flex justify-content-end">
-											<button type="submit" class="btn btn-primary" {% if billing_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
+											<button type="submit" class="btn btn-primary" {% if billing_frequency_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
 										</div>
 									</form>
 								</div>
@@ -275,7 +287,22 @@
 									{% if effective_billing_data %}
 										RFC: <strong>{{ effective_billing_data.rfc }}</strong><br>
 										Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong><br>
-										Frecuencia: <strong>{{effective_billing_frequency}}</strong><br>
+										{% if effective_billing_address %}
+											Domicilio Fiscal:
+											<strong>
+												{{ effective_billing_address.street }}
+												{% if effective_billing_address.exterior_number %} {{ effective_billing_address.exterior_number }}{% endif %}
+												{% if effective_billing_address.interior_number %} Int. {{ effective_billing_address.interior_number }}{% endif %},
+												{{ effective_billing_address.locality }},
+												{{ effective_billing_address.municipality }},
+												{{ effective_billing_address.state }},
+												CP {{ effective_billing_address.zip_code }},
+												{{ effective_billing_address.country }}
+											</strong><br>
+										{% endif %}
+										{% if effective_billing_frequency %}
+											Frecuencia: <strong>{{ effective_billing_frequency }}</strong><br>
+										{% endif %}
 									{% else %}
 										Sin datos de facturación efectivos disponibles.
 									{% endif %}
@@ -297,10 +324,6 @@
 										<div class="form-check mb-2">
 											{{ credit_policy_form.can_pay_with_credit }} <label class="form-check-label">{{ credit_policy_form.can_pay_with_credit.label }}</label>
 											<div class="form-text">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
-										</div>
-										<div class="form-check mb-2">
-											{{ credit_policy_form.requires_note_for_credit }} <label class="form-check-label">{{ credit_policy_form.requires_note_for_credit.label }}</label>
-											<div class="form-text">{{ credit_policy_form.requires_note_for_credit.help_text }}</div>
 										</div>
 										<div class="mb-2">
 											{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}
@@ -367,6 +390,74 @@
 
 	document.addEventListener('DOMContentLoaded', () => {
 		new InvoiceFrequencyFieldController();
+
+		class RecurringBillingToggleController {
+			constructor() {
+				this.checkbox = document.getElementById('id_recurring_billing-requires_billing');
+				this.container = this.checkbox?.closest('[data-recurring-billing-url]');
+				this.feedback = document.getElementById('recurring-billing-feedback');
+				this.updateUrl = this.container?.dataset.recurringBillingUrl;
+			}
+
+			getCsrfToken() {
+				const cookie = document.cookie
+					.split(';')
+					.map(part => part.trim())
+					.find(part => part.startsWith('csrftoken='));
+				return cookie ? decodeURIComponent(cookie.split('=')[1]) : '';
+			}
+
+			setFeedback(message, level) {
+				if (!this.feedback) {
+					return;
+				}
+				this.feedback.innerHTML = `<div class="alert alert-${level} py-2 mb-0">${message}</div>`;
+			}
+
+			async handleChange() {
+				if (!this.checkbox || !this.updateUrl) {
+					return;
+				}
+
+				const previousValue = !this.checkbox.checked;
+				this.checkbox.disabled = true;
+				this.setFeedback('Guardando configuración...', 'secondary');
+
+				try {
+					const response = await fetch(this.updateUrl, {
+						method: 'PATCH',
+						headers: {
+							'Content-Type': 'application/json',
+							'X-CSRFToken': this.getCsrfToken(),
+						},
+						body: JSON.stringify({
+							requires_billing: this.checkbox.checked,
+						}),
+					});
+					const data = await response.json();
+
+					if (!response.ok || !data.success) {
+						throw new Error(data.error || 'No se pudo actualizar la facturación recurrente.');
+					}
+
+					window.location.href = `${window.location.pathname}?tab=billing`;
+				} catch (error) {
+					this.checkbox.checked = previousValue;
+					this.setFeedback(error.message, 'danger');
+				} finally {
+					this.checkbox.disabled = false;
+				}
+			}
+
+			init() {
+				if (!this.checkbox || !this.updateUrl) {
+					return;
+				}
+				this.checkbox.addEventListener('change', () => this.handleChange());
+			}
+		}
+
+		new RecurringBillingToggleController().init();
 
 		const termType = document.getElementById('id_credit_config-payment_term_type');
 		const cutoffWrapper = document.getElementById('credit-cutoff-day-wrapper');

@@ -16,6 +16,7 @@ from .forms import (
     ClientCreditPolicyForm,
     ContactForm,
     InvoiceDataForm,
+    ClientRecurringBillingForm,
     InvoiceScheduleForm,
     ClientCreditConfigForm,
     AddressInlineForm,
@@ -27,14 +28,6 @@ from product.services import ensure_client_product_prices
 
 def _is_admin_user(user) -> bool:
     return user.is_authenticated and user.is_staff
-
-
-def _billing_tab_enabled(client: Client) -> bool:
-    if not client.requires_billing:
-        return False
-    if client.type == 'branch' and not client.billing_override_enabled:
-        return False
-    return True
 
 
 def _get_address_formset(*, data=None, instance=None):
@@ -141,22 +134,26 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         )
 
     invoice_data_form = forms_override.get('invoice_data_form') or InvoiceDataForm(instance=invoice_data_instance, prefix='invoice_data')
+    recurring_billing_form = forms_override.get('recurring_billing_form') or ClientRecurringBillingForm(instance=client, prefix='recurring_billing')
     invoice_schedule_form = forms_override.get('invoice_schedule_form') or InvoiceScheduleForm(instance=invoice_schedule_instance, prefix='invoice_schedule')
     credit_config_form = forms_override.get('credit_config_form') or ClientCreditConfigForm(instance=credit_config_instance, prefix='credit_config')
 
-    billing_enabled = bool(client and _billing_tab_enabled(client))
+    billing_enabled = bool(client)
     billing_read_only = bool(
         client
         and client.type == 'branch'
         and not client.billing_override_enabled
-        and client.requires_billing
     )
-    billing_disabled = not billing_enabled
+    billing_data_disabled = not billing_enabled or billing_read_only
+    billing_frequency_disabled = billing_data_disabled or not bool(client and client.requires_billing)
 
-    if billing_disabled:
-        for form in [invoice_data_form, invoice_schedule_form]:
-            for field in form.fields.values():
-                field.disabled = True
+    if billing_data_disabled:
+        for field in invoice_data_form.fields.values():
+            field.disabled = True
+
+    if billing_frequency_disabled:
+        for field in invoice_schedule_form.fields.values():
+            field.disabled = True
 
     return {
         'client': client,
@@ -166,12 +163,15 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         'address_formset': address_formset,
         'contact_formset': contact_formset,
         'invoice_data_form': invoice_data_form,
+        'recurring_billing_form': recurring_billing_form,
         'invoice_schedule_form': invoice_schedule_form,
         'credit_config_form': credit_config_form,
         'billing_enabled': billing_enabled,
         'billing_read_only': billing_read_only,
-        'billing_disabled': billing_disabled,
+        'billing_data_disabled': billing_data_disabled,
+        'billing_frequency_disabled': billing_frequency_disabled,
         'effective_billing_data': client.billing_info.effective.data if client else None,
+        'effective_billing_address': client.billing_info.effective.address if client else None,
         'effective_billing_frequency': client.billing_info.effective.frequency if client else None,
     }
 
@@ -238,6 +238,9 @@ def edit_v2(request, pk):
             core_form = ClientCoreForm(request.POST, instance=client)
             if core_form.is_valid():
                 core_form.save()
+                if not client.requires_billing and hasattr(client, 'invoice_schedule'):
+                    client.invoice_schedule.is_active = False
+                    client.invoice_schedule.save()
                 messages.success(request, 'Datos básicos actualizados correctamente.')
                 if client.requires_billing and not client.billing_info.effective.has_address:
                     messages.warning(request, '⚠️ Advertencia: El cliente requiere facturación pero no se encontró un domicilio de tipo FISCAL.')
@@ -249,6 +252,29 @@ def edit_v2(request, pk):
                 client=client,
                 active_tab=active_tab,
                 forms_override={'core_form': core_form},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'recurring_billing':
+            recurring_billing_form = ClientRecurringBillingForm(
+                request.POST,
+                instance=client,
+                prefix='recurring_billing',
+            )
+            if recurring_billing_form.is_valid():
+                recurring_billing_form.save()
+                if not client.requires_billing and hasattr(client, 'invoice_schedule'):
+                    client.invoice_schedule.is_active = False
+                    client.invoice_schedule.save()
+                messages.success(request, 'Configuración de facturación recurrente actualizada correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab='billing',
+                forms_override={'recurring_billing_form': recurring_billing_form},
             )
             return render(request, 'clients/client_form_v2.html', context)
 
@@ -296,13 +322,13 @@ def edit_v2(request, pk):
             return render(request, 'clients/client_form_v2.html', context)
 
         if section in ['billing_data', 'billing_frequency']:
-            if not _billing_tab_enabled(client):
-                messages.warning(request, 'No se puede editar facturación mientras esté deshabilitada o heredada.')
-                if request.path.startswith('/administrador/'):
-                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
-                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
-
             if section == 'billing_data':
+                if client.type == 'branch' and not client.billing_override_enabled:
+                    messages.warning(request, 'Esta sucursal hereda los datos de facturación del corporativo y no puede editarlos aquí.')
+                    if request.path.startswith('/administrador/'):
+                        return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
+                    return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+
                 form = InvoiceDataForm(request.POST, instance=getattr(client, 'invoice_data', None), prefix='invoice_data')
                 if form.is_valid():
                     invoice_data = form.save(commit=False)
@@ -319,6 +345,18 @@ def edit_v2(request, pk):
                     forms_override={'invoice_data_form': form},
                 )
                 return render(request, 'clients/client_form_v2.html', context)
+
+            if client.type == 'branch' and not client.billing_override_enabled:
+                messages.warning(request, 'Esta sucursal hereda la configuración de facturación del corporativo y no puede editarla aquí.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
+
+            if not client.requires_billing:
+                messages.warning(request, 'Active "Requiere facturación recurrente" en Datos Básicos para configurar la frecuencia de facturación.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=billing")
 
             schedule_instance = getattr(client, 'invoice_schedule', None)
             if schedule_instance is None:
@@ -581,7 +619,6 @@ def update_client(request, pk):
             corporate_id=body.get('corporate_id'),
             credit_limit=body.get('credit_limit'),
             can_pay_with_credit=body.get('can_pay_with_credit'),
-            requires_note_for_credit=body.get('requires_note_for_credit'),
             address_link=body.get('address_link'),
             requires_billing=body.get('requires_billing'),
             billing_override_enabled=body.get('billing_override_enabled'),
@@ -600,7 +637,6 @@ def update_client(request, pk):
                 'requires_billing': updated_client.requires_billing,
                 'active': updated_client.active,
                 'can_pay_with_credit': updated_client.can_pay_with_credit,
-                'requires_note_for_credit': updated_client.requires_note_for_credit,
                 'billing_override_enabled': updated_client.billing_override_enabled,
             }
         })

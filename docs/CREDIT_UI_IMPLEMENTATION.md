@@ -1,17 +1,15 @@
 # Credit Payment UI Controls Implementation
 
 ## Overview
-This implementation adds complete UI controls for credit payment restrictions, including automatic hiding/showing of credit payment options and required note fields based on client settings.
+This implementation adds complete UI controls for credit payment restrictions.
 
 ## Features Implemented
 
 ### 1. Backend Model Updates ✅
 - **New Client Fields**:
   - `can_pay_with_credit` (Boolean, default: True)
-  - `requires_note_for_credit` (Boolean, default: False)
 - **Client Methods**:
   - `can_use_credit_for_payment()` - Check if client can use credit
-  - `requires_note_for_credit_payment()` - Check if note is required
   - `validate_credit_payment(amount, note)` - Comprehensive validation
 - **Payment Model Updates**:
   - Enhanced validation in `clean()` method
@@ -20,41 +18,31 @@ This implementation adds complete UI controls for credit payment restrictions, i
 ### 2. View Updates ✅
 - **Orders View (`create_order`)**:
   - Added client credit settings to template context
-  - `can_use_credit` and `requires_credit_note` flags passed to frontend
+  - `can_use_credit` flag passed to frontend
 - **Payment View (`create_payment`)**:
-  - Credit note validation for restricted clients
   - Enhanced credit payment validation using client methods
   - Proper error handling with descriptive messages
 
 ### 3. UI Implementation ✅
 
 #### Template Updates (`create_order.html`)
-- **Credit Note Fields**: Hidden by default, shown when needed
-  - Desktop version: Full textarea with validation
-  - Mobile version: Compact textarea for smaller screens
-  - Both include proper labels, placeholders, and validation styling
+- **Credit Note Fields**: Optional note fields remain available when needed by the workflow
 
 #### JavaScript Implementation
 - **Client Settings Variables**: 
   ```javascript
   const canUseCredit = {{ can_use_credit|yesno:"true,false" }};
-  const requiresCreditNote = {{ requires_credit_note|yesno:"true,false" }};
   ```
 
 - **Payment Method Validation**:
   - Credit options disabled when `canUseCredit = false`
-  - Credit options show "(Requiere nota)" when `requiresCreditNote = true`
   - Dynamic affordability calculations respect credit restrictions
 
 - **Credit Note Management**:
-  - `toggleCreditNoteField()` - Shows/hides note fields based on payment method
-  - `validateCreditNote()` - Real-time validation with visual feedback
-  - `syncCreditNoteValues()` - Syncs values between desktop and mobile versions
-  - Automatic required field management
+  - Optional note values can still be sent with the payment request
+  - Syncs values between desktop and mobile versions when the UI exposes both
 
 - **Enhanced Payment Processing**:
-  - Credit note validation before payment submission
-  - Clear error messages for missing notes
   - Credit note included in payment requests
 
 ## How It Works
@@ -69,22 +57,10 @@ This implementation adds complete UI controls for credit payment restrictions, i
    - Backend validates client can use credit before processing
    - Clear error message if credit is not allowed
 
-### Scenario 2: Client Requiring Credit Notes (`requires_note_for_credit = True`)
-1. **UI Behavior**:
-   - Credit payment option shows "(Requiere nota)" indicator
-   - Credit note field automatically appears when credit is selected
-   - Real-time validation ensures note is provided
-   - Note field is marked as required
-
-2. **Payment Processing**:
-   - Backend validates note is provided for credit payments
-   - Note is stored with the credit transaction for audit trail
-   - Clear error message if note is missing
-
-### Scenario 3: Normal Client (Default Settings)
+### Scenario 2: Normal Client (Default Settings)
 1. **UI Behavior**:
    - Credit payment works as before
-   - No additional validation or note requirements
+   - No additional validation requirements
    - Standard credit payment flow
 
 ## User Experience
@@ -112,10 +88,6 @@ This implementation adds complete UI controls for credit payment restrictions, i
 - **Frontend**: "Crédito (No disponible)" option disabled
 - **Backend**: "Este cliente no puede usar crédito para pagos en este momento."
 
-### Note Required (Missing)
-- **Frontend**: "Se requiere una nota para pagos con crédito para este cliente."
-- **Backend**: "Se requiere una nota para pagos con crédito para este cliente."
-
 ### Insufficient Credit
 - **Frontend**: "Crédito (Insuficiente)" with calculation breakdown
 - **Backend**: "Cliente no tiene suficiente crédito disponible. Crédito disponible: $X, Monto requerido: $Y"
@@ -124,7 +96,7 @@ This implementation adds complete UI controls for credit payment restrictions, i
 
 ### Database Schema
 - **Migration**: `clients/migrations/0012_client_can_pay_with_credit_and_more.py`
-- **Fields Added**: Both boolean fields with appropriate defaults
+- **Fields Added**: `can_pay_with_credit` with the appropriate default
 - **Backward Compatible**: Existing clients default to normal behavior
 
 ### JavaScript Architecture

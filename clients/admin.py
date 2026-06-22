@@ -267,7 +267,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 			}),
 			('Balance y Crédito', {
 				'fields': (
-					('can_pay_with_credit', 'requires_note_for_credit'),	
+					('can_pay_with_credit',),
 					('credit_limit',),		
 					('balance', 'current_debt', ), 
 					('get_available_credit'),

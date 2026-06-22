@@ -397,6 +397,12 @@ class ClientCoreForm(forms.ModelForm):
             'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'billing_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+        labels = {
+            'requires_billing': 'Requiere facturación recurrente',
+        }
+        help_texts = {
+            'requires_billing': 'Activa la frecuencia de facturación automática o recurrente para este cliente.',
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -420,17 +426,13 @@ class ClientCoreForm(forms.ModelForm):
 class ClientCreditPolicyForm(forms.ModelForm):
     class Meta:
         model = Client
-        fields = ['can_pay_with_credit', 'requires_note_for_credit', 'credit_limit']
+        fields = ['can_pay_with_credit', 'credit_limit']
         help_texts = {
             'can_pay_with_credit': 'Habilita o deshabilita el uso de crédito.',
-            'requires_note_for_credit': (
-                'Obliga a capturar una nota al realizar una operación a crédito.'
-            ),
             'credit_limit': 'Monto máximo de deuda activa autorizado.',
         }
         widgets = {
             'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'requires_note_for_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
         }
 
@@ -455,6 +457,21 @@ class InvoiceDataForm(forms.ModelForm):
             'rfc': forms.TextInput(attrs={'class': 'form-control'}),
             'razon_social': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'curp': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+
+class ClientRecurringBillingForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = ['requires_billing']
+        widgets = {
+            'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'requires_billing': 'Requiere facturación recurrente',
+        }
+        help_texts = {
+            'requires_billing': 'Activa la frecuencia de facturación automática o recurrente para este cliente.',
         }
 
 

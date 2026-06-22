@@ -181,7 +181,11 @@
                 >
               </td>
               <td>#{{ order.id }}</td>
-              <td>{{ order.client.name }}</td>
+              <td>
+                <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none fw-semibold">
+                  {{ order.client.name }}
+                </a>
+              </td>
               <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
               <td>${{ order.subtotal|floatformat:2 }}</td>
               <td>${{ order.discount|floatformat:2 }}</td>

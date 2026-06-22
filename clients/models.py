@@ -113,7 +113,6 @@ class Client(TimeStampedModel):
     credit_limit = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Límite de crédito", help_text="Máximo monto que el cliente puede deber")
     current_debt = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, verbose_name="Deuda actual", help_text="Monto actual que debe el cliente")
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
-    requires_note_for_credit = models.BooleanField(default=False, verbose_name="Requiere justificación para crédito", help_text="Si está habilitado, se requerirá una justificación obligatoria al realizar pagos con crédito")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
     external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID externo", help_text="ID del cliente en sistemas externos (ERP, CRM, etc.)")
@@ -172,11 +171,6 @@ class Client(TimeStampedModel):
         # but this should be validated at the business logic level (e.g., when creating orders)
         # rather than at the model level, to allow proper admin inline workflow.
 
-        # Existing credit payment constraints
-        if not self.can_pay_with_credit and self.requires_note_for_credit:
-            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito y requerir nota al mismo tiempo.'
-            errors['requires_note_for_credit'] = 'No se puede requerir nota si el pago con crédito está deshabilitado.'
-
         if not self.can_pay_with_credit and self.current_debt > 0:
             errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
 
@@ -197,18 +191,12 @@ class Client(TimeStampedModel):
             and not self.requires_billing
         ):
             errors['requires_billing'] = (
-                'No se puede deshabilitar la facturación mientras el plazo de crédito '
+                'No se puede deshabilitar la facturación recurrente mientras el plazo de crédito '
                 'dependa de la emisión de factura.'
             )
 
         if errors:
             raise ValidationError(errors)
-
-    def save(self, *args, **kwargs):
-        """Auto-enable billing on new branches when the corporate requires it."""
-        if self.type == 'branch' and self.corporate and self.corporate.requires_billing:
-            self.requires_billing = True
-        return super().save(*args, **kwargs)
 
     # Balance and Credit State Methods (pure state queries, no side effects)
     def get_available_credit(self):
@@ -225,22 +213,13 @@ class Client(TimeStampedModel):
         # If credit payment is disabled for this client
         return self.can_pay_with_credit and self.get_available_credit() > 0
     
-    def requires_note_for_credit_payment(self):
-        """
-        Check if client requires a note when making credit payments
-        
-        Returns:
-            bool: True if note is required, False otherwise
-        """
-        return self.requires_note_for_credit
-    
     def validate_credit_payment(self, amount, note=None):
         """
         Validate if a credit payment can be processed
         
         Args:
             amount: Amount to be paid with credit
-            note: Note provided for the transaction
+            note: Optional note provided for the transaction
             
         Returns:
             dict: Validation result with success status and error message if applicable
@@ -251,14 +230,6 @@ class Client(TimeStampedModel):
                 'success': False,
                 'error': 'Client is not allowed to pay with credit at this time.',
                 'error_code': 'CREDIT_DISABLED'
-            }
-        
-        # Check if note is required
-        if self.requires_note_for_credit_payment() and not note:
-            return {
-                'success': False,
-                'error': 'A note is required for credit payments for this client.',
-                'error_code': 'NOTE_REQUIRED'
             }
         
         available_credit = self.get_available_credit()
@@ -644,6 +615,6 @@ class ClientCreditConfig(TimeStampedModel):
             raise ValidationError({
                 'payment_term_type': (
                     'El vencimiento posterior a factura solo está disponible para '
-                    'clientes que requieren facturación.'
+                    'clientes con facturación recurrente.'
                 ),
             })

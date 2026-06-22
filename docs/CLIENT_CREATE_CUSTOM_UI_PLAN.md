@@ -63,7 +63,6 @@ Fields:
 - note
 - address_link
 - can_pay_with_credit
-- requires_note_for_credit
 - credit_limit
 - requires_billing
 - billing_override_enabled (only branch)
@@ -116,7 +115,7 @@ Rules:
 
 Primary models:
 
-- `Client`: can_pay_with_credit, requires_note_for_credit, credit_limit
+- `Client`: can_pay_with_credit, credit_limit
 - `ClientCreditConfig`: max_payment_days, first_notification_days, second_notification_days, overdue_notification_days
 
 Rules:

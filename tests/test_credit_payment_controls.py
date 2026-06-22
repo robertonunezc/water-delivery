@@ -11,7 +11,6 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'water_delivery.settings')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 django.setup()
 
-from django.core.exceptions import ValidationError
 from clients.models import Client
 from decimal import Decimal
 
@@ -29,28 +28,11 @@ def test_credit_payment_controls():
         credit_limit=Decimal('1000.00')
     )
     print(f"   can_pay_with_credit: {client1.can_pay_with_credit} (should be True)")
-    print(f"   requires_note_for_credit: {client1.requires_note_for_credit} (should be False)")
     assert client1.can_pay_with_credit == True
-    assert client1.requires_note_for_credit == False
     print("   ✓ Default values correct")
     
-    # Test 2: Validation - both fields cannot be restrictive
-    print("\n2. Testing validation (both fields cannot be restrictive)...")
-    client2 = Client(
-        name="Test Client 2",
-        can_pay_with_credit=False,
-        requires_note_for_credit=True,
-        credit_limit=Decimal('1000.00')
-    )
-    try:
-        client2.full_clean()
-        print("   ✗ Validation should have failed!")
-        assert False, "Validation should have failed"
-    except ValidationError as e:
-        print(f"   ✓ Validation correctly failed: {e.message_dict}")
-    
-    # Test 3: can_use_credit_for_payment method
-    print("\n3. Testing can_use_credit_for_payment method...")
+    # Test 2: can_use_credit_for_payment method
+    print("\n2. Testing can_use_credit_for_payment method...")
     
     # Client with credit disabled and no credit balance
     client3 = Client.objects.create(
@@ -82,8 +64,8 @@ def test_credit_payment_controls():
     print(f"   Client 5 - can_pay_with_credit=True, available_credit=0: {client5.can_use_credit_for_payment()} (should be False)")
     assert client5.can_use_credit_for_payment() == False
     
-    # Test 4: validate_credit_payment method
-    print("\n4. Testing validate_credit_payment method...")
+    # Test 3: validate_credit_payment method
+    print("\n3. Testing validate_credit_payment method...")
     
     # Test with client that can't pay with credit
     result = client3.validate_credit_payment(Decimal('100.00'))
@@ -98,26 +80,19 @@ def test_credit_payment_controls():
     assert result['success'] == False
     assert result['error_code'] == 'CREDIT_LIMIT_EXCEEDED'
     
-    # Test with client requiring note but no note provided
+    # Notes are now optional for credit payments
     client6 = Client.objects.create(
         name="Test Client 6",
         can_pay_with_credit=True,
-        requires_note_for_credit=True,
         credit_limit=Decimal('1000.00'),
         current_debt=Decimal('0.00')
     )
     result = client6.validate_credit_payment(Decimal('100.00'))
-    print(f"   Client 6 no note provided: {result}")
-    assert result['success'] == False
-    assert result['error_code'] == 'NOTE_REQUIRED'
-    
-    # Test with client requiring note and note provided
-    result = client6.validate_credit_payment(Decimal('100.00'), note="Test note")
-    print(f"   Client 6 with note: {result}")
+    print(f"   Client 6 without note: {result}")
     assert result['success'] == True
     
-    # Test 5: can_afford_order method
-    print("\n5. Testing can_afford_order method...")
+    # Test 4: can_afford_order method
+    print("\n4. Testing can_afford_order method...")
     
     # Client that can't use credit
     client3.balance = Decimal('200.00')
