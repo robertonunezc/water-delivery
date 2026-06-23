@@ -1,7 +1,7 @@
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 
 from clients.services.pending_payment_service import (
     _monthly_cutoff_date,
@@ -51,3 +51,15 @@ class CreditPaymentTermDateTests(SimpleTestCase):
         )
 
         self.assertIsNone(get_order_credit_due_date(order, config))
+
+    @override_settings(USE_TZ=False)
+    def test_monthly_cutoff_accepts_naive_order_datetime(self) -> None:
+        order = SimpleNamespace(order_date=datetime(2026, 6, 21, 14, 30))
+        config = SimpleNamespace(
+            payment_term_type='monthly_cutoff',
+            cutoff_day='20',
+        )
+
+        due_date = get_order_credit_due_date(order, config)
+
+        self.assertEqual(due_date, date(2026, 7, 20))

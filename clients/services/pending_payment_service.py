@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -8,6 +8,20 @@ from django.utils import timezone
 
 from clients.models import Client, ClientCreditConfig, CreditTransaction
 from orders.models import Order
+
+
+def _as_date(value: date | datetime) -> date:
+    """Normalize date-like values for projects with or without timezone support."""
+    if isinstance(value, datetime):
+        if timezone.is_aware(value):
+            return timezone.localtime(value).date()
+        return value.date()
+    return value
+
+
+def _current_date() -> date:
+    """Return today's date without assuming timezone-aware datetimes."""
+    return _as_date(timezone.now())
 
 
 def _monthly_cutoff_date(reference_date: date, cutoff_day: str) -> date:
@@ -29,7 +43,7 @@ def get_order_credit_due_date(
 ) -> date | None:
     """Return the payment due date for an order under the client's credit terms."""
     if credit_config.payment_term_type == 'monthly_cutoff':
-        order_date = timezone.localtime(order.order_date).date()
+        order_date = _as_date(order.order_date)
         return _monthly_cutoff_date(order_date, credit_config.cutoff_day)
 
     emitted_dates = [
@@ -90,7 +104,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         .select_related('client', 'client__credit_config')
         .prefetch_related('invoice_links__invoice')
     )
-    current_date = timezone.localdate()
+    current_date = _current_date()
     overdue_orders, total_overdue, days_overdue = _overdue_order_data(
         client,
         unpaid_orders,
@@ -161,7 +175,7 @@ def get_clients_with_pending_payments() -> list[dict[str, Any]]:
     last_payment_map = {item['client_id']: item['last_date'] for item in last_payments}
 
     clients_data = []
-    current_date = timezone.localdate()
+    current_date = _current_date()
     for client_id, orders in orders_by_client.items():
         overdue_orders, total_overdue, days_overdue = _overdue_order_data(
             clients_map[client_id],
