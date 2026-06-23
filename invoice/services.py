@@ -139,8 +139,7 @@ def get_clients_needing_billing(
             ).order_by('-order_date')
         )
     )
-    print(queryset.count())
-    print('Frecuency filter:', frequency_filter)
+
     # Apply frequency filter
     if frequency_filter:
         queryset = queryset.filter(invoice_schedule__frequency=frequency_filter)
