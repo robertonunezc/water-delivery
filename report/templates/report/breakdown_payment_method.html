@@ -6,22 +6,31 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
       border-radius: 10px;
-      margin-bottom: 1.5rem;
+      margin-bottom: 1rem;
+      padding: 0.85rem;
+    }
+
+    .debt-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.6rem;
     }
     
     .debt-stat-item {
       text-align: center;
-      padding: 1rem;
+      padding: 0.65rem;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 8px;
     }
     
     .debt-stat-value {
-      font-size: 1.8rem;
+      font-size: 1.2rem;
       font-weight: bold;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.25rem;
     }
     
     .debt-stat-label {
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       opacity: 0.9;
     }
     
@@ -91,20 +100,24 @@
     <!-- Overall Statistics -->
     {% if stats.total_orders %}
       <div class="debt-stats-card">
-        <div class="row">
-          <div class="col-md-3 debt-stat-item">
+        <div class="debt-stats-grid">
+          <div class="debt-stat-item">
             <div class="debt-stat-value">{{ stats.total_orders }}</div>
             <div class="debt-stat-label">Órdenes Totales</div>
           </div>
-          <div class="col-md-3 debt-stat-item">
+          <div class="debt-stat-item">
+            <div class="debt-stat-value">${{ stats.subtotal_amount|floatformat:2 }}</div>
+            <div class="debt-stat-label">Subtotal</div>
+          </div>
+          <div class="debt-stat-item">
+            <div class="debt-stat-value">${{ stats.total_discount|floatformat:2 }}</div>
+            <div class="debt-stat-label">Descuentos</div>
+          </div>
+          <div class="debt-stat-item">
             <div class="debt-stat-value">${{ stats.total_amount|floatformat:2 }}</div>
             <div class="debt-stat-label">Monto Total</div>
           </div>
-          <div class="col-md-3 debt-stat-item">
-            <div class="debt-stat-value">{{ stats.active_payment_methods }}</div>
-            <div class="debt-stat-label">Métodos de Pago Activos</div>
-          </div>
-          <div class="col-md-3 debt-stat-item">
+          <div class="debt-stat-item">
             <div class="debt-stat-value">${{ stats.avg_amount|floatformat:2 }}</div>
             <div class="debt-stat-label">Promedio por Orden</div>
           </div>
@@ -119,6 +132,9 @@
           <div class="payment-method-section">
             <h3 class="payment-method-title">
               {{ method_data.name }}: Total ${{ method_data.total_amount|floatformat:2 }}
+              {% if method_data.total_discount %}
+                | Descuento ${{ method_data.total_discount|floatformat:2 }}
+              {% endif %}
             </h3>
             <div class="card">
               <div class="card-body p-0">
@@ -130,6 +146,8 @@
                         <th scope="col">Cliente</th>
                         <th scope="col">Productos</th>
                         <th scope="col">Hora</th>
+                        <th scope="col" class="text-end">Subtotal</th>
+                        <th scope="col" class="text-end">Descuento</th>
                         <th scope="col" class="text-end">Total</th>
                       </tr>
                     </thead>
@@ -159,6 +177,12 @@
                           </td>
                           <td>
                             <small class="text-muted">{{ order.order_date|time:"H:i" }}</small>
+                          </td>
+                          <td class="text-end">
+                            <span class="fw-bold">${{ order.subtotal_amount|floatformat:2 }}</span>
+                          </td>
+                          <td class="text-end">
+                            <span class="fw-bold text-danger">${{ order.discount|floatformat:2 }}</span>
                           </td>
                           <td class="text-end">
                             <span class="fw-bold text-success">${{ order.total_amount|floatformat:2 }}</span>

@@ -13,6 +13,22 @@ from orders.models import Order, ORDER_STATUS_CHOICES
 from payment.models import PAYMENT_METHOD_CHOICES
 
 
+NO_PAYMENT_RECORDED_METHOD = 'no_payment_recorded'
+FULL_DISCOUNT_METHOD = 'full_discount'
+
+
+def _get_order_payment_bucket(order: Order) -> tuple[str, str]:
+    """Return the report bucket key/name for an order."""
+    first_payment = next(iter(order.payments.all()), None)
+    if first_payment:
+        return first_payment.method, first_payment.get_method_display()
+
+    if order.discount > 0 and order.total_amount == Decimal('0.00'):
+        return FULL_DISCOUNT_METHOD, 'Descuento 100% / Sin cobro'
+
+    return NO_PAYMENT_RECORDED_METHOD, 'Sin pago registrado'
+
+
 @login_required
 def client_debt_report(request):
     """
@@ -415,27 +431,49 @@ def breakdown_payment_method(request):
 
     # Calculate overall statistics
     total_orders = orders.count()
-    total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    totals = orders.aggregate(
+        total_amount=Sum('total_amount'),
+        total_discount=Sum('discount'),
+        subtotal_amount=Sum('subtotal_amount'),
+    )
+    total_amount = totals['total_amount'] or Decimal('0.00')
+    total_discount = totals['total_discount'] or Decimal('0.00')
+    subtotal_amount = totals['subtotal_amount'] or Decimal('0.00')
     avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
 
     # Aggregate orders by payment method
     payment_method_stats = {}
     active_payment_methods = 0
-    for method_key, method_name in PAYMENT_METHOD_CHOICES:
-        method_orders = orders.filter(payments__method=method_key).distinct()
+    bucket_order_ids = {}
+    bucket_names = dict(PAYMENT_METHOD_CHOICES)
+    bucket_names[FULL_DISCOUNT_METHOD] = 'Descuento 100% / Sin cobro'
+    bucket_names[NO_PAYMENT_RECORDED_METHOD] = 'Sin pago registrado'
+
+    for order in orders:
+        bucket_key, bucket_name = _get_order_payment_bucket(order)
+        bucket_names[bucket_key] = bucket_name
+        bucket_order_ids.setdefault(bucket_key, []).append(order.id)
+
+    for method_key, method_name in bucket_names.items():
+        order_ids = bucket_order_ids.get(method_key, [])
+        method_orders = orders.filter(id__in=order_ids) if order_ids else orders.none()
         method_total = method_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-        order_count = method_orders.count()
+        method_discount = method_orders.aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        order_count = len(order_ids)
         payment_method_stats[method_key] = {
             'name': method_name,
             'total_amount': method_total,
+            'total_discount': method_discount,
             'order_count': order_count,
-            'orders': method_orders
+            'orders': method_orders,
         }
         if order_count > 0:
             active_payment_methods += 1
 
     stats = {
         'total_orders': total_orders,
+        'subtotal_amount': subtotal_amount,
+        'total_discount': total_discount,
         'total_amount': total_amount,
         'avg_amount': avg_amount,
         'active_payment_methods': active_payment_methods
@@ -470,7 +508,14 @@ def breakdown_payment_method_csv(request):
     print(orders)
     # Calculate overall statistics
     total_orders = orders.count()
-    total_amount = orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
+    totals = orders.aggregate(
+        total_amount=Sum('total_amount'),
+        total_discount=Sum('discount'),
+        subtotal_amount=Sum('subtotal_amount'),
+    )
+    total_amount = totals['total_amount'] or Decimal('0.00')
+    total_discount = totals['total_discount'] or Decimal('0.00')
+    subtotal_amount = totals['subtotal_amount'] or Decimal('0.00')
     avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
 
     # Create CSV response
@@ -484,6 +529,8 @@ def breakdown_payment_method_csv(request):
     writer.writerow([])  # Blank row
     writer.writerow(['RESUMEN ESTADÍSTICO'])
     writer.writerow(['Total de Órdenes', total_orders])
+    writer.writerow(['Subtotal', f'${subtotal_amount:.2f}'])
+    writer.writerow(['Total Descuentos', f'${total_discount:.2f}'])
     writer.writerow(['Monto Total', f'${total_amount:.2f}'])
     writer.writerow(['Promedio por Orden', f'${avg_amount:.2f}'])
     writer.writerow([])  # Blank row
@@ -497,15 +544,15 @@ def breakdown_payment_method_csv(request):
         'Método de Pago',
         'Productos',
         'Hora',
+        'Subtotal',
+        'Descuento',
         'Total'
     ])
     
     # Write each order
     for order in orders.prefetch_related('items__product', 'payments'):
         # Get payment method
-        payment_method = 'N/A'
-        if order.payments.exists():
-            payment_method = order.payments.first().get_method_display()
+        _, payment_method = _get_order_payment_bucket(order)
         
         # Get products as comma-separated string
         products = ', '.join([
@@ -520,6 +567,8 @@ def breakdown_payment_method_csv(request):
             payment_method,
             products,
             order.order_date.strftime('%H:%M'),
+            f'${order.subtotal_amount:.2f}',
+            f'${order.discount:.2f}',
             f'${order.total_amount:.2f}'
         ])
     
