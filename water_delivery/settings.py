@@ -261,9 +261,9 @@ LANGUAGE_CODE = 'es-mx'
 
 TIME_ZONE = 'America/Mexico_City'
 
-USE_I18N = True
+USE_I18N = False
 
-USE_TZ = True
+USE_TZ = False
 
 #Implement django logging
 from pythonjsonlogger import jsonlogger

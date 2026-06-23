@@ -100,7 +100,7 @@
               </div>
 
               <!-- Auto Amount Checkbox -->
-              <div class="col-md-6">
+              {% comment %} <div class="col-md-6">
                 <label class="form-label">Modo de Calculo</label>
                 <div class="card p-2 border shadow-sm">
                   <div class="form-check form-switch d-flex align-items-center gap-2">
@@ -110,7 +110,7 @@
                     </label>
                   </div>
                 </div>
-              </div>
+              </div> {% endcomment %}
 
               <!-- Amount -->
               <div class="col-md-12">
@@ -143,8 +143,8 @@
             </div>
 
             <div class="d-flex justify-content-end gap-2 mt-4">
-              <a href="{% url 'admin_invoices' %}" class="btn btn-outline-secondary">Cancel</a>
-              <button type="submit" class="btn btn-primary">Save Details</button>
+              <a href="{% url 'admin_invoices' %}" class="btn btn-outline-secondary">Cancelar</a>
+              <button type="submit" class="btn btn-primary">Guardar</button>
             </div>
           </form>
         </div>
