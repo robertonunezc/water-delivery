@@ -874,6 +874,7 @@ class PaymentController {
     this.orderNotesController = orderNotesController;
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
+    this.feedbackElement = document.getElementById('payment-flow-feedback');
   }
 
   init() {
@@ -886,16 +887,34 @@ class PaymentController {
     //this.validateFinishButtonState();
   }
 
+  clearFeedback() {
+    if (!this.feedbackElement) {
+      return;
+    }
+    this.feedbackElement.style.display = 'none';
+    this.feedbackElement.textContent = '';
+  }
+
+  showFeedback(message) {
+    if (!this.feedbackElement) {
+      return;
+    }
+    this.feedbackElement.textContent = message;
+    this.feedbackElement.style.display = 'block';
+  }
+
   validateFinishButtonState() {
     const orderType = this.getOrderType();
     let isValid = false;
+    const orderTotal = this.getOrderTotal();
+    const subtotal = this.getSubtotal();
+    const isDiscountedFreeOrder = orderTotal === 0 && subtotal > 0;
 
     if (orderType === 'credito') {
-      isValid = true;
+      isValid = orderTotal > 0 || isDiscountedFreeOrder;
     } else {
       const cantidadCobrada = this.getCantidadCobrada() || 0;
-      const orderTotal = this.getOrderTotal();
-      if (cantidadCobrada >= orderTotal - 0.01) {
+      if ((orderTotal > 0 && cantidadCobrada >= orderTotal - 0.01) || isDiscountedFreeOrder) {
         isValid = true;
       }
     }
@@ -926,6 +945,7 @@ class PaymentController {
   }
 
   configureOrderTypeUI() {
+    this.clearFeedback();
     const orderType = this.getOrderType();
     const paymentMethodDesktop = document.getElementById('payment-method-select');
     const paymentMethodMobile = document.getElementById('payment-method-select-mobile');
@@ -1026,6 +1046,12 @@ class PaymentController {
     return parseFloat(orderTotalStr.replace(/[^\d.-]/g, '')) || 0;
   }
 
+  getSubtotal() {
+    const subtotalElement = document.getElementById('summary-subtotal');
+    const subtotalStr = subtotalElement ? subtotalElement.textContent : '0.00';
+    return parseFloat(subtotalStr.replace(/[^\d.-]/g, '')) || 0;
+  }
+
   getPaymentMethod() {
     const paymentMethodSelect = document.getElementById('payment-method-select');
     const paymentMethodSelectMobile = document.getElementById('payment-method-select-mobile');
@@ -1094,8 +1120,12 @@ class PaymentController {
   }
 
   async handleFinish() {
+    this.clearFeedback();
     const orderTotal = this.getOrderTotal();
-    if (orderTotal === 0) {
+    const subtotal = this.getSubtotal();
+    const isDiscountedFreeOrder = orderTotal === 0 && subtotal > 0;
+
+    if (orderTotal === 0 && !isDiscountedFreeOrder) {
       this.alertManager.show('warning', 'Atención', 'El pedido está vacío. Agregue productos antes de terminar.');
       return;
     }
@@ -1119,6 +1149,7 @@ class PaymentController {
         }
       } catch (error) {
         this.enableButtons();
+        this.showFeedback(error.message || 'No se pudo registrar la orden a crédito.');
         this.alertManager.show('danger', 'Error', `No se pudo registrar la orden a crédito. ${error.message}`);
         console.error('Credit order registration error', error);
       }
@@ -1147,6 +1178,7 @@ class PaymentController {
       }
     } catch (error) {
       this.enableButtons();
+      this.showFeedback(error.message || 'No se pudo procesar el pago.');
       this.alertManager.show('danger', 'Error', `No se pudo procesar el pago. ${error.message}`);
       console.error('Payment error', error);
     }
@@ -1161,6 +1193,7 @@ class PaymentController {
   }
 
   handleSuccess(data) {
+    this.clearFeedback();
     let message = 'El pedido se ha completado correctamente.';
 
     if (data.payments?.length) {
@@ -1191,6 +1224,7 @@ class PaymentController {
   }
 
   handleCreditOrderPendingSuccess(data) {
+    this.clearFeedback();
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
     setTimeout(() => {
@@ -1262,7 +1296,7 @@ class OrderPageApp {
     const startingTotal = this.config.initialOrderTotal || this.getCurrentOrderTotal();
     this.amountFieldManager.init(startingTotal);
     this.affordabilityStatusManager.update(startingTotal);
-    this.updateFinalizationVisibility(startingTotal);
+      this.updateFinalizationVisibility(startingTotal, this.config.initialSubtotal);
     this.updateSummaryTotals(startingTotal, this.config.initialDiscount, this.config.initialSubtotal);
 
     const hasBalance = (parseFloat(this.config.clientBalance) || 0) > 0;
@@ -1296,10 +1330,10 @@ class OrderPageApp {
       if (totalMobile) totalMobile.textContent = data.order_total;
       this.affordabilityStatusManager.update(data.order_total);
       const numericTotal = parseFloat(data.order_total.replace(/[^\d.-]/g, '')) || 0;
-      this.amountFieldManager.updateFields(numericTotal, true);
-      this.updateFinalizationVisibility(numericTotal);
-      const discountAmount = data.discount ? parseFloat(data.discount) : this.discountManager.getAmount();
       const subtotal = data.subtotal ? parseFloat(data.subtotal) : undefined;
+      this.amountFieldManager.updateFields(numericTotal, true);
+      this.updateFinalizationVisibility(numericTotal, subtotal);
+      const discountAmount = data.discount ? parseFloat(data.discount) : this.discountManager.getAmount();
       if (data.discount) this.discountManager.setAmount(discountAmount);
       this.updateSummaryTotals(numericTotal, discountAmount, subtotal);
     }
@@ -1324,11 +1358,14 @@ class OrderPageApp {
     if (totalEl) totalEl.textContent = orderTotalNumber.toFixed(2);
   }
 
-  updateFinalizationVisibility(orderTotalNumber) {
+  updateFinalizationVisibility(orderTotalNumber, subtotalNumber) {
     const total = typeof orderTotalNumber === 'number'
       ? orderTotalNumber
       : parseFloat(String(orderTotalNumber).replace(/[^\d.-]/g, '')) || 0;
-    const hasProducts = total > 0;
+    const subtotal = typeof subtotalNumber === 'number'
+      ? subtotalNumber
+      : this.getCurrentSubtotal();
+    const hasProducts = subtotal > 0;
     const desktopSection = document.getElementById('order-finalization-section');
     const desktopEmptyState = document.getElementById('order-finalization-empty-state');
     const mobileSection = document.getElementById('mobile-finalization-section');
@@ -1353,6 +1390,13 @@ class OrderPageApp {
     if (!totalElement) return 0;
     const totalText = totalElement.textContent || totalElement.innerText;
     return parseFloat(totalText.replace(/[^\d.-]/g, '')) || 0;
+  }
+
+  getCurrentSubtotal() {
+    const subtotalElement = document.getElementById('summary-subtotal');
+    if (!subtotalElement) return 0;
+    const subtotalText = subtotalElement.textContent || subtotalElement.innerText;
+    return parseFloat(subtotalText.replace(/[^\d.-]/g, '')) || 0;
   }
 }
 
