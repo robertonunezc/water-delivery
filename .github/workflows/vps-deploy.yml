@@ -189,7 +189,8 @@ jobs:
           rm -f "$ENV_FILE"
           rm -f "$LOGGING_ENV_FILE"
 
-          ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" << 'EOF'
+          ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" \
+            "PRODUCTION_HEALTHCHECK_URL='${{ secrets.PRODUCTION_HEALTHCHECK_URL }}' bash -s" << 'EOF'
             set -euo pipefail
             echo "Deploying purigest application..."
             cd projects/purigest
@@ -236,7 +237,12 @@ jobs:
             docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml ps
 
             echo "Running post-deploy health check..."
-            HEALTHCHECK_URL="http://localhost:8001/health/"
+            if [ -z "${PRODUCTION_HEALTHCHECK_URL:-}" ]; then
+              echo "PRODUCTION_HEALTHCHECK_URL secret is required for deploy smoke tests."
+              exit 1
+            fi
+
+            HEALTHCHECK_URL="$PRODUCTION_HEALTHCHECK_URL"
             ATTEMPTS=12
             SLEEP_SECONDS=5
 
