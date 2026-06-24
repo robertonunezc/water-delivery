@@ -5,8 +5,9 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase
 from django.urls import reverse
+from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
@@ -93,7 +94,7 @@ class PaymentServicesTests(SimpleTestCase):
 		self.assertEqual(result, ({'success': True, 'order_pending_credit': True}, 200))
 		credit_flow_mock.assert_called_once_with(order=order, data={}, request_user=user)
 
-class PaymentViewsIntegrationTests(TestCase):
+class PaymentViewsIntegrationTests(FastTenantTestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(username='tester', password='testpass123')
 		self.client.force_login(self.user)
@@ -154,7 +155,7 @@ class PaymentViewsIntegrationTests(TestCase):
 		payment_instance.link_pending_transaction_references.assert_called_once()
 
 
-class CreditOrderSettlementTests(TestCase):
+class CreditOrderSettlementTests(FastTenantTestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(
 			username='credit-settlement-user',
@@ -287,7 +288,7 @@ class CreditOrderSettlementTests(TestCase):
 		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
 		self.assertEqual(self.customer.get_available_credit(), 1000.0)
 
-class MigrateLegacyCreditOrdersCommandTests(TestCase):
+class MigrateLegacyCreditOrdersCommandTests(FastTenantTestCase):
 	def setUp(self):
 		self.customer = Client.objects.create(
 			name='Cliente Crédito',

@@ -384,8 +384,8 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 	"""Tests for the create_invoice_from_orders and sync_invoice_amount services."""
 
 	def setUp(self):
-		self.client_a = Client.objects.create(name='Client A')
-		self.client_b = Client.objects.create(name='Client B')
+		self.client_a = Client.objects.create(name='Client A', type='corporate')
+		self.client_b = Client.objects.create(name='Client B', type='corporate')
 		self._make_invoice_ready(self.client_a)
 		self._make_invoice_ready(self.client_b)
 
@@ -456,11 +456,15 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 		from invoice.services import create_invoice_from_orders
 		from django.core.exceptions import ValidationError
 
-		InvoiceData.objects.filter(client=self.client_a).delete()
+		invoice_data = self.client_a.invoice_data
+		invoice_data.rfc = ''
+		invoice_data.razon_social = ''
+		invoice_data.save(update_fields=['rfc', 'razon_social', 'updated_at'])
 		order_a = self._completed_order(self.client_a, '50.00')
+		client = Client.objects.get(pk=self.client_a.pk)
 
 		with self.assertRaisesMessage(ValidationError, 'RFC'):
-			create_invoice_from_orders(orders=[order_a], client=self.client_a)
+			create_invoice_from_orders(orders=[order_a], client=client)
 
 	def test_sync_invoice_amount_recalculates_from_linked_orders(self):
 		from invoice.services import create_invoice_from_orders, sync_invoice_amount

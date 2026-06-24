@@ -1,9 +1,9 @@
-from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
 import json
+from tenant_client.test_utils import FastTenantTestCase
 
 from clients.models import Address, Client, InvoiceData
 
@@ -15,7 +15,7 @@ from product.models import Product, ProductClientPrice, ProductCategory
 from invoice.models import Invoice
 
 
-class UpdateOrderTestCase(TestCase):
+class UpdateOrderTestCase(FastTenantTestCase):
     """Tests for the update_order service function."""
 
     def setUp(self) -> None:
@@ -204,7 +204,7 @@ class UpdateOrderTestCase(TestCase):
         self.assertEqual(result.total_amount, Decimal("90.00"))
 
 
-class UpdateOrderViewTestCase(TestCase):
+class UpdateOrderViewTestCase(FastTenantTestCase):
     """Integration tests for update_order endpoint behavior."""
 
     def setUp(self) -> None:
@@ -351,7 +351,7 @@ class UpdateOrderViewTestCase(TestCase):
         self.assertEqual(self.order.total_amount, Decimal("70.00"))
 
 
-class CancelOrderServiceTestCase(TestCase):
+class CancelOrderServiceTestCase(FastTenantTestCase):
     """Tests for cancel_pending_order service function."""
 
     def setUp(self) -> None:
@@ -411,7 +411,7 @@ class CancelOrderServiceTestCase(TestCase):
         self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
 
 
-class CancelOrderViewTestCase(TestCase):
+class CancelOrderViewTestCase(FastTenantTestCase):
     """Integration tests for cancel_order endpoint behavior."""
 
     def setUp(self) -> None:
@@ -467,7 +467,7 @@ class CancelOrderViewTestCase(TestCase):
         self.assertIn('error', payload)
 
 
-class OrdersDashboardBulkActionTestCase(TestCase):
+class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
     """Tests for the dashboard bulk actions UI endpoint."""
 
     def setUp(self) -> None:
@@ -478,8 +478,8 @@ class OrdersDashboardBulkActionTestCase(TestCase):
         )
         self.client.force_login(self.user)
 
-        self.customer = Client.objects.create(name="Bulk Client")
-        self.other_customer = Client.objects.create(name="Other Bulk Client")
+        self.customer = Client.objects.create(name="Bulk Client", type="corporate")
+        self.other_customer = Client.objects.create(name="Other Bulk Client", type="corporate")
         self._make_invoice_ready(self.customer)
         self._make_invoice_ready(self.other_customer)
 
@@ -647,7 +647,7 @@ class OrdersDashboardBulkActionTestCase(TestCase):
         self.completed_order_1.refresh_from_db()
         self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
 
-class CalculateOrderTotalTestCase(TestCase):
+class CalculateOrderTotalTestCase(FastTenantTestCase):
     """Tests for the calculate_order_total service function."""
 
     def setUp(self) -> None:
@@ -718,7 +718,7 @@ class CalculateOrderTotalTestCase(TestCase):
         self.assertEqual(total, Decimal("46.50"))
 
 
-class ProcessOrderPaymentTestCase(TestCase):
+class ProcessOrderPaymentTestCase(FastTenantTestCase):
     """Tests for the process_order_payment service function."""
 
     def setUp(self) -> None:
@@ -928,7 +928,7 @@ class ProcessOrderPaymentTestCase(TestCase):
         self.assertIn("cannot use credit", result["error"])
 
 
-class CreatePaymentForOrderTestCase(TestCase):
+class CreatePaymentForOrderTestCase(FastTenantTestCase):
     """Tests for the create_payment_for_order service function."""
 
     def setUp(self) -> None:

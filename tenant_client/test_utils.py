@@ -4,8 +4,11 @@ Test utilities for multi-tenant testing.
 Provides mixins and helper functions for creating and managing test tenants
 in unit and integration tests.
 """
+import hashlib
+import re
 from datetime import date, timedelta
-from django_tenants.test.cases import FastTenantTestCase as DjangoTenantsFastTenantTestCase
+from django.db import connection
+from django_tenants.test.cases import TenantTestCase
 from django_tenants.test.client import TenantClient
 from .models import ClientTenant, Domain
 
@@ -92,13 +95,13 @@ class TenantTestMixin:
         tenant.delete()
 
 
-class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
+class FastTenantTestCase(TenantTestCase):
     """
     Base test case for tenant-specific tests.
 
-    This class extends django-tenants' FastTenantTestCase so tenant-aware
-    suites reuse the framework's fast test schema behavior instead of
-    recreating the fixed ``test`` tenant for each test class.
+    This compatibility wrapper creates an isolated tenant schema per test
+    class. It keeps the existing import surface used across the project while
+    avoiding shared-schema state between tenant-aware suites.
 
     Example:
         class ClientModelTest(FastTenantTestCase):
@@ -128,6 +131,28 @@ class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
         return tenant
 
     @classmethod
+    def get_test_schema_name(cls):
+        """
+        Build a deterministic schema name per test class.
+
+        django-tenants' default ``TenantTestCase`` uses the fixed name
+        ``test``. That collides across classes in this project, so derive a
+        compact unique schema name from the module and class.
+        """
+        raw_name = f"{cls.__module__}_{cls.__name__}".lower()
+        normalized = re.sub(r"[^a-z0-9_]+", "_", raw_name).strip("_")
+        if len(normalized) <= 55:
+            return normalized
+        digest = hashlib.md5(normalized.encode("utf-8")).hexdigest()[:6]
+        return f"{normalized[:48]}_{digest}"
+
+    @classmethod
+    def get_test_tenant_domain(cls):
+        # Hostnames cannot contain underscores even though PostgreSQL schema
+        # names can, so derive the test domain from the schema safely.
+        return f"{cls.get_test_schema_name().replace('_', '-')}.test.com"
+
+    @classmethod
     def setup_test_data(cls):
         """
         Override this method to add test data to the tenant.
@@ -135,6 +160,18 @@ class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
         Called after tenant creation but before tests run.
         """
         pass
+
+    def _pre_setup(self):
+        """
+        Re-activate the tenant schema and tenant-aware test client per test.
+
+        Django recreates ``self.client`` for every test, and other test
+        lifecycle steps may leave the DB connection on ``public``. Tenant app
+        tests must restore both pieces before each test method runs.
+        """
+        super()._pre_setup()
+        connection.set_tenant(self.tenant)
+        self.client = TenantClient(self.tenant)
 
 
 def create_public_tenant():
