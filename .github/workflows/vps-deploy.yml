@@ -24,7 +24,6 @@ jobs:
         options: >-
           --health-cmd "redis-cli ping" --health-interval 10s --health-timeout 5s --health-retries 5
     env:
-      SKIP_TESTS: "true"
       DJANGO_SETTINGS_MODULE: water_delivery.settings
       SECRET_KEY: dummy-ci-secret-key
       POSTGRES_DB: purigest
@@ -56,16 +55,13 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
       - name: Run tests
-        if: env.SKIP_TESTS != 'true'
         working-directory: .
         run: |
           python -m pytest clients orders payment invoice
+          python manage.py test core.tests.HealthCheckViewTests -v 2
 
-      - name: Skip tests (temporary)
-        if: env.SKIP_TESTS == 'true'
-        run: |
-          echo "Skipping test execution temporarily (SKIP_TESTS=true)."
   build_and_push:
     if: always() && needs.test.result == 'success'
     runs-on: ubuntu-latest
@@ -149,7 +145,6 @@ jobs:
           GRAFANA_CLOUD_USER: ${{ secrets['GRAFANA_CLOUD_USER'] }}
           GRAFANA_CLOUD_LOKI_URL: ${{ secrets['GRAFANA_CLOUD_LOKI_URL'] }}
           LOG_HOSTNAME: ${{ secrets.EC2_HOST }}
-          PRODUCTION_HEALTHCHECK_URL: ${{ secrets['PRODUCTION_HEALTHCHECK_URL'] }}
 
         run: |
           set -euo pipefail
@@ -157,14 +152,6 @@ jobs:
           PORT="${SSH_PORT:-22}"
           ENV_FILE="$(mktemp)"
           LOGGING_ENV_FILE="$(mktemp)"
-
-          if [ -z "${PRODUCTION_HEALTHCHECK_URL:-}" ]; then
-            echo "PRODUCTION_HEALTHCHECK_URL secret is required for deploy smoke tests."
-            exit 1
-          fi
-
-          echo "Smoke test target configured."
-          echo "Healthcheck URL: ${PRODUCTION_HEALTHCHECK_URL}"
 
           install -m 600 /dev/null "$ENV_FILE"
           {
@@ -199,8 +186,7 @@ jobs:
           rm -f "$ENV_FILE"
           rm -f "$LOGGING_ENV_FILE"
 
-          ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" \
-            "PRODUCTION_HEALTHCHECK_URL='${PRODUCTION_HEALTHCHECK_URL}' bash -s" << 'EOF'
+          ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" << 'EOF'
             set -euo pipefail
             echo "Deploying purigest application..."
             cd projects/purigest
@@ -245,34 +231,6 @@ jobs:
             docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml pull alloy
             docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml up -d alloy
             docker-compose --env-file observability/.env.production -f observability/docker-compose.logging.yml ps
-
-            echo "Running post-deploy health check..."
-            if [ -z "${PRODUCTION_HEALTHCHECK_URL:-}" ]; then
-              echo "PRODUCTION_HEALTHCHECK_URL secret is required for deploy smoke tests."
-              exit 1
-            fi
-
-            HEALTHCHECK_URL="$PRODUCTION_HEALTHCHECK_URL"
-            ATTEMPTS=12
-            SLEEP_SECONDS=5
-            echo "Smoke test target on VPS: $HEALTHCHECK_URL"
-
-            for i in $(seq 1 "$ATTEMPTS"); do
-              echo "Smoke test attempt $i/$ATTEMPTS"
-              if RESPONSE=$(curl -fsS "$HEALTHCHECK_URL"); then
-                echo "Health check passed on attempt $i"
-                echo "Response: $RESPONSE"
-                break
-              fi
-
-              if [ "$i" -eq "$ATTEMPTS" ]; then
-                echo "Health check failed after $ATTEMPTS attempts"
-                exit 1
-              fi
-
-              echo "Health check attempt $i/$ATTEMPTS failed. Retrying in ${SLEEP_SECONDS}s..."
-              sleep "$SLEEP_SECONDS"
-            done
             echo "Deployment completed successfully!"
             echo "Cleaning up unused Docker images..."
             docker image prune -f
@@ -280,9 +238,54 @@ jobs:
 
           EOF
 
+  smoke_test:
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    env:
+      PRODUCTION_HEALTHCHECK_URL: ${{ secrets['PRODUCTION_HEALTHCHECK_URL'] }}
+    steps:
+      - name: Verify smoke test target
+        run: |
+          set -euo pipefail
+
+          if [ -z "${PRODUCTION_HEALTHCHECK_URL:-}" ]; then
+            echo "PRODUCTION_HEALTHCHECK_URL secret is required for deploy smoke tests."
+            exit 1
+          fi
+
+          echo "Smoke test target configured."
+          echo "Healthcheck URL: ${PRODUCTION_HEALTHCHECK_URL}"
+
+      - name: Run readiness smoke test
+        run: |
+          set -euo pipefail
+
+          HEALTHCHECK_URL="${PRODUCTION_HEALTHCHECK_URL}"
+          ATTEMPTS=12
+          SLEEP_SECONDS=5
+
+          echo "Smoke test target: ${HEALTHCHECK_URL}"
+
+          for i in $(seq 1 "$ATTEMPTS"); do
+            echo "Smoke test attempt $i/$ATTEMPTS"
+            if RESPONSE=$(curl -fsS "$HEALTHCHECK_URL"); then
+              echo "Health check passed on attempt $i"
+              echo "Response: $RESPONSE"
+              exit 0
+            fi
+
+            if [ "$i" -eq "$ATTEMPTS" ]; then
+              echo "Health check failed after $ATTEMPTS attempts"
+              exit 1
+            fi
+
+            echo "Health check attempt $i/$ATTEMPTS failed. Retrying in ${SLEEP_SECONDS}s..."
+            sleep "$SLEEP_SECONDS"
+          done
+
   notify:
     runs-on: ubuntu-latest
-    needs: [test, build_and_push, deploy]
+    needs: [test, build_and_push, deploy, smoke_test]
     if: always()
     steps:
       - name: Send Telegram notification
@@ -308,7 +311,7 @@ jobs:
           }
 
           OVERALL="SUCCESS"
-          for result in "${{ needs.test.result }}" "${{ needs.build_and_push.result }}" "${{ needs.deploy.result }}"; do
+          for result in "${{ needs.test.result }}" "${{ needs.build_and_push.result }}" "${{ needs.deploy.result }}" "${{ needs.smoke_test.result }}"; do
             if [ "$result" != "success" ]; then
               OVERALL="FAILED"
               break
@@ -327,6 +330,7 @@ jobs:
             "- test: $(status_label '${{ needs.test.result }}')" \
             "- build_and_push: $(status_label '${{ needs.build_and_push.result }}')" \
             "- deploy: $(status_label '${{ needs.deploy.result }}')" \
+            "- smoke_test: $(status_label '${{ needs.smoke_test.result }}')" \
             "" \
             "<a href='${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'>View workflow run</a>"
           )
