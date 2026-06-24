@@ -149,12 +149,22 @@ jobs:
           GRAFANA_CLOUD_USER: ${{ secrets['GRAFANA_CLOUD_USER'] }}
           GRAFANA_CLOUD_LOKI_URL: ${{ secrets['GRAFANA_CLOUD_LOKI_URL'] }}
           LOG_HOSTNAME: ${{ secrets.EC2_HOST }}
+          PRODUCTION_HEALTHCHECK_URL: ${{ secrets['PRODUCTION_HEALTHCHECK_URL'] }}
 
         run: |
+          set -euo pipefail
           HOST="${{ secrets.EC2_HOST }}"
           PORT="${SSH_PORT:-22}"
           ENV_FILE="$(mktemp)"
           LOGGING_ENV_FILE="$(mktemp)"
+
+          if [ -z "${PRODUCTION_HEALTHCHECK_URL:-}" ]; then
+            echo "PRODUCTION_HEALTHCHECK_URL secret is required for deploy smoke tests."
+            exit 1
+          fi
+
+          echo "Smoke test target configured."
+          echo "Healthcheck URL: ${PRODUCTION_HEALTHCHECK_URL}"
 
           install -m 600 /dev/null "$ENV_FILE"
           {
@@ -190,7 +200,7 @@ jobs:
           rm -f "$LOGGING_ENV_FILE"
 
           ssh -p "$PORT" -i ~/.ssh/id_rsa "${{ secrets.EC2_USER }}@$HOST" \
-            "PRODUCTION_HEALTHCHECK_URL='${{ secrets.PRODUCTION_HEALTHCHECK_URL }}' bash -s" << 'EOF'
+            "PRODUCTION_HEALTHCHECK_URL='${PRODUCTION_HEALTHCHECK_URL}' bash -s" << 'EOF'
             set -euo pipefail
             echo "Deploying purigest application..."
             cd projects/purigest
@@ -245,8 +255,10 @@ jobs:
             HEALTHCHECK_URL="$PRODUCTION_HEALTHCHECK_URL"
             ATTEMPTS=12
             SLEEP_SECONDS=5
+            echo "Smoke test target on VPS: $HEALTHCHECK_URL"
 
             for i in $(seq 1 "$ATTEMPTS"); do
+              echo "Smoke test attempt $i/$ATTEMPTS"
               if RESPONSE=$(curl -fsS "$HEALTHCHECK_URL"); then
                 echo "Health check passed on attempt $i"
                 echo "Response: $RESPONSE"
