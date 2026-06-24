@@ -15,6 +15,7 @@ from clients.models import Client
 from orders.models import Order
 from payment.models import Payment
 from payment import services
+from payment.services import PaymentRequestData
 
 
 class PaymentServicesTests(SimpleTestCase):
@@ -52,17 +53,17 @@ class PaymentServicesTests(SimpleTestCase):
 		process_multiple_mock.return_value = ({'success': True}, 200)
 		order = SimpleNamespace(total_amount=Decimal('100.00'), type='contado')
 		user = SimpleNamespace(id=1)
-		data = {
-			'payments': [{'amount': '100.00', 'payment_method': 'cash'}],
-			'cantidad_cobrada': '100.00',
-		}
+		data = PaymentRequestData(
+			payments_data=[{'amount': '100.00', 'payment_method': 'cash'}],
+			cantidad_cobrada='100.00',
+		)
 
 		result = services.process_payment_request(order=order, data=data, request_user=user)
 
 		self.assertEqual(result, ({'success': True}, 200))
 		process_multiple_mock.assert_called_once_with(
 			order=order,
-			payments_data=data['payments'],
+			payments_data=data.payments_data,
 			cantidad_cobrada='100.00',
 			request_user=user,
 		)
@@ -72,7 +73,7 @@ class PaymentServicesTests(SimpleTestCase):
 		process_legacy_mock.return_value = ({'success': True}, 200)
 		order = SimpleNamespace(total_amount=Decimal('100.00'), type='contado')
 		user = SimpleNamespace(id=1)
-		data = {'payment_method': 'cash', 'amount': '100.00'}
+		data = PaymentRequestData(payment_method='cash', amount='100.00')
 
 		result = services.process_payment_request(order=order, data=data, request_user=user)
 
@@ -88,11 +89,12 @@ class PaymentServicesTests(SimpleTestCase):
 		credit_flow_mock.return_value = ({'success': True, 'order_pending_credit': True}, 200)
 		order = SimpleNamespace(total_amount=Decimal('100.00'), type='credito')
 		user = SimpleNamespace(id=1)
+		data = PaymentRequestData()
 
-		result = services.process_payment_request(order=order, data={}, request_user=user)
+		result = services.process_payment_request(order=order, data=data, request_user=user)
 
 		self.assertEqual(result, ({'success': True, 'order_pending_credit': True}, 200))
-		credit_flow_mock.assert_called_once_with(order=order, data={}, request_user=user)
+		credit_flow_mock.assert_called_once_with(order=order, data=data, request_user=user)
 
 class PaymentViewsIntegrationTests(FastTenantTestCase):
 	def setUp(self):
@@ -108,7 +110,7 @@ class PaymentViewsIntegrationTests(FastTenantTestCase):
 			total_amount=Decimal('120.00'),
 		)
 
-	@patch('payment.views.payment_services.process_payment_request')
+	@patch('payment.views.services.process_payment_request')
 	def test_create_payment_delegates_to_service(self, process_request_mock):
 		process_request_mock.return_value = ({'success': True, 'payment_count': 1}, 200)
 
@@ -128,7 +130,19 @@ class PaymentViewsIntegrationTests(FastTenantTestCase):
 
 		kwargs = process_request_mock.call_args.kwargs
 		self.assertEqual(kwargs['order'].id, self.order.id)
-		self.assertEqual(kwargs['data'], payload)
+		self.assertIsInstance(kwargs['data'], PaymentRequestData)
+		self.assertEqual(
+			kwargs['data'],
+			PaymentRequestData(
+				payments_data=payload['payments'],
+				payment_method=None,
+				cantidad_cobrada=None,
+				amount=None,
+				credit_note=None,
+				order_type=None,
+				notes=None,
+			),
+		)
 		self.assertEqual(kwargs['request_user'].id, self.user.id)
 
 	@patch('payment.services.Payment')
