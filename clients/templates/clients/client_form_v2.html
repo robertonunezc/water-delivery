@@ -59,7 +59,7 @@
 
 	{% if not client %}
 		<div class="alert alert-info">
-			Primero guarda los datos básicos del cliente. Después se habilitan Direcciones, Contactos, Facturación y Crédito.
+			Primero guarda los datos básicos del cliente. Después se habilitan Direcciones, Contactos, Rutas, Facturación y Crédito.
 		</div>
 	{% endif %}
 
@@ -74,6 +74,9 @@
 				</li>
 				<li class="nav-item" role="presentation">
 					<button class="nav-link {% if active_tab == 'contacts' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button" role="tab">Contactos</button>
+				</li>
+				<li class="nav-item" role="presentation">
+					<button class="nav-link {% if active_tab == 'routes' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-routes" type="button" role="tab">Rutas</button>
 				</li>
 				<li class="nav-item" role="presentation">
 					<button class="nav-link {% if active_tab == 'billing' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button" role="tab">Facturación</button>
@@ -211,6 +214,46 @@
 							</div>
 							<div class="mt-3 d-flex justify-content-end">
 								<button type="submit" class="btn btn-primary">Guardar Contactos</button>
+							</div>
+						</form>
+					{% endif %}
+				</div>
+
+				<div class="tab-pane fade {% if active_tab == 'routes' %}show active{% endif %}" id="tab-routes" role="tabpanel">
+					{% if client %}
+						{% if not has_delivery_address %}
+							<div class="alert alert-warning">
+								Para asignar rutas, primero agregue una dirección activa de tipo <b>Ubicacion fisica</b> en la pestaña de Direcciones.
+							</div>
+						{% endif %}
+						<form method="post">
+							{% csrf_token %}
+							<input type="hidden" name="section" value="routes">
+							{{ route_assignment_formset.management_form }}
+							{% if route_assignment_formset.non_form_errors %}
+								<div class="alert alert-danger">{{ route_assignment_formset.non_form_errors }}</div>
+							{% endif %}
+							<div class="form-section-title">Asignaciones de Ruta</div>
+							<div class="row g-3">
+								{% for form in route_assignment_formset.forms %}
+									<div class="col-12 border rounded p-3">
+										{{ form.id }}
+										<div class="row g-2 align-items-start">
+											{{ form.errors }}
+											<div class="col-md-4">{{ form.route.label_tag }}{{ form.route }}{{ form.route.errors }}</div>
+											<div class="col-md-2">{{ form.sequence.label_tag }}{{ form.sequence }}{{ form.sequence.errors }}</div>
+											<div class="col-md-2">{{ form.interval_weeks.label_tag }}{{ form.interval_weeks }}{{ form.interval_weeks.errors }}</div>
+											<div class="col-md-2">{{ form.anchor_date.label_tag }}{{ form.anchor_date }}{{ form.anchor_date.errors }}</div>
+											<div class="col-md-1 mt-4"><div class="form-check">{{ form.is_active }} <label class="form-check-label">Activo</label></div></div>
+											{% if form.DELETE %}<div class="col-md-1 mt-4"><div class="form-check">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div></div>{% endif %}
+											<div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+										</div>
+										{{ form.non_field_errors }}
+									</div>
+								{% endfor %}
+							</div>
+							<div class="mt-3 d-flex justify-content-end">
+								<button type="submit" class="btn btn-primary">Guardar Rutas</button>
 							</div>
 						</form>
 					{% endif %}

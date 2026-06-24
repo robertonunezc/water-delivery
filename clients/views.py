@@ -8,6 +8,7 @@ from django.forms import inlineformset_factory
 from django.urls import reverse
 from datetime import date, datetime, timedelta
 from calendar import monthrange
+from typing import Any
 from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
 from .forms import (
     ManualCreditTransactionForm,
@@ -24,6 +25,8 @@ from .forms import (
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from orders.models import Order
 from product.services import ensure_client_product_prices
+from routes.forms import ClientRouteAssignmentForm
+from routes.models import RouteClient
 
 
 def _is_admin_user(user) -> bool:
@@ -50,6 +53,17 @@ def _get_contact_formset(*, data=None, instance=None):
         can_delete=True,
     )
     return formset_cls(data=data, instance=instance, prefix='contacts')
+
+
+def _get_route_assignment_formset(*, data: Any = None, instance: Client | None = None) -> Any:
+    formset_cls = inlineformset_factory(
+        Client,
+        RouteClient,
+        form=ClientRouteAssignmentForm,
+        extra=1,
+        can_delete=True,
+    )
+    return formset_cls(data=data, instance=instance, prefix='routes')
 
 
 def _copy_delivery_to_billing_if_missing(client: Client) -> bool:
@@ -120,6 +134,10 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     if contact_formset is None and client is not None:
         contact_formset = _get_contact_formset(instance=client)
 
+    route_assignment_formset = forms_override.get('route_assignment_formset')
+    if route_assignment_formset is None and client is not None:
+        route_assignment_formset = _get_route_assignment_formset(instance=client)
+
     invoice_data_instance = getattr(client, 'invoice_data', None) if client else None
     invoice_schedule_instance = getattr(client, 'invoice_schedule', None) if client else None
     if client and invoice_schedule_instance is None:
@@ -162,6 +180,8 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         'credit_policy_form': credit_policy_form,
         'address_formset': address_formset,
         'contact_formset': contact_formset,
+        'route_assignment_formset': route_assignment_formset,
+        'has_delivery_address': client.has_delivery_address() if client else False,
         'invoice_data_form': invoice_data_form,
         'recurring_billing_form': recurring_billing_form,
         'invoice_schedule_form': invoice_schedule_form,
@@ -318,6 +338,25 @@ def edit_v2(request, pk):
                 client=client,
                 active_tab=active_tab,
                 forms_override={'contact_formset': contact_formset},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'routes':
+            route_assignment_formset = _get_route_assignment_formset(
+                data=request.POST,
+                instance=client,
+            )
+            if route_assignment_formset.is_valid():
+                route_assignment_formset.save()
+                messages.success(request, 'Asignaciones de ruta actualizadas correctamente.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=routes")
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=routes")
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab='routes',
+                forms_override={'route_assignment_formset': route_assignment_formset},
             )
             return render(request, 'clients/client_form_v2.html', context)
 

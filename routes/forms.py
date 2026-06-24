@@ -1,5 +1,8 @@
 import datetime
+from typing import Any
+
 from django import forms
+from django.db.models import Q
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from .models import RouteClient, Route
@@ -10,6 +13,7 @@ class RouteClientForm(forms.ModelForm):
 
     anchor_date = forms.DateField(
         required=False,
+        label='Fecha de inicio de ciclo',
         widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
         input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
     )
@@ -21,7 +25,7 @@ class RouteClientForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         if 'anchor_date' in self.fields:
             self.fields['anchor_date'].localize = False
@@ -30,7 +34,7 @@ class RouteClientForm(forms.ModelForm):
             if not instance or not instance.anchor_date:
                 self.fields['anchor_date'].initial = datetime.date.today()
 
-    def clean_anchor_date(self):
+    def clean_anchor_date(self) -> datetime.date:
         return self.cleaned_data.get('anchor_date') or datetime.date.today()
 
 
@@ -50,13 +54,59 @@ class RouteClientInlineForm(RouteClientForm):
     class Meta(RouteClientForm.Meta):
         fields = RouteClientForm.Meta.fields + ['confirm_duplicate_assignment']
     
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         
         # Move confirmation field to the end
         if 'confirm_duplicate_assignment' in self.fields:
             confirm_field = self.fields.pop('confirm_duplicate_assignment')
             self.fields['confirm_duplicate_assignment'] = confirm_field
+
+
+class ClientRouteAssignmentForm(forms.ModelForm):
+    """Form for editing a client's route assignments from the custom client form."""
+
+    anchor_date = forms.DateField(
+        required=False,
+        label='Fecha de inicio de ciclo',
+        widget=forms.DateInput(
+            format='%Y-%m-%d',
+            attrs={'type': 'date', 'class': 'form-control'},
+        ),
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
+    )
+
+    class Meta:
+        model = RouteClient
+        fields = ['route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
+        widgets = {
+            'route': forms.Select(attrs={'class': 'form-select'}),
+            'sequence': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'interval_weeks': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '4'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+        labels = {
+            'interval_weeks': 'Intervalo',
+            'anchor_date': 'Inicio de ciclo',
+            'is_active': 'Activo',
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        route_queryset = Route.objects.filter(is_active=True)
+        if self.instance and self.instance.pk and self.instance.route_id:
+            route_queryset = Route.objects.filter(
+                Q(is_active=True) | Q(pk=self.instance.route_id)
+            )
+        self.fields['route'].queryset = route_queryset.order_by('weekday', 'name')
+
+        if not self.instance or not self.instance.anchor_date:
+            self.fields['anchor_date'].initial = datetime.date.today()
+
+    def clean_anchor_date(self) -> datetime.date:
+        return self.cleaned_data.get('anchor_date') or datetime.date.today()
 
 
 class RouteForm(forms.ModelForm):

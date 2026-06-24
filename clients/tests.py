@@ -1,5 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from decimal import Decimal
 from datetime import date, timedelta
 import csv
@@ -16,6 +17,8 @@ from .services.csv_import_service import (
     get_clients_csv_template,
     import_clients_from_csv,
 )
+from core.models import Transport
+from routes.models import Route, RouteClient
 
 User = get_user_model()
 
@@ -234,6 +237,107 @@ class AddressInlineFormTests(FastTenantTestCase):
         )
         with self.assertRaises(ValidationError):
             duplicate.full_clean()
+
+
+class ClientRouteAssignmentTabTests(FastTenantTestCase):
+    """Tests for managing RouteClient assignments from the client edit form."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='route_tab_admin',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.login(username='route_tab_admin', password='testpass123')
+        self.client_obj = Client.objects.create(
+            name='Route Tab Client',
+            type='corporate',
+            active=True,
+        )
+        self.transport = Transport.objects.create(
+            license_plate='TAB-001',
+            model='Route Tab Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.active_route = Route.objects.create(
+            name='Active Client Tab Route',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+        self.inactive_route = Route.objects.create(
+            name='Inactive Hidden Client Tab Route',
+            transportation=self.transport,
+            weekday='tuesday',
+            is_active=False,
+        )
+
+    def _edit_url(self) -> str:
+        return reverse('clients:edit_v2', kwargs={'pk': self.client_obj.pk})
+
+    def _route_formset_post_data(self, route: Route) -> dict:
+        return {
+            'section': 'routes',
+            'routes-TOTAL_FORMS': '1',
+            'routes-INITIAL_FORMS': '0',
+            'routes-MIN_NUM_FORMS': '0',
+            'routes-MAX_NUM_FORMS': '1000',
+            'routes-0-route': str(route.pk),
+            'routes-0-sequence': '1',
+            'routes-0-interval_weeks': '1',
+            'routes-0-anchor_date': '2026-06-22',
+            'routes-0-is_active': 'on',
+            'routes-0-notes': 'Visita semanal',
+        }
+
+    def test_edit_form_renders_routes_tab(self) -> None:
+        response = self.client.get(f'{self._edit_url()}?tab=routes')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Rutas')
+        self.assertContains(response, 'Asignaciones de Ruta')
+        self.assertContains(response, 'Fecha de inicio de ciclo')
+        self.assertNotContains(response, 'Anchor date')
+
+    def test_route_select_only_offers_active_routes_for_new_assignment(self) -> None:
+        response = self.client.get(f'{self._edit_url()}?tab=routes')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.active_route.name)
+        self.assertNotContains(response, self.inactive_route.name)
+
+    def test_post_valid_route_assignment_creates_route_client(self) -> None:
+        Address.objects.create(
+            client=self.client_obj,
+            type='delivery',
+            street='Calle Ruta 1',
+            active=True,
+        )
+
+        response = self.client.post(
+            self._edit_url(),
+            data=self._route_formset_post_data(self.active_route),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(
+            RouteClient.objects.filter(
+                client=self.client_obj,
+                route=self.active_route,
+                is_active=True,
+            ).exists()
+        )
+
+    def test_missing_delivery_address_keeps_user_on_routes_tab_with_errors(self) -> None:
+        response = self.client.post(
+            self._edit_url(),
+            data=self._route_formset_post_data(self.active_route),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'dirección de envío válida')
+        self.assertFalse(RouteClient.objects.filter(client=self.client_obj).exists())
 
 
 class ClientCSVExternalIdTests(FastTenantTestCase):
