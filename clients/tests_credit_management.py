@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -12,6 +12,7 @@ from clients.forms import ClientCoreForm, ClientCreditConfigForm, ClientCreditPo
 from clients.models import Client, ClientCreditConfig
 from clients.services import balance_service
 from orders.models import Order
+from tenant_client.test_utils import FastTenantTestCase
 
 
 User = get_user_model()
@@ -66,7 +67,7 @@ class ClientCreditAvailabilityTests(SimpleTestCase):
         self.assertFalse(client.can_use_credit_for_payment())
 
 
-class CreditConfigurationValidationTests(TestCase):
+class CreditConfigurationValidationTests(FastTenantTestCase):
     def test_invoice_due_requires_billing(self) -> None:
         client = Client.objects.create(
             name='Cliente sin facturación',
@@ -101,7 +102,7 @@ class CreditConfigurationValidationTests(TestCase):
         self.assertIn('requires_billing', context.exception.message_dict)
 
 
-class BranchCreditTabTests(TestCase):
+class BranchCreditTabTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
             username='credit-tab-admin',
@@ -172,7 +173,7 @@ class BranchCreditTabTests(TestCase):
         )
 
 
-class CreditSaleEnforcementTests(TestCase):
+class CreditSaleEnforcementTests(FastTenantTestCase):
     def test_credit_sale_cannot_exceed_hard_limit(self) -> None:
         client = Client.objects.create(
             name='Cliente al límite',
@@ -236,7 +237,7 @@ class CreditSaleEnforcementTests(TestCase):
         self.assertEqual(client.current_debt, Decimal('100.00'))
 
 
-class ClientCreditDueDateDetailTests(TestCase):
+class ClientCreditDueDateDetailTests(FastTenantTestCase):
     def test_detail_context_contains_nearest_credit_due_date(self) -> None:
         user = User.objects.create_user(
             username='client-detail-user',

@@ -5,7 +5,7 @@ Provides mixins and helper functions for creating and managing test tenants
 in unit and integration tests.
 """
 from datetime import date, timedelta
-from django_tenants.test.cases import TenantTestCase
+from django_tenants.test.cases import FastTenantTestCase as DjangoTenantsFastTenantTestCase
 from django_tenants.test.client import TenantClient
 from .models import ClientTenant, Domain
 
@@ -92,12 +92,13 @@ class TenantTestMixin:
         tenant.delete()
 
 
-class FastTenantTestCase(TenantTestCase):
+class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
     """
     Base test case for tenant-specific tests.
 
-    This class extends django-tenants' TenantTestCase to provide
-    automatic tenant setup and teardown for each test.
+    This class extends django-tenants' FastTenantTestCase so tenant-aware
+    suites reuse the framework's fast test schema behavior instead of
+    recreating the fixed ``test`` tenant for each test class.
 
     Example:
         class ClientModelTest(FastTenantTestCase):
@@ -110,6 +111,21 @@ class FastTenantTestCase(TenantTestCase):
                 # Test runs in tenant schema context
                 pass
     """
+
+    @classmethod
+    def setup_tenant(cls, tenant):
+        """
+        Populate the required fields on the tenant model used by tests.
+
+        django-tenants instantiates the tenant with only ``schema_name`` by
+        default. Our ClientTenant model requires extra non-null fields, so the
+        shared test base must provide safe defaults for suites that don't
+        override ``setup_tenant()`` themselves.
+        """
+        tenant.name = tenant.name or f"Test Tenant {tenant.schema_name}"
+        tenant.paid_until = tenant.paid_until or (date.today() + timedelta(days=30))
+        tenant.on_trial = tenant.on_trial if tenant.on_trial is not None else False
+        return tenant
 
     @classmethod
     def setup_test_data(cls):

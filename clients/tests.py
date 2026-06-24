@@ -1,10 +1,10 @@
-from django.test import TestCase
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from decimal import Decimal
 from datetime import date, timedelta
 import csv
 import io
+from tenant_client.test_utils import FastTenantTestCase
 from .models import (
     Client, InvoiceData, Address, BalanceTransaction, CreditTransaction,
     Contact, ClientBillingFrecuency, ClientCreditConfig
@@ -20,7 +20,7 @@ from .services.csv_import_service import (
 User = get_user_model()
 
 
-class ClientBillingInheritanceTestCase(TestCase):
+class ClientBillingInheritanceTestCase(FastTenantTestCase):
     """Business-rule focused tests for billing inheritance/override."""
 
     def setUp(self):
@@ -169,7 +169,7 @@ class ClientBillingInheritanceTestCase(TestCase):
         self.assertEqual(billing.source, 'own')
 
 
-class AddressInlineFormTests(TestCase):
+class AddressInlineFormTests(FastTenantTestCase):
     """Tests for AddressInlineForm and its same_as_previous helper field."""
 
     def setUp(self) -> None:
@@ -236,7 +236,7 @@ class AddressInlineFormTests(TestCase):
             duplicate.full_clean()
 
 
-class ClientCSVExternalIdTests(TestCase):
+class ClientCSVExternalIdTests(FastTenantTestCase):
     """Tests for CSV import/export support of client external_id."""
 
     def test_template_includes_external_id_header(self) -> None:
@@ -287,7 +287,7 @@ class ClientCSVExternalIdTests(TestCase):
         self.assertEqual(rows[0]["external_id"], "ERP-900")
 
 
-class ClientCSVCorporateNormalizationTests(TestCase):
+class ClientCSVCorporateNormalizationTests(FastTenantTestCase):
     def test_reuses_existing_corporate_without_suffix(self) -> None:
         existing = Client.objects.create(
             name="Michoacana",
@@ -325,5 +325,3 @@ class ClientCSVCorporateNormalizationTests(TestCase):
         self.assertTrue(Client.objects.filter(name="BANANE corporativo", type="corporate").exists())
         self.assertFalse(Client.objects.filter(name="BANANE", type="corporate").exists())
         self.assertEqual(Client.objects.filter(name__icontains="BANANE", type="corporate").count(), 1)
-
-
