@@ -93,7 +93,7 @@ class OrderQuerySet(models.QuerySet):
         Returns:
             QuerySet of today's orders with optimized prefetch/select_related
         """
-        today = timezone.now().date()
+        today = timezone.localdate()
         qs = self.filter(order_date__date=today).select_related(
             'client', 'owner'
         ).prefetch_related('items', 'payments')

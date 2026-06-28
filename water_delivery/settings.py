@@ -224,6 +224,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'America/Mexico_City'
 CELERY_ENABLE_UTC = True
+DJANGO_CELERY_BEAT_TZ_AWARE = True
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 30 * 60
 CELERY_TASK_SOFT_TIME_LIMIT = 25 * 60
@@ -263,7 +264,7 @@ TIME_ZONE = 'America/Mexico_City'
 
 USE_I18N = False
 
-USE_TZ = False
+USE_TZ = True
 
 #Implement django logging
 from pythonjsonlogger import jsonlogger

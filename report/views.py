@@ -176,7 +176,7 @@ def orders_report(request):
         orders_queryset = orders_queryset.filter(status=status_filter)
     
     # Apply date filters
-    today = timezone.now().date()
+    today = timezone.localdate()
     if date_filter == 'today':
         orders_queryset = orders_queryset.filter(order_date__date=today)
     elif date_filter == 'week':
@@ -336,7 +336,7 @@ def orders_report_csv(request):
         orders_queryset = orders_queryset.filter(invoice_links__isnull=True)
     if status_filter and status_filter != 'all':
         orders_queryset = orders_queryset.filter(status=status_filter)
-    today = timezone.now().date()
+    today = timezone.localdate()
     if date_filter == 'today':
         orders_queryset = orders_queryset.filter(order_date__date=today)
     elif date_filter == 'week':
@@ -418,9 +418,9 @@ def breakdown_payment_method(request):
     """
     date_str = request.GET.get('date', '')
     try:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.localdate()
     except ValueError:
-        selected_date = timezone.now().date()
+        selected_date = timezone.localdate()
 
     owner = request.user
     # Query orders for the selected date and owner
@@ -497,9 +497,9 @@ def breakdown_payment_method_csv(request):
     date_str = request.GET.get('date', '')
     print(date_str)
     try:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.now().date()
+        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.localdate()
     except ValueError:
-        selected_date = timezone.now().date()
+        selected_date = timezone.localdate()
     owner = request.user
     orders = Order.objects.filter(
         owner=owner,

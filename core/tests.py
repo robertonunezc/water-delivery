@@ -1,8 +1,12 @@
 from unittest.mock import patch
 
+from django.conf import settings
 from django.test import TestCase, RequestFactory, SimpleTestCase
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from django_celery_beat.schedulers import DatabaseScheduler
+from django_celery_beat.schedulers import now as beat_now
 
 User = get_user_model()
 
@@ -83,3 +87,19 @@ class HealthCheckViewTests(SimpleTestCase):
         )
         database_check.assert_called_once_with(request)
         redis_check.assert_called_once_with()
+
+
+class TimezoneConfigurationTests(SimpleTestCase):
+    def test_celery_beat_uses_aware_mexico_time(self) -> None:
+        self.assertEqual(settings.TIME_ZONE, "America/Mexico_City")
+        self.assertTrue(settings.USE_TZ)
+
+        current_time = beat_now()
+
+        self.assertTrue(timezone.is_aware(current_time))
+        self.assertEqual(timezone.localtime(current_time).tzinfo.key, settings.TIME_ZONE)
+
+    def test_database_scheduler_handles_crontab_hours(self) -> None:
+        excluded_hours = DatabaseScheduler.get_excluded_hours_for_crontab_tasks()
+
+        self.assertGreater(len(excluded_hours), 0)
