@@ -427,14 +427,28 @@ class ClientCreditPolicyForm(forms.ModelForm):
     class Meta:
         model = Client
         fields = ['can_pay_with_credit', 'credit_limit']
+        labels = {
+            'can_pay_with_credit': 'Cliente no puede pagar con credito',
+        }
         help_texts = {
-            'can_pay_with_credit': 'Habilita o deshabilita el uso de crédito.',
+            'can_pay_with_credit': 'Activa este paro de emergencia para bloquear nuevas ventas a crédito.',
             'credit_limit': 'Monto máximo de deuda activa autorizado.',
         }
         widgets = {
             'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance:
+            emergency_stop_enabled = not self.instance.can_pay_with_credit
+            self.initial['can_pay_with_credit'] = emergency_stop_enabled
+            self.fields['can_pay_with_credit'].initial = emergency_stop_enabled
+
+    def clean_can_pay_with_credit(self):
+        emergency_stop_enabled = self.cleaned_data['can_pay_with_credit']
+        return not emergency_stop_enabled
 
 
 class ContactForm(forms.ModelForm):

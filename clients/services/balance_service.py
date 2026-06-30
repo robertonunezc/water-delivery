@@ -214,6 +214,9 @@ def add_debt(
         raise ValueError("Amount must be positive")
 
     locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    if transaction_type == 'purchase' and not locked_client.can_pay_with_credit:
+        raise ValueError('Cliente no puede pagar con credito')
+
     new_debt = locked_client.current_debt + amount
     if transaction_type == 'purchase' and new_debt > locked_client.credit_limit:
         available_credit = max(

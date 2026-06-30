@@ -804,10 +804,10 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         self.assertIn("Insufficient credit", result["error"])
 
     @patch("clients.services.balance_service.add_debt")
-    def test_process_order_payment_credit_ignores_disabled_toggle_when_limit_available(
+    def test_process_order_payment_credit_disabled_blocks_even_when_limit_available(
         self, mock_add_debt: MagicMock
     ) -> None:
-        """Test credit payment succeeds when the available credit limit covers the order."""
+        """Test emergency credit stop blocks credit even when limit is available."""
         mock_add_debt.return_value = MagicMock()
         self.client.can_pay_with_credit = False
         self.client.balance = Decimal("0.00")
@@ -822,10 +822,10 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
             order=self.order,
         )
 
-        self.assertTrue(result["success"])
-        self.assertEqual(result["credit_used"], Decimal("50.00"))
-        self.assertEqual(result["balance_used"], Decimal("0"))
-        mock_add_debt.assert_called_once()
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "Cliente no puede pagar con credito")
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_add_debt.assert_not_called()
 
     def test_process_order_payment_credit_succeeds_without_note(self) -> None:
         """Test credit payments no longer require a note."""
@@ -917,10 +917,10 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
 
     @patch("clients.services.balance_service.add_debt")
     @patch("clients.services.balance_service.deduct_balance")
-    def test_process_order_payment_auto_uses_credit_when_toggle_disabled(
+    def test_process_order_payment_auto_blocks_credit_when_toggle_disabled(
         self, mock_deduct_balance: MagicMock, mock_add_debt: MagicMock
     ) -> None:
-        """Test auto uses balance then credit when the credit limit can cover the remainder."""
+        """Test emergency credit stop blocks auto payments that need credit."""
         self.client.balance = Decimal("30.00")
         self.client.can_pay_with_credit = False
         self.client.credit_limit = Decimal("100.00")
@@ -936,11 +936,12 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
             order=self.order,
         )
 
-        self.assertTrue(result["success"])
-        self.assertEqual(result["balance_used"], Decimal("30.00"))
-        self.assertEqual(result["credit_used"], Decimal("20.00"))
-        mock_deduct_balance.assert_called_once()
-        mock_add_debt.assert_called_once()
+        self.assertFalse(result["success"])
+        self.assertEqual(result["error"], "Cliente no puede pagar con credito")
+        self.assertEqual(result["balance_used"], Decimal("0"))
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_deduct_balance.assert_not_called()
+        mock_add_debt.assert_not_called()
 
 
 class OrderPaymentRoutingTestCase(FastTenantTestCase):

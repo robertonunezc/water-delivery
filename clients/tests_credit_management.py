@@ -39,8 +39,8 @@ class CreditFormFieldTests(SimpleTestCase):
         form = ClientCreditPolicyForm()
 
         self.assertEqual(
-            form.fields['can_pay_with_credit'].help_text,
-            'Habilita o deshabilita el uso de crédito.',
+            form.fields['can_pay_with_credit'].label,
+            'Cliente no puede pagar con credito',
         )
         self.assertEqual(
             form.fields['credit_limit'].help_text,
@@ -69,6 +69,58 @@ class ClientCreditAvailabilityTests(SimpleTestCase):
 
 
 class CreditConfigurationValidationTests(FastTenantTestCase):
+    def test_credit_policy_checkbox_is_emergency_stop(self) -> None:
+        client = Client.objects.create(
+            name='Cliente con crédito permitido',
+            type='corporate',
+            can_pay_with_credit=True,
+            credit_limit=Decimal('500.00'),
+        )
+
+        form = ClientCreditPolicyForm(
+            data={
+                'can_pay_with_credit': 'on',
+                'credit_limit': '500.00',
+            },
+            instance=client,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        updated_client = form.save(commit=False)
+        self.assertFalse(updated_client.can_pay_with_credit)
+
+    def test_credit_policy_checkbox_unchecked_allows_credit(self) -> None:
+        client = Client.objects.create(
+            name='Cliente con crédito bloqueado',
+            type='corporate',
+            can_pay_with_credit=False,
+            credit_limit=Decimal('500.00'),
+        )
+
+        form = ClientCreditPolicyForm(
+            data={
+                'credit_limit': '500.00',
+            },
+            instance=client,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        updated_client = form.save(commit=False)
+        self.assertTrue(updated_client.can_pay_with_credit)
+
+    def test_credit_can_be_disabled_with_existing_debt_and_limit(self) -> None:
+        client = Client.objects.create(
+            name='Cliente con paro de emergencia',
+            type='corporate',
+            credit_limit=Decimal('500.00'),
+            current_debt=Decimal('100.00'),
+            can_pay_with_credit=False,
+        )
+
+        client.full_clean()
+
+        self.assertFalse(client.can_pay_with_credit)
+
     def test_invoice_due_requires_billing(self) -> None:
         client = Client.objects.create(
             name='Cliente sin facturación',
@@ -175,6 +227,25 @@ class BranchCreditTabTests(FastTenantTestCase):
 
 
 class CreditSaleEnforcementTests(FastTenantTestCase):
+    def test_emergency_credit_stop_blocks_new_credit_sale(self) -> None:
+        client = Client.objects.create(
+            name='Cliente bloqueado',
+            type='corporate',
+            credit_limit=Decimal('500.00'),
+            current_debt=Decimal('0.00'),
+            can_pay_with_credit=False,
+        )
+
+        with self.assertRaisesRegex(ValueError, 'Cliente no puede pagar con credito'):
+            balance_service.add_debt(
+                client=client,
+                amount=Decimal('50.00'),
+                transaction_type='purchase',
+            )
+
+        client.refresh_from_db()
+        self.assertEqual(client.current_debt, Decimal('0.00'))
+
     def test_credit_sale_cannot_exceed_hard_limit(self) -> None:
         client = Client.objects.create(
             name='Cliente al límite',

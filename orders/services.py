@@ -233,6 +233,14 @@ def process_order_payment(
 
     elif payment_method == "credit":
         # Try to pay entirely with credit
+        if not client.can_pay_with_credit:
+            return {
+                "success": False,
+                "error": "Cliente no puede pagar con credito",
+                "balance_used": Decimal("0"),
+                "credit_used": Decimal("0"),
+            }
+
         available_credit = max(
             client.credit_limit - client.current_debt,
             Decimal("0.00"),
@@ -256,6 +264,16 @@ def process_order_payment(
 
         # Then, use credit if needed and available
         if remaining_amount > 0:
+            if not client.can_pay_with_credit:
+                return {
+                    "success": False,
+                    "error": "Cliente no puede pagar con credito",
+                    "balance_used": Decimal("0"),
+                    "credit_used": Decimal("0"),
+                    "balance_available": client.balance,
+                    "credit_available": Decimal("0"),
+                }
+
             available_credit = max(
                 client.credit_limit - client.current_debt,
                 Decimal("0.00"),

@@ -171,14 +171,8 @@ class Client(TimeStampedModel):
         # but this should be validated at the business logic level (e.g., when creating orders)
         # rather than at the model level, to allow proper admin inline workflow.
 
-        if not self.can_pay_with_credit and self.current_debt > 0:
-            errors['can_pay_with_credit'] = 'No se puede deshabilitar el pago con crédito si el cliente ya tiene deuda existente.'
-
         # if self.current_debt > self.credit_limit:
         #     errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
-
-        if not self.can_pay_with_credit and self.credit_limit > 0:
-            errors['can_pay_with_credit'] = 'No se puede habilitar el límite de crédito sin permitir el pago con crédito.'
 
         try:
             credit_config = self.credit_config
@@ -228,7 +222,7 @@ class Client(TimeStampedModel):
         if not self.can_use_credit_for_payment():
             return {
                 'success': False,
-                'error': 'Client is not allowed to pay with credit at this time.',
+                'error': 'Cliente no puede pagar con credito',
                 'error_code': 'CREDIT_DISABLED'
             }
         

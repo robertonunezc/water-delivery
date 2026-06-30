@@ -313,9 +313,9 @@ class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 			password='testpass123',
 		)
 
-	def test_credit_order_ignores_disabled_toggle_when_limit_is_available(self):
+	def test_credit_order_emergency_stop_blocks_even_when_limit_is_available(self):
 		customer = Client.objects.create(
-			name='Cliente crédito deshabilitado con límite',
+			name='Cliente crédito bloqueado con límite',
 			type='corporate',
 			balance=Decimal('30.00'),
 			credit_limit=Decimal('200.00'),
@@ -334,18 +334,12 @@ class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 			request_user=self.user,
 		)
 
-		self.assertEqual(status_code, 200)
-		self.assertTrue(response['success'])
+		self.assertEqual(status_code, 400)
+		self.assertEqual(response['error'], 'Cliente no puede pagar con credito')
 		customer.refresh_from_db()
-		self.assertEqual(customer.balance, Decimal('0.00'))
-		self.assertEqual(customer.current_debt, Decimal('70.00'))
-		self.assertTrue(
-			order.payments.filter(
-				method='pending_credit',
-				status='pending',
-				amount=Decimal('70.00'),
-			).exists()
-		)
+		self.assertEqual(customer.balance, Decimal('30.00'))
+		self.assertEqual(customer.current_debt, Decimal('0.00'))
+		self.assertFalse(order.payments.exists())
 
 	def test_overdue_credit_is_reported_but_does_not_block_credit_order(self):
 		customer = Client.objects.create(
@@ -406,7 +400,7 @@ class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 			balance=Decimal('10.00'),
 			credit_limit=Decimal('100.00'),
 			current_debt=Decimal('80.00'),
-			can_pay_with_credit=False,
+			can_pay_with_credit=True,
 		)
 		order = Order.objects.create(
 			client=customer,

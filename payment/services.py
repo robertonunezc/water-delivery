@@ -437,7 +437,8 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
     ).first()
 
     order_total = Decimal(str(order.total_amount))
-    balance_amount = min(order.client.balance, order_total)
+    client_balance = Decimal(str(order.client.balance))
+    balance_amount = min(client_balance, order_total)
     credit_amount = order_total - balance_amount
 
     try:
