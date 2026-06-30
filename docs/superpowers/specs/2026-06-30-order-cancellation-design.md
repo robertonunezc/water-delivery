@@ -51,6 +51,25 @@ Cancellation is blocked when:
 - Reversing balance added by the order would require more balance than the client currently has.
 - The service detects financial state that does not match expected order-linked payments or transactions.
 
+Blocked cancellation attempts are persisted on the order so they are visible after the request ends. The order remains in its current status and is marked for staff review.
+
+Add cancellation review metadata to `Order`:
+
+- `cancellation_review_required`
+- `cancellation_review_reason`
+- `cancellation_requested_at`
+- `cancellation_requested_by`
+
+When a non-staff user hits a manual-review block, the service sets the review metadata and returns a message explaining that the order was marked for review. Staff users can see the same review state and are responsible for resolving the underlying issue before retrying cancellation.
+
+Staff review does not bypass accounting rules in the first version. Staff approval means:
+
+1. Inspect the order and review reason.
+2. Fix the financial state manually using existing admin/accounting tools.
+3. Retry cancellation.
+
+If the financial state is valid after review, cancellation succeeds. If not, the order remains marked for review.
+
 ## QuerySet API
 
 Add explicit query helpers on `OrderQuerySet`:
@@ -69,6 +88,14 @@ Update the normal cancellation UI copy:
 - Explain that the order will be marked cancelled and internal balance or credit effects will be reversed when possible.
 - Show manual-review block errors returned by the service.
 
+Update the orders list to make blocked cancellations easy to find:
+
+- Show a visible `Requiere revisión de cancelación` badge on orders with `cancellation_review_required=True`.
+- Add a `Revisión requerida` filter.
+- For staff users, show a `Reintentar cancelación` action.
+- For non-staff users, show an `En revisión` state so they know their cancellation request was recorded.
+- Add a staff-facing count for orders requiring cancellation review in the orders list header.
+
 ## Service Shape
 
 Replace the pending-only cancellation service with a broader order cancellation service:
@@ -79,13 +106,15 @@ cancel_order(order, user, reason=None)
   lock client
   lock payments
   if order is already CANCELLED: return success/no-op
-  if order is invoiced: reject
+  if order is invoiced: mark review required and reject
   calculate internal balance/credit reversals
-  if added balance cannot be removed: reject
+  if added balance cannot be removed: mark review required and reject
+  if financial state is unexpected: mark review required and reject
   create balance reversal transactions
   create credit reversal transactions
   mark payments reversed
   mark order CANCELLED
+  clear cancellation review metadata
 ```
 
 The service owns orchestration, locking, idempotency, and transactions. Views and admin actions should call this service instead of implementing cancellation rules inline.
@@ -102,5 +131,8 @@ Add tests for:
 - Credit purchase debt is reversed.
 - Settled credit orders reverse settlement then purchase effects.
 - Invoiced orders are blocked.
+- Blocked cancellations persist cancellation review metadata.
+- Staff can see orders requiring cancellation review in the orders list.
+- Successful retry after staff fixes financial state clears cancellation review metadata.
 - Already-cancelled orders are idempotent.
 - `active()`, `cancelled()`, and `including_cancelled()` return expected orders.
