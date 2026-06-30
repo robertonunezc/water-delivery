@@ -217,7 +217,6 @@ def process_order_payment(
     remaining_amount = order_amount
     balance_used = Decimal("0")
     credit_used = Decimal("0")
-    print("preferred method", payment_method)
     if payment_method == "balance":
         # Try to pay entirely with balance
         if client.balance >= order_amount:
@@ -233,17 +232,11 @@ def process_order_payment(
             }
 
     elif payment_method == "credit":
-        # Check if client can use credit
-        if not client.can_use_credit_for_payment():
-            return {
-                "success": False,
-                "error": "Client is not allowed to pay with credit at this time.",
-                "balance_used": Decimal("0"),
-                "credit_used": Decimal("0"),
-            }
-
         # Try to pay entirely with credit
-        available_credit = client.get_available_credit()
+        available_credit = max(
+            client.credit_limit - client.current_debt,
+            Decimal("0.00"),
+        )
         if available_credit >= order_amount:
             credit_used = order_amount
             remaining_amount = Decimal("0")
@@ -263,19 +256,10 @@ def process_order_payment(
 
         # Then, use credit if needed and available
         if remaining_amount > 0:
-            # Check if client can use credit
-            if not client.can_use_credit_for_payment():
-                return {
-                    "success": False,
-                    "error": f"Client cannot use credit. Need additional "
-                    f"${remaining_amount:.2f} in balance.",
-                    "balance_used": Decimal("0"),
-                    "credit_used": Decimal("0"),
-                    "balance_available": client.balance,
-                    "credit_available": Decimal("0"),
-                }
-
-            available_credit = Decimal(str(client.get_available_credit()))
+            available_credit = max(
+                client.credit_limit - client.current_debt,
+                Decimal("0.00"),
+            )
             credit_used = min(available_credit, remaining_amount)
             remaining_amount -= credit_used
 
@@ -289,20 +273,6 @@ def process_order_payment(
             "balance_available": client.balance,
             "credit_available": client.get_available_credit(),
         }
-
-    if credit_used > 0:
-        from clients.services.pending_payment_service import client_has_overdue_credit
-
-        if client_has_overdue_credit(client):
-            return {
-                "success": False,
-                "error": (
-                    "El cliente tiene créditos vencidos y no puede realizar nuevas "
-                    "ventas a crédito."
-                ),
-                "balance_used": Decimal("0"),
-                "credit_used": Decimal("0"),
-            }
 
     # Actually process the payment using balance_service
     if balance_used > 0:

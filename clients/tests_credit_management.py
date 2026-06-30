@@ -11,6 +11,7 @@ from django.utils import timezone
 from clients.forms import ClientCoreForm, ClientCreditConfigForm, ClientCreditPolicyForm
 from clients.models import Client, ClientCreditConfig
 from clients.services import balance_service
+from clients.services.pending_payment_service import client_has_overdue_credit
 from orders.models import Order
 from tenant_client.test_utils import FastTenantTestCase
 
@@ -193,7 +194,7 @@ class CreditSaleEnforcementTests(FastTenantTestCase):
         client.refresh_from_db()
         self.assertEqual(client.current_debt, Decimal('90.00'))
 
-    def test_overdue_credit_blocks_new_credit_sale(self) -> None:
+    def test_overdue_credit_does_not_block_new_credit_sale_when_limit_available(self) -> None:
         client = Client.objects.create(
             name='Cliente vencido',
             type='corporate',
@@ -219,22 +220,22 @@ class CreditSaleEnforcementTests(FastTenantTestCase):
         Order.objects.filter(pk=overdue_order.pk).update(
             order_date=timezone.now() - timedelta(days=60),
         )
+        self.assertTrue(client_has_overdue_credit(client))
         new_order = Order.objects.create(
             client=client,
             total_amount=Decimal('50.00'),
             type='credito',
         )
 
-        with self.assertRaisesRegex(ValueError, 'créditos vencidos'):
-            balance_service.add_debt(
-                client=client,
-                amount=Decimal('50.00'),
-                transaction_type='purchase',
-                reference_order=new_order,
-            )
+        balance_service.add_debt(
+            client=client,
+            amount=Decimal('50.00'),
+            transaction_type='purchase',
+            reference_order=new_order,
+        )
 
         client.refresh_from_db()
-        self.assertEqual(client.current_debt, Decimal('100.00'))
+        self.assertEqual(client.current_debt, Decimal('150.00'))
 
 
 class ClientCreditDueDateDetailTests(FastTenantTestCase):
