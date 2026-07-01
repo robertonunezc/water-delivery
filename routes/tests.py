@@ -8,6 +8,7 @@ from .services import get_route_detail_payload
 from .forms import RouteClientForm, RouteClientInlineForm
 from clients.models import Address, Client, Contact
 from core.models import Transport
+from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
@@ -247,6 +248,70 @@ class RouteClientFrequencyIntervalTest(TestCase):
 
         self.assertEqual(due_first_week.count(), 2)
         self.assertEqual(due_second_week.count(), 1)
+
+
+class RouteDashboardSummaryServiceTest(FastTenantTestCase):
+    def setUp(self):
+        self.transport = Transport.objects.create(
+            license_plate='SUM-001',
+            model='Summary Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.monday_route = Route.objects.create(
+            name='Summary Monday',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+        self.tuesday_route = Route.objects.create(
+            name='Summary Tuesday',
+            transportation=self.transport,
+            weekday='tuesday',
+            is_active=True,
+        )
+
+    def _create_route_client(
+        self,
+        *,
+        name: str,
+        route: Route,
+        sequence: int,
+        interval_weeks: int = 1,
+        is_active: bool = True,
+    ) -> RouteClient:
+        client = Client.objects.create(name=name)
+        Address.objects.create(client=client, type='delivery', street=f'Calle {name}')
+        return RouteClient.objects.create(
+            route=route,
+            client=client,
+            sequence=sequence,
+            interval_weeks=interval_weeks,
+            anchor_date=date(2026, 3, 2),
+            is_active=is_active,
+        )
+
+    def test_get_route_clients_due_count_uses_due_on_queryset(self):
+        from routes.services import get_route_clients_due_count
+
+        self._create_route_client(name='Due Every Week', route=self.monday_route, sequence=1)
+        self._create_route_client(
+            name='Not Due This Week',
+            route=self.monday_route,
+            sequence=2,
+            interval_weeks=2,
+        )
+        self._create_route_client(
+            name='Inactive Client',
+            route=self.monday_route,
+            sequence=3,
+            is_active=False,
+        )
+        self._create_route_client(name='Different Weekday', route=self.tuesday_route, sequence=4)
+
+        count = get_route_clients_due_count(date(2026, 3, 9))
+
+        self.assertEqual(count, 1)
 
 
 class RouteDetailRefactorTest(TestCase):

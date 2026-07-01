@@ -1,7 +1,9 @@
 from calendar import monthrange
+from decimal import Decimal
 from datetime import date, timedelta
 from typing import Optional, List
-from django.db.models import Sum
+from django.db.models import DecimalField, ExpressionWrapper, F, OuterRef, Subquery, Sum, Value
+from django.db.models.functions import Coalesce
 from django.db import models
 from django.forms import ValidationError
 
@@ -41,6 +43,63 @@ OCCURRENCE_CHOICES = [
 ]
 
 # Create your models here.
+class InvoiceQuerySet(models.QuerySet):
+    def with_balance_totals(self) -> 'InvoiceQuerySet':
+        """Annotate invoice linked order totals, paid totals, and remaining amounts."""
+        from payment.models import Payment
+
+        linked_total_subquery = (
+            InvoiceOrderLink.objects.filter(invoice=OuterRef('pk'))
+            .values('invoice')
+            .annotate(total=Sum('order__total_amount'))
+            .values('total')
+        )
+        paid_total_subquery = (
+            Payment.objects.filter(
+                order__invoice_links__invoice=OuterRef('pk'),
+                status='completed',
+            )
+            .exclude(method='pending_credit')
+            .values('order__invoice_links__invoice')
+            .annotate(total=Sum('amount'))
+            .values('total')
+        )
+        decimal_zero = Value(Decimal('0.00'), output_field=DecimalField())
+        qs = self.annotate(
+            linked_orders_total=Coalesce(
+                Subquery(linked_total_subquery, output_field=DecimalField()),
+                decimal_zero,
+            ),
+            paid_total=Coalesce(
+                Subquery(paid_total_subquery, output_field=DecimalField()),
+                decimal_zero,
+            ),
+        )
+        return qs.annotate(
+            available_capacity=ExpressionWrapper(
+                F('amount') - F('linked_orders_total'),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            ),
+            unpaid_balance=ExpressionWrapper(
+                F('amount') - F('paid_total'),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            ),
+        )
+
+    def with_available_capacity(self) -> 'InvoiceQuerySet':
+        """Return invoices whose amount exceeds linked completed order totals."""
+        return self.with_balance_totals().filter(available_capacity__gt=0)
+
+    def with_unpaid_balance(self) -> 'InvoiceQuerySet':
+        """Return invoices whose amount exceeds completed non-credit payments."""
+        return self.with_balance_totals().filter(unpaid_balance__gt=0)
+
+
+class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
+    def get_queryset(self) -> InvoiceQuerySet:
+        return InvoiceQuerySet(self.model, using=self._db).filter(deleted_at=None)
+
+
 class Invoice(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='invoices', verbose_name='Cliente')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
@@ -54,6 +113,7 @@ class Invoice(TimeStampedModel):
         verbose_name="Monto automático",
         help_text="Si está activo, el monto se calcula automáticamente como la suma de los pedidos vinculados.",
     )
+    objects = InvoiceManager()
 
     def __str__(self):
         return f"Factura #{self.id} para {self.client.name} - {self.amount}"

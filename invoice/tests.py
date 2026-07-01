@@ -557,6 +557,76 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		self.assertTrue(InvoiceOrderLink.objects.filter(invoice=self.invoice, order=order).exists())
 
 
+class InvoiceBalanceSnapshotServiceTests(InvoiceTenantTestCase):
+	def setUp(self):
+		self.client_a = Client.objects.create(name="Balance Snapshot A")
+		self.client_b = Client.objects.create(name="Balance Snapshot B")
+
+	def test_invoice_balance_snapshot_separates_capacity_from_unpaid_balance(self):
+		from payment.models import Payment
+		from invoice.services import get_invoice_balance_snapshot
+
+		invoice = Invoice.objects.create(
+			client=self.client_a,
+			amount=Decimal("1000.00"),
+			identifier="BAL-001",
+			folio="BAL-001",
+		)
+		order_one = Order.objects.create(
+			client=self.client_a,
+			total_amount=Decimal("400.00"),
+			status="COMPLETED",
+		)
+		order_two = Order.objects.create(
+			client=self.client_a,
+			total_amount=Decimal("400.00"),
+			status="COMPLETED",
+		)
+		InvoiceOrderLink.objects.create(invoice=invoice, order=order_one)
+		InvoiceOrderLink.objects.create(invoice=invoice, order=order_two)
+		Payment.objects.create(
+			client=self.client_a,
+			order=order_one,
+			amount=Decimal("600.00"),
+			method="cash",
+			status="completed",
+		)
+		Payment.objects.create(
+			client=self.client_a,
+			order=order_two,
+			amount=Decimal("50.00"),
+			method="pending_credit",
+			status="completed",
+		)
+
+		fully_used_invoice = Invoice.objects.create(
+			client=self.client_b,
+			amount=Decimal("300.00"),
+			identifier="BAL-002",
+			folio="BAL-002",
+		)
+		fully_used_order = Order.objects.create(
+			client=self.client_b,
+			total_amount=Decimal("300.00"),
+			status="COMPLETED",
+		)
+		InvoiceOrderLink.objects.create(invoice=fully_used_invoice, order=fully_used_order)
+		Payment.objects.create(
+			client=self.client_b,
+			order=fully_used_order,
+			amount=Decimal("300.00"),
+			method="cash",
+			status="completed",
+		)
+
+		snapshot = get_invoice_balance_snapshot()
+
+		self.assertEqual(snapshot["available_capacity_count"], 1)
+		self.assertEqual(snapshot["available_capacity_total"], Decimal("200.00"))
+		self.assertEqual(snapshot["unpaid_balance_count"], 1)
+		self.assertEqual(snapshot["unpaid_balance_total"], Decimal("400.00"))
+
+
 
 # class CrearFacturaActionTests(TestCase):
 # 	"""Tests for the crear_factura admin action on OrderAdmin."""

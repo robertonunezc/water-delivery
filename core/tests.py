@@ -1,3 +1,4 @@
+from datetime import date
 from unittest.mock import patch
 
 from django.conf import settings
@@ -13,6 +14,7 @@ User = get_user_model()
 from .models import Employee
 from .admin import EmployeeAdmin
 from . import views
+from tenant_client.test_utils import FastTenantTestCase
 
 
 class HealthCheckViewTests(SimpleTestCase):
@@ -103,3 +105,112 @@ class TimezoneConfigurationTests(SimpleTestCase):
         excluded_hours = DatabaseScheduler.get_excluded_hours_for_crontab_tasks()
 
         self.assertGreater(len(excluded_hours), 0)
+
+
+class DashboardDateRangeTests(SimpleTestCase):
+    def test_yesterday_preset_uses_previous_day(self) -> None:
+        from core.services.dashboard_service import get_dashboard_date_range
+
+        selected_range = get_dashboard_date_range("yesterday", today=date(2026, 7, 1))
+
+        self.assertEqual(selected_range.start_date, date(2026, 6, 30))
+        self.assertEqual(selected_range.end_date, date(2026, 6, 30))
+        self.assertEqual(selected_range.label, "Ayer")
+
+    def test_last_week_preset_uses_previous_monday_to_sunday(self) -> None:
+        from core.services.dashboard_service import get_dashboard_date_range
+
+        selected_range = get_dashboard_date_range("last_week", today=date(2026, 7, 1))
+
+        self.assertEqual(selected_range.start_date, date(2026, 6, 22))
+        self.assertEqual(selected_range.end_date, date(2026, 6, 28))
+        self.assertEqual(selected_range.label, "Semana pasada")
+
+    def test_last_month_preset_uses_previous_calendar_month(self) -> None:
+        from core.services.dashboard_service import get_dashboard_date_range
+
+        selected_range = get_dashboard_date_range("last_month", today=date(2026, 1, 15))
+
+        self.assertEqual(selected_range.start_date, date(2025, 12, 1))
+        self.assertEqual(selected_range.end_date, date(2025, 12, 31))
+        self.assertEqual(selected_range.label, "Mes pasado")
+
+    def test_custom_preset_uses_valid_custom_dates(self) -> None:
+        from core.services.dashboard_service import get_dashboard_date_range
+
+        selected_range = get_dashboard_date_range(
+            "custom",
+            custom_start="2026-06-05",
+            custom_end="2026-06-12",
+            today=date(2026, 7, 1),
+        )
+
+        self.assertEqual(selected_range.start_date, date(2026, 6, 5))
+        self.assertEqual(selected_range.end_date, date(2026, 6, 12))
+        self.assertEqual(selected_range.label, "Personalizado")
+
+
+class HomeDashboardRoutingTests(FastTenantTestCase):
+    def _create_employee_user(self, *, username: str, position: str) -> User:
+        user = User.objects.create_user(
+            username=username,
+            password="testpass123",
+            is_staff=position == "manager",
+        )
+        Employee.objects.create(
+            user=user,
+            nombre=username.title(),
+            apellidos="Dashboard",
+            curp=f"{username[:8].upper():0<18}",
+            rfc=f"{username[:8].upper():0<13}",
+            street_number="Calle 1",
+            position=position,
+        )
+        return user
+
+    def test_anonymous_user_keeps_public_home(self) -> None:
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "home.html")
+        self.assertContains(response, "Water Delivery")
+
+    def test_driver_employee_keeps_current_home(self) -> None:
+        user = self._create_employee_user(username="driveruser", position="driver")
+        self.client.force_login(user)
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "home.html")
+        self.assertContains(response, "Panel Principal")
+
+    def test_staff_employee_keeps_current_home(self) -> None:
+        user = self._create_employee_user(username="staffuser", position="staff")
+        self.client.force_login(user)
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "home.html")
+        self.assertContains(response, "Panel Principal")
+
+    def test_manager_employee_uses_manager_dashboard(self) -> None:
+        user = self._create_employee_user(username="manageruser", position="manager")
+        self.client.force_login(user)
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "manager_dashboard.html")
+        self.assertContains(response, "Dashboard Backoffice")
+
+    def test_user_without_employee_keeps_current_home(self) -> None:
+        user = User.objects.create_user(username="noemployee", password="testpass123")
+        self.client.force_login(user)
+
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "home.html")
+        self.assertContains(response, "Panel Principal")

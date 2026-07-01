@@ -94,6 +94,28 @@ def get_clients_with_invoices() -> 'django.db.models.QuerySet':
     )
 
 
+def get_invoice_balance_snapshot() -> dict[str, Decimal | int]:
+    """Return invoice unpaid-balance and available-capacity counts and totals."""
+    from invoice.models import Invoice
+
+    available_capacity = Invoice.objects.with_available_capacity()
+    unpaid_balance = Invoice.objects.with_unpaid_balance()
+    available_summary = available_capacity.aggregate(
+        count=Count('id'),
+        total=Sum('available_capacity'),
+    )
+    unpaid_summary = unpaid_balance.aggregate(
+        count=Count('id'),
+        total=Sum('unpaid_balance'),
+    )
+    return {
+        'available_capacity_count': available_summary['count'] or 0,
+        'available_capacity_total': available_summary['total'] or Decimal('0.00'),
+        'unpaid_balance_count': unpaid_summary['count'] or 0,
+        'unpaid_balance_total': unpaid_summary['total'] or Decimal('0.00'),
+    }
+
+
 
 def get_clients_needing_billing(
     start_date: date,
@@ -211,7 +233,6 @@ def get_clients_needing_billing(
                     'frequency_display': billing_freq.get_frequency_display(),
                     'billing_info': billing_freq.get_billing_info()
                 })
-    print('Final results count:', len(results))
     return results
 
 

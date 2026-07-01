@@ -1,0 +1,412 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard Backoffice{% endblock %}
+
+{% block extra_css %}
+<style>
+    .manager-dashboard {
+        --dashboard-ink: #1f2937;
+        --dashboard-muted: #64748b;
+        --dashboard-border: #d9e2ec;
+        --dashboard-surface: #ffffff;
+        --dashboard-page: #f4f7fb;
+        border-radius: 8px;
+        padding: 1rem;
+    }
+
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 1rem;
+        align-items: center;
+        margin-bottom: 1rem;
+        border-left: 5px solid #0f766e;
+        border-radius: 8px;
+        background: #ffffff;
+        box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07);
+        padding: 1rem;
+    }
+
+    .dashboard-title {
+        flex: 0 0 auto;
+        min-width: 220px;
+    }
+
+    .dashboard-header h1 {
+        color: var(--dashboard-ink);
+        font-weight: 800;
+    }
+
+    .dashboard-range {
+        color: var(--dashboard-muted);
+        font-weight: 600;
+    }
+
+    .dashboard-filters {
+        align-items: end;
+        display: grid;
+        flex: 1 1 auto;
+        gap: 0.55rem;
+        grid-template-columns: minmax(150px, 1.1fr) minmax(135px, 1fr) minmax(135px, 1fr) minmax(108px, 0.7fr);
+    }
+
+    .dashboard-filters .form-label {
+        color: #334155;
+        font-size: 0.82rem;
+        font-weight: 700;
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+    }
+
+    .dashboard-filters .form-control,
+    .dashboard-filters .form-select {
+        min-height: 38px;
+    }
+
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+    }
+
+    .metric-card {
+        --metric-accent: #475569;
+        --metric-tint: #f8fafc;
+        --metric-value: #1f2937;
+        border: 1px solid var(--dashboard-border);
+        border-left: 5px solid var(--metric-accent);
+        border-radius: 8px;
+        padding: 1rem;
+        background: linear-gradient(180deg, var(--metric-tint), var(--dashboard-surface) 72%);
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+        min-height: 116px;
+    }
+
+    .metric-label {
+        color: #334155;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.82rem;
+        font-weight: 800;
+        letter-spacing: 0;
+        text-transform: uppercase;
+    }
+
+    .metric-icon {
+        align-items: center;
+        background: var(--metric-accent);
+        border-radius: 999px;
+        color: #ffffff;
+        display: inline-flex;
+        height: 1.45rem;
+        justify-content: center;
+        width: 1.45rem;
+    }
+
+    .metric-value {
+        color: var(--metric-value);
+        font-size: 1.45rem;
+        font-weight: 700;
+        line-height: 1.2;
+        margin-top: 0.35rem;
+    }
+
+    .metric-note {
+        color: var(--dashboard-muted);
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-top: 0.35rem;
+    }
+
+    .metric-note a {
+        color: var(--metric-accent);
+        font-weight: 800;
+        text-decoration: none;
+    }
+
+    .metric-note a:hover {
+        text-decoration: underline;
+    }
+
+    .metric-sales {
+        --metric-accent: #0f766e;
+        --metric-tint: #ecfdf5;
+        --metric-value: #065f46;
+    }
+
+    .metric-orders {
+        --metric-accent: #2563eb;
+        --metric-tint: #eff6ff;
+        --metric-value: #1d4ed8;
+    }
+
+    .metric-ticket {
+        --metric-accent: #7c3aed;
+        --metric-tint: #f5f3ff;
+        --metric-value: #5b21b6;
+    }
+
+    .metric-discount,
+    .metric-pending {
+        --metric-accent: #d97706;
+        --metric-tint: #fffbeb;
+        --metric-value: #92400e;
+    }
+
+    .metric-risk {
+        --metric-accent: #dc2626;
+        --metric-tint: #fef2f2;
+        --metric-value: #991b1b;
+    }
+
+    .metric-invoice {
+        --metric-accent: #4f46e5;
+        --metric-tint: #eef2ff;
+        --metric-value: #3730a3;
+    }
+
+    .metric-capacity {
+        --metric-accent: #0891b2;
+        --metric-tint: #ecfeff;
+        --metric-value: #155e75;
+    }
+
+    .metric-route {
+        --metric-accent: #16a34a;
+        --metric-tint: #f0fdf4;
+        --metric-value: #166534;
+    }
+
+    .dashboard-section {
+        margin-top: 1rem;
+    }
+
+    .section-title {
+        color: var(--dashboard-ink);
+        font-size: 1rem;
+        font-weight: 800;
+        margin-bottom: 0.75rem;
+    }
+
+    .table-panel {
+        background: #ffffff;
+        border: 1px solid var(--dashboard-border);
+        border-radius: 8px;
+        box-shadow: 0 8px 18px rgba(15, 23, 42, 0.07);
+        overflow: hidden;
+    }
+
+    .compact-table th,
+    .compact-table td {
+        padding: 0.55rem 0.65rem;
+        vertical-align: middle;
+    }
+
+    .compact-table {
+        margin-bottom: 0;
+    }
+
+    .compact-table thead th {
+        background: #1f3a5f;
+        border-color: #1f3a5f;
+        color: #ffffff;
+        font-size: 0.82rem;
+        text-transform: uppercase;
+    }
+
+    .compact-table tbody tr:nth-child(even) {
+        background: #f8fafc;
+    }
+
+    @media (max-width: 768px) {
+        .dashboard-header {
+            display: block;
+        }
+
+        .dashboard-title {
+            margin-bottom: 0.85rem;
+            min-width: 0;
+        }
+
+        .dashboard-filters {
+            grid-template-columns: 1fr;
+        }
+
+        .manager-dashboard {
+            padding: 0.75rem;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="manager-dashboard">
+    <form method="get" class="dashboard-header">
+        <div class="dashboard-title">
+            <h1 class="h3 mb-1">Dashboard Backoffice</h1>
+            <div class="dashboard-range">
+                {{ date_range.label }}:
+                {{ date_range.start_date|date:"d/m/Y" }} - {{ date_range.end_date|date:"d/m/Y" }}
+            </div>
+        </div>
+        <div class="dashboard-filters">
+            <div>
+                <label for="date_preset" class="form-label">Rango</label>
+                <select id="date_preset" name="date_preset" class="form-select">
+                    {% for value, label in date_options %}
+                        <option value="{{ value }}" {% if selected_preset == value %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label for="start_date" class="form-label">Inicio</label>
+                <input id="start_date" type="date" name="start_date" value="{{ custom_start }}" class="form-control">
+            </div>
+            <div>
+                <label for="end_date" class="form-label">Fin</label>
+                <input id="end_date" type="date" name="end_date" value="{{ custom_end }}" class="form-control">
+            </div>
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-filter me-1"></i>Aplicar
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <section class="dashboard-section">
+        <div class="section-title">Ventas</div>
+        <div class="metric-grid">
+            <div class="metric-card metric-sales">
+                <div class="metric-label">
+                    <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
+                    Vendido
+                </div>
+                <div class="metric-value">${{ sales_snapshot.total_amount|floatformat:2 }}</div>
+                <div class="metric-note">Pedidos completados en el rango</div>
+            </div>
+            <div class="metric-card metric-orders">
+                <div class="metric-label">
+                    <span class="metric-icon"><i class="fas fa-clipboard-check"></i></span>
+                    Pedidos
+                </div>
+                <div class="metric-value">{{ sales_snapshot.total_orders }}</div>
+                <div class="metric-note">Solo estado completado</div>
+            </div>
+            <div class="metric-card metric-ticket">
+                <div class="metric-label">
+                    <span class="metric-icon"><i class="fas fa-receipt"></i></span>
+                    Ticket promedio
+                </div>
+                <div class="metric-value">${{ sales_snapshot.average_ticket|floatformat:2 }}</div>
+                <div class="metric-note">Vendido / pedidos</div>
+            </div>
+            <div class="metric-card metric-discount">
+                <div class="metric-label">
+                    <span class="metric-icon"><i class="fas fa-tags"></i></span>
+                    Descuentos
+                </div>
+                <div class="metric-value">${{ sales_snapshot.total_discount|floatformat:2 }}</div>
+                <div class="metric-note">
+                    <a href="{{ links.orders_report }}">Ver pedidos</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div class="row g-3 dashboard-section">
+        <div class="col-lg-5">
+            <div class="section-title">Métodos de pago</div>
+            <div class="table-panel table-responsive">
+                <table class="table table-sm compact-table">
+                    <thead>
+                        <tr>
+                            <th>Método</th>
+                            <th class="text-end">Pagos</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for method in sales_snapshot.payment_methods %}
+                            <tr>
+                                <td>{{ method.label }}</td>
+                                <td class="text-end">{{ method.payment_count }}</td>
+                                <td class="text-end">${{ method.total_amount|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="3" class="text-center text-muted">Sin pagos en el rango.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="section-title">Operación</div>
+            <div class="metric-grid">
+                <div class="metric-card metric-risk">
+                    <div class="metric-label">
+                        <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
+                        Clientes vencidos
+                    </div>
+                    <div class="metric-value">{{ overdue_clients.count }}</div>
+                    <div class="metric-note">
+                        ${{ overdue_clients.total_amount|floatformat:2 }}
+                        <a href="{{ links.overdue_clients }}" class="ms-1">Detalle</a>
+                    </div>
+                </div>
+                <div class="metric-card metric-invoice">
+                    <div class="metric-label">
+                        <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
+                        Facturas por cobrar
+                    </div>
+                    <div class="metric-value">{{ invoice_balance.unpaid_balance_count }}</div>
+                    <div class="metric-note">
+                        ${{ invoice_balance.unpaid_balance_total|floatformat:2 }}
+                        {% if links.invoices %}<a href="{{ links.invoices }}" class="ms-1">Detalle</a>{% endif %}
+                    </div>
+                </div>
+                <div class="metric-card metric-capacity">
+                    <div class="metric-label">
+                        <span class="metric-icon"><i class="fas fa-gauge-high"></i></span>
+                        Capacidad en facturas
+                    </div>
+                    <div class="metric-value">{{ invoice_balance.available_capacity_count }}</div>
+                    <div class="metric-note">
+                        ${{ invoice_balance.available_capacity_total|floatformat:2 }} disponible
+                        {% if links.invoices %}<a href="{{ links.invoices }}" class="ms-1">Detalle</a>{% endif %}
+                    </div>
+                </div>
+                <div class="metric-card metric-pending">
+                    <div class="metric-label">
+                        <span class="metric-icon"><i class="fas fa-file-circle-plus"></i></span>
+                        Facturas pendientes
+                    </div>
+                    <div class="metric-value">{{ pending_invoices.count }}</div>
+                    <div class="metric-note">
+                        {{ pending_invoices.total_orders }} pedidos
+                        {% if links.pending_invoices %}<a href="{{ links.pending_invoices }}" class="ms-1">Detalle</a>{% endif %}
+                    </div>
+                </div>
+                <div class="metric-card metric-route">
+                    <div class="metric-label">
+                        <span class="metric-icon"><i class="fas fa-route"></i></span>
+                        Clientes en ruta hoy
+                    </div>
+                    <div class="metric-value">{{ route_clients_today.count }}</div>
+                    <div class="metric-note">
+                        {{ route_clients_today.date|date:"d/m/Y" }}
+                        <a href="{{ links.routes_today }}" class="ms-1">Detalle</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

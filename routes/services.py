@@ -40,3 +40,8 @@ def get_route_detail_payload(route: Route, search_query: str) -> RouteDetailPayl
         search_query=search_query,
         today=date.today(),
     )
+
+
+def get_route_clients_due_count(target_date: date) -> int:
+    """Return the number of active route clients due on the given date."""
+    return RouteClient.objects.due_on(target_date).count()

@@ -2,6 +2,7 @@ from datetime import date
 from decimal import Decimal
 from django.db import transaction
 from django.db.models import ProtectedError
+from django.db.models import Count, Sum
 from clients.models import Client
 from core import models
 from orders.models import Order, OrderProduct, OrderStatus
@@ -12,6 +13,55 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def get_sales_snapshot(start_date: date, end_date: date) -> dict[str, object]:
+    """Return compact completed-order sales metrics for a date range."""
+    completed_orders = Order.objects.completed_in_date_range(start_date, end_date)
+    totals = completed_orders.aggregate(
+        total_orders=Count('id'),
+        total_amount=Sum('total_amount'),
+        total_discount=Sum('discount'),
+    )
+    total_orders = totals['total_orders'] or 0
+    total_amount = totals['total_amount'] or Decimal('0.00')
+    total_discount = totals['total_discount'] or Decimal('0.00')
+    average_ticket = total_amount / total_orders if total_orders else Decimal('0.00')
+
+    from payment.models import PAYMENT_METHOD_CHOICES, Payment
+
+    method_labels = dict(PAYMENT_METHOD_CHOICES)
+    payment_rows = (
+        Payment.objects.filter(
+            order__in=completed_orders,
+            status='completed',
+        )
+        .exclude(method='pending_credit')
+        .values('method')
+        .annotate(
+            total_amount=Sum('amount'),
+            payment_count=Count('id'),
+        )
+        .order_by('method')
+    )
+    payment_methods = [
+        {
+            'method': row['method'],
+            'label': method_labels.get(row['method'], row['method']),
+            'total_amount': row['total_amount'] or Decimal('0.00'),
+            'payment_count': row['payment_count'],
+        }
+        for row in payment_rows
+    ]
+    return {
+        'total_orders': total_orders,
+        'total_amount': total_amount,
+        'average_ticket': average_ticket,
+        'total_discount': total_discount,
+        'payment_methods': payment_methods,
+    }
+
+
 @dataclass
 class OrderData:
     id: int

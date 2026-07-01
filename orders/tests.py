@@ -939,3 +939,99 @@ class OrderPaymentRoutingTestCase(FastTenantTestCase):
 
         self.assertIs(match.func, views.create_payment_for_order)
         self.assertFalse(hasattr(services, "create_payment_for_order"))
+
+
+class SalesSnapshotServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.client = Client.objects.create(name="Dashboard Client")
+
+    def _create_order(
+        self,
+        *,
+        amount: Decimal,
+        status: str,
+        order_date,
+        discount: Decimal = Decimal("0.00"),
+    ) -> Order:
+        order = Order.objects.create(
+            client=self.client,
+            total_amount=amount,
+            subtotal_amount=amount + discount,
+            discount=discount,
+            status=status,
+        )
+        Order.objects.filter(pk=order.pk).update(order_date=order_date)
+        order.refresh_from_db()
+        return order
+
+    def test_sales_snapshot_counts_only_completed_orders_in_range(self) -> None:
+        from datetime import datetime
+        from django.utils import timezone
+
+        start_date = datetime(2026, 6, 1).date()
+        end_date = datetime(2026, 6, 30).date()
+
+        cash_order = self._create_order(
+            amount=Decimal("100.00"),
+            discount=Decimal("10.00"),
+            status=OrderStatus.COMPLETED.value,
+            order_date=timezone.make_aware(datetime(2026, 6, 5, 10, 0)),
+        )
+        transfer_order = self._create_order(
+            amount=Decimal("50.00"),
+            status=OrderStatus.COMPLETED.value,
+            order_date=timezone.make_aware(datetime(2026, 6, 8, 11, 0)),
+        )
+        pending_order = self._create_order(
+            amount=Decimal("75.00"),
+            status=OrderStatus.PENDING.value,
+            order_date=timezone.make_aware(datetime(2026, 6, 9, 12, 0)),
+        )
+        outside_order = self._create_order(
+            amount=Decimal("200.00"),
+            status=OrderStatus.COMPLETED.value,
+            order_date=timezone.make_aware(datetime(2026, 7, 1, 9, 0)),
+        )
+
+        Payment.objects.create(
+            client=self.client,
+            order=cash_order,
+            amount=Decimal("100.00"),
+            method="cash",
+            status="completed",
+        )
+        Payment.objects.create(
+            client=self.client,
+            order=transfer_order,
+            amount=Decimal("50.00"),
+            method="bank_transfer",
+            status="completed",
+        )
+        Payment.objects.create(
+            client=self.client,
+            order=pending_order,
+            amount=Decimal("75.00"),
+            method="cash",
+            status="completed",
+        )
+        Payment.objects.create(
+            client=self.client,
+            order=outside_order,
+            amount=Decimal("200.00"),
+            method="cash",
+            status="completed",
+        )
+
+        snapshot = services.get_sales_snapshot(start_date=start_date, end_date=end_date)
+
+        self.assertEqual(snapshot["total_orders"], 2)
+        self.assertEqual(snapshot["total_amount"], Decimal("150.00"))
+        self.assertEqual(snapshot["average_ticket"], Decimal("75.00"))
+        self.assertEqual(snapshot["total_discount"], Decimal("10.00"))
+        payment_totals = {
+            item["method"]: item["total_amount"]
+            for item in snapshot["payment_methods"]
+        }
+        self.assertEqual(payment_totals["cash"], Decimal("100.00"))
+        self.assertEqual(payment_totals["bank_transfer"], Decimal("50.00"))
+        self.assertNotIn("pending_credit", payment_totals)

@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date
 
 from django.conf import settings
 from django.db import models
@@ -103,6 +104,18 @@ class OrderQuerySet(models.QuerySet):
 
         return qs
 
+    def completed_in_date_range(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> 'OrderQuerySet':
+        """Filter completed orders whose order date falls in the inclusive date range."""
+        return self.filter(
+            status=OrderStatus.COMPLETED.value,
+            order_date__date__gte=start_date,
+            order_date__date__lte=end_date,
+        )
+
     def with_payment_totals(self) -> 'OrderQuerySet':
         """Annotate each order with the sum of its completed payments as `total_paid`."""
         from payment.models import Payment
@@ -147,6 +160,13 @@ class OrderManager(models.Manager):
 
     def today_orders(self, user=None):
         return self.get_queryset().today_orders(user)
+
+    def completed_in_date_range(
+        self,
+        start_date: date,
+        end_date: date,
+    ) -> OrderQuerySet:
+        return self.get_queryset().completed_in_date_range(start_date, end_date)
 
     def with_payment_totals(self):
         return self.get_queryset().with_payment_totals()
