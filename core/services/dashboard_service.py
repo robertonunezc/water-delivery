@@ -182,7 +182,7 @@ def get_delivery_dashboard_context(
                 'key': 'credits',
                 'title': 'Créditos',
                 'description': 'Consultar clientes con deuda y registrar pagos.',
-                'url': _url_with_query('clients:list', {'mode': 'credits'}),
+                'url': reverse('report:pending_payments'),
                 'icon': 'fa-credit-card',
                 'variant': 'warning',
                 'is_enabled': True,
