@@ -2,7 +2,9 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from django.db.models import QuerySet
+from django.utils import timezone
 
+from clients.models import Client
 from .models import Route, RouteClient, RouteClientOrder
 
 
@@ -45,3 +47,21 @@ def get_route_detail_payload(route: Route, search_query: str) -> RouteDetailPayl
 def get_route_clients_due_count(target_date: date) -> int:
     """Return the number of active route clients due on the given date."""
     return RouteClient.objects.due_on(target_date).count()
+
+
+def get_current_route_for_client(
+    client: Client,
+    target_date: date | None = None,
+) -> Route | None:
+    """Return the client's active route assignment due on the target date."""
+    current_date = target_date or timezone.localdate()
+    route_client = (
+        RouteClient.objects.due_on(current_date)
+        .filter(client=client, route__is_active=True)
+        .select_related('route')
+        .order_by('sequence', 'route_id', 'id')
+        .first()
+    )
+    if route_client is None:
+        return None
+    return route_client.route

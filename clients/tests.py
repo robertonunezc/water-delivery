@@ -239,6 +239,90 @@ class AddressInlineFormTests(FastTenantTestCase):
             duplicate.full_clean()
 
 
+class ClientListModeTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username='client_mode_user', password='testpass123')
+        self.client.login(username='client_mode_user', password='testpass123')
+
+    def _create_client(self, *, name: str, debt: Decimal = Decimal('0.00')) -> Client:
+        client = Client.objects.create(
+            name=name,
+            current_debt=debt,
+            active=True,
+        )
+        Address.objects.create(
+            client=client,
+            type='delivery',
+            street=f'Calle {name}',
+            active=True,
+        )
+        return client
+
+    def test_credits_mode_filters_clients_with_debt(self) -> None:
+        debt_client = self._create_client(name='Cliente con deuda', debt=Decimal('150.00'))
+        self._create_client(name='Cliente sin deuda')
+
+        response = self.client.get(reverse('clients:list'), {'mode': 'credits'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Créditos')
+        self.assertContains(response, debt_client.name)
+        self.assertContains(response, reverse('clients:pay_credit', kwargs={'pk': debt_client.pk}))
+        self.assertNotContains(response, 'Cliente sin deuda')
+
+    def test_outside_route_sales_mode_does_not_exclude_today_route_clients(self) -> None:
+        route_client = self._create_client(name='Cliente en ruta')
+        other_client = self._create_client(name='Cliente fuera de ruta')
+        transport = Transport.objects.create(
+            license_plate='OUT-001',
+            model='Unidad venta',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        today = date.today()
+        route = Route.objects.create(
+            name='Ruta de hoy',
+            transportation=transport,
+            weekday=today.strftime('%A').lower(),
+            is_active=True,
+        )
+        RouteClient.objects.create(
+            route=route,
+            client=route_client,
+            sequence=1,
+            interval_weeks=1,
+            anchor_date=today,
+            is_active=True,
+        )
+
+        response = self.client.get(reverse('clients:list'), {'mode': 'outside_route_sales'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Ventas fuera de ruta')
+        self.assertContains(response, route_client.name)
+        self.assertContains(response, other_client.name)
+
+    def test_client_list_preserves_mode_in_search_and_pagination(self) -> None:
+        for index in range(11):
+            self._create_client(
+                name=f'Credito paginado {index:02d}',
+                debt=Decimal('25.00'),
+            )
+
+        response = self.client.get(
+            reverse('clients:list'),
+            {
+                'mode': 'credits',
+                'search': 'Credito paginado',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="mode" value="credits"')
+        self.assertContains(response, 'mode=credits')
+        self.assertContains(response, 'search=Credito+paginado')
+
+
 class ClientRouteAssignmentTabTests(FastTenantTestCase):
     """Tests for managing RouteClient assignments from the client edit form."""
 

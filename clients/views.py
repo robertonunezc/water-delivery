@@ -9,6 +9,7 @@ from django.urls import reverse
 from datetime import date, datetime, timedelta
 from calendar import monthrange
 from typing import Any
+from urllib.parse import urlencode
 from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
 from .forms import (
     ManualCreditTransactionForm,
@@ -703,11 +704,17 @@ def update_client(request, pk):
 
 def get_clients(request):
     search_query = request.GET.get('search', '').strip()
+    client_list_mode = request.GET.get('mode', '').strip()
+    if client_list_mode not in {'outside_route_sales', 'credits'}:
+        client_list_mode = ''
     
     # Start with all clients
     clients_queryset = Client.objects.select_related().prefetch_related(
         'contacts', 'addresses'
     ).order_by('-created_at', 'name')
+
+    if client_list_mode == 'credits':
+        clients_queryset = clients_queryset.filter(current_debt__gt=0)
     
     # Apply search filter if query exists
     if search_query:
@@ -736,12 +743,39 @@ def get_clients(request):
     except EmptyPage:
         # If page is out of range (e.g. 9999), deliver last page of results.
         clients = paginator.page(paginator.num_pages)
+
+    page_title = 'Clientes'
+    page_subtitle = ''
+    if client_list_mode == 'outside_route_sales':
+        page_title = 'Ventas fuera de ruta'
+        page_subtitle = 'Busca cualquier cliente para crear una venta manual.'
+    elif client_list_mode == 'credits':
+        page_title = 'Créditos'
+        page_subtitle = 'Clientes con deuda pendiente para consulta o cobro.'
+
+    preserved_query = {}
+    if client_list_mode:
+        preserved_query['mode'] = client_list_mode
+    if search_query:
+        preserved_query['search'] = search_query
+
+    mode_query = urlencode({'mode': client_list_mode}) if client_list_mode else ''
+    pagination_query = urlencode(preserved_query)
+    clear_url = reverse('clients:list')
+    if mode_query:
+        clear_url = f'{clear_url}?{mode_query}'
     
     context = {
         'clients': clients,
         'search_query': search_query,
         'total_clients': paginator.count,
         'has_search': bool(search_query),
+        'client_list_mode': client_list_mode,
+        'page_title': page_title,
+        'page_subtitle': page_subtitle,
+        'mode_query': mode_query,
+        'pagination_query': pagination_query,
+        'client_list_clear_url': clear_url,
     }
     return context
 @login_required

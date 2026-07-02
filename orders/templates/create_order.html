@@ -540,7 +540,8 @@
                       id="finish-order-btn" 
                       class="btn btn-success btn-lg btn-touch" 
                       
-                      data-order-id="{{ order.pk }}">
+                      data-order-id="{{ order.pk }}"
+                      data-redirect="{{ order_redirect_url }}">
                 <i class="fas fa-check-circle me-2"></i>Terminar Pedido
               </button>
             </div>
@@ -631,7 +632,8 @@
               <button type="button" 
                       id="finish-order-btn-mobile" 
                       class="btn btn-success btn-lg w-100" 
-                      data-order-id="{{ order.pk }}">
+                      data-order-id="{{ order.pk }}"
+                      data-redirect="{{ order_redirect_url }}">
                 <i class="fas fa-check-circle me-2"></i>Terminar
               </button>
             </div>

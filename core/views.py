@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 
 from core.services.dashboard_service import (
+    get_delivery_dashboard_context,
     get_current_week_pending_invoices_count,
     get_employee_position,
     get_manager_dashboard_context,
@@ -16,9 +17,14 @@ logger = logging.getLogger(__name__)
 
 def home(request):
     """Home page view - shows dashboard for authenticated users, welcome page for anonymous users"""
-    if request.user.is_authenticated and get_employee_position(request.user) == 'manager':
-        context = get_manager_dashboard_context(user=request.user, params=request.GET)
-        return render(request, 'manager_dashboard.html', context)
+    if request.user.is_authenticated:
+        employee_position = get_employee_position(request.user)
+        if employee_position == 'manager':
+            context = get_manager_dashboard_context(user=request.user, params=request.GET)
+            return render(request, 'manager_dashboard.html', context)
+        if employee_position in {'driver', 'staff'}:
+            context = get_delivery_dashboard_context(user=request.user)
+            return render(request, 'delivery_dashboard.html', context)
 
     context = {
         'is_authenticated': request.user.is_authenticated,

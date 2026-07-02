@@ -38,10 +38,8 @@
                                 <!-- <li><a class="dropdown-item" href="{% url 'report:client_debt' %}">Clientes con Deuda</a></li> -->
                                  <li><a class="dropdown-item" href="{% url 'report:orders_report' %}">Pedidos</a></li>
                                     <li><a class="dropdown-item" href="{% url 'report:breakdown_payment_method' %}">Reporte de Hoy</a></li>
-                                {% if user.is_staff %}
                                     <li><hr class="dropdown-divider"></li>
                                     <li><a class="dropdown-item" href="{% url 'report:pending_payments' %}">Pagos Vencidos</a></li>
-                                {% endif %}
                             </ul>
                           
                         </li>

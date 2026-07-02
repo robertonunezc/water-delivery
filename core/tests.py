@@ -5,6 +5,7 @@ from django.conf import settings
 from django.test import TestCase, RequestFactory, SimpleTestCase
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 from django.utils import timezone
 from django_celery_beat.schedulers import DatabaseScheduler
 from django_celery_beat.schedulers import now as beat_now
@@ -14,6 +15,7 @@ User = get_user_model()
 from .models import Employee
 from .admin import EmployeeAdmin
 from . import views
+from clients.models import Client
 from tenant_client.test_utils import FastTenantTestCase
 
 
@@ -175,25 +177,25 @@ class HomeDashboardRoutingTests(FastTenantTestCase):
         self.assertTemplateUsed(response, "home.html")
         self.assertContains(response, "Water Delivery")
 
-    def test_driver_employee_keeps_current_home(self) -> None:
+    def test_driver_employee_uses_delivery_dashboard(self) -> None:
         user = self._create_employee_user(username="driveruser", position="driver")
         self.client.force_login(user)
 
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "home.html")
-        self.assertContains(response, "Panel Principal")
+        self.assertTemplateUsed(response, "delivery_dashboard.html")
+        self.assertContains(response, "Panel del repartidor")
 
-    def test_staff_employee_keeps_current_home(self) -> None:
+    def test_staff_employee_uses_delivery_dashboard(self) -> None:
         user = self._create_employee_user(username="staffuser", position="staff")
         self.client.force_login(user)
 
         response = self.client.get("/")
 
         self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "home.html")
-        self.assertContains(response, "Panel Principal")
+        self.assertTemplateUsed(response, "delivery_dashboard.html")
+        self.assertContains(response, "Panel del repartidor")
 
     def test_manager_employee_uses_manager_dashboard(self) -> None:
         user = self._create_employee_user(username="manageruser", position="manager")
@@ -214,3 +216,70 @@ class HomeDashboardRoutingTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "home.html")
         self.assertContains(response, "Panel Principal")
+
+
+class DeliveryDashboardContextTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="deliveryuser", password="testpass123")
+        Employee.objects.create(
+            user=self.user,
+            nombre="Delivery",
+            apellidos="Dashboard",
+            curp="DELIVERYUSER00000",
+            rfc="DELIVERY00000",
+            street_number="Calle 1",
+            position="driver",
+        )
+
+    def test_delivery_dashboard_actions_are_ordered(self) -> None:
+        from core.services.dashboard_service import get_delivery_dashboard_context
+
+        context = get_delivery_dashboard_context(user=self.user, today=date(2026, 7, 1))
+
+        self.assertEqual(
+            [action["key"] for action in context["dashboard_actions"]],
+            [
+                "route",
+                "future_reminders",
+                "outside_route_sales",
+                "credits",
+                "day_close",
+            ],
+        )
+
+    def test_future_reminders_action_is_disabled(self) -> None:
+        from core.services.dashboard_service import get_delivery_dashboard_context
+
+        context = get_delivery_dashboard_context(user=self.user, today=date(2026, 7, 1))
+        reminders_action = context["dashboard_actions"][1]
+
+        self.assertEqual(reminders_action["key"], "future_reminders")
+        self.assertFalse(reminders_action["is_enabled"])
+        self.assertEqual(reminders_action["status_label"], "Próximamente")
+
+    def test_day_close_action_uses_selected_local_date(self) -> None:
+        from core.services.dashboard_service import get_delivery_dashboard_context
+
+        context = get_delivery_dashboard_context(user=self.user, today=date(2026, 7, 1))
+        day_close_action = context["dashboard_actions"][4]
+
+        self.assertEqual(day_close_action["key"], "day_close")
+        self.assertEqual(
+            day_close_action["url"],
+            f"{reverse('report:breakdown_payment_method')}?date=2026-07-01",
+        )
+        self.assertIn("Inventario", day_close_action["meta"])
+
+    def test_credits_action_counts_clients_with_debt(self) -> None:
+        from core.services.dashboard_service import get_delivery_dashboard_context
+
+        Client.objects.create(name="Con deuda 1", current_debt="10.00", active=True)
+        Client.objects.create(name="Con deuda 2", current_debt="25.00", active=True)
+        Client.objects.create(name="Sin deuda", current_debt="0.00", active=True)
+
+        context = get_delivery_dashboard_context(user=self.user, today=date(2026, 7, 1))
+        credits_action = context["dashboard_actions"][3]
+
+        self.assertEqual(credits_action["key"], "credits")
+        self.assertEqual(credits_action["badge_count"], 2)
+        self.assertEqual(credits_action["url"], f"{reverse('clients:list')}?mode=credits")
