@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 from botocore import client
 from django.contrib import messages
+from django.contrib.auth.models import AbstractBaseUser
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -21,6 +22,7 @@ from clients.models import Client
 from .  import services as order_services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
 from payment import services as payment_services
+from routes import services as route_services
 
 log = order_services.get_logger(__name__)
 
@@ -42,6 +44,24 @@ ORDER_DASHBOARD_BULK_ACTIONS = (
     #     'label': 'Marcar como cancelados',
     # },
 )
+
+ROUTE_REDIRECT_EMPLOYEE_POSITIONS = {'staff', 'driver'}
+
+
+def _should_redirect_order_to_route(user: AbstractBaseUser) -> bool:
+    employee = getattr(user, 'employee', None)
+    return bool(employee and employee.position in ROUTE_REDIRECT_EMPLOYEE_POSITIONS)
+
+
+def _get_order_redirect_url(user: AbstractBaseUser, client: Client) -> str:
+    if not _should_redirect_order_to_route(user):
+        return reverse('clients:list')
+
+    route = route_services.get_current_route_for_client(client)
+    if route is None:
+        return reverse('clients:list')
+
+    return reverse('routes:detail', kwargs={'route_id': route.pk})
 
 
 def calculate_payment_breakdown(order_total, client_balance):
@@ -418,6 +438,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         'has_pending_credit_payment': has_pending_credit_payment,
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_delivery_address': has_delivery_address,
+        'order_redirect_url': _get_order_redirect_url(request.user, client),
     }
     log.info(
         f"Opened order id:{order.id} for client {client.id} by user {owner.username}"

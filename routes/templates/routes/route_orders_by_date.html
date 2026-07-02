@@ -40,13 +40,13 @@
                             <table class="table table-bordered table-striped">
                                 <thead>
                                     <tr>
-                                        <th>Sequence</th>
-                                        <th>Client</th>
-                                        <th>Order</th>
-                                        <th>Address</th>
-                                        <th>Status</th>
-                                        <th>Completed</th>
-                                        <th>Notes</th>
+                                        <th>Id</th>
+                                        <th>Cliente</th>
+                                        <th>Orden</th>
+                                        <th>Direccion</th>
+                                        <th>Estado</th>
+                                        <th>Completada</th>
+                                        <th>Notas</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -74,14 +74,14 @@
                                             <td>
                                                 {% if route_order.is_completed %}
                                                     <span class="badge badge-success">
-                                                        <i class="fas fa-check"></i> Completed
+                                                        <i class="fas fa-check"></i> Completada
                                                     </span>
                                                     {% if route_order.completed_at %}
                                                         <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
                                                     {% endif %}
                                                 {% else %}
                                                     <span class="badge badge-warning">
-                                                        <i class="fas fa-clock"></i> Pending
+                                                        <i class="fas fa-clock"></i> Pendiente
                                                     </span>
                                                 {% endif %}
                                             </td>
@@ -93,10 +93,10 @@
                         </div>
                     {% else %}
                         <div class="alert alert-info">
-                            <h5>No orders scheduled</h5>
-                            <p>There are no orders scheduled for {{ visit_date|date:"l, F d, Y" }} on this route.</p>
+                            <h5>No hay órdenes programadas</h5>
+                            <p>No hay ordenenes programadas para {{ visit_date|date:"l, F d, Y" }} en esta Ruta</p>
                             <a href="{% url 'routes:detail' route.id %}" class="btn btn-primary">
-                                View Regular Clients
+                                Ver clientes
                             </a>
                         </div>
                     {% endif %}

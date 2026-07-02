@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Panel del repartidor{% endblock %}
+
+{% block extra_css %}
+<style>
+  .delivery-shell {
+    max-width: 1120px;
+  }
+
+  .delivery-action {
+    border-radius: 8px;
+    min-height: 100%;
+  }
+
+  .delivery-action-icon {
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f3f5;
+  }
+
+  .delivery-action-disabled {
+    opacity: 0.72;
+  }
+
+  .delivery-action-meta {
+    min-height: 1.25rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="delivery-shell mx-auto">
+  <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-2 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Panel del repartidor</h1>
+      <p class="text-muted mb-0">{{ today|date:"d/m/Y" }}</p>
+    </div>
+    <a href="{% url 'core:home' %}" class="btn btn-outline-secondary btn-sm">
+      <i class="fas fa-sync-alt me-1"></i>Actualizar
+    </a>
+  </div>
+
+  <div class="row g-3">
+    {% for action in dashboard_actions %}
+      <div class="col-12 col-md-6 col-xl-4">
+        <article class="card delivery-action {% if not action.is_enabled %}delivery-action-disabled{% else %}border-{{ action.variant }}{% endif %}">
+          <div class="card-body d-flex flex-column gap-3">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <span class="delivery-action-icon text-{{ action.variant }}">
+                <i class="fas {{ action.icon }} fa-lg"></i>
+              </span>
+              <div class="d-flex flex-wrap justify-content-end gap-2">
+                {% if action.badge_count is not None %}
+                  <span class="badge text-bg-light">{{ action.badge_count }}</span>
+                {% endif %}
+                {% if action.status_label %}
+                  <span class="badge text-bg-secondary">{{ action.status_label }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div>
+              <h2 class="h5 mb-2">{{ action.title }}</h2>
+              <p class="text-muted mb-2">{{ action.description }}</p>
+              <div class="delivery-action-meta small text-muted">{{ action.meta }}</div>
+            </div>
+
+            <div class="mt-auto">
+              {% if action.is_enabled %}
+                <a href="{{ action.url }}" class="btn btn-{{ action.variant }} w-100">
+                  Abrir
+                </a>
+              {% else %}
+                <button type="button" class="btn btn-outline-secondary w-100" disabled>
+                  No disponible
+                </button>
+              {% endif %}
+            </div>
+          </div>
+        </article>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -124,6 +124,91 @@ def get_current_week_pending_invoices_count(today: date | None = None) -> int:
     )
 
 
+def _get_clients_with_debt_count() -> int:
+    from clients.models import Client
+
+    return Client.objects.filter(active=True, current_debt__gt=0).count()
+
+
+def get_delivery_dashboard_context(
+    *,
+    user: Any,
+    today: date | None = None,
+) -> dict[str, Any]:
+    """Build the operational dashboard context for route delivery users."""
+    current_date = today or timezone.localdate()
+    return {
+        'is_authenticated': True,
+        'user': user,
+        'today': current_date,
+        'dashboard_actions': [
+            {
+                'key': 'route',
+                'title': 'Ruta',
+                'description': 'Abrir la ruta programada para hoy e iniciar ventas.',
+                'url': reverse('routes:today'),
+                'icon': 'fa-route',
+                'variant': 'primary',
+                'is_enabled': True,
+                'status_label': '',
+                'badge_count': None,
+                'meta': 'Programa de visitas del día',
+            },
+            {
+                'key': 'future_reminders',
+                'title': 'Pedidos futuros y recordatorios',
+                'description': 'Programación de pedidos especiales y recordatorios de clientes.',
+                'url': '',
+                'icon': 'fa-calendar-plus',
+                'variant': 'secondary',
+                'is_enabled': False,
+                'status_label': 'Próximamente',
+                'badge_count': None,
+                'meta': 'Pendiente de modelo operativo',
+            },
+            {
+                'key': 'outside_route_sales',
+                'title': 'Ventas fuera de ruta',
+                'description': 'Buscar cualquier cliente y crear una venta manual.',
+                'url': _url_with_query('clients:list', {'mode': 'outside_route_sales'}),
+                'icon': 'fa-cart-plus',
+                'variant': 'success',
+                'is_enabled': True,
+                'status_label': '',
+                'badge_count': None,
+                'meta': 'Búsqueda general de clientes',
+            },
+            {
+                'key': 'credits',
+                'title': 'Créditos',
+                'description': 'Consultar clientes con deuda y registrar pagos.',
+                'url': _url_with_query('clients:list', {'mode': 'credits'}),
+                'icon': 'fa-credit-card',
+                'variant': 'warning',
+                'is_enabled': True,
+                'status_label': '',
+                'badge_count': _get_clients_with_debt_count(),
+                'meta': 'Clientes con saldo pendiente',
+            },
+            {
+                'key': 'day_close',
+                'title': 'Cierre de día',
+                'description': 'Revisar el corte de ventas y formas de pago del día.',
+                'url': _url_with_query(
+                    'report:breakdown_payment_method',
+                    {'date': current_date.isoformat()},
+                ),
+                'icon': 'fa-clipboard-check',
+                'variant': 'info',
+                'is_enabled': True,
+                'status_label': '',
+                'badge_count': None,
+                'meta': 'Inventario pendiente para una siguiente versión',
+            },
+        ],
+    }
+
+
 def _get_overdue_clients_summary() -> dict[str, Decimal | int]:
     from clients.services.pending_payment_service import get_clients_with_pending_payments
 
