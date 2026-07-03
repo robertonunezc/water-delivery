@@ -233,10 +233,16 @@ def _handle_orders_dashboard_bulk_action(request):
 
     if action == 'mark_cancelled':
         result = order_services.cancel_orders(selected_orders, user=request.user)
+        review_message = (
+            f" {result['review_required']} requiere(n) revisión."
+            if result.get('review_required')
+            else ''
+        )
         messages.success(
             request,
             f"{result['updated']} pedido(s) marcados como cancelados."
-            + (f" {result['skipped']} ya estaban cancelados." if result['skipped'] else ''),
+            + (f" {result['skipped']} no se cancelaron." if result['skipped'] else '')
+            + review_message,
         )
         return redirect(redirect_to)
 
@@ -318,6 +324,8 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
             orders = orders.paid()
         elif status_filter == 'UNPAID':
             orders = orders.unpaid()
+        elif status_filter == 'REVIEW_REQUIRED':
+            orders = orders.review_required()
         else:
             orders = orders.filter(status=status_filter)
     
@@ -382,9 +390,11 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
     # Extend status choices with virtual statuses
     extended_status_choices = list(ORDER_STATUS_CHOICES)
     extended_status_choices.extend([
+        ('REVIEW_REQUIRED', 'Requiere revisión'),
         ('PAID', 'Pagados'),
         ('UNPAID', 'No pagados')
     ])
+    review_required_count = Order.objects.review_required().count()
     
     return {
         'orders': orders_page,
@@ -400,6 +410,7 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
         },
         'has_filters': any([status_filter, client_filter, date_from, date_to, search_query]),
         'total_orders': total_orders,
+        'review_required_count': review_required_count,
         'page_stats': page_stats,
         'today': date.today(),
     }
@@ -516,10 +527,17 @@ def update_order(request, order_pk):
 @require_http_methods(["POST"])
 def cancel_order(request, order_pk):
     order = get_object_or_404(Order, pk=order_pk)
-    result = order_services.cancel_pending_order(order=order, user=request.user)
+    result = order_services.cancel_order(order=order, user=request.user)
 
     if not result.get('success'):
-        return JsonResponse({'success': False, 'error': result.get('error', 'No se pudo cancelar el pedido.')}, status=400)
+        return JsonResponse(
+            {
+                'success': False,
+                'review_required': bool(result.get('review_required')),
+                'error': result.get('error', 'No se pudo cancelar el pedido.'),
+            },
+            status=400,
+        )
 
     return JsonResponse({
         'success': True,

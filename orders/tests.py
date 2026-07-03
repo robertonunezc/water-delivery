@@ -926,7 +926,7 @@ class CancelOrderViewTestCase(FastTenantTestCase):
             unit_price=Decimal("25.00"),
         )
 
-    def test_cancel_order_endpoint_deletes_order(self) -> None:
+    def test_cancel_order_endpoint_marks_order_cancelled(self) -> None:
         response = self.client.post(
             reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
             data=json.dumps({}),
@@ -937,11 +937,35 @@ class CancelOrderViewTestCase(FastTenantTestCase):
         payload = response.json()
         self.assertTrue(payload.get('success'))
         self.assertIn('redirect_url', payload)
-        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
 
-    def test_cancel_order_endpoint_returns_400_for_non_pending(self) -> None:
+    def test_cancel_order_endpoint_allows_completed_order(self) -> None:
         self.order.status = OrderStatus.COMPLETED.value
         self.order.save(update_fields=['status'])
+
+        response = self.client.post(
+            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
+            data=json.dumps({}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload.get('success'))
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
+
+    def test_cancel_order_endpoint_returns_review_required_for_blocked_order(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=['status'])
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal("50.00"),
+            identifier="INV-CANCEL-VIEW-1",
+            folio="F-CANCEL-VIEW-1",
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=self.order)
 
         response = self.client.post(
             reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
@@ -952,7 +976,9 @@ class CancelOrderViewTestCase(FastTenantTestCase):
         self.assertEqual(response.status_code, 400)
         payload = response.json()
         self.assertFalse(payload.get('success'))
-        self.assertIn('error', payload)
+        self.assertTrue(payload.get('review_required'))
+        self.order.refresh_from_db()
+        self.assertTrue(self.order.cancellation_review_required)
 
 
 class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
@@ -1134,6 +1160,54 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.completed_order_1.refresh_from_db()
         self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
+
+    def test_orders_list_shows_review_badge_for_blocked_cancellation(self) -> None:
+        self.completed_order_1.cancellation_review_required = True
+        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
+        self.completed_order_1.save(
+            update_fields=[
+                "cancellation_review_required",
+                "cancellation_review_reason",
+            ]
+        )
+
+        response = self.client.get(reverse("orders:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Requiere revisión de cancelación")
+        self.assertContains(response, "Saldo insuficiente")
+
+    def test_admin_orders_list_shows_review_count_and_badge(self) -> None:
+        self.completed_order_1.cancellation_review_required = True
+        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
+        self.completed_order_1.save(
+            update_fields=[
+                "cancellation_review_required",
+                "cancellation_review_reason",
+            ]
+        )
+
+        response = self.client.get(reverse("admin_orders"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Cancelaciones por revisar")
+        self.assertContains(response, "Requiere revisión de cancelación")
+
+    def test_review_required_filter_returns_only_review_orders(self) -> None:
+        self.completed_order_1.cancellation_review_required = True
+        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
+        self.completed_order_1.save(
+            update_fields=[
+                "cancellation_review_required",
+                "cancellation_review_reason",
+            ]
+        )
+
+        response = self.client.get(reverse("admin_orders"), {"status": "REVIEW_REQUIRED"})
+
+        self.assertEqual(response.status_code, 200)
+        listed_orders = list(response.context["orders"].object_list)
+        self.assertEqual(listed_orders, [self.completed_order_1])
 
 class CalculateOrderTotalTestCase(FastTenantTestCase):
     """Tests for the calculate_order_total service function."""

@@ -226,10 +226,20 @@
                       <span class="badge status-badge {{ order.status }} badge-sm">
                         {{ order.get_status_display_fixed }}
                       </span>
+                      {% if order.cancellation_review_required %}
+                        <span class="badge bg-danger ms-2 badge-sm">
+                          Requiere revisión de cancelación
+                        </span>
+                      {% endif %}
                       {% if order.is_paid %}
                         <span class="badge bg-success ms-2 badge-sm">Pagado</span>
                       {% endif %}
                     </div>
+                    {% if order.cancellation_review_required and order.cancellation_review_reason %}
+                      <div class="small text-danger mb-2">
+                        {{ order.cancellation_review_reason }}
+                      </div>
+                    {% endif %}
                     <h6 class="mb-1">
                       <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none">
                         {{ order.client.name }}
