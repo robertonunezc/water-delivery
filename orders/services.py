@@ -1,8 +1,8 @@
 from datetime import date
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import ProtectedError
-from django.db.models import Count, Sum
+from django.db.models import Count, QuerySet, Sum
+from django.utils import timezone
 from clients.models import Client
 from core import models
 from orders.models import Order, OrderProduct, OrderStatus
@@ -185,51 +185,236 @@ def get_logger(name: str):
     return logging.getLogger(name)
 
 
-@transaction.atomic
-def cancel_pending_order(order: Order, user=None) -> Dict[str, object]:
-    """Cancel a pending order by deleting it and its related items.
+def _audit_user(user: object | None = None) -> object | None:
+    """Return a persisted user for audit fields, or None for anonymous/system work."""
+    if user is None or not getattr(user, "is_authenticated", False):
+        return None
+    return user
+
+
+def _mark_cancellation_review_required(
+    order: Order,
+    reason: str,
+    user: object | None = None,
+) -> Dict[str, object]:
+    """Persist cancellation review metadata and return a service failure result."""
+    order.cancellation_review_required = True
+    order.cancellation_review_reason = reason
+    order.cancellation_requested_at = timezone.now()
+    order.cancellation_requested_by = _audit_user(user)
+    order.save(
+        update_fields=[
+            'cancellation_review_required',
+            'cancellation_review_reason',
+            'cancellation_requested_at',
+            'cancellation_requested_by',
+            'updated_at',
+        ]
+    )
+    return {
+        'success': False,
+        'review_required': True,
+        'error': reason,
+    }
+
+
+def _mark_cancellation_review_required_by_id(
+    order_id: int,
+    reason: str,
+    user: object | None = None,
+) -> Dict[str, object]:
+    order = Order.objects.get(pk=order_id)
+    return _mark_cancellation_review_required(order=order, reason=reason, user=user)
+
+
+def _clear_cancellation_review(order: Order) -> None:
+    order.cancellation_review_required = False
+    order.cancellation_review_reason = None
+    order.cancellation_requested_at = None
+    order.cancellation_requested_by = None
+
+
+def _get_added_balance_amount(order: Order) -> Decimal:
+    total = order.client.balance_transactions.filter(
+        reference_order=order,
+        transaction_type='added_in_order',
+    ).aggregate(total=Sum('amount'))['total']
+    return total or Decimal('0.00')
+
+
+def _reverse_added_balance(
+    order: Order,
+    amount: Decimal,
+    user: object | None = None,
+) -> None:
+    if amount <= 0:
+        return
+
+    from clients.services import balance_service
+
+    transaction_result = balance_service.reverse_added_order_balance(
+        client=order.client,
+        amount=amount,
+        user=user,
+        reference_order=order,
+    )
+    if transaction_result is None:
+        raise ValueError(
+            'El cliente no tiene saldo suficiente para revertir el saldo agregado en la venta.'
+        )
+
+
+def _reverse_completed_balance_payments(
+    order: Order,
+    user: object | None = None,
+) -> None:
+    from clients.services import balance_service
+
+    balance_payments = order.payments.select_for_update().filter(
+        method='balance',
+        status='completed',
+    )
+    for payment in balance_payments:
+        balance_service.reverse_balance_payment(payment=payment, user=user)
+
+
+def _reverse_credit_payment_transactions(
+    order: Order,
+    user: object | None = None,
+) -> None:
+    from clients.services import balance_service
+
+    credit_payments = order.client.credit_transactions.filter(
+        reference_order=order,
+        transaction_type__in=['payment', 'payment_from_balance'],
+    ).order_by('created_at', 'id')
+    for credit_payment in credit_payments:
+        balance_service.reverse_credit_payment(
+            client=order.client,
+            amount=credit_payment.amount,
+            user=user,
+            reference_order=order,
+            reference_payment=credit_payment.reference_payment,
+            notes=f'Reversión de pago de deuda por cancelación de pedido #{order.id}',
+        )
+
+
+def _reverse_credit_purchase_transactions(
+    order: Order,
+    user: object | None = None,
+) -> None:
+    from clients.services import balance_service
+
+    credit_purchases = order.client.credit_transactions.filter(
+        reference_order=order,
+        transaction_type='purchase',
+    ).order_by('created_at', 'id')
+    for credit_purchase in credit_purchases:
+        balance_service.reverse_credit_purchase(
+            client=order.client,
+            amount=credit_purchase.amount,
+            user=user,
+            reference_order=order,
+            reference_payment=credit_purchase.reference_payment,
+            notes=f'Reversión de compra a crédito por cancelación de pedido #{order.id}',
+        )
+
+
+def _mark_payments_reversed(order: Order) -> int:
+    return order.payments.select_for_update().filter(
+        status__in=['completed', 'pending'],
+    ).update(status='reversed', updated_at=timezone.now())
+
+
+def _cancel_order_in_transaction(
+    order: Order,
+    user: object | None = None,
+) -> Dict[str, object]:
+    locked_order = (
+        Order.objects.select_for_update()
+        .select_related('client')
+        .get(pk=order.pk)
+    )
+    locked_client = Client.objects.select_for_update().get(pk=locked_order.client_id)
+    locked_order.client = locked_client
+
+    if locked_order.status == OrderStatus.CANCELLED.value:
+        return {
+            'success': True,
+            'skipped': True,
+            'message': f'Pedido #{locked_order.id} ya estaba cancelado.',
+        }
+
+    if locked_order.invoice_links.exists():
+        return _mark_cancellation_review_required(
+            order=locked_order,
+            reason='El pedido ya está vinculado a una factura y requiere revisión.',
+            user=user,
+        )
+
+    added_balance_amount = _get_added_balance_amount(locked_order)
+    if added_balance_amount > locked_client.balance:
+        return _mark_cancellation_review_required(
+            order=locked_order,
+            reason=(
+                'El cliente no tiene saldo suficiente para revertir el saldo '
+                'agregado en la venta. Requiere revisión.'
+            ),
+            user=user,
+        )
+
+    _reverse_added_balance(locked_order, added_balance_amount, user=user)
+    _reverse_completed_balance_payments(locked_order, user=user)
+    _reverse_credit_payment_transactions(locked_order, user=user)
+    _reverse_credit_purchase_transactions(locked_order, user=user)
+    payments_reversed = _mark_payments_reversed(locked_order)
+
+    locked_order.status = OrderStatus.CANCELLED.value
+    _clear_cancellation_review(locked_order)
+    locked_order.save(
+        update_fields=[
+            'status',
+            'cancellation_review_required',
+            'cancellation_review_reason',
+            'cancellation_requested_at',
+            'cancellation_requested_by',
+            'updated_at',
+        ]
+    )
+
+    logger.info(
+        f"Order #{locked_order.id} cancelled by "
+        f"{user.username if user else 'system'} - client_id={locked_order.client_id}, "
+        f"payments_reversed={payments_reversed}"
+    )
+    return {
+        'success': True,
+        'skipped': False,
+        'message': f'Pedido #{locked_order.id} cancelado correctamente.',
+        'payments_reversed': payments_reversed,
+    }
+
+
+def cancel_order(order: Order, user: object | None = None) -> Dict[str, object]:
+    """Cancel an order by status and reverse internal financial effects.
 
     Returns:
         dict with success status and message/error details.
     """
-    if order.status != OrderStatus.PENDING.value:
-        return {
-            'success': False,
-            'error': 'Solo se pueden cancelar pedidos en estado pendiente.',
-        }
-
-    if order.payments.exists():
-        return {
-            'success': False,
-            'error': 'No se puede cancelar este pedido porque ya tiene pagos registrados.',
-        }
-
-    order_id = order.id
-    client_id = order.client_id
-    item_count = order.items.count()
-
     try:
-        order.items.all().delete()
-        deleted_count, _ = Order.all_objects.filter(pk=order_id).delete()
-        if deleted_count == 0:
-            return {
-                'success': False,
-                'error': 'No se pudo eliminar el pedido.',
-            }
-    except ProtectedError:
-        return {
-            'success': False,
-            'error': 'No se pudo cancelar el pedido porque tiene registros protegidos relacionados.',
-        }
+        with transaction.atomic():
+            return _cancel_order_in_transaction(order=order, user=user)
+    except ValueError as exc:
+        return _mark_cancellation_review_required_by_id(
+            order_id=order.pk,
+            reason=str(exc),
+            user=user,
+        )
 
-    logger.info(
-        f"Order #{order_id} cancelled and deleted by "
-        f"{user.username if user else 'system'} - client_id={client_id}, items={item_count}"
-    )
-    return {
-        'success': True,
-        'message': f'Pedido #{order_id} cancelado correctamente.',
-    }
+
+def cancel_pending_order(order: Order, user: object | None = None) -> Dict[str, object]:
+    """Backward-compatible wrapper for status-based order cancellation."""
+    return cancel_order(order=order, user=user)
 
 
 # Payment Processing Functions
@@ -423,17 +608,14 @@ def mark_orders_as_completed(queryset, user=None) -> Dict[str, int]:
 
 
 @transaction.atomic
-def cancel_orders(queryset, user=None) -> Dict[str, int]:
+def cancel_orders(queryset: QuerySet, user: object | None = None) -> Dict[str, int]:
     """
     Cancel multiple orders.
 
     This function:
-    1. Validates each order can be cancelled
-    2. Updates status to CANCELLED
-    3. Logs the operation with user information
-
-    Note: Does NOT automatically refund payments. Payment reversal should be
-    handled separately through the payment admin if needed.
+    1. Delegates each order to the single-order cancellation service
+    2. Reverses internal financial effects when cancellation succeeds
+    3. Marks blocked cancellations for staff review
 
     Args:
         queryset: QuerySet of Order objects to cancel
@@ -444,26 +626,23 @@ def cancel_orders(queryset, user=None) -> Dict[str, int]:
     """
     updated = 0
     skipped = 0
+    review_required = 0
 
     for order in queryset:
-        # Skip if already cancelled
-        if order.status == OrderStatus.CANCELLED.value:
-            logger.info(f"Order #{order.id} already cancelled, skipping")
+        result = cancel_order(order=order, user=user)
+        if result.get('success') and not result.get('skipped'):
+            updated += 1
+            continue
+        if result.get('review_required'):
+            review_required += 1
             skipped += 1
             continue
-
-        # Update status
-        order.status = OrderStatus.CANCELLED.value
-        order.save(update_fields=['status', 'updated_at'])
-
-        logger.info(
-            f"Order #{order.id} marked as CANCELLED by {user.username if user else 'system'}"
-        )
-        updated += 1
+        skipped += 1
 
     return {
         'updated': updated,
         'skipped': skipped,
+        'review_required': review_required,
     }
 
 

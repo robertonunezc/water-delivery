@@ -328,6 +328,106 @@ def pay_debt(
 
 
 @transaction.atomic
+def reverse_balance_payment(
+    payment: "Payment",
+    user: "User | None" = None,
+) -> "BalanceTransaction":
+    """Restore client balance that was consumed by a balance payment."""
+    amount = payment.balance_used or payment.amount
+    return add_balance(
+        client=payment.client,
+        amount=amount,
+        transaction_type="payment_reversal",
+        user=user,
+        reference_order=payment.order,
+        reference_payment=payment,
+        notes=f"Reversión de pago con saldo - Pedido #{payment.order_id}",
+    )
+
+
+@transaction.atomic
+def reverse_added_order_balance(
+    client: "Client",
+    amount: Decimal,
+    user: "User | None",
+    reference_order: "Order",
+) -> "BalanceTransaction | None":
+    """Remove balance that was added to the client while processing an order."""
+    return deduct_balance(
+        client=client,
+        amount=amount,
+        transaction_type="added_in_order_reversal",
+        user=user,
+        reference_order=reference_order,
+        notes=f"Reversión de saldo agregado en venta - Pedido #{reference_order.id}",
+    )
+
+
+@transaction.atomic
+def reverse_credit_purchase(
+    client: "Client",
+    amount: Decimal,
+    user: "User | None" = None,
+    reference_order: "Order | None" = None,
+    reference_payment: "Payment | None" = None,
+    notes: str | None = None,
+) -> "CreditTransaction":
+    """Reduce debt created by a credit purchase."""
+    paid_amount = pay_debt(
+        client=client,
+        amount=amount,
+        transaction_type="purchase_reversal",
+        user=user,
+        reference_order=reference_order,
+        reference_payment=reference_payment,
+        notes=notes or _build_reversal_note("Reversión de compra a crédito", reference_order),
+    )
+    if paid_amount != amount:
+        raise ValueError("No se pudo revertir completo el crédito del pedido.")
+
+    transaction = client.credit_transactions.filter(
+        transaction_type="purchase_reversal",
+        amount=amount,
+        reference_order=reference_order,
+        reference_payment=reference_payment,
+    ).order_by("-created_at").first()
+    if transaction is None:
+        raise ValueError("No se encontró la transacción de reversión de crédito.")
+    return transaction
+
+
+@transaction.atomic
+def reverse_credit_payment(
+    client: "Client",
+    amount: Decimal,
+    user: "User | None" = None,
+    reference_order: "Order | None" = None,
+    reference_payment: "Payment | None" = None,
+    notes: str | None = None,
+) -> "CreditTransaction":
+    """Restore debt that was reduced by a payment being cancelled."""
+    transaction = add_debt(
+        client=client,
+        amount=amount,
+        transaction_type="payment_reversal",
+        user=user,
+        reference_order=reference_order,
+        reference_payment=reference_payment,
+        notes=notes or _build_reversal_note("Reversión de pago de deuda", reference_order),
+    )
+    if transaction is None:
+        raise ValueError("No se pudo crear la reversión de pago de deuda.")
+    return transaction
+
+
+def _build_reversal_note(prefix: str, reference_order: "Order | None") -> str:
+    """Build a consistent note for reversal transactions."""
+    if reference_order is None:
+        return prefix
+    return f"{prefix} - Pedido #{reference_order.id}"
+
+
+@transaction.atomic
 def update_credit_limit(
     client: "Client",
     new_limit: Decimal,

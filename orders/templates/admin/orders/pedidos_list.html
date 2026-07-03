@@ -23,6 +23,7 @@
   .kpi-amber { background: linear-gradient(135deg, #b45309, #d97706); }
   .kpi-emerald { background: linear-gradient(135deg, #047857, #059669); }
   .kpi-slate { background: linear-gradient(135deg, #334155, #475569); }
+  .kpi-red { background: linear-gradient(135deg, #b91c1c, #dc2626); }
 
   .dashboard-card {
     border: 0;
@@ -54,25 +55,33 @@
   </div>
 
   <div class="row g-3 mb-3">
-    <div class="col-md-3">
+    <div class="col-md">
       <div class="dashboard-kpi kpi-blue">
         <h6>Total pedidos</h6>
         <div class="value">{{ total_orders }}</div>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md">
       <div class="dashboard-kpi kpi-amber">
         <h6>Pedidos en página</h6>
         <div class="value">{{ page_stats.count|default:0 }}</div>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md">
       <div class="dashboard-kpi kpi-emerald">
         <h6>Total página</h6>
         <div class="value">${{ page_stats.total_amount|floatformat:2 }}</div>
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-md">
+      <a href="?status=REVIEW_REQUIRED" class="text-decoration-none">
+        <div class="dashboard-kpi kpi-red">
+          <h6>Cancelaciones por revisar</h6>
+          <div class="value">{{ review_required_count }}</div>
+        </div>
+      </a>
+    </div>
+    <div class="col-md">
       <div class="dashboard-kpi kpi-slate">
         <h6>Hoy</h6>
         <div class="value">{{ today|date:'d/m/Y' }}</div>
@@ -200,7 +209,17 @@
               </td>
               <td>
                 <span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span>
-                
+                {% if order.cancellation_review_required %}
+                  <span
+                    class="badge bg-danger ms-1"
+                    title="{{ order.cancellation_review_reason|default:'Requiere revisión' }}"
+                  >
+                    Requiere revisión de cancelación
+                  </span>
+                  {% if order.cancellation_review_reason %}
+                    <div class="small text-danger mt-1">{{ order.cancellation_review_reason }}</div>
+                  {% endif %}
+                {% endif %}
               </td>
               <td>
                 {% if order.is_paid %}
@@ -232,6 +251,9 @@
                     {% endif %}
                     {% if order.status == 'PENDING' %}
                       <li><a class="dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
+                    {% endif %}
+                    {% if order.cancellation_review_required %}
+                      <li><a class="dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
                     {% endif %}
                     {% if not order.is_paid %}
                       <li><a class="dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>

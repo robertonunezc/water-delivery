@@ -326,6 +326,8 @@ class BalanceTransaction(TimeStampedModel):
         ('deposit', 'Depósito'),           # Client adds money
         ('payment', 'Pago con saldo'),     # Using balance for order payment
         ('added_in_order', 'Saldo agregado en venta'), # Using balance for deferred payment
+        ('payment_reversal', 'Reversión de pago con saldo'),
+        ('added_in_order_reversal', 'Reversión de saldo agregado en venta'),
         ('refund', 'Reembolso'),           # Money returned to balance
         ('adjustment', 'Ajuste manual'),   # Manual adjustment
         ('transfer_in', 'Transferencia recibida'),   # Transfer from another client
@@ -334,7 +336,7 @@ class BalanceTransaction(TimeStampedModel):
     ]
 
     client = models.ForeignKey('Client', related_name='balance_transactions', on_delete=models.PROTECT, verbose_name="Cliente")
-    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
+    transaction_type = models.CharField(max_length=30, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     balance_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Anterior")
     balance_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Posterior")
@@ -376,7 +378,7 @@ class BalanceTransaction(TimeStampedModel):
             raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
         
         # Validate balance calculation
-        if self.transaction_type in ['deposit', 'refund', 'transfer_in', 'adjustment']:
+        if self.transaction_type in ['deposit', 'refund', 'transfer_in', 'adjustment', 'payment_reversal']:
             # Additions to balance
             if self.balance_after != self.balance_before + self.amount:
                 raise ValidationError('Error en cálculo de saldo: adición incorrecta.')
@@ -386,7 +388,10 @@ class BalanceTransaction(TimeStampedModel):
                 raise ValidationError('Error en cálculo de saldo: deducción incorrecta.')
         
         # Validate sufficient balance for deductions
-        if self.transaction_type in ['payment', 'transfer_out'] and self.balance_before < self.amount:
+        if (
+            self.transaction_type in ['payment', 'transfer_out', 'added_in_order_reversal']
+            and self.balance_before < self.amount
+        ):
             raise ValidationError({'amount': f'Saldo insuficiente. Disponible: ${self.balance_before:.2f}'})
 
 
@@ -398,6 +403,8 @@ class CreditTransaction(TimeStampedModel):
         ('purchase', 'Compra a crédito'),     # Adding debt
         ('payment', 'Pago de deuda'),         # Reducing debt
         ('payment_from_balance', 'Pago con Saldo'),  # Payment using client's balance
+        ('purchase_reversal', 'Reversión de compra a crédito'),
+        ('payment_reversal', 'Reversión de pago de deuda'),
         ('adjustment', 'Ajuste manual'),      # Manual debt adjustment
         ('limit_change', 'Cambio de límite'), # Credit limit modification
         ('interest', 'Interés aplicado'),     # Interest charges
@@ -450,7 +457,7 @@ class CreditTransaction(TimeStampedModel):
             raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
         
         # Validate debt calculation
-        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment']:
+        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment', 'payment_reversal']:
             # Additions to debt
             if self.debt_after != self.debt_before + self.amount:
                 raise ValidationError('Error en cálculo de deuda: adición incorrecta.')

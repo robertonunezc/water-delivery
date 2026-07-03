@@ -153,7 +153,7 @@
         <a href="{% url 'clients:list' %}" class="btn btn-outline-primary me-2">
           <i class="fas fa-users"></i> Ver Clientes
         </a>
-        <a class="btn btn-outline-success me-2" href="{% url 'report:orders_report_csv' %}"><i class="fas fa-file-excel me-2"></i>Exportar</a>
+        <a class="btn btn-outline-success me-2" href="{{ orders_export_url }}"><i class="fas fa-file-excel me-2"></i>Exportar</a>
       </div>
     </div>
 

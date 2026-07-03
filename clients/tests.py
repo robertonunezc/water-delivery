@@ -18,6 +18,8 @@ from .services.csv_import_service import (
     import_clients_from_csv,
 )
 from core.models import Transport
+from orders.models import Order, OrderStatus
+from payment.models import Payment
 from routes.models import Route, RouteClient
 
 User = get_user_model()
@@ -237,6 +239,40 @@ class AddressInlineFormTests(FastTenantTestCase):
         )
         with self.assertRaises(ValidationError):
             duplicate.full_clean()
+
+
+class ClientDetailOrderActionsTests(FastTenantTestCase):
+    def test_closed_order_still_shows_order_action_link(self) -> None:
+        user = User.objects.create_user(
+            username='client-detail-actions-user',
+            password='testpass123',
+        )
+        customer = Client.objects.create(
+            name='Cliente con pedido cerrado',
+            active=True,
+        )
+        order = Order.objects.create(
+            client=customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+        Payment.objects.create(
+            client=customer,
+            order=order,
+            amount=Decimal('100.00'),
+            method='cash',
+            status='completed',
+            created_by=user,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('clients:detail', args=[customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'href="{reverse("orders:get_order", args=[order.pk])}"',
+        )
 
 
 class ClientListModeTests(FastTenantTestCase):

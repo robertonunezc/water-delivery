@@ -746,7 +746,7 @@ class NavigationController {
   async handleCancel(event) {
     event.preventDefault();
 
-    const confirmed = window.confirm('¿Desea cancelar este pedido? Se eliminarán el pedido y sus productos asociados.');
+    const confirmed = window.confirm('¿Desea cancelar este pedido? El pedido se marcará como cancelado y se revertirán los movimientos internos cuando aplique.');
     if (!confirmed) {
       return;
     }
@@ -754,6 +754,9 @@ class NavigationController {
     try {
       const data = await this.api.cancelOrder();
       if (!data.success) {
+        if (data.review_required) {
+          throw new Error(data.error || 'La cancelación requiere revisión de administración.');
+        }
         throw new Error(data.error || 'No se pudo cancelar el pedido.');
       }
 

@@ -2,10 +2,10 @@ import datetime
 from typing import Any
 
 from django import forms
-from django.db.models import Q
 from django.core.exceptions import ValidationError
-from django.contrib import messages
-from .models import RouteClient, Route
+from django.db.models import Q
+
+from .models import Route, RouteClient
 
 
 class RouteClientForm(forms.ModelForm):
@@ -40,27 +40,69 @@ class RouteClientForm(forms.ModelForm):
 
 class RouteClientInlineForm(RouteClientForm):
     """Specialized form for inline admin usage"""
-    
+
     confirm_duplicate_assignment = forms.BooleanField(
         required=False,
         label="Confirmar asignación",
         help_text="Cliente ya asignado a otra ruta. Marque para confirmar.",
-        widget=forms.CheckboxInput(attrs={
-            'class': 'confirm-duplicate-checkbox',
-            'style': 'display: none;'  # Hidden by default, shown via JavaScript
-        })
+        widget=forms.CheckboxInput(
+            attrs={
+                'class': 'confirm-duplicate-checkbox',
+                'style': 'display: none;',  # Hidden by default, shown via JavaScript
+            }
+        ),
     )
-    
+
     class Meta(RouteClientForm.Meta):
         fields = RouteClientForm.Meta.fields + ['confirm_duplicate_assignment']
-    
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        
+
         # Move confirmation field to the end
         if 'confirm_duplicate_assignment' in self.fields:
             confirm_field = self.fields.pop('confirm_duplicate_assignment')
             self.fields['confirm_duplicate_assignment'] = confirm_field
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        client = cleaned_data.get('client')
+        is_active = cleaned_data.get('is_active', True)
+        confirmed = cleaned_data.get('confirm_duplicate_assignment')
+
+        if not client or not is_active or confirmed:
+            return cleaned_data
+
+        existing_assignments = RouteClient.objects.filter(
+            client=client,
+            is_active=True,
+        ).select_related('route')
+
+        if self.instance and self.instance.pk:
+            existing_assignments = existing_assignments.exclude(pk=self.instance.pk)
+
+        current_route = self._get_current_route()
+        if current_route and current_route.pk:
+            existing_assignments = existing_assignments.exclude(route=current_route)
+
+        if existing_assignments.exists():
+            routes = ', '.join(
+                assignment.route.name for assignment in existing_assignments
+            )
+            self.add_error(
+                'client',
+                ValidationError(
+                    f"CONFLICTO DE ASIGNACIÓN: Cliente '{client.name}' "
+                    f"ya está asignado a: {routes}."
+                ),
+            )
+
+        return cleaned_data
+
+    def _get_current_route(self) -> Route | None:
+        formset = getattr(self, '_formset', None)
+        route = getattr(formset, 'instance', None)
+        return route if isinstance(route, Route) else None
 
 
 class ClientRouteAssignmentForm(forms.ModelForm):
