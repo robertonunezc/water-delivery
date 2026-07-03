@@ -1,25 +1,56 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q, Max, Min, Sum, Avg, Subquery, OuterRef, Count
+from django.db.models import (
+    Q, Max, Min, Sum, Avg, Subquery, OuterRef, Count, Prefetch, QuerySet,
+)
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.urls import reverse
 from django.utils import timezone
-from django.http import HttpResponse
+from django.http import HttpRequest, HttpResponse
 from datetime import datetime, timedelta
 from decimal import Decimal
 import csv
 from django.contrib.auth import get_user_model
 from clients.models import Client, CreditTransaction
-from orders.models import Order, ORDER_STATUS_CHOICES
-from payment.models import PAYMENT_METHOD_CHOICES
+from orders.models import Order, ORDER_STATUS_CHOICES, OrderStatus
+from payment.models import PAYMENT_METHOD_CHOICES, Payment
 
 
 NO_PAYMENT_RECORDED_METHOD = 'no_payment_recorded'
 FULL_DISCOUNT_METHOD = 'full_discount'
+REPORT_PAYMENTS_ATTR = 'report_payments'
+
+
+def _report_payments_prefetch() -> Prefetch:
+    return Prefetch(
+        'payments',
+        queryset=Payment.objects.not_reversed(),
+        to_attr=REPORT_PAYMENTS_ATTR,
+    )
+
+
+def _get_report_orders_queryset(status_filter: str = '') -> QuerySet:
+    if status_filter == OrderStatus.CANCELLED.value:
+        return Order.objects.including_cancelled()
+    return Order.objects.active()
+
+
+def _get_payment_method_order_ids(payment_method: str) -> QuerySet:
+    return Payment.objects.not_reversed().filter(
+        method=payment_method,
+    ).values('order_id')
+
+
+def _get_report_payments(order: Order) -> list[Payment] | QuerySet:
+    prefetched_payments = getattr(order, REPORT_PAYMENTS_ATTR, None)
+    if prefetched_payments is not None:
+        return prefetched_payments
+    return order.payments.not_reversed()
 
 
 def _get_order_payment_bucket(order: Order) -> tuple[str, str]:
     """Return the report bucket key/name for an order."""
-    first_payment = next(iter(order.payments.all()), None)
+    first_payment = next(iter(_get_report_payments(order)), None)
     if first_payment:
         return first_payment.method, first_payment.get_method_display()
 
@@ -27,6 +58,22 @@ def _get_order_payment_bucket(order: Order) -> tuple[str, str]:
         return FULL_DISCOUNT_METHOD, 'Descuento 100% / Sin cobro'
 
     return NO_PAYMENT_RECORDED_METHOD, 'Sin pago registrado'
+
+
+def _get_order_payment_method_keys(order: Order) -> str:
+    return ', '.join(
+        sorted({str(payment.method) for payment in _get_report_payments(order)})
+    )
+
+
+def _build_orders_export_url(request: HttpRequest) -> str:
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    query_string = query_params.urlencode()
+    export_url = reverse('report:orders_report_csv')
+    if query_string:
+        return f'{export_url}?{query_string}'
+    return export_url
 
 
 @login_required
@@ -144,11 +191,13 @@ def orders_report(request):
     max_amount = request.GET.get('max_amount', '').strip()
     sort_by = request.GET.get('sort_by', '-order_date').strip()
     
-    # Start with all orders
-    orders_queryset = Order.objects.select_related(
+    orders_queryset = _get_report_orders_queryset(status_filter).select_related(
         'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts', 'payments', 'invoice_links__invoice'
+        'items__product',
+        'client__contacts',
+        _report_payments_prefetch(),
+        'invoice_links__invoice',
     )
     
     # Apply search filter
@@ -163,7 +212,9 @@ def orders_report(request):
     #Apply payment method filter
     payment_method = request.GET.get('payment_method', '').strip()
     if payment_method:
-        orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
+        orders_queryset = orders_queryset.filter(
+            pk__in=_get_payment_method_order_ids(payment_method)
+        )
 
     # Apply billing attached filter: 'yes' => has invoice_links, 'no' => no invoice_links
     if has_billing == 'yes':
@@ -243,7 +294,7 @@ def orders_report(request):
     
     # Get all employees for filter dropdown
     employees = get_user_model().objects.filter(
-        id__in=Order.objects.values_list('owner_id', flat=True).distinct()
+        id__in=Order.objects.active().values_list('owner_id', flat=True).distinct()
     ).order_by('first_name', 'last_name')
     
     # Pagination
@@ -288,6 +339,7 @@ def orders_report(request):
         'order_status_choices': ORDER_STATUS_CHOICES,
         'employees': employees,
         'today_date': today.strftime('%Y-%m-%d'),
+        'orders_export_url': _build_orders_export_url(request),
     }
     
     return render(request, 'report/orders_report.html', context)
@@ -315,10 +367,13 @@ def orders_report_csv(request):
     sort_by = request.GET.get('sort_by', '-order_date').strip()
     payment_method = request.GET.get('payment_method', '').strip()
 
-    orders_queryset = Order.objects.select_related(
+    orders_queryset = _get_report_orders_queryset(status_filter).select_related(
         'client', 'owner',
     ).prefetch_related(
-        'items__product', 'client__contacts', 'payments', 'invoice_links__invoice'
+        'items__product',
+        'client__contacts',
+        _report_payments_prefetch(),
+        'invoice_links__invoice',
     )
 
     if search_query:
@@ -329,7 +384,9 @@ def orders_report_csv(request):
             Q(client__contacts__name__icontains=search_query)
         ).distinct()
     if payment_method:
-        orders_queryset = orders_queryset.filter(payments__method=payment_method).distinct()
+        orders_queryset = orders_queryset.filter(
+            pk__in=_get_payment_method_order_ids(payment_method)
+        )
     if has_billing == 'yes':
         orders_queryset = orders_queryset.filter(invoice_links__isnull=False).distinct()
     elif has_billing == 'no':
@@ -392,9 +449,7 @@ def orders_report_csv(request):
 
     for order in orders_queryset:
         # Get payment method(s) as comma-separated
-        payment_methods = ', '.join(set([
-            str(p.method) for p in order.payments.all()
-        ]))
+        payment_methods = _get_order_payment_method_keys(order)
         products = ', '.join(set([str(item) for item in order.items.all()]))
         writer.writerow([
             smart_str(order.id),
@@ -424,10 +479,10 @@ def breakdown_payment_method(request):
 
     owner = request.user
     # Query orders for the selected date and owner
-    orders = Order.objects.filter(
+    orders = Order.objects.active().filter(
         owner=owner,
         order_date__date=selected_date
-    ).prefetch_related('items__product', 'payments', 'client')
+    ).prefetch_related('items__product', _report_payments_prefetch(), 'client')
 
     # Calculate overall statistics
     total_orders = orders.count()
@@ -495,17 +550,15 @@ def breakdown_payment_method_csv(request):
     by payment method.
     """
     date_str = request.GET.get('date', '')
-    print(date_str)
     try:
         selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.localdate()
     except ValueError:
         selected_date = timezone.localdate()
     owner = request.user
-    orders = Order.objects.filter(
+    orders = Order.objects.active().filter(
         owner=owner,
         order_date__date=selected_date
     )
-    print(orders)
     # Calculate overall statistics
     total_orders = orders.count()
     totals = orders.aggregate(
@@ -550,7 +603,7 @@ def breakdown_payment_method_csv(request):
     ])
     
     # Write each order
-    for order in orders.prefetch_related('items__product', 'payments'):
+    for order in orders.prefetch_related('items__product', _report_payments_prefetch()):
         # Get payment method
         _, payment_method = _get_order_payment_bucket(order)
         
