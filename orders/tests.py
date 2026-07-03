@@ -13,6 +13,7 @@ from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
 
 from clients.models import Address, Client, InvoiceData
+from clients.services import balance_service
 
 User = get_user_model()
 from core.models import Employee, Transport
@@ -532,6 +533,94 @@ class OrderCancellationQuerySetTestCase(FastTenantTestCase):
             [self.review_order],
             transform=lambda order: order,
         )
+
+
+class OrderCancellationFinancialReversalTestCase(FastTenantTestCase):
+    """Tests for financial reversal helpers used by order cancellation."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="cancel_finance_user")
+        self.customer = Client.objects.create(
+            name="Cliente Reversas",
+            balance=Decimal("100.00"),
+            credit_limit=Decimal("500.00"),
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("50.00"),
+        )
+
+    def test_reverse_balance_payment_restores_client_balance(self) -> None:
+        payment = Payment(
+            amount=Decimal("40.00"),
+            method="balance",
+            client=self.customer,
+            order=self.order,
+            status="completed",
+            balance_used=Decimal("40.00"),
+            created_by=self.user,
+        )
+        payment.save(apply_accounting=False)
+        self.customer.balance = Decimal("60.00")
+        self.customer.save(update_fields=["balance"])
+
+        tx = balance_service.reverse_balance_payment(payment=payment, user=self.user)
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("100.00"))
+        self.assertEqual(tx.transaction_type, "payment_reversal")
+        self.assertEqual(tx.reference_payment, payment)
+
+    def test_reverse_added_order_balance_deducts_client_balance(self) -> None:
+        tx = balance_service.reverse_added_order_balance(
+            client=self.customer,
+            amount=Decimal("25.00"),
+            user=self.user,
+            reference_order=self.order,
+        )
+
+        self.customer.refresh_from_db()
+        self.assertIsNotNone(tx)
+        self.assertEqual(self.customer.balance, Decimal("75.00"))
+        self.assertEqual(tx.transaction_type, "added_in_order_reversal")
+        self.assertEqual(tx.reference_order, self.order)
+
+    def test_reverse_credit_purchase_reduces_client_debt(self) -> None:
+        self.customer.current_debt = Decimal("75.00")
+        self.customer.save(update_fields=["current_debt"])
+
+        tx = balance_service.reverse_credit_purchase(
+            client=self.customer,
+            amount=Decimal("75.00"),
+            user=self.user,
+            reference_order=self.order,
+            reference_payment=None,
+            notes="Reversa de prueba",
+        )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
+        self.assertEqual(tx.transaction_type, "purchase_reversal")
+        self.assertEqual(tx.reference_order, self.order)
+
+    def test_reverse_credit_payment_restores_client_debt(self) -> None:
+        self.customer.current_debt = Decimal("10.00")
+        self.customer.save(update_fields=["current_debt"])
+
+        tx = balance_service.reverse_credit_payment(
+            client=self.customer,
+            amount=Decimal("35.00"),
+            user=self.user,
+            reference_order=self.order,
+            reference_payment=None,
+            notes="Reversa de pago de prueba",
+        )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("45.00"))
+        self.assertEqual(tx.transaction_type, "payment_reversal")
+        self.assertEqual(tx.reference_order, self.order)
 
 
 class CancelOrderServiceTestCase(FastTenantTestCase):
