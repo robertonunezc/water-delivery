@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from tenant_client.test_utils import FastTenantTestCase
 
-from clients.models import Address, Client, InvoiceData
+from clients.models import Address, BalanceTransaction, Client, CreditTransaction, InvoiceData
 from clients.services import balance_service
 
 User = get_user_model()
@@ -22,7 +22,7 @@ from orders import services
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
-from invoice.models import Invoice
+from invoice.models import Invoice, InvoiceOrderLink
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -624,11 +624,15 @@ class OrderCancellationFinancialReversalTestCase(FastTenantTestCase):
 
 
 class CancelOrderServiceTestCase(FastTenantTestCase):
-    """Tests for cancel_pending_order service function."""
+    """Tests for status-based order cancellation."""
 
     def setUp(self) -> None:
         self.user = User.objects.create_user(username="cancel_service_user", password="testpass")
-        self.customer = Client.objects.create(name="Cliente Cancelación Servicio")
+        self.customer = Client.objects.create(
+            name="Cliente Cancelación Servicio",
+            balance=Decimal("100.00"),
+            credit_limit=Decimal("500.00"),
+        )
         self.category = ProductCategory.objects.create(name="Water Service")
         self.product = Product.objects.create(
             name="Garrafón Servicio",
@@ -649,38 +653,250 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
             unit_price=Decimal("25.00"),
         )
 
-    def test_cancel_pending_order_deletes_order_and_items(self) -> None:
+    def test_cancel_pending_order_marks_cancelled_without_deleting_items(self) -> None:
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
+        self.assertTrue(OrderProduct.objects.filter(order=self.order).exists())
+        self.assertFalse(self.order.cancellation_review_required)
+
+    def test_cancel_pending_order_wrapper_uses_status_cancellation(self) -> None:
         result = services.cancel_pending_order(order=self.order, user=self.user)
 
         self.assertTrue(result["success"])
-        self.assertFalse(Order.objects.filter(pk=self.order.pk).exists())
-        self.assertFalse(OrderProduct.objects.filter(order_id=self.order.pk).exists())
-
-    def test_cancel_pending_order_rejects_non_pending_status(self) -> None:
-        self.order.status = OrderStatus.COMPLETED.value
-        self.order.save(update_fields=['status'])
-
-        result = services.cancel_pending_order(order=self.order, user=self.user)
-
-        self.assertFalse(result["success"])
-        self.assertIn("pendiente", result["error"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
         self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
 
-    def test_cancel_pending_order_rejects_order_with_payments(self) -> None:
-        Payment.objects.create(
+    def test_cancel_completed_external_payment_marks_payment_reversed(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=["status"])
+        payment = Payment.objects.create(
             amount=Decimal("50.00"),
-            method='cash',
+            method="cash",
             client=self.customer,
             order=self.order,
-            status='pending',
+            status="completed",
             created_by=self.user,
         )
 
-        result = services.cancel_pending_order(order=self.order, user=self.user)
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.order.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
+        self.assertEqual(payment.status, "reversed")
+
+    def test_cancel_order_with_balance_payment_restores_client_balance(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=["status"])
+        payment = Payment.objects.create(
+            amount=Decimal("40.00"),
+            method="balance",
+            client=self.customer,
+            order=self.order,
+            status="completed",
+            created_by=self.user,
+        )
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("60.00"))
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.customer.refresh_from_db()
+        payment.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("100.00"))
+        self.assertEqual(payment.status, "reversed")
+        self.assertTrue(
+            BalanceTransaction.objects.filter(
+                reference_payment=payment,
+                transaction_type="payment_reversal",
+            ).exists()
+        )
+
+    def test_cancel_order_with_credit_purchase_reduces_client_debt(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.type = "credito"
+        self.order.save(update_fields=["status", "type"])
+        pending_credit = Payment(
+            amount=Decimal("50.00"),
+            method="pending_credit",
+            client=self.customer,
+            order=self.order,
+            status="pending",
+            created_by=self.user,
+        )
+        pending_credit.save(apply_accounting=False)
+        balance_service.add_debt(
+            client=self.customer,
+            amount=Decimal("50.00"),
+            transaction_type="purchase",
+            user=self.user,
+            reference_order=self.order,
+            reference_payment=pending_credit,
+        )
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.customer.refresh_from_db()
+        pending_credit.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
+        self.assertEqual(pending_credit.status, "reversed")
+        self.assertTrue(
+            CreditTransaction.objects.filter(
+                reference_order=self.order,
+                transaction_type="purchase_reversal",
+            ).exists()
+        )
+
+    def test_cancel_settled_credit_order_reverses_payment_and_purchase(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.type = "credito"
+        self.order.save(update_fields=["status", "type"])
+        pending_credit = Payment(
+            amount=Decimal("50.00"),
+            method="pending_credit",
+            client=self.customer,
+            order=self.order,
+            status="completed",
+            created_by=self.user,
+        )
+        pending_credit.save(apply_accounting=False)
+        balance_service.add_debt(
+            client=self.customer,
+            amount=Decimal("50.00"),
+            transaction_type="purchase",
+            user=self.user,
+            reference_order=self.order,
+            reference_payment=pending_credit,
+        )
+        settlement_payment = Payment.objects.create(
+            amount=Decimal("50.00"),
+            method="cash",
+            client=self.customer,
+            order=self.order,
+            status="completed",
+            created_by=self.user,
+        )
+        balance_service.pay_debt(
+            client=self.customer,
+            amount=Decimal("50.00"),
+            transaction_type="payment",
+            user=self.user,
+            reference_order=self.order,
+            reference_payment=settlement_payment,
+        )
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.customer.refresh_from_db()
+        pending_credit.refresh_from_db()
+        settlement_payment.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
+        self.assertEqual(pending_credit.status, "reversed")
+        self.assertEqual(settlement_payment.status, "reversed")
+        self.assertTrue(
+            CreditTransaction.objects.filter(
+                reference_payment=settlement_payment,
+                transaction_type="payment_reversal",
+            ).exists()
+        )
+        self.assertTrue(
+            CreditTransaction.objects.filter(
+                reference_payment=pending_credit,
+                transaction_type="purchase_reversal",
+            ).exists()
+        )
+
+    def test_cancel_order_with_spent_added_balance_marks_review_required(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.cantidad_cobrada = Decimal("100.00")
+        self.order.save(update_fields=["status", "cantidad_cobrada"])
+        BalanceTransaction.objects.create(
+            client=self.customer,
+            transaction_type="added_in_order",
+            amount=Decimal("50.00"),
+            balance_before=Decimal("50.00"),
+            balance_after=Decimal("100.00"),
+            reference_order=self.order,
+            created_by=self.user,
+        )
+        self.customer.balance = Decimal("0.00")
+        self.customer.save(update_fields=["balance"])
+
+        result = services.cancel_order(order=self.order, user=self.user)
 
         self.assertFalse(result["success"])
-        self.assertIn("pagos", result["error"])
-        self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
+        self.assertTrue(result["review_required"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.COMPLETED.value)
+        self.assertTrue(self.order.cancellation_review_required)
+        self.assertIn("saldo", self.order.cancellation_review_reason.lower())
+
+    def test_cancel_order_linked_to_invoice_marks_review_required(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=["status"])
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal("50.00"),
+            identifier="INV-CANCEL-1",
+            folio="F-CANCEL-1",
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=self.order)
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertFalse(result["success"])
+        self.assertTrue(result["review_required"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.COMPLETED.value)
+        self.assertTrue(self.order.cancellation_review_required)
+        self.assertIn("factura", self.order.cancellation_review_reason.lower())
+
+    def test_successful_retry_clears_cancellation_review_metadata(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.cancellation_review_required = True
+        self.order.cancellation_review_reason = "Saldo insuficiente"
+        self.order.cancellation_requested_at = timezone.now()
+        self.order.cancellation_requested_by = self.user
+        self.order.save(
+            update_fields=[
+                "status",
+                "cancellation_review_required",
+                "cancellation_review_reason",
+                "cancellation_requested_at",
+                "cancellation_requested_by",
+            ]
+        )
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
+        self.assertFalse(self.order.cancellation_review_required)
+        self.assertIsNone(self.order.cancellation_review_reason)
+        self.assertIsNone(self.order.cancellation_requested_at)
+        self.assertIsNone(self.order.cancellation_requested_by)
+
+    def test_cancel_order_is_idempotent_when_already_cancelled(self) -> None:
+        self.order.status = OrderStatus.CANCELLED.value
+        self.order.save(update_fields=["status"])
+
+        result = services.cancel_order(order=self.order, user=self.user)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["skipped"])
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
 
 
 class CancelOrderViewTestCase(FastTenantTestCase):
