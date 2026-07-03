@@ -1,3 +1,4 @@
+from datetime import timedelta
 from decimal import Decimal
 from io import StringIO
 from types import SimpleNamespace
@@ -7,11 +8,14 @@ from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import SimpleTestCase
 from django.urls import reverse
+from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
-from clients.models import Client
+from clients.models import Client, ClientCreditConfig
+from clients.services import balance_service
+from clients.services.pending_payment_service import client_has_overdue_credit
 from orders.models import Order
 from payment.models import Payment
 from payment import services
@@ -301,6 +305,121 @@ class CreditOrderSettlementTests(FastTenantTestCase):
 		self.customer.refresh_from_db()
 		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
 		self.assertEqual(self.customer.get_available_credit(), 1000.0)
+
+class CreditOrderRegistrationRuleTests(FastTenantTestCase):
+	def setUp(self):
+		self.user = User.objects.create_user(
+			username='credit-registration-user',
+			password='testpass123',
+		)
+
+	def test_credit_order_emergency_stop_blocks_even_when_limit_is_available(self):
+		customer = Client.objects.create(
+			name='Cliente crédito bloqueado con límite',
+			type='corporate',
+			balance=Decimal('30.00'),
+			credit_limit=Decimal('200.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=False,
+		)
+		order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('100.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 400)
+		self.assertEqual(response['error'], 'Cliente no puede pagar con credito')
+		customer.refresh_from_db()
+		self.assertEqual(customer.balance, Decimal('30.00'))
+		self.assertEqual(customer.current_debt, Decimal('0.00'))
+		self.assertFalse(order.payments.exists())
+
+	def test_overdue_credit_is_reported_but_does_not_block_credit_order(self):
+		customer = Client.objects.create(
+			name='Cliente vencido con límite disponible',
+			type='corporate',
+			credit_limit=Decimal('500.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+		)
+		ClientCreditConfig.objects.create(
+			client=customer,
+			payment_term_type='monthly_cutoff',
+			cutoff_day='last_day',
+		)
+		overdue_order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('100.00'),
+			type='credito',
+		)
+		balance_service.add_debt(
+			client=customer,
+			amount=Decimal('100.00'),
+			transaction_type='purchase',
+			reference_order=overdue_order,
+		)
+		Order.objects.filter(pk=overdue_order.pk).update(
+			order_date=timezone.now() - timedelta(days=60),
+		)
+		self.assertTrue(client_has_overdue_credit(customer))
+		new_order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('50.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=new_order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 200)
+		self.assertTrue(response['success'])
+		customer.refresh_from_db()
+		self.assertEqual(customer.current_debt, Decimal('150.00'))
+		self.assertTrue(
+			new_order.payments.filter(
+				method='pending_credit',
+				status='pending',
+				amount=Decimal('50.00'),
+			).exists()
+		)
+
+	def test_credit_order_fails_when_remaining_amount_exceeds_available_limit(self):
+		customer = Client.objects.create(
+			name='Cliente sin límite suficiente',
+			type='corporate',
+			balance=Decimal('10.00'),
+			credit_limit=Decimal('100.00'),
+			current_debt=Decimal('80.00'),
+			can_pay_with_credit=True,
+		)
+		order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('50.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 400)
+		self.assertIn('excede el límite de crédito', response['error'])
+		customer.refresh_from_db()
+		self.assertEqual(customer.balance, Decimal('10.00'))
+		self.assertEqual(customer.current_debt, Decimal('80.00'))
+		self.assertFalse(order.payments.exists())
 
 class MigrateLegacyCreditOrdersCommandTests(FastTenantTestCase):
 	def setUp(self):

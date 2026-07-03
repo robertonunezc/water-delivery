@@ -209,24 +209,23 @@ def add_debt(
         ValueError: If amount is invalid or the credit sale is not allowed.
     """
     from clients.models import Client, CreditTransaction
-    from clients.services.pending_payment_service import client_has_overdue_credit
 
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
     locked_client = Client.objects.select_for_update().get(pk=client.pk)
-    if transaction_type == 'purchase' and not locked_client.can_use_credit_for_payment():
-        raise ValueError('El cliente no tiene crédito disponible para esta venta.')
-    if transaction_type == 'purchase' and client_has_overdue_credit(locked_client):
-        raise ValueError(
-            'El cliente tiene créditos vencidos y no puede realizar nuevas ventas a crédito.'
-        )
+    if transaction_type == 'purchase' and not locked_client.can_pay_with_credit:
+        raise ValueError('Cliente no puede pagar con credito')
 
     new_debt = locked_client.current_debt + amount
     if transaction_type == 'purchase' and new_debt > locked_client.credit_limit:
+        available_credit = max(
+            locked_client.credit_limit - locked_client.current_debt,
+            Decimal("0.00"),
+        )
         raise ValueError(
             f'La venta excede el límite de crédito. Disponible: '
-            f'${locked_client.get_available_credit():.2f}.'
+            f'${available_credit:.2f}.'
         )
 
     # Store previous values

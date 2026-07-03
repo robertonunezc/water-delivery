@@ -803,11 +803,16 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         self.assertFalse(result["success"])
         self.assertIn("Insufficient credit", result["error"])
 
-    def test_process_order_payment_credit_disabled(self) -> None:
-        """Test payment fails when client cannot use credit and has no available credit."""
+    @patch("clients.services.balance_service.add_debt")
+    def test_process_order_payment_credit_disabled_blocks_even_when_limit_available(
+        self, mock_add_debt: MagicMock
+    ) -> None:
+        """Test emergency credit stop blocks credit even when limit is available."""
+        mock_add_debt.return_value = MagicMock()
         self.client.can_pay_with_credit = False
         self.client.balance = Decimal("0.00")
-        self.client.credit_limit = Decimal("0.00")
+        self.client.credit_limit = Decimal("100.00")
+        self.client.current_debt = Decimal("0.00")
         self.client.save()
 
         result = services.process_order_payment(
@@ -818,7 +823,9 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         )
 
         self.assertFalse(result["success"])
-        self.assertIn("not allowed to pay with credit", result["error"])
+        self.assertEqual(result["error"], "Cliente no puede pagar con credito")
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_add_debt.assert_not_called()
 
     def test_process_order_payment_credit_succeeds_without_note(self) -> None:
         """Test credit payments no longer require a note."""
@@ -908,14 +915,19 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         self.assertFalse(result["success"])
         self.assertIn("Insufficient funds", result["error"])
 
-    def test_process_order_payment_auto_cannot_use_credit_insufficient_balance(
-        self,
+    @patch("clients.services.balance_service.add_debt")
+    @patch("clients.services.balance_service.deduct_balance")
+    def test_process_order_payment_auto_blocks_credit_when_toggle_disabled(
+        self, mock_deduct_balance: MagicMock, mock_add_debt: MagicMock
     ) -> None:
-        """Test auto fails when credit disabled, no available credit, and balance insufficient."""
+        """Test emergency credit stop blocks auto payments that need credit."""
         self.client.balance = Decimal("30.00")
         self.client.can_pay_with_credit = False
-        self.client.credit_limit = Decimal("0.00")
+        self.client.credit_limit = Decimal("100.00")
+        self.client.current_debt = Decimal("0.00")
         self.client.save()
+        mock_deduct_balance.return_value = MagicMock()
+        mock_add_debt.return_value = MagicMock()
 
         result = services.process_order_payment(
             client=self.client,
@@ -925,7 +937,11 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         )
 
         self.assertFalse(result["success"])
-        self.assertIn("cannot use credit", result["error"])
+        self.assertEqual(result["error"], "Cliente no puede pagar con credito")
+        self.assertEqual(result["balance_used"], Decimal("0"))
+        self.assertEqual(result["credit_used"], Decimal("0"))
+        mock_deduct_balance.assert_not_called()
+        mock_add_debt.assert_not_called()
 
 
 class OrderPaymentRoutingTestCase(FastTenantTestCase):
