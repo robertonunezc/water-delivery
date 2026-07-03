@@ -733,11 +733,9 @@
                         {% endfor %}
                       </td>
                     <td>
-                        {% if not order.is_closed %}
-                          <a href="{% url 'orders:get_order' order.id %}" class="btn btn-sm btn-outline-primary">
-                            <i class="fas fa-edit"></i>
-                          </a>
-                        {% endif %}
+                        <a href="{% url 'orders:get_order' order.id %}" class="btn btn-sm btn-outline-primary">
+                          <i class="fas fa-edit"></i>
+                        </a>
                       </td> 
                     </tr>
                   {% endfor %}

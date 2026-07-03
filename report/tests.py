@@ -1,18 +1,18 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
 from django.urls import reverse
 
 from clients.models import Client
 from orders.models import Order, OrderProduct, OrderStatus
 from payment.models import Payment
 from product.models import Product, ProductCategory
+from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
 
-class BreakdownPaymentMethodReportTests(TestCase):
+class BreakdownPaymentMethodReportTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
             username="report_user",
@@ -31,7 +31,7 @@ class BreakdownPaymentMethodReportTests(TestCase):
             presentation="20",
             unit_of_measure=1,
             category=self.category,
-            base_price=Decimal("100.00"),
+            price=Decimal("100.00"),
         )
 
     def _create_order(

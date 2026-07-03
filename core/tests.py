@@ -282,4 +282,4 @@ class DeliveryDashboardContextTests(FastTenantTestCase):
 
         self.assertEqual(credits_action["key"], "credits")
         self.assertEqual(credits_action["badge_count"], 2)
-        self.assertEqual(credits_action["url"], f"{reverse('clients:list')}?mode=credits")
+        self.assertEqual(credits_action["url"], reverse("report:pending_payments"))

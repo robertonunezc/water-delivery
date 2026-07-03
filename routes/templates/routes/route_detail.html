@@ -185,6 +185,12 @@
                                             {% if not route_client.client.active %}
                                                 <span class="badge badge-warning">Inactivo</span>
                                             {% endif %}
+                                            {% if route_client.client.address_link %}
+                                                <br>
+                                                <a href="{{ route_client.client.address_link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    Ver Dirección
+                                                </a>
+                                            {% endif %}
                                         </td>
                                         <td>
                                             {% with route_client.client.addresses.filter|first as address %}
