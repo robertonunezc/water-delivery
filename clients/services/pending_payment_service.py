@@ -99,7 +99,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         reference_order__isnull=False,
     ).values('reference_order_id')
     unpaid_orders = list(
-        Order.objects.unpaid()
+        Order.objects.active().unpaid()
         .filter(client=client, pk__in=credit_order_ids)
         .select_related('client', 'client__credit_config')
         .prefetch_related('invoice_links__invoice')
@@ -159,7 +159,7 @@ def get_clients_with_pending_payments() -> list[dict[str, Any]]:
         reference_order__isnull=False,
     ).values('reference_order_id')
     unpaid_orders = (
-        Order.objects.unpaid()
+        Order.objects.active().unpaid()
         .filter(client_id__in=clients_map, pk__in=credit_order_ids)
         .select_related('client', 'client__credit_config')
         .prefetch_related('invoice_links__invoice')

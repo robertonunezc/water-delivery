@@ -17,7 +17,35 @@ PAYMENT_STATUS_CHOICES = [
     ('completed', 'Completado'),
     ('pending', 'Pendiente'),
     ('failed', 'Fallido'),
+    ('reversed', 'Revertido'),
 ]
+
+
+class PaymentQuerySet(models.QuerySet):
+    """Custom queryset for common payment status filters."""
+
+    def not_reversed(self) -> 'PaymentQuerySet':
+        """Return payments that have not been reversed."""
+        return self.exclude(status='reversed')
+
+    def reversed(self) -> 'PaymentQuerySet':
+        """Return only reversed payments."""
+        return self.filter(status='reversed')
+
+
+class PaymentManager(models.Manager):
+    """Default payment manager excluding soft-deleted rows."""
+
+    def get_queryset(self) -> PaymentQuerySet:
+        return PaymentQuerySet(self.model, using=self._db).filter(deleted_at=None)
+
+    def not_reversed(self) -> PaymentQuerySet:
+        return self.get_queryset().not_reversed()
+
+    def reversed(self) -> PaymentQuerySet:
+        return self.get_queryset().reversed()
+
+
 class Payment(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto del Pago")
     date = models.DateTimeField(auto_now_add=True, verbose_name="Fecha")
@@ -32,6 +60,7 @@ class Payment(TimeStampedModel):
     
     # Audit field
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")
+    objects = PaymentManager()
     
     def status_display(self):
         return dict(PAYMENT_STATUS_CHOICES).get(self.status, 'Desconocido')

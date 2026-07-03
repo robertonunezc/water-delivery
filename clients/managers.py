@@ -47,11 +47,13 @@ class BalanceTransactionQuerySet(models.QuerySet):
 
     def deposits(self) -> Self:
         """Filter to deposit-type transactions (money in)."""
-        return self.by_types(["deposit", "refund", "transfer_in", "added_in_order"])
+        return self.by_types(
+            ["deposit", "refund", "transfer_in", "added_in_order", "payment_reversal"]
+        )
 
     def payments(self) -> Self:
         """Filter to payment-type transactions (money out)."""
-        return self.by_types(["payment", "transfer_out"])
+        return self.by_types(["payment", "transfer_out", "added_in_order_reversal"])
 
     def balance_at(self, target_date: date | datetime) -> Decimal:
         """
@@ -120,11 +122,13 @@ class CreditTransactionQuerySet(models.QuerySet):
 
     def purchases(self) -> Self:
         """Filter to purchase-type transactions (debt increase)."""
-        return self.by_types(["purchase", "interest", "fee"])
+        return self.by_types(["purchase", "interest", "fee", "payment_reversal"])
 
     def payments(self) -> Self:
         """Filter to payment-type transactions (debt decrease)."""
-        return self.by_types(["payment", "payment_from_balance", "forgiveness"])
+        return self.by_types(
+            ["payment", "payment_from_balance", "forgiveness", "purchase_reversal"]
+        )
 
     def debt_at(self, target_date: date | datetime) -> Decimal:
         """

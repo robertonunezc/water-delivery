@@ -1,19 +1,21 @@
-from django.test import TestCase, Client as TestClient
+from datetime import date
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.urls import reverse
-from datetime import date
-from .models import Route, RouteClient
-from .services import get_route_detail_payload
-from .forms import RouteClientForm, RouteClientInlineForm
+
 from clients.models import Address, Client, Contact
 from core.models import Transport
 from tenant_client.test_utils import FastTenantTestCase
 
+from .forms import RouteClientForm, RouteClientInlineForm
+from .models import Route, RouteClient
+from .services import get_route_detail_payload
+
 User = get_user_model()
 
 
-class RouteClientValidationTest(TestCase):
+class RouteClientValidationTest(FastTenantTestCase):
     """Test client assignment validation and duplicate detection"""
     
     def setUp(self):
@@ -76,7 +78,7 @@ class RouteClientValidationTest(TestCase):
         }
         
         # Create form for route2 with client1 (already assigned to route1)
-        form = RouteClientForm(data=form_data)
+        form = RouteClientInlineForm(data=form_data)
         form._formset = type('MockFormset', (), {'instance': self.route2})()
         
         self.assertFalse(form.is_valid())
@@ -135,7 +137,7 @@ class RouteClientValidationTest(TestCase):
     
     def test_check_client_assignments_ajax_view(self):
         """Test the AJAX endpoint for checking client assignments"""
-        self.client_test = TestClient()
+        self.client_test = self.client
         self.client_test.login(username='testadmin', password='testpass123')
         
         # Test with existing assignment
@@ -154,7 +156,7 @@ class RouteClientValidationTest(TestCase):
     
     def test_check_client_assignments_no_conflict(self):
         """Test AJAX endpoint with no conflicts"""
-        self.client_test = TestClient()
+        self.client_test = self.client
         self.client_test.login(username='testadmin', password='testpass123')
         
         # Test with client that has no assignments
@@ -179,7 +181,7 @@ class RouteClientValidationTest(TestCase):
             is_staff=False
         )
         
-        self.client_test = TestClient()
+        self.client_test = self.client
         self.client_test.login(username='regular', password='testpass123')
         
         response = self.client_test.get(
@@ -191,10 +193,10 @@ class RouteClientValidationTest(TestCase):
         self.assertIn(response.status_code, [302, 403])
 
 
-class RouteClientFrequencyIntervalTest(TestCase):
+class RouteClientFrequencyIntervalTest(FastTenantTestCase):
     def setUp(self):
-        self.client = Client.objects.create(name='Frequency Client')
-        Address.objects.create(client=self.client, type='delivery', street='Calle Frecuencia')
+        self.delivery_client = Client.objects.create(name='Frequency Client')
+        Address.objects.create(client=self.delivery_client, type='delivery', street='Calle Frecuencia')
         self.transport = Transport.objects.create(
             license_plate='XYZ-999',
             model='Test Vehicle',
@@ -211,7 +213,7 @@ class RouteClientFrequencyIntervalTest(TestCase):
     def test_is_due_on_every_two_weeks(self):
         route_client = RouteClient.objects.create(
             route=self.route,
-            client=self.client,
+            client=self.delivery_client,
             sequence=1,
             interval_weeks=2,
             anchor_date=date(2026, 3, 2),  # Monday
@@ -225,7 +227,7 @@ class RouteClientFrequencyIntervalTest(TestCase):
     def test_due_on_queryset_filters_clients(self):
         RouteClient.objects.create(
             route=self.route,
-            client=self.client,
+            client=self.delivery_client,
             sequence=1,
             interval_weeks=1,
             anchor_date=date(2026, 3, 2),
@@ -314,7 +316,7 @@ class RouteDashboardSummaryServiceTest(FastTenantTestCase):
         self.assertEqual(count, 1)
 
 
-class RouteDetailRefactorTest(TestCase):
+class RouteDetailRefactorTest(FastTenantTestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             username='route_user',
@@ -379,7 +381,7 @@ class RouteDetailRefactorTest(TestCase):
         self.assertTrue(hasattr(route_clients[0].client, 'recent_orders'))
 
     def test_route_detail_view_uses_service_payload_with_search(self):
-        client = TestClient()
+        client = self.client
         client.login(username='route_user', password='testpass123')
 
         response = client.get(
