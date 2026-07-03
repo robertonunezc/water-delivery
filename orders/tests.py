@@ -1,17 +1,26 @@
-from django.urls import reverse
-from django.contrib.auth import get_user_model
+from datetime import date, timedelta
 from decimal import Decimal
-from unittest.mock import patch, MagicMock
 import json
+from pathlib import Path
+from typing import Any
+from unittest.mock import patch, MagicMock
+
+from django.contrib.auth import get_user_model
+from django.http import HttpResponse
+from django.urls import reverse
+from django.utils import timezone
+
 from tenant_client.test_utils import FastTenantTestCase
 
 from clients.models import Address, Client, InvoiceData
 
 User = get_user_model()
+from core.models import Employee, Transport
 from orders.models import Order, OrderProduct, OrderStatus
 from orders import services
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
+from routes.models import Route, RouteClient
 from invoice.models import Invoice
 
 
@@ -349,6 +358,135 @@ class UpdateOrderViewTestCase(FastTenantTestCase):
         self.assertEqual(self.order.notes, "Cliente solicita tocar el timbre")
         self.assertEqual(self.order.subtotal_amount, Decimal("70.00"))
         self.assertEqual(self.order.total_amount, Decimal("70.00"))
+
+
+class CreateOrderRedirectTestCase(FastTenantTestCase):
+    """Tests for route-aware redirects on the create order page."""
+
+    def setUp(self) -> None:
+        self.customer = Client.objects.create(name="Cliente Ruta")
+        Address.objects.create(
+            client=self.customer,
+            type="delivery",
+            street="Calle Ruta",
+        )
+
+    def _create_user_with_employee(self, *, username: str, position: str) -> User:
+        user = User.objects.create_user(username=username, password="testpass")
+        Employee.objects.create(
+            user=user,
+            nombre=username,
+            apellidos="Prueba",
+            curp=f"{username.upper():<18}"[:18],
+            rfc=f"{username.upper():<13}"[:13],
+            street_number="Calle 1",
+            position=position,
+        )
+        return user
+
+    def _create_route_assignment(
+        self,
+        *,
+        name: str,
+        weekday: str,
+        anchor_date: date,
+        sequence: int = 1,
+    ) -> Route:
+        transport = Transport.objects.create(
+            license_plate=f"TEST-{sequence}",
+            model="Unidad",
+            capacity_liters=1000,
+            is_active=True,
+        )
+        route = Route.objects.create(
+            name=name,
+            transportation=transport,
+            weekday=weekday,
+            is_active=True,
+        )
+        RouteClient.objects.create(
+            route=route,
+            client=self.customer,
+            sequence=sequence,
+            interval_weeks=1,
+            anchor_date=anchor_date,
+            is_active=True,
+        )
+        return route
+
+    def _get_order_page_context(self) -> dict[str, Any]:
+        with patch("orders.views.render") as render_mock:
+            render_mock.side_effect = (
+                lambda request, template_name, context: HttpResponse("ok")
+            )
+            response = self.client.get(
+                reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        render_mock.assert_called_once()
+        return render_mock.call_args.args[2]
+
+    def test_staff_order_page_redirects_to_clients_current_route(self) -> None:
+        today = timezone.localdate()
+        route = self._create_route_assignment(
+            name="Ruta de Hoy",
+            weekday=today.strftime("%A").lower(),
+            anchor_date=today,
+        )
+        user = self._create_user_with_employee(username="ventas", position="staff")
+        self.client.force_login(user)
+
+        context = self._get_order_page_context()
+
+        expected_url = reverse("routes:detail", kwargs={"route_id": route.pk})
+        self.assertEqual(context["order_redirect_url"], expected_url)
+
+    def test_driver_order_page_uses_today_route_when_client_has_multiple_routes(self) -> None:
+        today = timezone.localdate()
+        tomorrow = today + timedelta(days=1)
+        tomorrow_weekday = tomorrow.strftime("%A").lower()
+        today_route = self._create_route_assignment(
+            name="Ruta Actual",
+            weekday=today.strftime("%A").lower(),
+            anchor_date=today,
+            sequence=2,
+        )
+        self._create_route_assignment(
+            name="Ruta Otro Dia",
+            weekday=tomorrow_weekday,
+            anchor_date=tomorrow,
+            sequence=1,
+        )
+        user = self._create_user_with_employee(username="chofer", position="driver")
+        self.client.force_login(user)
+
+        context = self._get_order_page_context()
+
+        self.assertEqual(
+            context["order_redirect_url"],
+            reverse("routes:detail", kwargs={"route_id": today_route.pk}),
+        )
+
+    def test_manager_order_page_keeps_clients_list_redirect(self) -> None:
+        today = timezone.localdate()
+        self._create_route_assignment(
+            name="Ruta de Hoy",
+            weekday=today.strftime("%A").lower(),
+            anchor_date=today,
+        )
+        user = self._create_user_with_employee(username="manager", position="manager")
+        self.client.force_login(user)
+
+        context = self._get_order_page_context()
+
+        self.assertEqual(context["order_redirect_url"], reverse("clients:list"))
+
+    def test_order_template_wires_redirect_url_to_finish_buttons(self) -> None:
+        template_path = Path(__file__).resolve().parent / "templates" / "create_order.html"
+        template_source = template_path.read_text()
+
+        self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 2)
 
 
 class CancelOrderServiceTestCase(FastTenantTestCase):

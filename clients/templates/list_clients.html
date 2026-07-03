@@ -69,7 +69,19 @@
     <!-- Header Section -->
     <div class="row mb-4 g-3 align-items-center">
       <div class="col-12 col-md-3">
-        <h1><i class="fas fa-users me-2"></i>Clientes</h1>
+        <h1>
+          {% if client_list_mode == 'credits' %}
+            <i class="fas fa-credit-card me-2"></i>
+          {% elif client_list_mode == 'outside_route_sales' %}
+            <i class="fas fa-cart-plus me-2"></i>
+          {% else %}
+            <i class="fas fa-users me-2"></i>
+          {% endif %}
+          {{ page_title|default:"Clientes" }}
+        </h1>
+        {% if page_subtitle %}
+          <p class="text-muted mb-1">{{ page_subtitle }}</p>
+        {% endif %}
         {% if has_search %}
           <p class="text-muted mb-0">
             Mostrando resultados para: <strong>"{{ search_query }}"</strong>
@@ -79,6 +91,9 @@
       <div class="col-12 col-md-7">
         <form method="get" action="{% url 'clients:list' %}" class="search-form mx-auto">
           <div class="input-group">
+            {% if client_list_mode %}
+              <input type="hidden" name="mode" value="{{ client_list_mode }}">
+            {% endif %}
             <input type="search" 
                    class="form-control form-control-lg" 
                    name="search" 
@@ -89,7 +104,7 @@
               <i class="fas fa-search me-2"></i>Buscar
             </button>
             {% if has_search %}
-              <a href="{% url 'clients:list' %}" class="btn btn-outline-secondary">
+              <a href="{{ client_list_clear_url }}" class="btn btn-outline-secondary">
                 <i class="fas fa-times me-2"></i>Limpiar
               </a>
             {% endif %}
@@ -108,7 +123,7 @@
 
     <!-- Clients Table -->
     {% if clients %}
-      {% include 'includes/client_table.html' with items=clients table_context='client_list' show_id=True show_sequence=False show_frequency=False has_search=has_search search_query=search_query %}
+      {% include 'includes/client_table.html' with items=clients table_context='client_list' client_list_mode=client_list_mode show_id=True show_sequence=False show_frequency=False has_search=has_search search_query=search_query %}
 
       <!-- Pagination -->
       {% if clients.has_other_pages %}
@@ -118,12 +133,12 @@
               <ul class="pagination justify-content-center">
                 {% if clients.has_previous %}
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page=1" aria-label="Primera página">
+                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page=1" aria-label="Primera página">
                       <i class="fas fa-angle-double-left"></i>
                     </a>
                   </li>
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients.previous_page_number }}" aria-label="Página anterior">
+                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.previous_page_number }}" aria-label="Página anterior">
                       <i class="fas fa-angle-left"></i>
                     </a>
                   </li>
@@ -144,11 +159,11 @@
                     </li>
                   {% elif page_num > clients.number|add:'-3' and page_num < clients.number|add:'3' %}
                     <li class="page-item">
-                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == 1 or page_num == clients.paginator.num_pages %}
                     <li class="page-item">
-                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == clients.number|add:'-4' or page_num == clients.number|add:'4' %}
                     <li class="page-item disabled">
@@ -159,12 +174,12 @@
 
                 {% if clients.has_next %}
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients.next_page_number }}" aria-label="Página siguiente">
+                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.next_page_number }}" aria-label="Página siguiente">
                       <i class="fas fa-angle-right"></i>
                     </a>
                   </li>
                   <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ clients.paginator.num_pages }}" aria-label="Última página">
+                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.paginator.num_pages }}" aria-label="Última página">
                       <i class="fas fa-angle-double-right"></i>
                     </a>
                   </li>
