@@ -17,6 +17,7 @@ PAYMENT_STATUS_CHOICES = [
     ('completed', 'Completado'),
     ('pending', 'Pendiente'),
     ('failed', 'Fallido'),
+    ('reversed', 'Revertido'),
 ]
 class Payment(TimeStampedModel):
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto del Pago")

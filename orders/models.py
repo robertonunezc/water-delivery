@@ -32,6 +32,22 @@ ORDER_TYPE_CHOICES = (
 class OrderQuerySet(models.QuerySet):
     """Custom queryset for Order model with common filters"""
 
+    def active(self) -> 'OrderQuerySet':
+        """Return non-cancelled orders."""
+        return self.exclude(status=OrderStatus.CANCELLED.value)
+
+    def cancelled(self) -> 'OrderQuerySet':
+        """Return only cancelled orders."""
+        return self.filter(status=OrderStatus.CANCELLED.value)
+
+    def including_cancelled(self) -> 'OrderQuerySet':
+        """Return orders regardless of cancellation status."""
+        return self.all()
+
+    def review_required(self) -> 'OrderQuerySet':
+        """Return orders waiting for cancellation review."""
+        return self.filter(cancellation_review_required=True)
+
     def unbilled(self):
         """
         Get orders that haven't been added to any billing record.
@@ -146,8 +162,20 @@ class OrderQuerySet(models.QuerySet):
 class OrderManager(models.Manager):
     """Custom manager for Order model"""
 
-    def get_queryset(self):
+    def get_queryset(self) -> OrderQuerySet:
         return OrderQuerySet(self.model, using=self._db).filter(deleted_at=None)
+
+    def active(self) -> OrderQuerySet:
+        return self.get_queryset().active()
+
+    def cancelled(self) -> OrderQuerySet:
+        return self.get_queryset().cancelled()
+
+    def including_cancelled(self) -> OrderQuerySet:
+        return self.get_queryset().including_cancelled()
+
+    def review_required(self) -> OrderQuerySet:
+        return self.get_queryset().review_required()
 
     def unbilled(self):
         return self.get_queryset().unbilled()
@@ -186,6 +214,16 @@ class Order(TimeStampedModel):
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
     cantidad_cobrada = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Cantidad Cobrada", help_text="Cantidad realmente cobrada al cliente (puede ser mayor al total para agregar saldo)")
     status = models.CharField(max_length=50, choices=ORDER_STATUS_CHOICES, default=OrderStatus.PENDING.value, db_index=True)
+    cancellation_review_required = models.BooleanField(default=False, db_index=True)
+    cancellation_review_reason = models.TextField(blank=True, null=True)
+    cancellation_requested_at = models.DateTimeField(null=True, blank=True)
+    cancellation_requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cancellation_requested_orders",
+    )
     notes = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Empleado", help_text="Empleado que creó la orden")
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Descuento", help_text="Descuento aplicado a la orden (en la moneda del total)")

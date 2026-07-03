@@ -489,6 +489,51 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 2)
 
 
+class OrderCancellationQuerySetTestCase(FastTenantTestCase):
+    """Tests for order cancellation query helpers."""
+
+    def setUp(self) -> None:
+        self.customer = Client.objects.create(name="Cliente Query Cancelacion")
+        self.active_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("10.00"),
+        )
+        self.cancelled_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.CANCELLED.value,
+            total_amount=Decimal("20.00"),
+        )
+        self.review_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("30.00"),
+            cancellation_review_required=True,
+            cancellation_review_reason="Saldo insuficiente",
+        )
+
+    def test_active_excludes_cancelled_orders(self) -> None:
+        self.assertQuerySetEqual(
+            Order.objects.active().order_by("id"),
+            [self.active_order, self.review_order],
+            transform=lambda order: order,
+        )
+
+    def test_cancelled_returns_only_cancelled_orders(self) -> None:
+        self.assertQuerySetEqual(
+            Order.objects.cancelled(),
+            [self.cancelled_order],
+            transform=lambda order: order,
+        )
+
+    def test_review_required_returns_orders_waiting_for_staff_review(self) -> None:
+        self.assertQuerySetEqual(
+            Order.objects.review_required(),
+            [self.review_order],
+            transform=lambda order: order,
+        )
+
+
 class CancelOrderServiceTestCase(FastTenantTestCase):
     """Tests for cancel_pending_order service function."""
 
