@@ -116,10 +116,10 @@ class Client(TimeStampedModel):
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
     external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID externo", help_text="ID del cliente en sistemas externos (ERP, CRM, etc.)")
-    billing_override_enabled = models.BooleanField(
+    credit_override_enabled = models.BooleanField(
         default=False,
-        verbose_name="Usar datos propios de facturación",
-        help_text="Si está habilitado, la sucursal usará sus propios datos de facturación en lugar de heredar del corporativo"
+        verbose_name="Usar datos propios de crédito",
+        help_text="Si está habilitado, la sucursal podrá usar una configuración de crédito propia en lugar de la copiada del corporativo"
     )
     #Notification sent 
     last_first_reminder_sent_at = models.DateTimeField(null=True, blank=True)
@@ -154,12 +154,11 @@ class Client(TimeStampedModel):
         existing_client_qs = existing_client_qs.exclude(pk=self.pk)
         if existing_client_qs.exists():
                 errors['name'] = 'Ya existe un cliente con este nombre. Los nombres de clientes deben ser únicos.'
-        # NEW: Validate billing_override_enabled
-        if self.billing_override_enabled and self.type != 'branch':
-            errors['billing_override_enabled'] = 'Solo las sucursales pueden habilitar datos propios de facturación.'
+        if self.credit_override_enabled and self.type != 'branch':
+            errors['credit_override_enabled'] = 'Solo las sucursales pueden habilitar datos propios de crédito.'
         
-        if self.billing_override_enabled and self.type == 'branch' and not self.corporate:
-            errors['billing_override_enabled'] = 'No se puede habilitar datos propios sin un corporativo asociado.'
+        if self.credit_override_enabled and self.type == 'branch' and not self.corporate:
+            errors['credit_override_enabled'] = 'No se puede habilitar datos propios de crédito sin un corporativo asociado.'
 
         # NOTE: Removed hard validation for billing setup.
         # Clients can now enable requires_billing without having complete billing data.

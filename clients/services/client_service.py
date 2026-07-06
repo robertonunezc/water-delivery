@@ -67,7 +67,79 @@ class ClientUpdateData:
     can_pay_with_credit: Optional[bool] = None
     address_link: Optional[str] = None
     requires_billing: Optional[bool] = None
-    billing_override_enabled: Optional[bool] = None
+    credit_override_enabled: Optional[bool] = None
+
+
+def initialize_branch_credit_from_corporate(client: Client) -> bool:
+    """
+    Copy corporate credit policy to a new branch while keeping branch ledger state.
+
+    Returns True when any credit policy/configuration data was copied.
+    """
+    if client.type != 'branch' or client.corporate_id is None:
+        return False
+
+    from clients.models import ClientCreditConfig
+
+    corporate = client.corporate
+    changed_fields = []
+
+    if client.credit_limit != corporate.credit_limit:
+        client.credit_limit = corporate.credit_limit
+        changed_fields.append('credit_limit')
+
+    if client.can_pay_with_credit != corporate.can_pay_with_credit:
+        client.can_pay_with_credit = corporate.can_pay_with_credit
+        changed_fields.append('can_pay_with_credit')
+
+    try:
+        corporate_config = corporate.credit_config
+    except ClientCreditConfig.DoesNotExist:
+        corporate_config = None
+
+    if (
+        corporate_config
+        and corporate_config.payment_term_type == 'invoice_due'
+        and not client.requires_billing
+    ):
+        client.requires_billing = True
+        changed_fields.append('requires_billing')
+
+    if changed_fields:
+        client.save(update_fields=[*changed_fields, 'updated_at'])
+
+    if not corporate_config:
+        return bool(changed_fields)
+
+    ClientCreditConfig.objects.update_or_create(
+        client=client,
+        defaults={
+            'payment_term_type': corporate_config.payment_term_type,
+            'cutoff_day': corporate_config.cutoff_day,
+            'max_payment_days': corporate_config.max_payment_days,
+            'first_notification_days': corporate_config.first_notification_days,
+            'second_notification_days': corporate_config.second_notification_days,
+            'overdue_notification_days': corporate_config.overdue_notification_days,
+        },
+    )
+    return True
+
+
+def _has_credit_policy_update(update_data: ClientUpdateData) -> bool:
+    return (
+        update_data.credit_limit is not None
+        or update_data.can_pay_with_credit is not None
+    )
+
+
+def _branch_credit_policy_edit_allowed(client: Client, update_data: ClientUpdateData) -> bool:
+    client_type = update_data.type if update_data.type is not None else client.type
+    credit_override_enabled = (
+        update_data.credit_override_enabled
+        if update_data.credit_override_enabled is not None
+        else client.credit_override_enabled
+    )
+    return client_type != 'branch' or credit_override_enabled
 
 
 def update_client(client: Client, update_data: ClientUpdateData, user: User) -> Client:
@@ -85,6 +157,11 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     Raises:
         ValueError: If validation fails
     """
+    if _has_credit_policy_update(update_data) and not _branch_credit_policy_edit_allowed(client, update_data):
+        raise ValueError(
+            'La configuración de crédito se administra desde el corporativo para esta sucursal.'
+        )
+
     # Track if any changes were made
     updated = False
     
@@ -138,8 +215,8 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
         client.requires_billing = update_data.requires_billing
         updated = True
 
-    if update_data.billing_override_enabled is not None:
-        client.billing_override_enabled = update_data.billing_override_enabled
+    if update_data.credit_override_enabled is not None:
+        client.credit_override_enabled = update_data.credit_override_enabled
         updated = True
     
     # Note: balance and current_debt should be updated through transaction services

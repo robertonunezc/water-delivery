@@ -132,10 +132,10 @@
 
 							{% if core_form.type.value == 'branch' %}
 								<div class="col-md-4 form-check">
-									{{ core_form.billing_override_enabled }}
-									<label class="form-check-label">{{ core_form.billing_override_enabled.label }}</label>
-									<div class="form-text">Permite configurar datos de facturación específicos para esta sucursal, en lugar de heredar del corporativo.</div>
-									{{ core_form.billing_override_enabled.errors }}
+									{{ core_form.credit_override_enabled }}
+									<label class="form-check-label">{{ core_form.credit_override_enabled.label }}</label>
+									<div class="form-text">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
+									{{ core_form.credit_override_enabled.errors }}
 								</div>
 							{% endif %}
 						</div>
@@ -357,6 +357,9 @@
 
 				<div class="tab-pane fade {% if active_tab == 'credit' %}show active{% endif %}" id="tab-credit" role="tabpanel">
 					{% if client %}
+						{% if credit_read_only %}
+							<div class="alert alert-warning">La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
+						{% endif %}
 						<form method="post">
 							{% csrf_token %}
 							<input type="hidden" name="section" value="credit">
@@ -385,7 +388,7 @@
 								</div>
 							</div>
 							<div class="mt-3 d-flex justify-content-end">
-								<button type="submit" class="btn btn-primary">Guardar Configuración de Crédito</button>
+								<button type="submit" class="btn btn-primary" {% if credit_read_only %}disabled{% endif %}>Guardar Configuración de Crédito</button>
 							</div>
 						</form>
 					{% endif %}

@@ -24,6 +24,7 @@ from .forms import (
     AddressInlineForm,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
+from .services.client_service import initialize_branch_credit_from_corporate
 from orders.models import Order
 from product.services import ensure_client_product_prices
 from routes.forms import ClientRouteAssignmentForm
@@ -161,10 +162,14 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     billing_read_only = bool(
         client
         and client.type == 'branch'
-        and not client.billing_override_enabled
     )
     billing_data_disabled = not billing_enabled or billing_read_only
     billing_frequency_disabled = billing_data_disabled or not bool(client and client.requires_billing)
+    credit_read_only = bool(
+        client
+        and client.type == 'branch'
+        and not client.credit_override_enabled
+    )
 
     if billing_data_disabled:
         for field in invoice_data_form.fields.values():
@@ -172,6 +177,12 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
 
     if billing_frequency_disabled:
         for field in invoice_schedule_form.fields.values():
+            field.disabled = True
+
+    if credit_read_only:
+        for field in credit_policy_form.fields.values():
+            field.disabled = True
+        for field in credit_config_form.fields.values():
             field.disabled = True
 
     return {
@@ -191,6 +202,7 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         'billing_read_only': billing_read_only,
         'billing_data_disabled': billing_data_disabled,
         'billing_frequency_disabled': billing_frequency_disabled,
+        'credit_read_only': credit_read_only,
         'effective_billing_data': client.billing_info.effective.data if client else None,
         'effective_billing_address': client.billing_info.effective.address if client else None,
         'effective_billing_frequency': client.billing_info.effective.frequency if client else None,
@@ -208,6 +220,7 @@ def create_v2(request):
         form = ClientCoreForm(request.POST)
         if form.is_valid():
             client = form.save()
+            initialize_branch_credit_from_corporate(client)
             pricing_summary = ensure_client_product_prices(client)
             if pricing_summary.get('created_count', 0):
                 messages.info(
@@ -234,7 +247,7 @@ def create_v2(request):
             'active': True,
             'type': 'branch',
             'requires_billing': False,
-            'billing_override_enabled': False,
+            'credit_override_enabled': False,
         }
     )
     context = {
@@ -363,7 +376,7 @@ def edit_v2(request, pk):
 
         if section in ['billing_data', 'billing_frequency']:
             if section == 'billing_data':
-                if client.type == 'branch' and not client.billing_override_enabled:
+                if client.type == 'branch':
                     messages.warning(request, 'Esta sucursal hereda los datos de facturación del corporativo y no puede editarlos aquí.')
                     if request.path.startswith('/administrador/'):
                         return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
@@ -386,7 +399,7 @@ def edit_v2(request, pk):
                 )
                 return render(request, 'clients/client_form_v2.html', context)
 
-            if client.type == 'branch' and not client.billing_override_enabled:
+            if client.type == 'branch':
                 messages.warning(request, 'Esta sucursal hereda la configuración de facturación del corporativo y no puede editarla aquí.')
                 if request.path.startswith('/administrador/'):
                     return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=billing")
@@ -419,6 +432,12 @@ def edit_v2(request, pk):
             return render(request, 'clients/client_form_v2.html', context)
 
         if section == 'credit':
+            if client.type == 'branch' and not client.credit_override_enabled:
+                messages.warning(request, 'La configuración de crédito se administra desde el corporativo para esta sucursal.')
+                if request.path.startswith('/administrador/'):
+                    return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=credit")
+                return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=credit")
+
             credit_policy_form = ClientCreditPolicyForm(request.POST, instance=client, prefix='credit_policy')
             credit_config_instance = getattr(client, 'credit_config', None)
             if credit_config_instance is None:
@@ -661,7 +680,7 @@ def update_client(request, pk):
             can_pay_with_credit=body.get('can_pay_with_credit'),
             address_link=body.get('address_link'),
             requires_billing=body.get('requires_billing'),
-            billing_override_enabled=body.get('billing_override_enabled'),
+            credit_override_enabled=body.get('credit_override_enabled'),
         )
         
         # Update the client using the service
@@ -677,7 +696,7 @@ def update_client(request, pk):
                 'requires_billing': updated_client.requires_billing,
                 'active': updated_client.active,
                 'can_pay_with_credit': updated_client.can_pay_with_credit,
-                'billing_override_enabled': updated_client.billing_override_enabled,
+                'credit_override_enabled': updated_client.credit_override_enabled,
             }
         })
     

@@ -63,10 +63,6 @@ class InvoiceInfo:
             if current.type != "branch":
                 return current_own, "own" if current_own.is_complete else "none"
 
-            # Branch with override enabled prefers own; otherwise fall back to corporate
-            if current.billing_override_enabled and current_own.has_any:
-                return current_own, "own"
-
             if current.corporate:
                 corporate_own = self._get_own_components(current.corporate)
                 corporate_effective, _corporate_source = resolve(current.corporate, corporate_own)
@@ -105,14 +101,4 @@ class InvoiceInfo:
         }
 
     def get_override_validation_warnings(self) -> List[str]:
-        warnings: List[str] = []
-        if not (self._client.type == "branch" and self._client.billing_override_enabled):
-            return warnings
-
-        if not self.own.has_data:
-            warnings.append("Datos de facturación propios requeridos: debe agregar RFC y Razón Social.")
-        if not self.own.has_address:
-            warnings.append('Dirección fiscal propia requerida: debe agregar una dirección de tipo "Fiscal".')
-        if self._client.requires_billing and not self.own.has_frequency:
-            warnings.append("Frecuencia de facturación propia requerida: debe configurar la frecuencia.")
-        return warnings
+        return []
