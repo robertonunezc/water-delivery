@@ -261,7 +261,7 @@
 
 				<div class="tab-pane fade {% if active_tab == 'billing' %}show active{% endif %}" id="tab-billing" role="tabpanel">
 					{% if client %}
-						{% if not client.billing_info.effective.has_address %}
+						{% if not client.billing_info.effective.has_address and not billing_read_only %}
 							<div class="alert alert-warning">
 								<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
 							</div>
