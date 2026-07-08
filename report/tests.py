@@ -1,11 +1,14 @@
 import csv
 import io
+from datetime import date, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 
-from clients.models import Client
+from clients.models import Client, ClientCreditConfig, CreditTransaction
+from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderProduct, OrderStatus
 from payment.models import Payment
 from product.models import Product, ProductCategory
@@ -303,3 +306,122 @@ class OrdersReportQueryTests(FastTenantTestCase):
         self.assertEqual(response.context["order_stats"]["total_orders"], 0)
         page_order_ids = [order.id for order in response.context["orders"].object_list]
         self.assertNotIn(reversed_payment_order.id, page_order_ids)
+
+
+class CreditReportViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username="credit_report_user",
+            password="testpass123",
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(
+            name="Tempano",
+            current_debt=Decimal("9700.00"),
+            credit_limit=Decimal("20000.00"),
+        )
+        ClientCreditConfig.objects.create(
+            client=self.customer,
+            payment_term_type="monthly_cutoff",
+            cutoff_day="last_day",
+            max_payment_days=30,
+        )
+        self.order = self._create_credit_order(
+            amount=Decimal("9700.00"),
+            order_date=date(2026, 4, 1),
+        )
+
+    def _set_order_date(self, order: Order, order_date: date) -> None:
+        value = datetime.combine(order_date, datetime.min.time())
+        if timezone.is_aware(timezone.now()):
+            value = timezone.make_aware(value)
+        Order.objects.filter(pk=order.pk).update(order_date=value)
+        order.refresh_from_db()
+
+    def _create_credit_order(self, *, amount: Decimal, order_date: date) -> Order:
+        order = Order.objects.create(
+            client=self.customer,
+            subtotal_amount=amount,
+            total_amount=amount,
+            status=OrderStatus.COMPLETED.value,
+            type="credito",
+            owner=self.user,
+        )
+        self._set_order_date(order, order_date)
+        CreditTransaction.objects.create(
+            client=self.customer,
+            transaction_type="purchase",
+            amount=amount,
+            debt_before=Decimal("0.00"),
+            debt_after=amount,
+            credit_limit_after=self.customer.credit_limit,
+            reference_order=order,
+            created_by=self.user,
+        )
+        return order
+
+    def test_global_credit_report_lists_clients_and_links_to_client_credit_report(
+        self,
+    ) -> None:
+        response = self.client.get(reverse("report:credit_report"))
+        detail_url = reverse("report:client_credit_report", args=[self.customer.pk])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Crédito vigente")
+        self.assertContains(response, "Línea de crédito autorizada")
+        self.assertContains(response, "Disponible")
+        self.assertContains(response, "Monto vencido")
+        self.assertContains(response, "Tempano")
+        self.assertContains(response, detail_url)
+
+    def test_global_credit_report_csv_exports_required_columns(self) -> None:
+        response = self.client.get(reverse("report:credit_report_csv"))
+        content = response.content.decode("utf-8")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Cliente,Crédito vigente,Línea de crédito autorizada,Disponible,Monto vencido", content)
+        self.assertIn("Tempano,9700.00,20000.00,10300.00,9700.00", content)
+
+    def test_client_credit_report_shows_open_invoiced_and_uninvoiced_sections(
+        self,
+    ) -> None:
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal("9700.00"),
+            identifier="AA",
+            folio="1313",
+            emmited_at=date(2026, 4, 30),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=self.order)
+        self._create_credit_order(
+            amount=Decimal("4500.00"),
+            order_date=date(2026, 7, 1),
+        )
+        self.customer.current_debt = Decimal("14200.00")
+        self.customer.save(update_fields=["current_debt"])
+
+        response = self.client.get(
+            reverse("report:client_credit_report", args=[self.customer.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Reporte de crédito")
+        self.assertContains(response, "Ventas a crédito facturadas")
+        self.assertContains(response, "Ventas a crédito no facturadas")
+        self.assertContains(response, "AA 1313")
+
+    def test_client_detail_links_to_client_credit_report(self) -> None:
+        response = self.client.get(reverse("clients:detail", args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("report:client_credit_report", args=[self.customer.pk]),
+        )
+
+    def test_credit_report_requires_login(self) -> None:
+        self.client.logout()
+
+        response = self.client.get(reverse("report:credit_report"))
+
+        self.assertEqual(response.status_code, 302)

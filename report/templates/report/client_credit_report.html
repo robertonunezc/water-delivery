@@ -1,0 +1,225 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <style>
+    .credit-summary-card {
+      border-left: 4px solid #0d6efd;
+    }
+    .metric-label {
+      color: #6c757d;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+    }
+    .metric-value {
+      font-size: 1.3rem;
+      font-weight: 700;
+    }
+    .table th {
+      background-color: #f8f9fa;
+      border-top: none;
+    }
+    .amount-overdue {
+      color: #dc3545;
+      font-weight: 700;
+    }
+    .amount-current {
+      font-weight: 700;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <div class="row mb-4 align-items-start">
+      <div class="col-md-8">
+        <h1><i class="fas fa-credit-card me-2"></i>Reporte de crédito</h1>
+        <h4 class="text-muted">{{ client.name }}</h4>
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{% url 'report:credit_report' %}" class="btn btn-outline-secondary me-2">
+          <i class="fas fa-arrow-left me-1"></i>Reporte global
+        </a>
+        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-primary">
+          Ver cliente
+        </a>
+      </div>
+    </div>
+
+    {% if report_data.has_reconciliation_warning %}
+      <div class="alert alert-warning">
+        <strong>Diferencia de conciliación:</strong>
+        La deuda actual del cliente no coincide con el total abierto por órdenes.
+        Diferencia: ${{ report_data.reconciliation_difference|floatformat:2 }}.
+      </div>
+    {% endif %}
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-3">
+        <div class="card credit-summary-card h-100">
+          <div class="card-body">
+            <div class="metric-label">Crédito vigente</div>
+            <div class="metric-value">${{ report_data.current_credit|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card credit-summary-card h-100">
+          <div class="card-body">
+            <div class="metric-label">Línea autorizada</div>
+            <div class="metric-value">${{ report_data.authorized_credit_line|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card credit-summary-card h-100">
+          <div class="card-body">
+            <div class="metric-label">Disponible</div>
+            <div class="metric-value">${{ report_data.available_credit|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="card credit-summary-card h-100">
+          <div class="card-body">
+            <div class="metric-label">Monto vencido</div>
+            <div class="metric-value {% if report_data.overdue_amount > 0 %}text-danger{% endif %}">
+              ${{ report_data.overdue_amount|floatformat:2 }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="metric-label">Ventas a crédito facturadas</div>
+            <div class="metric-value">${{ report_data.invoiced_credit_total|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100">
+          <div class="card-body">
+            <div class="metric-label">Ventas a crédito no facturadas</div>
+            <div class="metric-value">${{ report_data.uninvoiced_credit_total|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-file-invoice-dollar me-2"></i>Ventas a crédito facturadas
+        </h5>
+      </div>
+      <div class="card-body p-0">
+        {% if report_data.invoice_items %}
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Factura</th>
+                  <th class="text-end">Monto abierto</th>
+                  <th class="text-end">Monto vencido</th>
+                  <th class="text-center">Vencimiento</th>
+                  <th class="text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in report_data.invoice_items %}
+                  <tr>
+                    <td>
+                      <strong>{{ item.invoice.identifier }} {{ item.invoice.folio }}</strong>
+                      <br><small class="text-muted">{{ item.orders|length }} venta{{ item.orders|length|pluralize }}</small>
+                    </td>
+                    <td class="text-end amount-current">${{ item.open_amount|floatformat:2 }}</td>
+                    <td class="text-end">
+                      {% if item.overdue_amount > 0 %}
+                        <span class="amount-overdue">${{ item.overdue_amount|floatformat:2 }}</span>
+                      {% else %}
+                        <span class="text-muted">$0.00</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      {% if item.due_date %}
+                        {{ item.due_date|date:"d/m/Y" }}
+                      {% else %}
+                        <span class="text-muted">Sin fecha</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      <span class="badge {% if item.is_overdue %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                        {{ item.status }}
+                      </span>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-4 text-muted">No hay ventas a crédito facturadas abiertas.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5 class="mb-0">
+          <i class="fas fa-receipt me-2"></i>Ventas a crédito no facturadas
+        </h5>
+      </div>
+      <div class="card-body p-0">
+        {% if report_data.uninvoiced_orders %}
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Fecha</th>
+                  <th class="text-end">Monto abierto</th>
+                  <th class="text-center">Vencimiento</th>
+                  <th class="text-center">Estado</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in report_data.uninvoiced_orders %}
+                  <tr>
+                    <td>
+                      <a href="{% url 'orders:get_order' item.order.id %}" class="fw-bold text-decoration-none">
+                        #{{ item.order.id }}
+                      </a>
+                    </td>
+                    <td>{{ item.order.order_date|date:"d/m/Y" }}</td>
+                    <td class="text-end amount-current">${{ item.remaining_amount|floatformat:2 }}</td>
+                    <td class="text-center">
+                      {% if item.due_date %}
+                        {{ item.due_date|date:"d/m/Y" }}
+                      {% else %}
+                        <span class="text-muted">Pendiente de factura</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      {% if item.is_overdue %}
+                        <span class="badge bg-danger">Vencida</span>
+                      {% elif item.due_date %}
+                        <span class="badge bg-warning text-dark">En plazo</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Sin vencimiento</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="p-4 text-muted">No hay ventas a crédito no facturadas abiertas.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endblock %}

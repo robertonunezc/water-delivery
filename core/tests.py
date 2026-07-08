@@ -175,7 +175,7 @@ class HomeDashboardRoutingTests(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "home.html")
-        self.assertContains(response, "Water Delivery")
+        self.assertContains(response, "PuriGest")
 
     def test_driver_employee_uses_delivery_dashboard(self) -> None:
         user = self._create_employee_user(username="driveruser", position="driver")
@@ -282,4 +282,4 @@ class DeliveryDashboardContextTests(FastTenantTestCase):
 
         self.assertEqual(credits_action["key"], "credits")
         self.assertEqual(credits_action["badge_count"], 2)
-        self.assertEqual(credits_action["url"], reverse("report:pending_payments"))
+        self.assertEqual(credits_action["url"], reverse("report:credit_report"))
