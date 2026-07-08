@@ -6,6 +6,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
+from django.utils import timezone
 from datetime import date, datetime, timedelta
 from calendar import monthrange
 from typing import Any
@@ -489,7 +490,10 @@ def list(request):
 @login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
-    first_day_of_month = date.today().replace(day=1)
+    first_day = timezone.localdate().replace(day=1)
+    first_day_of_month = datetime.combine(first_day, datetime.min.time())
+    if timezone.is_aware(timezone.now()):
+        first_day_of_month = timezone.make_aware(first_day_of_month)
     # Get client's orders with related data
     orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-created_at')
     

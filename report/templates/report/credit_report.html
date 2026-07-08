@@ -1,0 +1,211 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+  <style>
+    .credit-stats-card {
+      background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);
+      color: white;
+      border-radius: 10px;
+      margin-bottom: 1.5rem;
+    }
+    .credit-stat-item {
+      text-align: center;
+      padding: 1rem;
+    }
+    .credit-stat-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      margin-bottom: 0.25rem;
+    }
+    .credit-stat-label {
+      font-size: 0.85rem;
+      opacity: 0.9;
+    }
+    .filter-form {
+      background-color: #f8f9fa;
+      border-radius: 0.375rem;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    .table th {
+      background-color: #f8f9fa;
+      border-top: none;
+    }
+    .credit-row {
+      cursor: pointer;
+    }
+    .amount-overdue {
+      color: #dc3545;
+      font-weight: 700;
+    }
+    .amount-current {
+      font-weight: 700;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-4">
+    <div class="row mb-4">
+      <div class="col-md-8">
+        <h1><i class="fas fa-credit-card me-2"></i>Reporte de crédito</h1>
+        {% if has_search %}
+          <p class="text-muted mb-0">Resultados para: <strong>"{{ search_query }}"</strong></p>
+        {% endif %}
+      </div>
+      <div class="col-md-4 text-md-end">
+        <a href="{{ credit_report_export_url }}" class="btn btn-outline-success">
+          <i class="fas fa-file-csv me-1"></i>Exportar CSV
+        </a>
+      </div>
+    </div>
+
+    <div class="credit-stats-card">
+      <div class="row">
+        <div class="col-md-3 credit-stat-item">
+          <div class="credit-stat-value">${{ totals.total_current_credit|floatformat:2 }}</div>
+          <div class="credit-stat-label">Crédito vigente</div>
+        </div>
+        <div class="col-md-3 credit-stat-item">
+          <div class="credit-stat-value">${{ totals.total_authorized_credit_line|floatformat:2 }}</div>
+          <div class="credit-stat-label">Línea autorizada</div>
+        </div>
+        <div class="col-md-3 credit-stat-item">
+          <div class="credit-stat-value">${{ totals.total_available_credit|floatformat:2 }}</div>
+          <div class="credit-stat-label">Disponible</div>
+        </div>
+        <div class="col-md-3 credit-stat-item">
+          <div class="credit-stat-value">${{ totals.total_overdue_amount|floatformat:2 }}</div>
+          <div class="credit-stat-label">Monto vencido</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="filter-form">
+      <form method="get" action="{% url 'report:credit_report' %}">
+        <div class="row align-items-end">
+          <div class="col-md-8">
+            <label for="search" class="form-label">Buscar cliente:</label>
+            <input type="search"
+                   class="form-control"
+                   id="search"
+                   name="search"
+                   value="{{ search_query }}"
+                   placeholder="Nombre del cliente...">
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-primary" type="submit">
+              <i class="fas fa-search me-1"></i>Buscar
+            </button>
+            {% if has_search %}
+              <a href="{% url 'report:credit_report' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-1"></i>Limpiar
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </form>
+    </div>
+
+    {% if credit_rows %}
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted">
+          {{ totals.total_clients }} cliente{{ totals.total_clients|pluralize }} con crédito o deuda
+        </span>
+        {% if credit_rows.has_other_pages %}
+          <small class="text-muted">
+            Página {{ credit_rows.number }} de {{ credit_rows.paginator.num_pages }}
+          </small>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead>
+                <tr>
+                  <th>Cliente</th>
+                  <th class="text-end">Crédito vigente</th>
+                  <th class="text-end">Línea de crédito autorizada</th>
+                  <th class="text-end">Disponible</th>
+                  <th class="text-end">Monto vencido</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in credit_rows %}
+                  <tr class="credit-row" data-href="{% url 'report:client_credit_report' row.client.pk %}">
+                    <td>
+                      <a href="{% url 'report:client_credit_report' row.client.pk %}" class="fw-bold text-decoration-none">
+                        {{ row.client.name }}
+                      </a>
+                    </td>
+                    <td class="text-end amount-current">${{ row.current_credit|floatformat:2 }}</td>
+                    <td class="text-end">${{ row.authorized_credit_line|floatformat:2 }}</td>
+                    <td class="text-end">${{ row.available_credit|floatformat:2 }}</td>
+                    <td class="text-end">
+                      {% if row.overdue_amount > 0 %}
+                        <span class="amount-overdue">${{ row.overdue_amount|floatformat:2 }}</span>
+                      {% else %}
+                        <span class="text-muted">$0.00</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-center">
+                      <a href="{% url 'report:client_credit_report' row.client.pk %}" class="btn btn-sm btn-outline-primary">
+                        Ver reporte
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {% if credit_rows.has_other_pages %}
+        <nav class="mt-4" aria-label="Navegación del reporte de crédito">
+          <ul class="pagination justify-content-center">
+            {% if credit_rows.has_previous %}
+              <li class="page-item">
+                <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.previous_page_number }}">
+                  <i class="fas fa-angle-left"></i>
+                </a>
+              </li>
+            {% endif %}
+            <li class="page-item active">
+              <span class="page-link">{{ credit_rows.number }}</span>
+            </li>
+            {% if credit_rows.has_next %}
+              <li class="page-item">
+                <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.next_page_number }}">
+                  <i class="fas fa-angle-right"></i>
+                </a>
+              </li>
+            {% endif %}
+          </ul>
+        </nav>
+      {% endif %}
+    {% else %}
+      <div class="text-center py-5">
+        <i class="fas fa-search fa-4x text-muted mb-3"></i>
+        <h4 class="text-muted">No hay clientes para mostrar</h4>
+        <p class="text-muted">No se encontraron clientes activos con línea de crédito o deuda.</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    document.querySelectorAll('.credit-row').forEach((row) => {
+      row.addEventListener('click', (event) => {
+        if (event.target.closest('a, button')) {
+          return;
+        }
+        window.location.href = row.dataset.href;
+      });
+    });
+  </script>
+{% endblock %}
