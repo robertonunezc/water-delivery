@@ -99,6 +99,29 @@ class OrderQuerySet(models.QuerySet):
 
         return qs.distinct().order_by('-order_date')
 
+    def unbilled_for_fiscal_owner(self, fiscal_owner, exclude_order_id=None):
+        """
+        Get unbilled orders whose client resolves to the provided fiscal owner.
+
+        Includes orders that belong directly to the fiscal owner and orders
+        that belong to branches under that fiscal owner.
+        """
+        fiscal_owner_id = fiscal_owner.pk if hasattr(fiscal_owner, 'pk') else fiscal_owner
+        billable_filter = Q(
+            status=OrderStatus.COMPLETED.value,
+            invoice_links__isnull=True,
+        )
+        owner_filter = Q(client_id=fiscal_owner_id) | Q(client__corporate_id=fiscal_owner_id)
+
+        if exclude_order_id:
+            qs = self.filter(owner_filter).filter(
+                billable_filter | Q(pk=exclude_order_id)
+            )
+        else:
+            qs = self.filter(owner_filter).filter(billable_filter)
+
+        return qs.distinct().order_by('-order_date')
+
     def today_orders(self, user=None):
         """
         Get orders from today, optionally filtered by user.
@@ -185,6 +208,9 @@ class OrderManager(models.Manager):
 
     def unbilled_for_client(self, client, exclude_order_id=None):
         return self.get_queryset().unbilled_for_client(client, exclude_order_id)
+
+    def unbilled_for_fiscal_owner(self, fiscal_owner, exclude_order_id=None):
+        return self.get_queryset().unbilled_for_fiscal_owner(fiscal_owner, exclude_order_id)
 
     def today_orders(self, user=None):
         return self.get_queryset().today_orders(user)

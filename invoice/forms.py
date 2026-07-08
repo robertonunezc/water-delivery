@@ -1,7 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from invoice.models import Invoice, InvoiceOrderLink
-from invoice.services import get_invoiceable_orders_for_client
+from invoice.services import get_invoice_fiscal_owner, get_invoiceable_orders_for_client
 from clients.models import Client
 
 class InvoiceForm(forms.ModelForm):
@@ -31,8 +31,12 @@ class InvoiceForm(forms.ModelForm):
 
     def clean(self):
         cleaned_data = super().clean()
+        client = cleaned_data.get('client')
         auto_amount = cleaned_data.get('auto_amount')
         amount = cleaned_data.get('amount')
+
+        if client and not self.instance.pk:
+            cleaned_data['client'] = get_invoice_fiscal_owner(client)
 
         if not auto_amount and amount is None:
             raise ValidationError({'amount': 'El monto es obligatorio para facturas de cálculo manual.'})
@@ -51,12 +55,14 @@ class InvoiceOrderLinkForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         client = kwargs.pop('client', None)
         exclude_order_id = kwargs.pop('exclude_order_id', None)
+        scope = kwargs.pop('scope', 'exact')
         super().__init__(*args, **kwargs)
         
         if client:
             self.fields['order'].queryset = get_invoiceable_orders_for_client(
                 client=client,
                 include_order_id=exclude_order_id,
+                scope=scope,
                 as_dict=False
             )
         else:

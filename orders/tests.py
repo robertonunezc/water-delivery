@@ -5,8 +5,10 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import patch, MagicMock
 
+from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
@@ -19,6 +21,7 @@ User = get_user_model()
 from core.models import Employee, Transport
 from orders.models import Order, OrderProduct, OrderStatus
 from orders import services
+from orders.admin import OrderAdmin
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
@@ -1059,6 +1062,83 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
             {self.completed_order_1.id, self.completed_order_2.id},
         )
 
+    def test_dashboard_bulk_create_invoice_allows_same_corporate_branches(self) -> None:
+        branch_one = Client.objects.create(
+            name='Bulk Branch One',
+            type='branch',
+            corporate=self.customer,
+        )
+        branch_two = Client.objects.create(
+            name='Bulk Branch Two',
+            type='branch',
+            corporate=self.customer,
+        )
+        order_one = Order.objects.create(
+            client=branch_one,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('15.00'),
+        )
+        order_two = Order.objects.create(
+            client=branch_two,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('25.00'),
+        )
+
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'create_invoice',
+                'selected_orders': [order_one.pk, order_two.pk],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        invoice = Invoice.objects.get(client=self.customer)
+        self.assertEqual(invoice.amount, Decimal('40.00'))
+        self.assertSetEqual(
+            set(invoice.invoice_links.values_list('order_id', flat=True)),
+            {order_one.pk, order_two.pk},
+        )
+
+    def test_dashboard_bulk_create_invoice_rejects_different_fiscal_owners(self) -> None:
+        branch = Client.objects.create(
+            name='Bulk Branch',
+            type='branch',
+            corporate=self.customer,
+        )
+        other_branch = Client.objects.create(
+            name='Other Bulk Branch',
+            type='branch',
+            corporate=self.other_customer,
+        )
+        order_one = Order.objects.create(
+            client=branch,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('15.00'),
+        )
+        order_two = Order.objects.create(
+            client=other_branch,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('25.00'),
+        )
+
+        response = self.client.post(
+            reverse('admin_orders'),
+            data={
+                'bulk_action': 'create_invoice',
+                'selected_orders': [order_one.pk, order_two.pk],
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Invoice.objects.count(), 0)
+        self.assertContains(response, 'mismo cliente corporativo')
+
     def test_dashboard_bulk_create_invoice_rejects_non_completed_orders(self) -> None:
         response = self.client.post(
             reverse('admin_orders'),
@@ -1160,6 +1240,7 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
         self.completed_order_1.refresh_from_db()
         self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
 
+
     def test_orders_list_shows_review_badge_for_blocked_cancellation(self) -> None:
         self.completed_order_1.cancellation_review_required = True
         self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
@@ -1207,6 +1288,82 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         listed_orders = list(response.context["orders"].object_list)
         self.assertEqual(listed_orders, [self.completed_order_1])
+
+
+class OrdersAdminInvoiceActionTestCase(FastTenantTestCase):
+    """Tests for the Django admin order invoice action."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_superuser(
+            username='order_admin_user',
+            password='testpass',
+        )
+        self.factory = RequestFactory()
+        self.order_admin = OrderAdmin(Order, admin.site)
+        self.order_admin.message_user = MagicMock()
+        self.customer = Client.objects.create(name='Admin Bulk Client', type='corporate')
+        self._make_invoice_ready(self.customer)
+
+    def _make_invoice_ready(self, client: Client) -> None:
+        rfc_prefix = (client.name.upper().replace(' ', '') + 'XXXX')[:4]
+        InvoiceData.objects.create(
+            client=client,
+            rfc=f'{rfc_prefix}010101AAA',
+            razon_social=f'{client.name} SA de CV',
+        )
+        Address.objects.create(
+            client=client,
+            type='billing',
+            street='Fiscal 123',
+            locality='Centro',
+            municipality='Queretaro',
+            state='Queretaro',
+            zip_code='76000',
+            country='Mexico',
+        )
+
+    def _request(self):
+        request = self.factory.post('/admin/orders/order/')
+        request.user = self.user
+        return request
+
+    def test_admin_action_allows_same_corporate_branches(self) -> None:
+        branch_one = Client.objects.create(
+            name='Admin Branch One',
+            type='branch',
+            corporate=self.customer,
+        )
+        branch_two = Client.objects.create(
+            name='Admin Branch Two',
+            type='branch',
+            corporate=self.customer,
+        )
+        order_one = Order.objects.create(
+            client=branch_one,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('15.00'),
+        )
+        order_two = Order.objects.create(
+            client=branch_two,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('25.00'),
+        )
+
+        response = self.order_admin.crear_factura(
+            self._request(),
+            Order.objects.filter(pk__in=[order_one.pk, order_two.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        invoice = Invoice.objects.get(client=self.customer)
+        self.assertEqual(invoice.amount, Decimal('40.00'))
+        self.assertSetEqual(
+            set(invoice.invoice_links.values_list('order_id', flat=True)),
+            {order_one.pk, order_two.pk},
+        )
+
 
 class CalculateOrderTotalTestCase(FastTenantTestCase):
     """Tests for the calculate_order_total service function."""
