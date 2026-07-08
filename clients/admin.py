@@ -18,6 +18,7 @@ from .forms import (
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
+from clients.services.client_service import initialize_branch_credit_from_corporate
 from routes.models import RouteClient
 from core.admin_mixins import SoftDeleteAdminMixin
 
@@ -124,7 +125,6 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 
 	class Media:
 		js = (
-			'clients/admin/toggle_billing_inline.js',
 			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
 			#'clients/admin/billing_frequency_popup.js',
@@ -203,6 +203,8 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		if change:
 			return
 
+		initialize_branch_credit_from_corporate(obj)
+
 		pricing_summary = ensure_client_product_prices(obj)
 		if pricing_summary["created_count"]:
 			messages.info(
@@ -223,11 +225,11 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 
 	def get_inline_instances(self, request, obj=None):
 		"""
-		Conditionally show inlines based on client type and billing override settings.
+		Conditionally show inlines based on client type and credit override settings.
 		- New clients: hide all inlines
-		- Corporate clients: show all inlines
-		- Branch clients with billing_override_enabled=False: hide billing inlines (they inherit)
-		- Branch clients with billing_override_enabled=True: show all inlines
+		- Corporate clients: show all relevant inlines
+		- Branch clients: hide billing inlines because they inherit billing from corporate
+		- Branch clients without credit_override_enabled: hide credit config inline
 		"""
 		if obj is None:
 			# Creating a new client - hide all inlines
@@ -235,44 +237,58 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		
 		# Get all inline instances
 		all_inlines = super().get_inline_instances(request, obj)
-		
-		# Hide billing-related inlines when billing is not required
-		if not obj.requires_billing:
+
+		if obj.type == 'branch':
 			filtered_inlines = [
 				inline for inline in all_inlines
-			if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
-		]
+				if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
+			]
+			if not obj.credit_override_enabled:
+				filtered_inlines = [
+					inline for inline in filtered_inlines
+					if not isinstance(inline, ClientCreditConfigInline)
+				]
 			return filtered_inlines
 
-		# If it's a branch client without billing override, filter out billing-related inlines
-		if obj.type == 'branch' and not obj.billing_override_enabled:
+		# Hide billing-related inlines when billing is not required
+		if not obj.requires_billing:
 			filtered_inlines = [
 				inline for inline in all_inlines
 				if not isinstance(inline, (InvoiceFrequencyInline, ClientInvoiceDataInline))
 			]
 			return filtered_inlines
 		
-		# For corporate clients or branches with override enabled, show all inlines
 		return all_inlines
+
+	def get_readonly_fields(self, request, obj=None):
+		fields = list(super().get_readonly_fields(request, obj))
+		if obj and obj.type == 'branch' and not obj.credit_override_enabled:
+			fields.extend(['can_pay_with_credit', 'credit_limit'])
+		return tuple(dict.fromkeys(fields))
 
 	def get_fieldsets(self, request, obj=None):
 		"""
 		Show only basic fieldsets when creating a new client.
 		Show all fieldsets when editing an existing client.
 		"""
+		credit_fields = []
+		if obj is not None and obj.type == 'branch':
+			credit_fields.append(('credit_override_enabled',))
+		credit_fields.extend([
+			('can_pay_with_credit',),
+			('credit_limit',),
+			('balance', 'current_debt', ),
+			('get_available_credit'),
+			'get_balance_status',
+		])
+
 		# Base fieldsets for new clients
 		base_fieldsets = (
 			('Información Básica', {
 				'fields': (('name', 'active', 'external_id'), ('type', 'corporate'), ('note', 'address_link'), ),
 			}),
 			('Balance y Crédito', {
-				'fields': (
-					('can_pay_with_credit',),
-					('credit_limit',),		
-					('balance', 'current_debt', ), 
-					('get_available_credit'),
-					'get_balance_status',
-				),
+				'fields': tuple(credit_fields),
 				'classes': ["tab"],
 				'description': 'Visualización de saldo prepagado y crédito del cliente.'
 			}),
@@ -285,10 +301,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 		# Build billing fieldsets conditionally for existing clients
 		billing_fieldsets = []
 		
-		# Only show billing_override_enabled for branch clients
 		billing_requirement_fields = ['get_billing_requirement_warning', 'requires_billing']
-		if obj.type == 'branch':
-			billing_requirement_fields.append('billing_override_enabled')
 		
 		# Build a single billing fieldset, optionally adding billing info fields
 		billing_fields = list(billing_requirement_fields)

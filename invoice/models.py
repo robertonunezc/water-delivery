@@ -103,8 +103,8 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 class Invoice(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='invoices', verbose_name='Cliente')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
-    identifier = models.CharField(max_length=100, unique=True, verbose_name="Serie")
-    folio = models.CharField(max_length=100, unique=True, verbose_name="Folio")
+    identifier = models.CharField(max_length=100,  verbose_name="Serie")
+    folio = models.CharField(max_length=100, verbose_name="Folio")
     date = models.DateTimeField(auto_now_add=True)
     file = models.FileField(upload_to='billing_files/', blank=True, null=True)
     emmited_at = models.DateField(blank=True, null=True, verbose_name="Fecha de emisión")
@@ -163,6 +163,7 @@ class Invoice(TimeStampedModel):
         ordering = ['-date']
         verbose_name = 'Facturacion'
         verbose_name_plural = 'Facturas'
+        unique_together = ('identifier', 'folio')
 
 class InvoiceOrderLink(TimeStampedModel):
     invoice = models.ForeignKey('billing.Invoice', on_delete=models.CASCADE, related_name='invoice_links', verbose_name='Factura', db_column='billing_record_id')

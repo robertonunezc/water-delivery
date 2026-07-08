@@ -22,7 +22,7 @@ from orders.models import Order
 
 def _get_invoice_billing_owner(client: Client) -> Client:
     """Return the client whose fiscal data must be used for invoice generation."""
-    if client.type == 'branch' and not client.billing_override_enabled:
+    if client.type == 'branch':
         if client.corporate_id is None:
             raise ValidationError(
                 f'El cliente "{client.name}" no puede facturarse sin un cliente corporativo asociado.'
