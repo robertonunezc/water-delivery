@@ -62,6 +62,12 @@
           {% if client.active %}Activo{% else %}Inactivo{% endif %}
         </span>
         <span class="badge bg-info ms-2 fs-6">{{ client.get_type_display }}</span>
+        {% if client.corporate %}
+          <a href="{% url 'clients:detail' client.corporate.pk %}" class="badge bg-primary ms-2 fs-6 text-decoration-none">
+            <i class="fas fa-building me-1"></i> {{ client.corporate.name }}
+          </a>
+        {% endif %}
+
       </div>
       
       {% if client.note %}
