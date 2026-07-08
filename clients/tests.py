@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from django.utils import timezone
 from decimal import Decimal
 from datetime import date, timedelta
 import csv
@@ -242,37 +243,123 @@ class AddressInlineFormTests(FastTenantTestCase):
 
 
 class ClientDetailOrderActionsTests(FastTenantTestCase):
-    def test_closed_order_still_shows_order_action_link(self) -> None:
-        user = User.objects.create_user(
-            username='client-detail-actions-user',
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-detail-user',
             password='testpass123',
         )
-        customer = Client.objects.create(
-            name='Cliente con pedido cerrado',
+        self.customer = Client.objects.create(
+            name='Cliente detalle',
             active=True,
         )
+        self.client.force_login(self.user)
+
+    def _create_order(self, *, minutes_old: int) -> Order:
         order = Order.objects.create(
-            client=customer,
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+        created_at = timezone.now() - timedelta(minutes=minutes_old)
+        Order.objects.filter(pk=order.pk).update(created_at=created_at)
+        order.created_at = created_at
+        return order
+
+    def test_closed_order_still_shows_order_action_link(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
             status=OrderStatus.COMPLETED.value,
             total_amount=Decimal('100.00'),
         )
         Payment.objects.create(
-            client=customer,
+            client=self.customer,
             order=order,
             amount=Decimal('100.00'),
             method='cash',
             status='completed',
-            created_by=user,
+            created_by=self.user,
         )
-        self.client.force_login(user)
 
-        response = self.client.get(reverse('clients:detail', args=[customer.pk]))
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(
             response,
             f'href="{reverse("orders:get_order", args=[order.pk])}"',
         )
+
+    def test_orders_table_is_paginated_with_latest_10_first(self) -> None:
+        orders = [self._create_order(minutes_old=minutes) for minutes in range(12)]
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        orders_page = response.context['orders']
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(orders_page.paginator.per_page, 10)
+        self.assertEqual(len(orders_page.object_list), 10)
+        self.assertEqual(orders_page.object_list[0], orders[0])
+        self.assertNotIn(orders[10], orders_page.object_list)
+        self.assertTrue(orders_page.has_next())
+
+    def test_orders_table_second_page_shows_older_orders(self) -> None:
+        orders = [self._create_order(minutes_old=minutes) for minutes in range(12)]
+
+        response = self.client.get(
+            reverse('clients:detail', args=[self.customer.pk]),
+            {'orders_page': '2'},
+        )
+
+        orders_page = response.context['orders']
+        self.assertEqual(orders_page.number, 2)
+        self.assertEqual(list(orders_page.object_list), [orders[10], orders[11]])
+
+    def test_payment_history_is_paginated_independently(self) -> None:
+        orders = [self._create_order(minutes_old=minutes) for minutes in range(12)]
+        payments = []
+        for index, order in enumerate(orders):
+            payment = Payment.objects.create(
+                client=self.customer,
+                order=order,
+                amount=Decimal('100.00'),
+                method='cash',
+                status='completed',
+                created_by=self.user,
+            )
+            payment_date = timezone.now() - timedelta(minutes=index)
+            Payment.objects.filter(pk=payment.pk).update(date=payment_date)
+            payments.append(payment)
+
+        response = self.client.get(
+            reverse('clients:detail', args=[self.customer.pk]),
+            {'orders_page': '1', 'payments_page': '2'},
+        )
+
+        orders_page = response.context['orders']
+        payments_page = response.context['all_payment_data']
+        self.assertEqual(orders_page.number, 1)
+        self.assertEqual(payments_page.number, 2)
+        self.assertEqual(payments_page.paginator.per_page, 10)
+        self.assertEqual(
+            [payment_data['id'] for payment_data in payments_page.object_list],
+            [payments[10].id, payments[11].id],
+        )
+
+    def test_detail_header_renders_addresses_in_right_column(self) -> None:
+        Address.objects.create(
+            client=self.customer,
+            type='delivery',
+            street='Calle Header 42',
+            municipality='Querétaro',
+            state='Querétaro',
+            zip_code='76000',
+            country='México',
+            active=True,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertContains(response, 'client-header-addresses')
+        self.assertContains(response, 'Calle Header 42')
 
 
 class ClientListModeTests(FastTenantTestCase):
