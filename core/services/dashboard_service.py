@@ -182,7 +182,7 @@ def get_delivery_dashboard_context(
                 'key': 'credits',
                 'title': 'Créditos',
                 'description': 'Consultar clientes con deuda y registrar pagos.',
-                'url': reverse('report:pending_payments'),
+                'url': reverse('report:credit_report'),
                 'icon': 'fa-credit-card',
                 'variant': 'warning',
                 'is_enabled': True,
@@ -252,7 +252,7 @@ def _get_dashboard_links(
     selected_range: DashboardDateRange,
 ) -> dict[str, str]:
     links = {
-        'overdue_clients': reverse('report:pending_payments'),
+        'overdue_clients': reverse('report:credit_report'),
         'orders_report': _url_with_query(
             'report:orders_report',
             {

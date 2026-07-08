@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.contrib.auth.decorators import login_required
 from django.db.models import (
     Q, Max, Min, Sum, Avg, Subquery, OuterRef, Count, Prefetch, QuerySet,
@@ -12,6 +12,11 @@ from decimal import Decimal
 import csv
 from django.contrib.auth import get_user_model
 from clients.models import Client, CreditTransaction
+from clients.services.credit_report_service import (
+    GlobalCreditReportRow,
+    get_client_credit_report,
+    get_global_credit_report,
+)
 from orders.models import Order, ORDER_STATUS_CHOICES, OrderStatus
 from payment.models import PAYMENT_METHOD_CHOICES, Payment
 
@@ -74,6 +79,130 @@ def _build_orders_export_url(request: HttpRequest) -> str:
     if query_string:
         return f'{export_url}?{query_string}'
     return export_url
+
+
+def _format_money(value: Decimal) -> str:
+    return f'{value:.2f}'
+
+
+def _filter_credit_report_rows(
+    rows: list[GlobalCreditReportRow],
+    search_query: str,
+) -> list[GlobalCreditReportRow]:
+    if not search_query:
+        return rows
+    normalized_search = search_query.lower()
+    return [
+        row for row in rows
+        if normalized_search in row.client.name.lower()
+    ]
+
+
+def _build_credit_report_export_url(request: HttpRequest) -> str:
+    query_params = request.GET.copy()
+    query_params.pop('page', None)
+    query_string = query_params.urlencode()
+    export_url = reverse('report:credit_report_csv')
+    if query_string:
+        return f'{export_url}?{query_string}'
+    return export_url
+
+
+def _build_credit_report_totals(
+    rows: list[GlobalCreditReportRow],
+) -> dict[str, Decimal | int]:
+    return {
+        'total_clients': len(rows),
+        'total_current_credit': sum(
+            (row.current_credit for row in rows),
+            Decimal('0.00'),
+        ),
+        'total_authorized_credit_line': sum(
+            (row.authorized_credit_line for row in rows),
+            Decimal('0.00'),
+        ),
+        'total_available_credit': sum(
+            (row.available_credit for row in rows),
+            Decimal('0.00'),
+        ),
+        'total_overdue_amount': sum(
+            (row.overdue_amount for row in rows),
+            Decimal('0.00'),
+        ),
+    }
+
+
+@login_required
+def credit_report(request: HttpRequest) -> HttpResponse:
+    """Show the global credit report for active credit clients."""
+    search_query = request.GET.get('search', '').strip()
+    report_data = get_global_credit_report()
+    rows = _filter_credit_report_rows(report_data.rows, search_query)
+    totals = _build_credit_report_totals(rows)
+
+    paginator = Paginator(rows, 25)
+    page = request.GET.get('page')
+    try:
+        credit_rows = paginator.page(page)
+    except PageNotAnInteger:
+        credit_rows = paginator.page(1)
+    except EmptyPage:
+        credit_rows = paginator.page(paginator.num_pages)
+
+    context = {
+        'credit_rows': credit_rows,
+        'search_query': search_query,
+        'has_search': bool(search_query),
+        'totals': totals,
+        'credit_report_export_url': _build_credit_report_export_url(request),
+    }
+    return render(request, 'report/credit_report.html', context)
+
+
+@login_required
+def credit_report_csv(request: HttpRequest) -> HttpResponse:
+    """Download the global credit report as CSV."""
+    search_query = request.GET.get('search', '').strip()
+    report_data = get_global_credit_report()
+    rows = _filter_credit_report_rows(report_data.rows, search_query)
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="credit_report.csv"'
+    writer = csv.writer(response)
+    writer.writerow([
+        'Cliente',
+        'Crédito vigente',
+        'Línea de crédito autorizada',
+        'Disponible',
+        'Monto vencido',
+    ])
+    for row in rows:
+        writer.writerow([
+            row.client.name,
+            _format_money(row.current_credit),
+            _format_money(row.authorized_credit_line),
+            _format_money(row.available_credit),
+            _format_money(row.overdue_amount),
+        ])
+    return response
+
+
+@login_required
+def client_credit_report(request: HttpRequest, client_id: int) -> HttpResponse:
+    """Show the detailed credit report for one client."""
+    client = get_object_or_404(
+        Client.objects.select_related('credit_config'),
+        pk=client_id,
+    )
+    report_data = get_client_credit_report(client=client)
+    return render(
+        request,
+        'report/client_credit_report.html',
+        {
+            'client': client,
+            'report_data': report_data,
+        },
+    )
 
 
 @login_required

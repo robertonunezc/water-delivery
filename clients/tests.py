@@ -27,7 +27,7 @@ User = get_user_model()
 
 
 class ClientBillingInheritanceTestCase(FastTenantTestCase):
-    """Business-rule focused tests for billing inheritance/override."""
+    """Business-rule focused tests for branch billing inheritance."""
 
     def setUp(self):
         self.corporate = Client.objects.create(
@@ -65,11 +65,11 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             active=True,
         )
 
-        self.branch_override = Client.objects.create(
-            name="Branch Override",
+        self.branch_with_own_billing = Client.objects.create(
+            name="Branch With Own Billing",
             type="branch",
             corporate=self.corporate,
-            billing_override_enabled=True,
+            credit_override_enabled=True,
             requires_billing=True,
             active=True,
         )
@@ -136,14 +136,14 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
         self.assertFalse(billing.is_complete)
         self.assertEqual(billing.source, 'corporate')
 
-    def test_branch_override_ready_with_own_complete_data(self):
+    def test_branch_always_uses_corporate_even_with_own_complete_data(self):
         InvoiceData.objects.create(
-            client=self.branch_override,
+            client=self.branch_with_own_billing,
             rfc="BRANCH123456XYZ",
             razon_social="Sucursal SA de CV",
         )
         Address.objects.create(
-            client=self.branch_override,
+            client=self.branch_with_own_billing,
             type="billing",
             street="Av. Sucursal 200",
             municipality="Querétaro",
@@ -153,26 +153,33 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             active=True,
         )
         ClientBillingFrecuency.objects.create(
-            client=self.branch_override,
+            client=self.branch_with_own_billing,
             frequency="monthly",
-            billing_date="first_day",
+            billing_date="last_day",
             is_active=True,
         )
 
-        billing = self.branch_override.billing_info
+        billing = self.branch_with_own_billing.billing_info
         self.assertTrue(billing.is_complete)
-        self.assertEqual(billing.source, 'own')
+        self.assertEqual(billing.source, 'corporate')
+        self.assertEqual(billing.effective.data, self.corporate.invoice_data)
+        self.assertEqual(
+            billing.effective.address,
+            self.corporate.addresses.get(type='billing'),
+        )
+        self.assertEqual(billing.effective.frequency, self.corporate.invoice_schedule)
 
-    def test_branch_override_not_ready_with_incomplete_own_data(self):
+    def test_branch_ignores_incomplete_own_data_when_corporate_ready(self):
         InvoiceData.objects.create(
-            client=self.branch_override,
+            client=self.branch_with_own_billing,
             rfc="PART123456",
             razon_social="Parcial SA",
         )
-        # Missing address and frequency
-        billing = self.branch_override.billing_info
-        self.assertFalse(billing.is_complete)
-        self.assertEqual(billing.source, 'own')
+
+        billing = self.branch_with_own_billing.billing_info
+        self.assertTrue(billing.is_complete)
+        self.assertEqual(billing.source, 'corporate')
+        self.assertEqual(billing.effective.data, self.corporate.invoice_data)
 
 
 class AddressInlineFormTests(FastTenantTestCase):
@@ -360,6 +367,49 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
 
         self.assertContains(response, 'client-header-addresses')
         self.assertContains(response, 'Calle Header 42')
+
+
+class ClientDetailLayoutTests(FastTenantTestCase):
+    def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
+        user = User.objects.create_user(
+            username='client-detail-layout-user',
+            password='testpass123',
+        )
+        corporate = Client.objects.create(
+            name='Corporativo con sucursales',
+            type='corporate',
+            active=True,
+        )
+        active_branch = Client.objects.create(
+            name='Sucursal activa',
+            type='branch',
+            corporate=corporate,
+            active=True,
+        )
+        inactive_branch = Client.objects.create(
+            name='Sucursal inactiva',
+            type='branch',
+            corporate=corporate,
+            active=False,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('clients:detail', args=[corporate.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sucursales')
+        self.assertContains(
+            response,
+            f'href="{reverse("clients:detail", args=[active_branch.pk])}"',
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("clients:detail", args=[inactive_branch.pk])}"',
+        )
+        self.assertContains(response, 'Sucursal activa')
+        self.assertContains(response, 'Sucursal inactiva')
+        self.assertContains(response, '<span class="badge bg-success">Activo</span>')
+        self.assertContains(response, '<span class="badge bg-secondary">Inactivo</span>')
 
 
 class ClientListModeTests(FastTenantTestCase):

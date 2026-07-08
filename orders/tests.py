@@ -1099,7 +1099,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
             name='Branch Client',
             type='branch',
             corporate=corporate,
-            billing_override_enabled=False,
         )
         order = Order.objects.create(
             client=branch,
@@ -1119,16 +1118,16 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
         self.assertContains(response, 'cliente corporativo')
         self.assertContains(response, 'domicilio de tipo fiscal activo')
 
-    def test_dashboard_bulk_create_invoice_rejects_branch_override_without_own_billing_data(self) -> None:
-        corporate = Client.objects.create(name='Corporate Override', type='corporate')
-        self._make_invoice_ready(corporate)
+    def test_dashboard_bulk_create_invoice_validates_corporate_for_branch_with_own_billing_data(self) -> None:
+        corporate = Client.objects.create(name='Corporate Missing Billing', type='corporate')
 
         branch = Client.objects.create(
-            name='Branch Override',
+            name='Branch Own Billing Ignored',
             type='branch',
             corporate=corporate,
-            billing_override_enabled=True,
+            credit_override_enabled=True,
         )
+        self._make_invoice_ready(branch)
         order = Order.objects.create(
             client=branch,
             owner=self.user,
@@ -1144,7 +1143,7 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.filter(client=branch).exists())
-        self.assertContains(response, 'el mismo cliente')
+        self.assertContains(response, 'cliente corporativo')
         self.assertContains(response, 'RFC')
 
     def test_dashboard_bulk_status_update_uses_service_layer(self) -> None:
