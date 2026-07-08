@@ -37,14 +37,25 @@
       margin-bottom: 1rem;
       padding-bottom: 0.5rem;
     }
+    .client-header-addresses {
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background: #f8f9fa;
+      padding: 1rem;
+    }
+    .client-header-addresses .address-item:last-child {
+      border-bottom: 0 !important;
+      margin-bottom: 0 !important;
+      padding-bottom: 0 !important;
+    }
   </style>
 {% endblock %}
 
 {% block content %}
 <div class="container mt-4">
   <!-- Client Header -->
-  <div class="row mb-4">
-    <div class="col-md-8">
+  <div class="row mb-4 g-3 align-items-start">
+    <div class="col-lg-7">
       <div class="d-flex align-items-center mb-3">
         <h1 class="me-3">{{ client.name }}</h1>
         <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %} fs-6">
@@ -58,37 +69,6 @@
           <strong>Nota:</strong> {{ client.note }}
         </div>
       {% endif %}
-
-      <div class="mb-3">
-        <div class="fw-semibold mb-2">
-          <i class="fas fa-map-marker-alt me-2"></i>Direcciones
-        </div>
-        {% if addresses %}
-          <div class="d-flex flex-column gap-2">
-            {% for address in addresses %}
-              <div class="small">
-                <span class="badge bg-secondary me-1">{{ address.get_type_display }}</span>
-                <span>{{ address.street }}</span>
-                <span class="text-muted">
-                  {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}, {{ address.country }}
-                </span>
-                {% if address.note %}
-                  <div class="text-muted">{{ address.note }}</div>
-                {% endif %}
-              </div>
-            {% endfor %}
-          </div>
-        {% else %}
-          <p class="text-muted mb-2">No hay direcciones registradas.</p>
-        {% endif %}
-        {% if client.address_link %}
-          <div class="mt-2">
-            <a href="{{ client.address_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
-              <i class="fas fa-map-marker-alt"></i> Ver Ubicación en Google Maps
-            </a>
-          </div>
-        {% endif %}
-      </div>
       
       <div class="mb-3">
         <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-success me-2">
@@ -111,6 +91,27 @@
         </a>
         {% endif %}
        
+      </div>
+    </div>
+    <div class="col-lg-5">
+      <div class="h-100">
+        {% if addresses %}
+          {% for address in addresses %}
+            <div class="address-item mb-3 border-bottom pb-3">
+              <div>              <span class="badge bg-secondary mb-2">{{ address.get_type_display }}</span>
+{{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">No hay direcciones registradas.</p>
+        {% endif %}
+        {% if client.address_link %}
+          <div class="mt-3">
+            <a href="{{ client.address_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+              <i class="fas fa-map-marker-alt"></i> Ver Ubicación en Google Maps
+            </a>
+          </div>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -695,10 +696,16 @@
     <!-- Orders and Payments Column -->
     <div class="col-md-9">
       <!-- Recent Orders -->
-      <div class="card mb-4">
+      <div id="orders-history" class="card mb-4">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Ventas Recientes</h5>
-          <small class="text-muted">Mostrando los últimos 10</small>
+          <small class="text-muted">
+            {% if orders %}
+              Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
+            {% else %}
+              Sin ventas
+            {% endif %}
+          </small>
         </div>
         <div class="card-body">
           {% if orders %}
@@ -773,6 +780,29 @@
                 </tbody>
               </table>
             </div>
+            {% if orders.has_other_pages %}
+              <nav class="mt-3" aria-label="Paginación de ventas del cliente">
+                <ul class="pagination justify-content-end mb-0">
+                  {% if orders.has_previous %}
+                    <li class="page-item">
+                      <a class="page-link" href="?orders_page={{ orders.previous_page_number }}&payments_page={{ all_payment_data.number }}#orders-history">Anterior</a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                  {% endif %}
+                  <li class="page-item disabled">
+                    <span class="page-link">Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span>
+                  </li>
+                  {% if orders.has_next %}
+                    <li class="page-item">
+                      <a class="page-link" href="?orders_page={{ orders.next_page_number }}&payments_page={{ all_payment_data.number }}#orders-history">Siguiente</a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+                  {% endif %}
+                </ul>
+              </nav>
+            {% endif %}
           {% else %}
             <p class="text-muted">No hay ventas registrados para este cliente.</p>
             <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-primary">
@@ -783,10 +813,16 @@
       </div>
 
       <!-- Recent Payments -->
-      <div class="card">
+      <div id="payments-history" class="card">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
           <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Pagos Recientes</h5>
-          <small class="text-muted">Mostrando los últimos 10 (Pagos, Créditos y Saldos)</small>
+          <small class="text-muted">
+            {% if all_payment_data %}
+              Mostrando {{ all_payment_data.start_index }}-{{ all_payment_data.end_index }} de {{ all_payment_data.paginator.count }}
+            {% else %}
+              Sin transacciones
+            {% endif %}
+          </small>
         </div>
         <div class="card-body">
           {% if all_payment_data %}
@@ -852,6 +888,29 @@
                 </tbody>
               </table>
             </div>
+            {% if all_payment_data.has_other_pages %}
+              <nav class="mt-3" aria-label="Paginación de pagos del cliente">
+                <ul class="pagination justify-content-end mb-0">
+                  {% if all_payment_data.has_previous %}
+                    <li class="page-item">
+                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.previous_page_number }}#payments-history">Anterior</a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+                  {% endif %}
+                  <li class="page-item disabled">
+                    <span class="page-link">Página {{ all_payment_data.number }} de {{ all_payment_data.paginator.num_pages }}</span>
+                  </li>
+                  {% if all_payment_data.has_next %}
+                    <li class="page-item">
+                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.next_page_number }}#payments-history">Siguiente</a>
+                    </li>
+                  {% else %}
+                    <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+                  {% endif %}
+                </ul>
+              </nav>
+            {% endif %}
           {% else %}
             <p class="text-muted">No hay transacciones registradas para este cliente.</p>
           {% endif %}

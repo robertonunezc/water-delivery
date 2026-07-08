@@ -1,15 +1,12 @@
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Sum, Count, Q
+from django.db.models import Sum, Q
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
-from django.utils import timezone
-from datetime import date, datetime, timedelta
-from calendar import monthrange
-from typing import Any
+from typing import Any, List
 from urllib.parse import urlencode
 from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
 from .forms import (
@@ -487,91 +484,121 @@ def list(request):
     context = get_clients(request)
     return render(request, 'list_clients.html', context)
 
+
+CLIENT_DETAIL_PAGE_SIZE = 10
+
+
+def _paginate_client_detail_items(request: Any, items: Any, *, page_param: str) -> Any:
+    paginator = Paginator(items, CLIENT_DETAIL_PAGE_SIZE)
+    return paginator.get_page(request.GET.get(page_param, 1))
+
+
+def _payment_status_class(status: str) -> str:
+    if status == 'completed':
+        return 'success'
+    if status == 'pending':
+        return 'warning'
+    return 'danger'
+
+
+def _payment_history_item(payment: Any) -> dict[str, Any]:
+    return {
+        'type': 'payment',
+        'id': payment.id,
+        'date': payment.date,
+        'amount': payment.amount,
+        'method': payment.get_method_display(),
+        'status': payment.get_status_display(),
+        'status_class': _payment_status_class(payment.status),
+        'order_id': payment.order.id if payment.order else None,
+        'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
+        'is_positive': True,
+        'object': payment,
+        'created_by': payment.created_by,
+    }
+
+
+def _balance_history_item(balance_tx: Any) -> dict[str, Any]:
+    positive_types = ['deposit', 'refund', 'transfer_in', 'adjustment']
+    success_types = ['deposit', 'refund', 'transfer_in']
+    return {
+        'type': 'balance_transaction',
+        'id': balance_tx.id,
+        'date': balance_tx.created_at,
+        'amount': balance_tx.amount,
+        'method': balance_tx.get_transaction_type_display(),
+        'status': 'Completado',
+        'status_class': 'success' if balance_tx.transaction_type in success_types else 'info',
+        'order_id': balance_tx.reference_order.id if balance_tx.reference_order else None,
+        'description': balance_tx.notes or balance_tx.get_transaction_type_display(),
+        'is_positive': balance_tx.transaction_type in positive_types,
+        'object': balance_tx,
+        'created_by': balance_tx.created_by,
+    }
+
+
+def _credit_history_item(credit_tx: Any) -> dict[str, Any]:
+    positive_types = ['payment', 'adjustment', 'forgiveness', 'correction']
+    charge_types = ['purchase', 'interest', 'fee']
+    return {
+        'type': 'credit_transaction',
+        'id': credit_tx.id,
+        'date': credit_tx.created_at,
+        'amount': credit_tx.amount,
+        'method': credit_tx.get_transaction_type_display(),
+        'status': 'Completado',
+        'status_class': 'warning' if credit_tx.transaction_type in charge_types else 'success',
+        'order_id': credit_tx.reference_order.id if credit_tx.reference_order else None,
+        'description': credit_tx.notes or credit_tx.get_transaction_type_display(),
+        'is_positive': credit_tx.transaction_type in positive_types,
+        'object': credit_tx,
+        'created_by': credit_tx.created_by,
+    }
+
+
+def _build_payment_history(client: Client) -> List[dict[str, Any]]:
+    payments = client.payments.select_related('order', 'created_by').order_by('-date')
+    balance_transactions = client.balance_transactions.select_related(
+        'reference_order',
+        'reference_payment',
+        'created_by',
+    ).order_by('-created_at')
+    credit_transactions = client.credit_transactions.select_related(
+        'reference_order',
+        'reference_payment',
+        'created_by',
+    ).order_by('-created_at')
+
+    payment_history = []
+    for payment in payments:
+        payment_history.append(_payment_history_item(payment))
+
+    for balance_tx in balance_transactions:
+        if balance_tx.reference_payment:
+            continue
+        payment_history.append(_balance_history_item(balance_tx))
+
+    for credit_tx in credit_transactions:
+        if credit_tx.reference_payment:
+            continue
+        payment_history.append(_credit_history_item(credit_tx))
+
+    payment_history.sort(key=lambda item: item['date'], reverse=True)
+    return payment_history
+
+
 @login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
-    first_day = timezone.localdate().replace(day=1)
-    first_day_of_month = datetime.combine(first_day, datetime.min.time())
-    if timezone.is_aware(timezone.now()):
-        first_day_of_month = timezone.make_aware(first_day_of_month)
-    # Get client's orders with related data
     orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-created_at')
-    
-    # Get client's payments with related data
-    payments = client.payments.filter(date__gte=first_day_of_month).select_related('order').order_by('-date')
-    
-    # Get credit and balance transactions
-    balance_transactions = client.balance_transactions.all().select_related('reference_order', 'reference_payment', 'created_by').order_by('-created_at')
-    credit_transactions = client.credit_transactions.all().select_related('reference_order', 'reference_payment', 'created_by').order_by('-created_at')
-    
-    # Combine all payment-related data for the recent transactions view
-    all_payment_data = []
-    
-    # Add regular payments
-    for payment in payments:
-        all_payment_data.append({
-            'type': 'payment',
-            'id': payment.id,
-            'date': payment.date,
-            'amount': payment.amount,
-            'method': payment.get_method_display(),
-            'status': payment.get_status_display(),
-            'status_class': 'success' if payment.status == 'completed' else 'warning' if payment.status == 'pending' else 'danger',
-            'order_id': payment.order.id if payment.order else None,
-            'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
-            'is_positive': True,  # Regular payments are always positive from client perspective
-            'object': payment,
-            'created_by': payment.created_by if hasattr(payment,'created_by') else None,
-        })
-    
-    # Add balance transactions  
-    for balance_tx in balance_transactions:
-        # Skip balance transactions that are already represented as payments
-        if balance_tx.reference_payment:
-            continue
-            
-        status_class = 'success' if balance_tx.transaction_type in ['deposit', 'refund', 'transfer_in'] else 'info'
-        is_positive = balance_tx.transaction_type in ['deposit', 'refund', 'transfer_in', 'adjustment']
-        all_payment_data.append({
-            'type': 'balance_transaction',
-            'id': balance_tx.id,
-            'date': balance_tx.created_at,
-            'amount': balance_tx.amount,
-            'method': balance_tx.get_transaction_type_display(),
-            'status': 'Completado',
-            'status_class': status_class,
-            'order_id': balance_tx.reference_order.id if balance_tx.reference_order else None,
-            'description': balance_tx.notes or balance_tx.get_transaction_type_display(),
-            'is_positive': is_positive,
-            'object': balance_tx,
-            'created_by': balance_tx.created_by if hasattr(balance_tx,'created_by') else None,
-        })
-    
-    # Add credit transactions
-    for credit_tx in credit_transactions:
-        # Skip credit transactions that are already represented as payments
-        if credit_tx.reference_payment:
-            continue
-            
-        status_class = 'warning' if credit_tx.transaction_type in ['purchase', 'interest', 'fee'] else 'success'
-        is_positive = credit_tx.transaction_type in ['payment', 'adjustment', 'forgiveness', 'correction']
-        all_payment_data.append({
-            'type': 'credit_transaction',
-            'id': credit_tx.id,
-            'date': credit_tx.created_at,
-            'amount': credit_tx.amount,
-            'method': credit_tx.get_transaction_type_display(),
-            'status': 'Completado',
-            'status_class': status_class,
-            'order_id': credit_tx.reference_order.id if credit_tx.reference_order else None,
-            'description': credit_tx.notes or credit_tx.get_transaction_type_display(),
-            'is_positive': is_positive,
-            'object': credit_tx,
-            'created_by': credit_tx.created_by if hasattr(credit_tx,'created_by') else None,
-            })
-    
-    # Sort all payment data by date (most recent first)
-    all_payment_data.sort(key=lambda x: x['date'], reverse=True)
+    payments = client.payments.all()
+    all_payment_data = _build_payment_history(client)
+    orders_page = _paginate_client_detail_items(request, orders, page_param='orders_page')
+    payments_page = _paginate_client_detail_items(
+        request,
+        all_payment_data,
+        page_param='payments_page',
+    )
     
     # Calculate client statistics
     total_orders = orders.count()
@@ -606,10 +633,9 @@ def detail(request, pk):
 
     context = {
         'client': client,
-        'date_since': first_day_of_month,
-        'orders': orders[:10],  # Limit to recent 10 orders for performance
-        'payments': payments[:10],  # Limit to recent 10 payments for backward compatibility
-        'all_payment_data': all_payment_data[:10],  # Combined payment data - limit to recent 10
+        'orders': orders_page,
+        'payments': payments_page,
+        'all_payment_data': payments_page,
         'contacts': contacts,
         'addresses': addresses,
         'branches': branches,
