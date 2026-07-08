@@ -282,6 +282,49 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         )
 
 
+class ClientDetailLayoutTests(FastTenantTestCase):
+    def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
+        user = User.objects.create_user(
+            username='client-detail-layout-user',
+            password='testpass123',
+        )
+        corporate = Client.objects.create(
+            name='Corporativo con sucursales',
+            type='corporate',
+            active=True,
+        )
+        active_branch = Client.objects.create(
+            name='Sucursal activa',
+            type='branch',
+            corporate=corporate,
+            active=True,
+        )
+        inactive_branch = Client.objects.create(
+            name='Sucursal inactiva',
+            type='branch',
+            corporate=corporate,
+            active=False,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('clients:detail', args=[corporate.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Sucursales')
+        self.assertContains(
+            response,
+            f'href="{reverse("clients:detail", args=[active_branch.pk])}"',
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("clients:detail", args=[inactive_branch.pk])}"',
+        )
+        self.assertContains(response, 'Sucursal activa')
+        self.assertContains(response, 'Sucursal inactiva')
+        self.assertContains(response, '<span class="badge bg-success">Activo</span>')
+        self.assertContains(response, '<span class="badge bg-secondary">Inactivo</span>')
+
+
 class ClientListModeTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(username='client_mode_user', password='testpass123')

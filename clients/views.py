@@ -578,6 +578,9 @@ def detail(request, pk):
     # Get client's contacts and addresses
     contacts = client.contacts.all()
     addresses = client.addresses.filter(active=True)
+    branches = Client.objects.none()
+    if client.type == 'corporate':
+        branches = client.branches.all().order_by('name')
     billing_data = client.billing_info.effective.data
 
     # Get route information for the client
@@ -605,6 +608,7 @@ def detail(request, pk):
         'all_payment_data': all_payment_data[:10],  # Combined payment data - limit to recent 10
         'contacts': contacts,
         'addresses': addresses,
+        'branches': branches,
         'billing_data': billing_data,
         'billing_frequency': billing_frequency,
         'route_clients': route_clients,
