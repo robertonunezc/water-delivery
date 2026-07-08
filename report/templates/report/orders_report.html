@@ -354,6 +354,7 @@
                   <th scope="col">ID / Cliente</th>
                   <th scope="col">Fecha</th>
                   <th scope="col" class="text-end">Monto</th>
+                  <th scope="col" class="text-center">Metodo Pago</th>
                   <th scope="col" class="text-center">Estado</th>
                   <th scope="col" class="text-center">Facturación</th>
                   <th scope="col">Empleado</th>
@@ -394,7 +395,7 @@
                       </div>
                     </td>
                     <td class="text-end">
-                      <span class="{% if order.total_amount >= 1000 %}amount-high{% elif order.total_amount >= 500 %}amount-medium{% else %}amount-low{% endif %}">
+                      <span class="amount-high">
                         ${{ order.total_amount|floatformat:2 }}
                       </span>
                       {% if order.cantidad_cobrada and order.cantidad_cobrada != order.total_amount %}
@@ -402,6 +403,19 @@
                           Cobrado: ${{ order.cantidad_cobrada|floatformat:2 }}
                         </small>
                       {% endif %}
+                    </td>
+                    <td>
+                      <div class="text-center">
+                        {% if order.payments.all %}
+                          {% for payment in order.payments.all %}
+                            <span class="badge bg-info text-dark" style="margin-right:4px;">
+                              {{ payment.get_method_display }}
+                            </span>
+                          {% endfor %}
+                        {% else %}
+                          <small class="text-muted">Sin pagos</small>
+                        {% endif %}
+                      </div>
                     </td>
                     <td class="text-center">
                       <span class="badge status-{{ order.status|lower }} status-badge">
@@ -417,7 +431,7 @@
                             </span>
                           {% endfor %}
                         {% else %}
-                          <small class="text-muted">Sin</small>
+                          <small class="text-muted">No</small>
                         {% endif %}
                       {% endwith %}
                     </td>

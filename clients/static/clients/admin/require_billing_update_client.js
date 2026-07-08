@@ -108,7 +108,7 @@
 
         initHandlers() {
             this.bindCheckbox('#id_requires_billing', isChecked => ({ requires_billing: isChecked }));
-            this.bindCheckbox('#id_billing_override_enabled', isChecked => ({ billing_override_enabled: isChecked }));
+            this.bindCheckbox('#id_credit_override_enabled', isChecked => ({ credit_override_enabled: isChecked }));
         }
 
         init() {

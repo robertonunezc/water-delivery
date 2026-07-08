@@ -384,7 +384,7 @@ class ClientCoreForm(forms.ModelForm):
             'note',
             'address_link',
             'requires_billing',
-            'billing_override_enabled',
+            'credit_override_enabled',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
@@ -395,13 +395,15 @@ class ClientCoreForm(forms.ModelForm):
             'address_link': forms.URLInput(attrs={'class': 'form-control'}),
             'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'billing_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'credit_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'requires_billing': 'Requiere facturación recurrente',
+            'credit_override_enabled': 'Usar datos propios de crédito',
         }
         help_texts = {
             'requires_billing': 'Activa la frecuencia de facturación automática o recurrente para este cliente.',
+            'credit_override_enabled': 'Permite que esta sucursal edite su límite, bloqueo y condiciones de crédito.',
         }
 
     def __init__(self, *args, **kwargs):
@@ -415,7 +417,7 @@ class ClientCoreForm(forms.ModelForm):
 
         if client_type == 'corporate':
             cleaned_data['corporate'] = None
-            cleaned_data['billing_override_enabled'] = False
+            cleaned_data['credit_override_enabled'] = False
 
         if client_type == 'branch' and not corporate:
             self.add_error('corporate', 'Cliente sucursal debe tener un cliente corporativo asociado.')
