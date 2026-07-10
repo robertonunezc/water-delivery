@@ -7,8 +7,9 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.urls import reverse
 from django.utils import timezone
 from django.http import HttpRequest, HttpResponse
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from urllib.parse import urlencode
 import csv
 from django.contrib.auth import get_user_model
 from clients.models import Client, CreditTransaction
@@ -24,6 +25,7 @@ from payment.models import PAYMENT_METHOD_CHOICES, Payment
 NO_PAYMENT_RECORDED_METHOD = 'no_payment_recorded'
 FULL_DISCOUNT_METHOD = 'full_discount'
 REPORT_PAYMENTS_ATTR = 'report_payments'
+BREAKDOWN_REPORT_FILTER_POSITIONS = {'staff'}
 
 
 def _report_payments_prefetch() -> Prefetch:
@@ -79,6 +81,103 @@ def _build_orders_export_url(request: HttpRequest) -> str:
     if query_string:
         return f'{export_url}?{query_string}'
     return export_url
+
+
+def _parse_report_date(date_str: str) -> date:
+    try:
+        return (
+            datetime.strptime(date_str, '%Y-%m-%d').date()
+            if date_str else timezone.localdate()
+        )
+    except ValueError:
+        return timezone.localdate()
+
+
+def _can_filter_breakdown_by_user(user: object) -> bool:
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    if getattr(user, 'is_staff', False):
+        return True
+    employee = getattr(user, 'employee', None)
+    return getattr(employee, 'position', None) in BREAKDOWN_REPORT_FILTER_POSITIONS
+
+
+def _get_breakdown_user_filter_options() -> QuerySet:
+    order_owner_ids = Order.objects.active().exclude(
+        owner_id__isnull=True,
+    ).values_list('owner_id', flat=True).distinct()
+    return get_user_model().objects.filter(
+        id__in=order_owner_ids,
+    ).order_by('first_name', 'last_name', 'username')
+
+
+def _normalize_breakdown_user_filter(user_filter: str, users: QuerySet) -> str:
+    if user_filter in ('', 'all'):
+        return user_filter
+    try:
+        user_id = int(user_filter)
+    except (TypeError, ValueError):
+        return ''
+    if users.filter(pk=user_id).exists():
+        return str(user_id)
+    return ''
+
+
+def _get_breakdown_orders_queryset(
+    *,
+    request_user: object,
+    selected_date: date,
+    user_filter: str,
+) -> tuple[QuerySet, str, bool, QuerySet]:
+    can_filter_by_user = _can_filter_breakdown_by_user(request_user)
+    users = (
+        _get_breakdown_user_filter_options()
+        if can_filter_by_user
+        else get_user_model().objects.none()
+    )
+    selected_user = _normalize_breakdown_user_filter(user_filter, users)
+    orders = Order.objects.active().filter(order_date__date=selected_date)
+
+    if can_filter_by_user:
+        if selected_user and selected_user != 'all':
+            orders = orders.filter(owner_id=selected_user)
+    else:
+        orders = orders.filter(owner=request_user)
+        selected_user = ''
+
+    orders = orders.select_related('client', 'owner').prefetch_related(
+        'items__product',
+        _report_payments_prefetch(),
+    )
+    return orders, selected_user, can_filter_by_user, users
+
+
+def _build_breakdown_export_url(selected_date: date, user_filter: str) -> str:
+    query_params = {'date': selected_date.isoformat()}
+    if user_filter:
+        query_params['employee'] = user_filter
+    return f'{reverse("report:breakdown_payment_method_csv")}?{urlencode(query_params)}'
+
+
+def _get_breakdown_order_stats(orders: QuerySet) -> dict[str, Decimal | int]:
+    total_orders = orders.count()
+    totals = orders.aggregate(
+        total_amount=Sum('total_amount'),
+        total_discount=Sum('discount'),
+        subtotal_amount=Sum('subtotal_amount'),
+    )
+    total_amount = totals['total_amount'] or Decimal('0.00')
+    total_discount = totals['total_discount'] or Decimal('0.00')
+    subtotal_amount = totals['subtotal_amount'] or Decimal('0.00')
+    avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
+    return {
+        'total_orders': total_orders,
+        'subtotal_amount': subtotal_amount,
+        'total_discount': total_discount,
+        'total_amount': total_amount,
+        'avg_amount': avg_amount,
+        'active_payment_methods': 0,
+    }
 
 
 def _format_money(value: Decimal) -> str:
@@ -594,36 +693,23 @@ def orders_report_csv(request):
 
 
 @login_required
-def breakdown_payment_method(request):
+def breakdown_payment_method(request: HttpRequest) -> HttpResponse:
     """
     Generate a report for orders on a selected date, aggregated by payment methods.
     The user can select the date (default: today).
-    Only orders from the logged-in user are shown.
+    Staff users can see all orders and filter by owner.
     """
     date_str = request.GET.get('date', '')
-    try:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.localdate()
-    except ValueError:
-        selected_date = timezone.localdate()
-
-    owner = request.user
-    # Query orders for the selected date and owner
-    orders = Order.objects.active().filter(
-        owner=owner,
-        order_date__date=selected_date
-    ).prefetch_related('items__product', _report_payments_prefetch(), 'client')
+    selected_date = _parse_report_date(date_str)
+    user_filter = request.GET.get('employee', '').strip()
+    orders, user_filter, can_filter_by_user, users = _get_breakdown_orders_queryset(
+        request_user=request.user,
+        selected_date=selected_date,
+        user_filter=user_filter,
+    )
 
     # Calculate overall statistics
-    total_orders = orders.count()
-    totals = orders.aggregate(
-        total_amount=Sum('total_amount'),
-        total_discount=Sum('discount'),
-        subtotal_amount=Sum('subtotal_amount'),
-    )
-    total_amount = totals['total_amount'] or Decimal('0.00')
-    total_discount = totals['total_discount'] or Decimal('0.00')
-    subtotal_amount = totals['subtotal_amount'] or Decimal('0.00')
-    avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
+    stats = _get_breakdown_order_stats(orders)
 
     # Aggregate orders by payment method
     payment_method_stats = {}
@@ -641,8 +727,14 @@ def breakdown_payment_method(request):
     for method_key, method_name in bucket_names.items():
         order_ids = bucket_order_ids.get(method_key, [])
         method_orders = orders.filter(id__in=order_ids) if order_ids else orders.none()
-        method_total = method_orders.aggregate(total=Sum('total_amount'))['total'] or Decimal('0.00')
-        method_discount = method_orders.aggregate(total=Sum('discount'))['total'] or Decimal('0.00')
+        method_total = (
+            method_orders.aggregate(total=Sum('total_amount'))['total']
+            or Decimal('0.00')
+        )
+        method_discount = (
+            method_orders.aggregate(total=Sum('discount'))['total']
+            or Decimal('0.00')
+        )
         order_count = len(order_ids)
         payment_method_stats[method_key] = {
             'name': method_name,
@@ -654,51 +746,37 @@ def breakdown_payment_method(request):
         if order_count > 0:
             active_payment_methods += 1
 
-    stats = {
-        'total_orders': total_orders,
-        'subtotal_amount': subtotal_amount,
-        'total_discount': total_discount,
-        'total_amount': total_amount,
-        'avg_amount': avg_amount,
-        'active_payment_methods': active_payment_methods
-    }
+    stats['active_payment_methods'] = active_payment_methods
 
     return render(request, 'report/breakdown_payment_method.html', {
         'orders': orders,
         'payment_method_stats': payment_method_stats,
         'selected_date': selected_date,
-        'stats': stats
+        'stats': stats,
+        'can_filter_by_user': can_filter_by_user,
+        'employees': users,
+        'employee_filter': user_filter,
+        'breakdown_export_url': _build_breakdown_export_url(selected_date, user_filter),
     })
 
 
 @login_required
-def breakdown_payment_method_csv(request):
+def breakdown_payment_method_csv(request: HttpRequest) -> HttpResponse:
     """
     Download today's orders report as CSV format.
     Includes summary statistics and detailed order information
     by payment method.
     """
     date_str = request.GET.get('date', '')
-    try:
-        selected_date = datetime.strptime(date_str, '%Y-%m-%d').date() if date_str else timezone.localdate()
-    except ValueError:
-        selected_date = timezone.localdate()
-    owner = request.user
-    orders = Order.objects.active().filter(
-        owner=owner,
-        order_date__date=selected_date
+    selected_date = _parse_report_date(date_str)
+    user_filter = request.GET.get('employee', '').strip()
+    orders, _, _, _ = _get_breakdown_orders_queryset(
+        request_user=request.user,
+        selected_date=selected_date,
+        user_filter=user_filter,
     )
     # Calculate overall statistics
-    total_orders = orders.count()
-    totals = orders.aggregate(
-        total_amount=Sum('total_amount'),
-        total_discount=Sum('discount'),
-        subtotal_amount=Sum('subtotal_amount'),
-    )
-    total_amount = totals['total_amount'] or Decimal('0.00')
-    total_discount = totals['total_discount'] or Decimal('0.00')
-    subtotal_amount = totals['subtotal_amount'] or Decimal('0.00')
-    avg_amount = total_amount / total_orders if total_orders > 0 else Decimal('0.00')
+    stats = _get_breakdown_order_stats(orders)
 
     # Create CSV response
     response = HttpResponse(content_type='text/csv')
@@ -710,11 +788,11 @@ def breakdown_payment_method_csv(request):
     writer.writerow(['Reporte de Órdenes del Día', selected_date.strftime('%d/%m/%Y')])
     writer.writerow([])  # Blank row
     writer.writerow(['RESUMEN ESTADÍSTICO'])
-    writer.writerow(['Total de Órdenes', total_orders])
-    writer.writerow(['Subtotal', f'${subtotal_amount:.2f}'])
-    writer.writerow(['Total Descuentos', f'${total_discount:.2f}'])
-    writer.writerow(['Monto Total', f'${total_amount:.2f}'])
-    writer.writerow(['Promedio por Orden', f'${avg_amount:.2f}'])
+    writer.writerow(['Total de Órdenes', stats['total_orders']])
+    writer.writerow(['Subtotal', f'${stats["subtotal_amount"]:.2f}'])
+    writer.writerow(['Total Descuentos', f'${stats["total_discount"]:.2f}'])
+    writer.writerow(['Monto Total', f'${stats["total_amount"]:.2f}'])
+    writer.writerow(['Promedio por Orden', f'${stats["avg_amount"]:.2f}'])
     writer.writerow([])  # Blank row
     
     # Write detailed orders section
@@ -732,7 +810,7 @@ def breakdown_payment_method_csv(request):
     ])
     
     # Write each order
-    for order in orders.prefetch_related('items__product', _report_payments_prefetch()):
+    for order in orders:
         # Get payment method
         _, payment_method = _get_order_payment_bucket(order)
         

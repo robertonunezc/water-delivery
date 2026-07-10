@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client, ClientCreditConfig, CreditTransaction
+from core.models import Employee
 from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderProduct, OrderStatus
 from payment.models import Payment
@@ -21,6 +22,10 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
             username="report_user",
+            password="testpass123",
+        )
+        self.other_user = User.objects.create_user(
+            username="other_report_user",
             password="testpass123",
         )
         self.client.force_login(self.user)
@@ -48,10 +53,12 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         status: str = OrderStatus.COMPLETED.value,
         with_payment: bool = False,
         payment_status: str = "completed",
+        owner: object | None = None,
     ) -> Order:
+        order_owner = owner or self.user
         order = Order.objects.create(
             client=self.customer,
-            owner=self.user,
+            owner=order_owner,
             subtotal_amount=subtotal,
             discount=discount,
             total_amount=total,
@@ -70,7 +77,7 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
                 client=self.customer,
                 order=order,
                 status=payment_status,
-                created_by=self.user,
+                created_by=order_owner,
             )
         return order
 
@@ -196,6 +203,142 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         self.assertEqual(payment_stats["no_payment_recorded"]["order_count"], 1)
         self.assertContains(response, "Sin pago registrado")
         self.assertContains(response, f"#{reversed_payment_order.id}")
+
+    def test_breakdown_staff_user_sees_all_users_by_default(self) -> None:
+        own_order = self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("80.00"),
+            with_payment=True,
+        )
+        other_order = self._create_order(
+            subtotal=Decimal("120.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("120.00"),
+            with_payment=True,
+            owner=self.other_user,
+        )
+        staff_user = User.objects.create_user(
+            username="staff_report_user",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(reverse("report:breakdown_payment_method"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["stats"]["total_orders"], 2)
+        self.assertContains(response, f"#{own_order.id}")
+        self.assertContains(response, f"#{other_order.id}")
+        self.assertContains(response, 'name="employee"')
+
+    def test_breakdown_employee_staff_position_can_filter_by_user(self) -> None:
+        self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("80.00"),
+            with_payment=True,
+        )
+        other_order = self._create_order(
+            subtotal=Decimal("120.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("120.00"),
+            with_payment=True,
+            owner=self.other_user,
+        )
+        sales_user = User.objects.create_user(
+            username="sales_report_user",
+            password="testpass123",
+        )
+        Employee.objects.create(
+            user=sales_user,
+            nombre="Ventas",
+            apellidos="Reporte",
+            curp="VENTASREPORT000001",
+            rfc="VENTASREP0001",
+            street_number="Calle 1",
+            position="staff",
+        )
+        self.client.force_login(sales_user)
+
+        response = self.client.get(
+            reverse("report:breakdown_payment_method"),
+            {"employee": str(self.other_user.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["stats"]["total_orders"], 1)
+        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
+        self.assertEqual([order.id for order in cash_orders], [other_order.id])
+        self.assertContains(response, f'value="{self.other_user.pk}" selected')
+        self.assertContains(
+            response,
+            (
+                f'{reverse("report:breakdown_payment_method_csv")}?'
+                f'date={timezone.localdate().isoformat()}&amp;'
+                f'employee={self.other_user.pk}'
+            ),
+        )
+
+    def test_breakdown_regular_user_cannot_filter_to_other_users(self) -> None:
+        own_order = self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("80.00"),
+            with_payment=True,
+        )
+        other_order = self._create_order(
+            subtotal=Decimal("120.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("120.00"),
+            with_payment=True,
+            owner=self.other_user,
+        )
+
+        response = self.client.get(
+            reverse("report:breakdown_payment_method"),
+            {"employee": str(self.other_user.pk)},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["stats"]["total_orders"], 1)
+        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
+        self.assertEqual([order.id for order in cash_orders], [own_order.id])
+        self.assertNotIn(other_order.id, [order.id for order in cash_orders])
+        self.assertNotContains(response, 'name="employee"')
+
+    def test_breakdown_staff_csv_can_filter_by_user(self) -> None:
+        own_order = self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("80.00"),
+            with_payment=True,
+        )
+        other_order = self._create_order(
+            subtotal=Decimal("120.00"),
+            discount=Decimal("0.00"),
+            total=Decimal("120.00"),
+            with_payment=True,
+            owner=self.other_user,
+        )
+        staff_user = User.objects.create_user(
+            username="staff_csv_report_user",
+            password="testpass123",
+            is_staff=True,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(
+            reverse("report:breakdown_payment_method_csv"),
+            {"employee": str(self.other_user.pk)},
+        )
+        rows = list(csv.reader(io.StringIO(response.content.decode("utf-8"))))
+        order_ids = {row[0] for row in rows if row and row[0].startswith("#")}
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(f"#{other_order.id}", order_ids)
+        self.assertNotIn(f"#{own_order.id}", order_ids)
 
 
 class OrdersReportQueryTests(FastTenantTestCase):
