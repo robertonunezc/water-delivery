@@ -364,7 +364,7 @@ class InvoiceFrequencyReportAdmin(ModelAdmin):
 
 #@admin.register(InvoiceSchedule)
 class InvoiceScheduleAdmin(ModelAdmin):
-	list_display = ('client', 'frequency', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
+	list_display = ('client', 'frequency', 'start_date', 'billing_date', 'get_billing_description','next_billing_date', 'is_active')
 	search_fields = ('client__name', 'frequency')
 	list_filter = ('frequency', 'billing_date', 'is_active', 'weekday')
 	autocomplete_fields = ('client',)
@@ -377,7 +377,7 @@ class InvoiceScheduleAdmin(ModelAdmin):
 
 	fieldsets = (
 		('Información Básica', {
-			'fields': (('client', 'is_active'), 'frequency', 'billing_date')
+			'fields': (('client', 'is_active'), 'start_date', 'frequency', 'billing_date')
 		}),
 		('Configuración de Fecha Específica', {
 			'fields': ('specific_day',),

@@ -55,6 +55,7 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             client=self.corporate,
             frequency="monthly",
             billing_date="first_day",
+            start_date=date(2026, 7, 13),
             is_active=True,
         )
 
@@ -95,6 +96,7 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             client=corporate,
             frequency="monthly",
             billing_date="first_day",
+            start_date=date(2026, 7, 13),
             is_active=True,
         )
 
@@ -123,6 +125,7 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             client=corp_incomplete,
             frequency="monthly",
             billing_date="first_day",
+            start_date=date(2026, 7, 13),
             is_active=True,
         )
         branch = Client.objects.create(
@@ -156,6 +159,7 @@ class ClientBillingInheritanceTestCase(FastTenantTestCase):
             client=self.branch_with_own_billing,
             frequency="monthly",
             billing_date="last_day",
+            start_date=date(2026, 7, 13),
             is_active=True,
         )
 

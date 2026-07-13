@@ -257,8 +257,18 @@ class ClientBillingFrequencyForm(forms.ModelForm):
     class Meta:
         from invoice.models import InvoiceSchedule
         model = InvoiceSchedule
-        fields = ['frequency', 'billing_date', 'specific_day', 'weekday', 'occurrence', 'is_active', 'notes']
+        fields = [
+            'start_date',
+            'frequency',
+            'billing_date',
+            'specific_day',
+            'weekday',
+            'occurrence',
+            'is_active',
+            'notes',
+        ]
         widgets = {
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'frequency': forms.Select(attrs={'class': 'form-control'}),
             'billing_date': forms.Select(attrs={'class': 'form-control'}),
             'specific_day': forms.NumberInput(attrs={
@@ -277,6 +287,7 @@ class ClientBillingFrequencyForm(forms.ModelForm):
             }),
         }
         labels = {
+            'start_date': 'Fecha de Inicio',
             'frequency': 'Frecuencia de Facturación',
             'billing_date': 'Tipo de Fecha de Facturación',
             'specific_day': 'Día Específico del Mes',
@@ -292,6 +303,12 @@ class ClientBillingFrequencyForm(forms.ModelForm):
         specific_day = cleaned_data.get('specific_day')
         weekday = cleaned_data.get('weekday')
         occurrence = cleaned_data.get('occurrence')
+        frequency = cleaned_data.get('frequency')
+
+        if frequency == 'weekly' and weekday is None:
+            raise ValidationError({
+                'weekday': 'El día de la semana es obligatorio para frecuencia semanal.'
+            })
         
         # Validate specific_day is provided when billing_date is 'specific_date'
         if billing_date == 'specific_date' and not specific_day:
@@ -494,8 +511,18 @@ class ClientRecurringBillingForm(forms.ModelForm):
 class InvoiceScheduleForm(forms.ModelForm):
     class Meta:
         model = InvoiceSchedule
-        fields = ['frequency', 'billing_date', 'specific_day', 'weekday', 'occurrence', 'is_active', 'notes']
+        fields = [
+            'start_date',
+            'frequency',
+            'billing_date',
+            'specific_day',
+            'weekday',
+            'occurrence',
+            'is_active',
+            'notes',
+        ]
         widgets = {
+            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'frequency': forms.Select(attrs={'class': 'form-select'}),
             'billing_date': forms.Select(attrs={'class': 'form-select'}),
             'specific_day': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '31'}),

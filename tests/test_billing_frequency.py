@@ -38,6 +38,7 @@ def test_billing_frequency_examples():
         client=client,
         frequency='monthly',
         billing_date='last_day',
+        start_date=date(2026, 7, 13),
         is_active=True
     )
     print(f"   Description: {bf1}")

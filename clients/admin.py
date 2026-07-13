@@ -71,7 +71,7 @@ class InvoiceFrequencyInline(StackedInline):
 	verbose_name = "Frecuencia de Facturación"
 	verbose_name_plural = "Frecuencias de Facturación"
 	fields = (
-		('frequency', 'is_active'),
+		('start_date', 'frequency', 'is_active'),
 		'billing_date',
 		'specific_day',
 		('weekday', 'occurrence'),

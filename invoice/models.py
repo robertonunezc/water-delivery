@@ -183,6 +183,7 @@ class InvoiceSchedule(TimeStampedModel):
     client = models.OneToOneField('clients.Client', related_name='invoice_schedule', on_delete=models.CASCADE, related_query_name='invoice_schedule')
     frequency = models.CharField(max_length=50, choices=BILLING_FREQUENCY_CHOICES, default='other', verbose_name="Frecuencia de Facturación")
     billing_date = models.CharField(max_length=50, choices=BILLING_DATE_CHOICES, null=True, blank=True, verbose_name="Fecha de Facturación")
+    start_date = models.DateField(verbose_name="Fecha de Inicio")
 
     # For specific_date billing
     specific_day = models.PositiveIntegerField(null=True, blank=True, help_text="Día del mes (1-31)", verbose_name="Día Específico")
@@ -223,31 +224,54 @@ class InvoiceSchedule(TimeStampedModel):
     def clean(self):
         """Validate that the correct fields are filled based on billing_date type"""
         from django.core.exceptions import ValidationError
+        errors = {}
+
+        if not self.start_date:
+            errors['start_date'] = 'La fecha de inicio es obligatoria.'
+
         # Validate a client can have only one active billing frequency
         if self.is_active:
             active_frequencies = InvoiceSchedule.objects.filter(client=self.client, is_active=True).exclude(id=self.id)
             if active_frequencies.exists():
-                raise ValidationError({'is_active': 'El cliente ya tiene una frecuencia de facturación activa.'})
+                errors['is_active'] = 'El cliente ya tiene una frecuencia de facturación activa.'
         if self.client.requires_billing is False and self.is_active:
-            raise ValidationError({'client': 'No se puede activar una frecuencia de facturación para un cliente sin facturación recurrente.'})
-        if self.billing_date == 'specific_date':
-            if not self.specific_day:
-                raise ValidationError({'specific_day': 'Specific day is required when billing date is "specific_date".'})
-            if self.specific_day < 1 or self.specific_day > 31:
-                raise ValidationError({'specific_day': 'Specific day must be between 1 and 31.'})
+            errors['client'] = 'No se puede activar una frecuencia de facturación para un cliente sin facturación recurrente.'
 
-        elif self.billing_date == 'weekday_occurrence':
-            if self.weekday is None:
-                raise ValidationError({'weekday': 'Weekday is required when billing date is "weekday_occurrence".'})
-            if self.occurrence is None:
-                raise ValidationError({'occurrence': 'Occurrence is required when billing date is "weekday_occurrence".'})
-
-        # Clear unused fields based on billing_date type
-        if self.billing_date != 'specific_date':
+        if self.frequency == 'weekly':
+            self.billing_date = None
             self.specific_day = None
-        if self.billing_date != 'weekday_occurrence':
+            self.occurrence = None
+            if self.weekday is None:
+                errors['weekday'] = 'El día de la semana es obligatorio para frecuencia semanal.'
+
+        elif self.frequency == 'when_delivery':
+            self.billing_date = None
+            self.specific_day = None
             self.weekday = None
             self.occurrence = None
+
+        elif self.billing_date == 'specific_date':
+            if not self.specific_day:
+                errors['specific_day'] = 'Specific day is required when billing date is "specific_date".'
+            elif self.specific_day < 1 or self.specific_day > 31:
+                errors['specific_day'] = 'Specific day must be between 1 and 31.'
+            self.weekday = None
+            self.occurrence = None
+
+        elif self.billing_date == 'weekday_occurrence':
+            if self.occurrence is None:
+                errors['occurrence'] = 'Occurrence is required when billing date is "weekday_occurrence".'
+            if self.weekday is None:
+                errors['weekday'] = 'Weekday is required when billing date is "weekday_occurrence".'
+            self.specific_day = None
+
+        else:
+            self.specific_day = None
+            self.weekday = None
+            self.occurrence = None
+
+        if errors:
+            raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         """Override save to ensure clean is called and calculate next billing date"""
