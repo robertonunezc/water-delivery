@@ -109,6 +109,9 @@ def build_client_detail_snapshot(
                 "value": _money(client.balance),
                 "note": "Disponible" if client.balance > 0 else "Sin saldo",
                 "tone": "success" if client.balance > 0 else "muted",
+                "action_label": "Gestionar saldo",
+                "action_url_name": "clients:add_balance",
+                "action_icon": "fas fa-wallet",
             },
             {
                 "label": "Deuda actual",
@@ -129,6 +132,9 @@ def build_client_detail_snapshot(
                 "value": credit_value,
                 "note": credit_note,
                 "tone": "warning" if debt_percentage > 60 else "success",
+                "action_label": "Gestionar crédito",
+                "action_url_name": "clients:pay_credit",
+                "action_icon": "fas fa-credit-card",
             },
             {
                 "label": "Próxima visita",

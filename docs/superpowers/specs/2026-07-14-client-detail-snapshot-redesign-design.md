@@ -51,6 +51,7 @@ Primary action order:
 
 The page should avoid a large block of buttons. Secondary actions can be grouped or visually reduced if necessary.
 All header actions use a uniform soft neutral filled style so the content hierarchy, not button color, carries priority.
+Client account operations should not crowd the header. `Gestionar saldo` lives in the `Saldo prepago` tile and `Gestionar crédito` lives in the `Crédito` tile.
 
 ### Risk Alert
 
@@ -77,6 +78,7 @@ Use a stable five-card snapshot in one desktop row:
 1. `Saldo prepago`
    - value: `client.balance`
    - state: available, none, or negative.
+   - action: `Gestionar saldo`.
 2. `Deuda actual`
    - value: `client.current_debt`
    - state: no debt, pending, or overdue.
@@ -84,6 +86,7 @@ Use a stable five-card snapshot in one desktop row:
    - value: usage percentage when credit is enabled.
    - supporting text: available credit and credit limit.
    - fallback: `Sin crédito habilitado` when the client has no credit limit.
+   - action: `Gestionar crédito`.
 4. `Próxima visita`
    - value: next scheduled visit or route day when available.
    - fallback: no assigned route.
