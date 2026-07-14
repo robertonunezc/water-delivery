@@ -19,6 +19,7 @@ from .services.csv_import_service import (
     import_clients_from_csv,
 )
 from core.models import Transport
+from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderStatus
 from payment.models import Payment
 from routes.models import Route, RouteClient
@@ -272,6 +273,50 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         order.created_at = created_at
         return order
 
+    def _create_overdue_credit_order(
+        self,
+        *,
+        total: Decimal = Decimal('100.00'),
+    ) -> Order:
+        self.customer.requires_billing = True
+        self.customer.can_pay_with_credit = True
+        self.customer.credit_limit = Decimal('1000.00')
+        self.customer.current_debt = total
+        self.customer.save(
+            update_fields=[
+                'requires_billing',
+                'can_pay_with_credit',
+                'credit_limit',
+                'current_debt',
+                'updated_at',
+            ],
+        )
+        ClientCreditConfig.objects.create(
+            client=self.customer,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='1',
+        )
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=total,
+            type='credito',
+        )
+        Order.objects.filter(pk=order.pk).update(
+            order_date=timezone.now() - timedelta(days=60),
+        )
+        CreditTransaction.objects.create(
+            client=self.customer,
+            amount=total,
+            transaction_type='purchase',
+            debt_before=Decimal('0.00'),
+            debt_after=total,
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+        )
+        return Order.objects.get(pk=order.pk)
+
     def test_closed_order_still_shows_order_action_link(self) -> None:
         order = Order.objects.create(
             client=self.customer,
@@ -367,6 +412,123 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
 
         self.assertContains(response, 'client-header-addresses')
         self.assertContains(response, 'Calle Header 42')
+
+    def test_detail_lists_order_linked_invoices_for_billing_client(self) -> None:
+        self.customer.requires_billing = True
+        self.customer.save(update_fields=['requires_billing', 'updated_at'])
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('150.00'),
+        )
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('150.00'),
+            identifier='SER-CLIENT',
+            folio='FOL-CLIENT',
+            emmited_at=timezone.localdate(),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(invoice, list(response.context['client_invoices']))
+        self.assertContains(response, 'Facturas')
+        self.assertContains(response, 'SER-CLIENT')
+        self.assertContains(response, 'FOL-CLIENT')
+        self.assertContains(
+            response,
+            f'href="{reverse("admin_edit_invoice", args=[invoice.pk])}"',
+        )
+
+    def test_detail_hides_invoice_section_when_client_does_not_require_billing(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('90.00'),
+        )
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('90.00'),
+            identifier='SER-HIDDEN',
+            folio='FOL-HIDDEN',
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['client_invoices']), [])
+        self.assertNotContains(response, 'SER-HIDDEN')
+        self.assertNotContains(response, 'Facturas')
+
+    def test_branch_detail_lists_corporate_issued_invoice_linked_to_branch_order(self) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo fiscal',
+            type='corporate',
+            requires_billing=True,
+            active=True,
+        )
+        branch = Client.objects.create(
+            name='Sucursal facturada',
+            type='branch',
+            corporate=corporate,
+            requires_billing=True,
+            active=True,
+        )
+        order = Order.objects.create(
+            client=branch,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('210.00'),
+        )
+        invoice = Invoice.objects.create(
+            client=corporate,
+            amount=Decimal('210.00'),
+            identifier='SER-CORP',
+            folio='FOL-BRANCH',
+            emmited_at=timezone.localdate(),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        response = self.client.get(reverse('clients:detail', args=[branch.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(invoice, list(response.context['client_invoices']))
+        self.assertContains(response, 'SER-CORP')
+        self.assertContains(response, 'Corporativo fiscal')
+
+    def test_overdue_payments_table_links_invoiced_order_to_invoice(self) -> None:
+        order = self._create_overdue_credit_order()
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('100.00'),
+            identifier='SER-OVERDUE',
+            folio='FOL-OVERDUE',
+            emmited_at=timezone.localdate() - timedelta(days=45),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '¡Atención! Pagos Vencidos')
+        self.assertContains(response, '<th>Factura</th>')
+        self.assertContains(
+            response,
+            f'href="{reverse("admin_edit_invoice", args=[invoice.pk])}"',
+        )
+        self.assertContains(response, f'#{invoice.pk}')
+
+    def test_overdue_payments_table_shows_dash_for_order_without_invoice(self) -> None:
+        self._create_overdue_credit_order()
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '¡Atención! Pagos Vencidos')
+        self.assertContains(response, '<th>Factura</th>')
+        self.assertContains(response, '<span class="text-muted">-</span>')
 
 
 class ClientDetailLayoutTests(FastTenantTestCase):

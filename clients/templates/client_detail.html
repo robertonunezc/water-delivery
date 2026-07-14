@@ -299,6 +299,7 @@
                 <th>Días Vencidos</th>
                 <th>Total de la Orden</th>
                 <th>Monto Pendiente</th>
+                <th>Factura</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -310,6 +311,15 @@
                 <td><span class="badge bg-danger">{{ overdue_order.days_overdue }} días</span></td>
                 <td>${{ overdue_order.total_amount|floatformat:2 }}</td>
                 <td class="fw-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
+                <td>
+                  {% for invoice_link in overdue_order.invoice_links.all %}
+                    <a href="{% url 'admin_edit_invoice' invoice_link.invoice.id %}" class="btn btn-sm btn-outline-dark">
+                      #{{ invoice_link.invoice.id }}
+                    </a>
+                  {% empty %}
+                    <span class="text-muted">-</span>
+                  {% endfor %}
+                </td>
                 <td>
                                      <a href="{% url 'orders:get_order' overdue_order.id %}" class="btn btn-sm btn-danger">Pagar</a>
 
@@ -701,6 +711,65 @@
 
     <!-- Orders and Payments Column -->
     <div class="col-md-9">
+      {% if client.requires_billing %}
+      <div id="client-invoices" class="card mb-4">
+        <div class="card-header section-header d-flex justify-content-between align-items-center">
+          <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Facturas</h5>
+          <small class="text-muted">
+            {% if client_invoices %}
+              {{ client_invoices|length }} registradas
+            {% else %}
+              Sin facturas
+            {% endif %}
+          </small>
+        </div>
+        <div class="card-body">
+          {% if client_invoices %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente fiscal</th>
+                    <th>Serie</th>
+                    <th>Folio</th>
+                    <th>Emisión</th>
+                    <th>Monto</th>
+                    <th>Pagado</th>
+                    <th>Pendiente</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for invoice in client_invoices %}
+                    <tr>
+                      <td><strong>#{{ invoice.id }}</strong></td>
+                      <td>{{ invoice.client.name }}</td>
+                      <td><code>{{ invoice.identifier }}</code></td>
+                      <td><code>{{ invoice.folio }}</code></td>
+                      <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"-" }}</td>
+                      <td>${{ invoice.amount|floatformat:2 }}</td>
+                      <td>${{ invoice.total_payments|floatformat:2 }}</td>
+                      <td class="{% if invoice.pending_amount > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
+                        ${{ invoice.pending_amount|floatformat:2 }}
+                      </td>
+                      <td>
+                        <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-sm btn-outline-dark">
+                          <i class="fas fa-file-invoice"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <p class="text-muted mb-0">No hay facturas vinculadas a las ventas de este cliente.</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Recent Orders -->
       <div id="orders-history" class="card mb-4">
         <div class="card-header section-header d-flex justify-content-between align-items-center">
