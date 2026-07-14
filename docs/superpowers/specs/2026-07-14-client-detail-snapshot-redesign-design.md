@@ -51,7 +51,7 @@ Primary action order:
 
 The page should avoid a large block of buttons. Secondary actions can be grouped or visually reduced if necessary.
 All header actions use a uniform soft neutral filled style so the content hierarchy, not button color, carries priority.
-Client account operations should not crowd the header. `Gestionar saldo` lives in the `Saldo prepago` tile and `Gestionar crédito` lives in the `Crédito` tile.
+Client account operations should not crowd the header. `Gestionar saldo` lives as a compact utility icon in the `Saldo prepago` tile and `Gestionar crédito` lives as a compact utility icon in the `Crédito` tile, without adding vertical height to the card content.
 
 ### Risk Alert
 

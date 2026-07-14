@@ -36,10 +36,14 @@
     .client-detail-tabs-card {
       border-radius: 8px;
     }
+    .client-snapshot-card {
+      position: relative;
+    }
     .client-snapshot-card .card-body {
-      display: flex;
-      flex-direction: column;
       padding: .85rem;
+    }
+    .client-snapshot-card-actionable .card-body {
+      padding-right: 3.1rem;
     }
     .client-snapshot-card.border-success {
       background: #f0fdf4;
@@ -77,15 +81,20 @@
       color: #495057;
     }
     .client-snapshot-action {
-      margin-top: auto;
-      padding-top: .75rem;
+      position: absolute;
+      top: .75rem;
+      right: .75rem;
     }
     .client-tile-action {
       background: rgba(255, 255, 255, .72);
       border-color: rgba(33, 37, 41, .14);
       color: #22313f;
-      font-weight: 600;
-      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      height: 2rem;
+      padding: 0;
+      width: 2rem;
     }
     .client-tile-action:hover,
     .client-tile-action:focus {
@@ -237,15 +246,16 @@
   <section class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-3 mb-4 client-snapshot-grid">
     {% for card in snapshot_cards %}
       <div class="col">
-        <div class="card client-snapshot-card h-100 border-{{ card.tone }}">
+        <div class="card client-snapshot-card h-100 border-{{ card.tone }}{% if card.action_label %} client-snapshot-card-actionable{% endif %}">
           <div class="card-body">
             <div class="client-snapshot-label">{{ card.label }}</div>
             <div class="client-snapshot-value my-1">{{ card.value }}</div>
             <div class="small client-snapshot-note">{{ card.note }}</div>
             {% if card.action_label %}
               <div class="client-snapshot-action">
-                <a href="{% url card.action_url_name client.pk %}" class="btn btn-sm client-tile-action">
-                  <i class="{{ card.action_icon }} me-1"></i>{{ card.action_label }}
+                <a href="{% url card.action_url_name client.pk %}" class="btn btn-sm client-tile-action" title="{{ card.action_label }}" aria-label="{{ card.action_label }}">
+                  <i class="{{ card.action_icon }}" aria-hidden="true"></i>
+                  <span class="visually-hidden">{{ card.action_label }}</span>
                 </a>
               </div>
             {% endif %}
