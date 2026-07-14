@@ -25,9 +25,8 @@ The current page contains the right information, but it presents too many full s
 The design uses this hierarchy:
 
 1. **Urgent financial risk**, only when it exists.
-2. **Balanced account snapshot**, always visible near the top.
-3. **Compact context strips** for contact, delivery, and billing readiness.
-4. **Tabbed drill-down content** for activity, sales, payments, invoices, routes, and profile.
+2. **Balanced account snapshot**, always visible near the top in one compact row.
+3. **Tabbed drill-down content** for sales, payments, invoices, routes, and profile.
 
 Financial risk does not permanently dominate the design. It is promoted only when `pending_payment_data.total_overdue_amount > 0`.
 
@@ -51,6 +50,7 @@ Primary action order:
 4. `Volver`
 
 The page should avoid a large block of buttons. Secondary actions can be grouped or visually reduced if necessary.
+All header actions use a uniform soft neutral filled style so the content hierarchy, not button color, carries priority.
 
 ### Risk Alert
 
@@ -72,7 +72,7 @@ Do not label this CTA `Ver detalles`, because that hides where the user will go.
 
 ### Metric Cards
 
-Use a stable four-card snapshot:
+Use a stable five-card snapshot in one desktop row:
 
 1. `Saldo prepago`
    - value: `client.balance`
@@ -87,44 +87,19 @@ Use a stable four-card snapshot:
 4. `Próxima visita`
    - value: next scheduled visit or route day when available.
    - fallback: no assigned route.
+5. `Facturación`
+   - value: next billing date when configured.
+   - supporting text: pending invoice count.
+   - fallback: no date, or not applicable when billing is disabled.
 
 Credit due-date details remain visible through the risk alert and credit report. When there is no route information, the fourth card should still render with a clear empty state instead of disappearing and shifting the layout.
+The tiles use subtle tinted backgrounds by state to improve scanability without turning the header actions into competing primary buttons.
 
-### Compact Context Strips
-
-Below the metric cards, show three compact summaries:
-
-- `Contacto`: primary contact name and phone/email when present.
-- `Entrega`: primary delivery address and map link when available.
-- `Facturación`: fiscal readiness, next billing date, and pending invoice count when relevant.
-
-These strips replace the large first-column cards for the default view. Full details move to the `Perfil`, `Facturas`, and `Rutas` tabs.
+Contact, delivery, and full fiscal details should not appear as separate cards in the first viewport. They remain available in `Perfil`, `Facturas`, and `Rutas`.
 
 ## Tabbed Content
 
-The lower section uses tabs so dense data remains available without rendering as several stacked full sections.
-
-### Default Tab: Actividad
-
-`Actividad` is the default tab. It is a unified recent timeline using the newest meaningful events from:
-
-- payments,
-- balance transactions,
-- credit transactions,
-- recent sales,
-- invoices,
-- recent completed route deliveries.
-
-Each row should show:
-
-- date/time,
-- event type,
-- short description or reference,
-- state badge when useful,
-- amount when relevant,
-- link to the underlying object when available.
-
-This tab is for scanning recent account movement, not replacing the full tables.
+The lower section uses tabs so dense data remains available without rendering as several stacked full sections. The page opens on `Ventas`; the separate `Actividad` timeline is intentionally removed.
 
 ### Dedicated Tabs
 
