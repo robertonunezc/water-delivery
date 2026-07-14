@@ -50,7 +50,7 @@ Primary action order:
 4. `Volver`
 
 The page should avoid a large block of buttons. Secondary actions can be grouped or visually reduced if necessary.
-All header actions use a uniform soft neutral filled style so the content hierarchy, not button color, carries priority.
+All header actions use a compact inline toolbar style so they do not visually compete with the snapshot tiles.
 Client account operations should not crowd the header. `Gestionar saldo` lives as a compact utility icon in the `Saldo prepago` tile and `Gestionar crédito` lives as a compact utility icon in the `Crédito` tile, without adding vertical height to the card content.
 
 ### Risk Alert
