@@ -1,303 +1,223 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-  <!-- Font Awesome -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
   <style>
-    .stat-card {
-      transition: transform 0.2s;
+    .client-detail-shell {
+      --client-border: #dee2e6;
+      --client-muted: #6c757d;
     }
-    .stat-card:hover {
-      transform: translateY(-2px);
+    .client-detail-header {
+      border-bottom: 1px solid var(--client-border);
+      padding-bottom: 1rem;
+      margin-bottom: 1rem;
     }
-    .stat-card .card-body {
-      padding: 1rem 1.1rem;
+    .client-action-bar {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .25rem .5rem;
+      justify-content: flex-end;
     }
-    .stat-card .metric-icon {
-      width: 2.75rem;
-      height: 2.75rem;
-      border-radius: 0.9rem;
+    .btn.client-header-action {
+      align-items: center;
+      background: transparent;
+      border: 0;
+      border-radius: 6px;
+      color: #334155;
+      display: inline-flex;
+      font-size: .95rem;
+      font-weight: 600;
+      gap: .35rem;
+      line-height: 1.2;
+      min-height: 2.25rem;
+      padding: .35rem .55rem;
+    }
+    .btn.client-header-action:hover,
+    .btn.client-header-action:focus {
+      background: #f1f5f9;
+      color: #111827;
+      text-decoration: none;
+    }
+    .btn.client-header-action:focus-visible {
+      box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .18);
+    }
+    .client-risk-alert {
+      border-radius: 8px;
+    }
+    .client-snapshot-card,
+    .client-detail-tabs-card {
+      border-radius: 8px;
+    }
+    .client-snapshot-card {
+      position: relative;
+    }
+    .client-snapshot-card .card-body {
+      padding: .85rem;
+    }
+    .client-snapshot-card-actionable .card-body {
+      padding-right: 3.1rem;
+    }
+    .client-snapshot-card.border-success {
+      background: #f0fdf4;
+      border-color: #8fd19e !important;
+    }
+    .client-snapshot-card.border-danger {
+      background: #fff1f2;
+      border-color: #f1aeb5 !important;
+    }
+    .client-snapshot-card.border-warning {
+      background: #fff8e1;
+      border-color: #ffe69c !important;
+    }
+    .client-snapshot-card.border-primary {
+      background: #eff6ff;
+      border-color: #9ec5fe !important;
+    }
+    .client-snapshot-card.border-muted {
+      background: #f8f9fa;
+      border-color: #dee2e6 !important;
+    }
+    .client-snapshot-label {
+      color: var(--client-muted);
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+    }
+    .client-snapshot-value {
+      font-size: 1.12rem;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+    .client-snapshot-note {
+      color: #495057;
+    }
+    .client-snapshot-action {
+      position: absolute;
+      top: .75rem;
+      right: .75rem;
+    }
+    .client-tile-action {
+      background: rgba(255, 255, 255, .72);
+      border-color: rgba(33, 37, 41, .14);
+      color: #22313f;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
-      flex-shrink: 0;
+      height: 2rem;
+      padding: 0;
+      width: 2rem;
     }
-    .stat-card .metric-label {
-      font-size: 0.78rem;
-      letter-spacing: 0.02em;
-      text-transform: uppercase;
-    }
-    .stat-card .metric-value {
-      font-size: 1.2rem;
-      line-height: 1.1;
-    }
-    .section-header {
-      border-bottom: 2px solid #007bff;
-      margin-bottom: 1rem;
-      padding-bottom: 0.5rem;
+    .client-tile-action:hover,
+    .client-tile-action:focus {
+      background: #fff;
+      border-color: rgba(33, 37, 41, .24);
+      color: #111827;
     }
     .client-header-addresses {
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
       background: #f8f9fa;
-      padding: 1rem;
     }
-    .client-header-addresses .address-item:last-child {
-      border-bottom: 0 !important;
-      margin-bottom: 0 !important;
-      padding-bottom: 0 !important;
+    .client-detail-tabs-card .nav-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+    .client-detail-tabs-card .nav-link {
+      white-space: nowrap;
+    }
+    .client-profile-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 1rem;
+    }
+    .client-profile-section {
+      border: 1px solid var(--client-border);
+      border-radius: 8px;
+      padding: 1rem;
+      background: #fff;
+    }
+    .client-profile-section h3 {
+      font-size: 1rem;
+      margin-bottom: .75rem;
+    }
+    @media (max-width: 767.98px) {
+      .client-action-bar {
+        justify-content: flex-start;
+      }
     }
   </style>
 {% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-  <!-- Client Header -->
-  <div class="row mb-4 g-3 align-items-start">
-    <div class="col-lg-7">
-      <div class="d-flex align-items-center mb-3">
-        <h1 class="me-3">{{ client.name }}</h1>
-        <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %} fs-6">
-          {% if client.active %}Activo{% else %}Inactivo{% endif %}
-        </span>
-        <span class="badge bg-info ms-2 fs-6">{{ client.get_type_display }}</span>
-        {% if client.corporate %}
-          <a href="{% url 'clients:detail' client.corporate.pk %}" class="badge bg-primary ms-2 fs-6 text-decoration-none">
-            <i class="fas fa-building me-1"></i> {{ client.corporate.name }}
-          </a>
-        {% endif %}
-
-      </div>
-      
-      {% if client.note %}
-        <div class="alert alert-info">
-          <strong>Nota:</strong> {{ client.note }}
+<div class="container-fluid px-0 client-detail-shell">
+  <section class="client-detail-header">
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+      <div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <h1 class="h2 mb-0">{{ client.name }}</h1>
+          <span class="badge bg-{% if client.active %}success{% else %}secondary{% endif %}">
+            {% if client.active %}Activo{% else %}Inactivo{% endif %}
+          </span>
+          <span class="badge bg-info text-dark">{{ client.get_type_display }}</span>
+          {% if client.corporate %}
+            <a href="{% url 'clients:detail' client.corporate.pk %}" class="badge bg-primary text-decoration-none">
+              <i class="fas fa-building me-1"></i>{{ client.corporate.name }}
+            </a>
+          {% endif %}
         </div>
-      {% endif %}
-      
-      <div class="mb-3">
-        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-success me-2">
-          <i class="fas fa-plus"></i> Nuevo Pedido
+        {% if client.note %}
+          <div class="alert alert-info py-2 mb-0">
+            <strong>Nota:</strong> {{ client.note }}
+          </div>
+        {% endif %}
+      </div>
+      <div class="client-action-bar">
+        <a href="{% url 'orders:create_order' client.pk %}" class="btn client-header-action">
+          <i class="fas fa-plus me-1"></i>Nuevo Pedido
         </a>
-        <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-outline-primary me-2">
-          <i class="fas fa-credit-card"></i> Reporte de crédito
+        <a href="{% url 'report:client_credit_report' client.pk %}" class="btn client-header-action">
+          <i class="fas fa-credit-card me-1"></i>Reporte de crédito
         </a>
         {% if request.user.is_staff %}
-          <a href="{% url 'clients:edit_v2' client.pk %}" class="btn btn-warning">
-          <i class="fas fa-edit"></i> Editar Cliente
-        </a>
-        <a href="{% url 'admin_clients' %}" class="btn btn-secondary">
-          <i class="fas fa-arrow-left"></i> Volver a la Lista
-        </a>
-       
-        {%else%}
-          <a href="{% url 'clients:list' %}" class="btn btn-secondary">
-          <i class="fas fa-arrow-left"></i> Volver a la Lista
-        </a>
-        {% endif %}
-       
-      </div>
-    </div>
-    <div class="col-lg-5">
-      <div class="h-100">
-        {% if addresses %}
-          {% for address in addresses %}
-            <div class="address-item mb-3 border-bottom pb-3">
-              <div>              <span class="badge bg-secondary mb-2">{{ address.get_type_display }}</span>
-{{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
-            </div>
-          {% endfor %}
+          <a href="{% url 'clients:edit_v2' client.pk %}" class="btn client-header-action">
+            <i class="fas fa-edit me-1"></i>Editar Cliente
+          </a>
+          <a href="{% url 'admin_clients' %}" class="btn client-header-action">
+            <i class="fas fa-arrow-left me-1"></i>Volver
+          </a>
         {% else %}
-          <p class="text-muted mb-0">No hay direcciones registradas.</p>
-        {% endif %}
-        {% if client.address_link %}
-          <div class="mt-3">
-            <a href="{{ client.address_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
-              <i class="fas fa-map-marker-alt"></i> Ver Ubicación en Google Maps
-            </a>
-          </div>
+          <a href="{% url 'clients:list' %}" class="btn client-header-action">
+            <i class="fas fa-arrow-left me-1"></i>Volver
+          </a>
         {% endif %}
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- Statistics Cards -->
-  <div class="row g-3 mb-4">
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 {% if client.balance > 0 %}border-success{% elif client.balance == 0 %}border-secondary{% else %}border-danger{% endif %}">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="metric-icon {% if client.balance > 0 %}bg-success-subtle text-success{% elif client.balance == 0 %}bg-secondary-subtle text-secondary{% else %}bg-danger-subtle text-danger{% endif %}">
-            <i class="fas fa-piggy-bank"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="metric-label text-muted mb-1">Saldo del prepago</div>
-            <div class="metric-value fw-semibold {% if client.balance > 0 %}text-success{% elif client.balance == 0 %}text-secondary{% else %}text-danger{% endif %}">
-              ${{ client.balance|floatformat:2 }}
-            </div>
-            {% if client.balance > 0 %}
-              <small class="text-success"><i class="fas fa-check-circle"></i> Saldo disponible</small>
-            {% elif client.balance == 0 %}
-              <small class="text-muted">Sin saldo</small>
-            {% else %}
-              <small class="text-warning"><i class="fas fa-exclamation-triangle"></i> Saldo negativo</small>
-            {% endif %}
-          </div>
+  {% if has_financial_risk %}
+    <section class="alert alert-danger client-risk-alert shadow-sm mb-3" role="alert">
+      <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+        <div>
+          <h2 class="h5 mb-1">¡Atención! Pagos Vencidos</h2>
+          <p class="mb-0">
+            El cliente tiene <strong>${{ pending_payment_data.total_overdue_amount|floatformat:2 }}</strong>
+            vencidos. Atraso máximo: <strong>{{ pending_payment_data.days_overdue }} días</strong>.
+          </p>
+        </div>
+        <div>
+          <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-danger">
+            {{ credit_report_url_label }}
+          </a>
         </div>
       </div>
-    </div>
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 {% if client.current_debt > 0 %}border-danger{% else %}border-success{% endif %}">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="metric-icon {% if client.current_debt > 0 %}bg-danger-subtle text-danger{% else %}bg-success-subtle text-success{% endif %}">
-            <i class="fas fa-credit-card"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="metric-label text-muted mb-1">Deuda actual</div>
-            <div class="metric-value fw-semibold {% if client.current_debt > 0 %}text-danger{% else %}text-success{% endif %}">
-              ${{ client.current_debt|floatformat:2 }}
-            </div>
-            {% if client.current_debt > 0 %}
-              <small class="text-danger"><i class="fas fa-exclamation-circle"></i> Debe ${{ client.current_debt|floatformat:2 }}</small>
-            {% else %}
-              <small class="text-success"><i class="fas fa-check-circle"></i> Sin deuda</small>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    {% if client.credit_limit > 0 %}
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 border-info">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="metric-icon bg-info-subtle text-info">
-            <i class="fas fa-hand-holding-usd"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="metric-label text-muted mb-1">Límite de crédito</div>
-            <div class="metric-value fw-semibold text-dark">${{ client.credit_limit|floatformat:2 }}</div>
-            <small class="text-muted">Disponible: ${{ client.get_available_credit|floatformat:2 }}</small>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 border-info">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="metric-icon bg-info-subtle text-info">
-            <i class="fas fa-calendar-alt"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="metric-label text-muted mb-1">Ciclo de vencimiento</div>
-            {% if client.credit_config.payment_term_type == 'monthly_cutoff' %}
-              <div class="metric-value fw-semibold text-dark">{{ client.credit_config.get_cutoff_day_display }}</div>
-            {% elif client.credit_config.payment_term_type == 'invoice_due' %}
-              <div class="metric-value fw-semibold text-dark">{{ client.credit_config.max_payment_days }} días</div>
-              <small class="text-muted">Después de emitir la factura</small>
-            {% else %}
-              <small class="text-muted">Sin configuración</small>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 {% if pending_payment_data.nearest_due_is_overdue %}border-danger{% else %}border-primary{% endif %}">
-        <div class="card-body d-flex align-items-center gap-3">
-          <div class="metric-icon {% if pending_payment_data.nearest_due_is_overdue %}bg-danger-subtle text-danger{% else %}bg-primary-subtle text-primary{% endif %}">
-            <i class="fas fa-calendar-day"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="metric-label text-muted mb-1">Próximo vencimiento</div>
-            {% if pending_payment_data.nearest_due_date %}
-              <div class="metric-value fw-semibold {% if pending_payment_data.nearest_due_is_overdue %}text-danger{% else %}text-dark{% endif %}">
-                {{ pending_payment_data.nearest_due_date|date:"d/m/Y" }}
-              </div>
-              {% if pending_payment_data.nearest_due_is_overdue %}
-                <small class="text-danger">Crédito vencido</small>
-              {% endif %}
-            {% elif pending_payment_data.awaiting_invoice %}
-              <small class="text-muted">Pendiente de emisión de factura</small>
-            {% else %}
-              <small class="text-muted">Sin créditos pendientes</small>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="col-md-6 col-xl-4">
-      <div class="card stat-card h-100 border-info">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-            <div class="d-flex align-items-center gap-3">
-              <div class="metric-icon {% if debt_percentage > 95 %}bg-danger-subtle text-danger{% elif debt_percentage > 60 %}bg-warning-subtle text-warning{% else %}bg-success-subtle text-success{% endif %}">
-                <i class="fas fa-chart-line"></i>
-              </div>
-              <div>
-                <div class="metric-label text-muted mb-1">Uso del crédito</div>
-                <div class="metric-value fw-semibold text-dark">{{ debt_percentage }}%</div>
-              </div>
-            </div>
-            <span class="badge {% if debt_percentage > 95 %}bg-danger{% elif debt_percentage > 60 %}bg-warning text-dark{% else %}bg-success{% endif %}">
-              {{ debt_percentage }}%
-            </span>
-          </div>
-          <div class="progress mb-2" style="height: 10px;">
-            <div class="progress-bar {% if debt_percentage > 80 and debt_percentage <= 95 %}bg-warning{% elif debt_percentage > 60 and debt_percentage <= 80 %}bg-warning{% elif debt_percentage <= 60 %}bg-success{% else %}bg-danger{% endif %}"
-                 role="progressbar"
-                 style="width: {{ debt_percentage }}%"
-                 aria-valuenow="{{ debt_percentage }}"
-                 aria-valuemin="0"
-                 aria-valuemax="100">
-            </div>
-          </div>
-          <small class="text-muted">
-            Disponible: ${{ client.get_available_credit|floatformat:2 }} de ${{ client.credit_limit|floatformat:2 }}
-            {% if debt_percentage > 80 and debt_percentage <= 95 %}
-              <span class="text-warning"><i class="fas fa-exclamation-triangle"></i> Límite cercano</span>
-            {% elif debt_percentage > 60 and debt_percentage <= 80 %}
-              <span class="text-warning"><i class="fas fa-exclamation-circle"></i> Uso moderado</span>
-            {% elif debt_percentage <= 60 %}
-              <span class="text-success"><i class="fas fa-check-circle"></i> Uso saludable</span>
-            {% elif debt_percentage > 100 %}
-              <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> Límite excedido</span>
-            {% else %}
-              <span class="text-success"><i class="fas fa-check-circle"></i> Dentro del límite</span>
-            {% endif %}
-          </small>
-        </div>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-
-  <!-- Pending Payments Indicator -->
-  {% if pending_payment_data.total_overdue_amount > 0 %}
-  <div class="row mb-4">
-    <div class="col-md-12">
-      <div class="alert alert-danger shadow-sm border-danger">
-        <div class="d-flex align-items-center justify-content-between mb-3">
-          <div class="d-flex align-items-center">
-            <i class="fas fa-exclamation-triangle fa-3x text-danger me-3"></i>
-            <div>
-              <h4 class="alert-heading mb-1 text-danger">¡Atención! Pagos Vencidos</h4>
-              <p class="mb-0">
-                El cliente tiene un total de <strong>${{ pending_payment_data.total_overdue_amount|floatformat:2 }}</strong> en pagos vencidos.
-                El atraso máximo es de <strong>{{ pending_payment_data.days_overdue }} días</strong>.
-              </p>
-            </div>
-          </div>
-        </div>
-        <hr>
-        <p class="mb-2"><strong>Órdenes con pago pendiente:</strong></p>
-        <div class="table-responsive bg-white rounded">
+      {% if pending_payment_data.overdue_orders %}
+        <div class="table-responsive bg-white rounded mt-3">
           <table class="table table-sm table-hover mb-0">
             <thead class="table-danger">
               <tr>
                 <th>Orden #</th>
-                <th>Fecha de Creación</th>
+                <th>Fecha</th>
                 <th>Días Vencidos</th>
-                <th>Total de la Orden</th>
                 <th>Monto Pendiente</th>
                 <th>Factura</th>
                 <th>Acciones</th>
@@ -305,498 +225,115 @@
             </thead>
             <tbody>
               {% for overdue_order in pending_payment_data.overdue_orders %}
-              <tr>
-                <td><a href="{% url 'orders:get_order' overdue_order.id %}" class="text-danger fw-bold">#{{ overdue_order.id }}</a></td>
-                <td>{{ overdue_order.order_date|date:"d/m/Y H:i" }}</td>
-                <td><span class="badge bg-danger">{{ overdue_order.days_overdue }} días</span></td>
-                <td>${{ overdue_order.total_amount|floatformat:2 }}</td>
-                <td class="fw-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
-                <td>
-                  {% for invoice_link in overdue_order.invoice_links.all %}
-                    <a href="{% url 'admin_edit_invoice' invoice_link.invoice.id %}" class="btn btn-sm btn-outline-dark">
-                      #{{ invoice_link.invoice.id }}
+                <tr>
+                  <td>
+                    <a href="{% url 'orders:get_order' overdue_order.id %}" class="text-danger fw-bold">
+                      #{{ overdue_order.id }}
                     </a>
-                  {% empty %}
-                    <span class="text-muted">-</span>
-                  {% endfor %}
-                </td>
-                <td>
-                                     <a href="{% url 'orders:get_order' overdue_order.id %}" class="btn btn-sm btn-danger">Pagar</a>
-
-                </td>
-              </tr>
+                  </td>
+                  <td>{{ overdue_order.order_date|date:"d/m/Y H:i" }}</td>
+                  <td><span class="badge bg-danger">{{ overdue_order.days_overdue }} días</span></td>
+                  <td class="fw-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
+                  <td>
+                    {% for invoice_link in overdue_order.invoice_links.all %}
+                      <a href="{% url 'admin_edit_invoice' invoice_link.invoice.id %}" class="btn btn-sm btn-outline-dark">
+                        #{{ invoice_link.invoice.id }}
+                      </a>
+                    {% empty %}
+                      <span class="text-muted">-</span>
+                    {% endfor %}
+                  </td>
+                  <td>
+                    <a href="{% url 'orders:get_order' overdue_order.id %}" class="btn btn-sm btn-danger">Pagar</a>
+                  </td>
+                </tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  </div>
+      {% endif %}
+    </section>
   {% endif %}
 
-  <div class="row">
-    <!-- Client Information Column -->
-    <div class="col-md-3">
-      <!-- Contact Information -->
-      <div class="card mb-4">
-        <div class="card-header section-header">
-          <h5 class="mb-0"><i class="fas fa-user me-2"></i>Información de Contacto</h5>
-        </div>
-        <div class="card-body">
-          {% if contacts %}
-            {% for contact in contacts %}
-              <div class="mb-3 border-bottom pb-2">
-                <h6>{{ contact.name }}</h6>
-                {% if contact.position %}
-                  <small class="text-muted d-block">{{ contact.position }}</small>
-                {% endif %}
-                {% if contact.phone %}
-                  <div><i class="fas fa-phone me-1"></i> {{ contact.phone }}</div>
-                {% endif %}
-                {% if contact.email %}
-                  <div><i class="fas fa-envelope me-1"></i> {{ contact.email }}</div>
-                {% endif %}
-              </div>
-            {% endfor %}
-          {% else %}
-            <p class="text-muted">No hay información de contacto disponible.</p>
-          {% endif %}
-        </div>
-      </div>
-
-      {% if client.type == 'corporate' %}
-      <!-- Branches -->
-      <div class="card mb-4">
-        <div class="card-header section-header">
-          <h5 class="mb-0"><i class="fas fa-code-branch me-2"></i>Sucursales</h5>
-        </div>
-        <div class="card-body">
-          {% if branches %}
-            {% for branch in branches %}
-              <div class="mb-3 border-bottom pb-2">
-                <div class="d-flex justify-content-between align-items-start gap-2">
-                  <a href="{% url 'clients:detail' branch.pk %}" class="fw-semibold text-decoration-none">
-                    {{ branch.name }}
-                  </a>
-                  <span class="badge bg-{% if branch.active %}success{% else %}secondary{% endif %}">{% if branch.active %}Activo{% else %}Inactivo{% endif %}</span>
-                </div>
-                {% if branch.note %}
-                  <small class="text-muted d-block mt-1">{{ branch.note }}</small>
-                {% endif %}
-              </div>
-            {% endfor %}
-          {% else %}
-            <p class="text-muted">No hay sucursales registradas.</p>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-
-      <!-- Billing Data -->
-      {% if billing_data %}
-        <div class="card mb-4">
-          <div class="card-header section-header">
-            <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Datos Fiscales</h5>
-          </div>
+  <section class="row row-cols-1 row-cols-sm-2 row-cols-lg-5 g-3 mb-4 client-snapshot-grid">
+    {% for card in snapshot_cards %}
+      <div class="col">
+        <div class="card client-snapshot-card h-100 border-{{ card.tone }}{% if card.action_label %} client-snapshot-card-actionable{% endif %}">
           <div class="card-body">
-              <div class="mb-3">
-                <div><strong>RFC:</strong> {{ billing_data.rfc }}</div>
-                <div><strong>Razón Social:</strong> {{ billing_data.razon_social }}</div>
-                {% comment %} <div><strong>Uso CFDI:</strong> {{ billing_data.uso_cfdi }}</div>
-                <div><strong>Método de Pago:</strong> {{ billing_data.get_metodo_pago_display }}</div> {% endcomment %}
-              </div>
-          </div>
-        </div>
-      {% endif %}
-
-      <!-- Billing Frequency -->
-      {% if billing_frequency %}
-        <div class="card mb-4">
-          <div class="card-header section-header">
-            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Frecuencia de Facturación</h5>
-          </div>
-          <div class="card-body">
-            <div class="mb-3">
-              <div class="row">
-                <div class="col-sm-6">
-                  <div><strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}</div>
-                  <div><strong>Tipo de Fecha:</strong> {{ billing_frequency.get_billing_date_display }}</div>
-                </div>
-                <div class="col-sm-6">
-                  <div><strong>Estado:</strong> 
-                    <span class="badge bg-{% if billing_frequency.is_active %}success{% else %}secondary{% endif %}">
-                      {% if billing_frequency.is_active %}Activo{% else %}Inactivo{% endif %}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Specific configuration details -->
-              <div class="mt-3">
-                {% if billing_frequency.billing_date == 'specific_date' and billing_frequency.specific_day %}
-                  <div class="alert alert-light">
-                    <i class="fas fa-calendar-day me-2"></i>
-                    <strong>Día Específico:</strong> {{ billing_frequency.specific_day }} de cada mes
-                  </div>
-                {% elif billing_frequency.billing_date == 'weekday_occurrence' and billing_frequency.weekday is not None and billing_frequency.occurrence %}
-                  <div class="alert alert-light">
-                    <i class="fas fa-calendar-week me-2"></i>
-                    <strong>Día de la Semana:</strong> {{ billing_frequency.get_occurrence_display }} {{ billing_frequency.get_weekday_display }} de cada mes
-                  </div>
-                {% elif billing_frequency.billing_date == 'first_day' %}
-                  <div class="alert alert-light">
-                    <i class="fas fa-calendar-plus me-2"></i>
-                    <strong>Primer día</strong> de cada período
-                  </div>
-                {% elif billing_frequency.billing_date == 'last_day' %}
-                  <div class="alert alert-light">
-                    <i class="fas fa-calendar-minus me-2"></i>
-                    <strong>Último día</strong> de cada período
-                  </div>
-                {% endif %}
-              </div>
-              {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
-                <div class="mt-3">
-                  <div class="alert alert-info d-flex align-items-center">
-                    <i class="fas fa-calendar-check me-2"></i>
-                    <div>
-                      <strong>Próxima Facturación:</strong><br>
-                      <span class="fs-5 text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
-                      <small class="text-muted d-block">
-                        {% now "Y-m-d" as today %}
-                        {% if billing_frequency.next_billing_date|date:"Y-m-d" == today %}
-                          ¡Hoy es día de facturación!
-                        {% else %}
-                          En {{ billing_frequency.next_billing_date|timeuntil }}
-                        {% endif %}
-                      </small>
-                    </div>
-                  </div>
-                </div>
-              {% elif not billing_frequency.is_active %}
-                <div class="mt-3">
-                  <div class="alert alert-warning">
-                    <i class="fas fa-pause-circle me-2"></i>
-                    La facturación automática está desactivada para este cliente.
-                  </div>
-                </div>
-              {% else %}
-                <div class="mt-3">
-                  <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    No se pudo calcular la próxima fecha de facturación.
-                  </div>
-                </div>
-              {% endif %}
-              
-              {% if billing_frequency.notes %}
-                <div class="mt-3">
-                  <div class="alert alert-secondary">
-                    <strong><i class="fas fa-sticky-note me-2"></i>Notas:</strong>
-                    <p class="mb-0 mt-2">{{ billing_frequency.notes }}</p>
-                  </div>
-                </div>
-              {% endif %}
-              
-              <div class="mt-2">
-                <small class="text-muted">
-                  <i class="fas fa-info-circle me-1"></i>
-                  {{ billing_frequency.get_billing_info }}
-                </small>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% else %}
-        <div class="card mb-4">
-          <div class="card-header section-header">
-            <h5 class="mb-0"><i class="fas fa-calendar-alt me-2"></i>Frecuencia de Facturación</h5>
-          </div>
-          <div class="card-body">
-            <div class="alert alert-warning">
-              <i class="fas fa-info-circle me-2"></i>
-              No hay frecuencia de facturación configurada para este cliente.
-              <div class="mt-2">
-                <small class="text-muted">Configura la frecuencia de facturación desde la sección administrativa para automatizar la generación de facturas.</small>
-              </div>
-            </div>
-          </div>
-        </div>
-      {% endif %}
-
-      <!-- Routes Information -->
-      <div class="card mb-4">
-        <div class="card-header section-header">
-          <h5 class="mb-0"><i class="fas fa-route me-2"></i>Información de Rutas</h5>
-        </div>
-        <div class="card-body">
-          {% if route_clients or upcoming_route_orders %}
-            
-            <!-- Regular Route Assignments -->
-            {% if route_clients %}
-              <div class="mb-4">
-                <h6 class="text-primary mb-3">
-                  <i class="fas fa-calendar-week me-2"></i>Rutas Regulares Asignadas
-                </h6>
-                {% for route_client in route_clients %}
-                  <div class="border rounded p-3 mb-3 bg-light">
-                    <div class="row">
-                      <div class="col-sm-6">
-                        <div class="mb-2">
-                          <strong class="text-primary">{{ route_client.route.name }}</strong>
-                          <span class="badge bg-secondary ms-2">Secuencia: {{ route_client.sequence }}</span>
-                        </div>
-                        <div class="mb-2">
-                          <i class="fas fa-calendar-day me-1 text-info"></i>
-                          <strong>Día de visita:</strong> {{ route_client.route.get_weekday_display }}
-                        </div>
-                        <div class="mb-2">
-                          <i class="fas fa-sync-alt me-1 text-success"></i>
-                          <strong>Frecuencia:</strong> {{ route_client.get_frequency_display }}
-                        </div>
-                      </div>
-                      <div class="col-sm-6">
-                        {% if route_client.route.transportation %}
-                          <div class="mb-2">
-                            <i class="fas fa-truck me-1 text-warning"></i>
-                            <strong>Vehículo:</strong> {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
-                          </div>
-                          {% if route_client.route.transportation.assigned_driver %}
-                            <div class="mb-2">
-                              <i class="fas fa-user me-1 text-primary"></i>
-                              <strong>Conductor:</strong> {{ route_client.route.transportation.assigned_driver.user.get_full_name }}
-                            </div>
-                          {% else %}
-                            <div class="mb-2">
-                              <i class="fas fa-user-slash me-1 text-muted"></i>
-                              <span class="text-muted">Sin conductor asignado</span>
-                            </div>
-                          {% endif %}
-                        {% else %}
-                          <div class="mb-2">
-                            <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
-                            <span class="text-warning">Sin vehículo asignado</span>
-                          </div>
-                        {% endif %}
-                      </div>
-                    </div>
-                    {% if route_client.notes %}
-                      <div class="mt-2 pt-2 border-top">
-                        <small class="text-muted">
-                          <i class="fas fa-sticky-note me-1"></i>
-                          <strong>Notas:</strong> {{ route_client.notes }}
-                        </small>
-                      </div>
-                    {% endif %}
-                  </div>
-                {% endfor %}
+            <div class="client-snapshot-label">{{ card.label }}</div>
+            <div class="client-snapshot-value my-1">{{ card.value }}</div>
+            <div class="small client-snapshot-note">{{ card.note }}</div>
+            {% if card.action_label %}
+              <div class="client-snapshot-action">
+                <a href="{% url card.action_url_name client.pk %}" class="btn btn-sm client-tile-action" title="{{ card.action_label }}" aria-label="{{ card.action_label }}">
+                  <i class="{{ card.action_icon }}" aria-hidden="true"></i>
+                  <span class="visually-hidden">{{ card.action_label }}</span>
+                </a>
               </div>
             {% endif %}
-
-            <!-- Upcoming Specific Visits -->
-            {% if upcoming_route_orders %}
-              <div class="mb-4">
-                <h6 class="text-success mb-3">
-                  <i class="fas fa-calendar-check me-2"></i>Próximas Visitas Programadas
-                </h6>
-                <div class="table-responsive">
-                  <table class="table table-sm table-hover">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Ruta</th>
-                        <th>Conductor</th>
-                        <th>Pedido</th>
-                        <th>Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for route_order in upcoming_route_orders %}
-                        <tr>
-                          <td>
-                            <strong>{{ route_order.visit_date|date:"d/m/Y" }}</strong>
-                            <br>
-                            <small class="text-muted">
-                              {% now "Y-m-d" as today %}
-                              {% if route_order.visit_date|date:"Y-m-d" == today %}
-                                <span class="badge bg-warning">Hoy</span>
-                              {% else %}
-                                En {{ route_order.visit_date|timeuntil }}
-                              {% endif %}
-                            </small>
-                          </td>
-                          <td>
-                            {{ route_order.route.name }}
-                            <br>
-                            <small class="text-muted">Seq: {{ route_order.sequence }}</small>
-                          </td>
-                          <td>
-                            {% if route_order.route.transportation.assigned_driver %}
-                              {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
-                              <br>
-                              <small class="text-muted">{{ route_order.route.transportation.license_plate }}</small>
-                            {% else %}
-                              <span class="text-muted">Sin asignar</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            <strong>#{{ route_order.order.id }}</strong>
-                            <br>
-                            <small class="text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small>
-                          </td>
-                          <td>
-                            <span class="badge bg-info">Programado</span>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            {% endif %}
-
-            <!-- Recent Completed Deliveries -->
-            {% if recent_completed_routes %}
-              <div class="mb-3">
-                <h6 class="text-secondary mb-3">
-                  <i class="fas fa-history me-2"></i>Entregas Recientes Completadas
-                </h6>
-                <div class="table-responsive">
-                  <table class="table table-sm">
-                    <thead class="table-light">
-                      <tr>
-                        <th>Completado</th>
-                        <th>Ruta</th>
-                        <th>Conductor</th>
-                        <th>Pedido</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for route_order in recent_completed_routes %}
-                        <tr>
-                          <td>
-                            {{ route_order.completed_at|date:"d/m/Y H:i" }}
-                          </td>
-                          <td>{{ route_order.route.name }}</td>
-                          <td>
-                            {% if route_order.route.transportation.assigned_driver %}
-                              {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
-                            {% else %}
-                              <span class="text-muted">N/A</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            <strong>#{{ route_order.order.id }}</strong>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            {% endif %}
-
-          {% else %}
-            <div class="alert alert-light">
-              <i class="fas fa-info-circle me-2"></i>
-              Este cliente no tiene rutas asignadas actualmente.
-              <div class="mt-2">
-                <small class="text-muted">Las rutas se pueden asignar desde la sección de administración de rutas para programar entregas regulares.</small>
-              </div>
-            </div>
-          {% endif %}
+          </div>
         </div>
       </div>
+    {% endfor %}
+  </section>
+
+  <section class="card client-detail-tabs-card">
+    <div class="card-header bg-white">
+      <ul class="nav nav-tabs card-header-tabs" id="client-detail-tabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="sales-tab" data-bs-toggle="tab" data-bs-target="#sales-tab-pane" type="button" role="tab" aria-controls="sales-tab-pane" aria-selected="true">
+            Ventas
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="payments-tab" data-bs-toggle="tab" data-bs-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="false">
+            Pagos
+          </button>
+        </li>
+        {% if client.requires_billing %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="invoices-tab" data-bs-toggle="tab" data-bs-target="#invoices-tab-pane" type="button" role="tab" aria-controls="invoices-tab-pane" aria-selected="false">
+              Facturas
+            </button>
+          </li>
+        {% endif %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="routes-tab" data-bs-toggle="tab" data-bs-target="#routes-tab-pane" type="button" role="tab" aria-controls="routes-tab-pane" aria-selected="false">
+            Rutas
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">
+            Perfil
+          </button>
+        </li>
+      </ul>
     </div>
-
-    <!-- Orders and Payments Column -->
-    <div class="col-md-9">
-      {% if client.requires_billing %}
-      <div id="client-invoices" class="card mb-4">
-        <div class="card-header section-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-file-invoice-dollar me-2"></i>Facturas</h5>
-          <small class="text-muted">
-            {% if client_invoices %}
-              {{ client_invoices|length }} registradas
-            {% else %}
-              Sin facturas
-            {% endif %}
-          </small>
-        </div>
-        <div class="card-body">
-          {% if client_invoices %}
-            <div class="table-responsive">
-              <table class="table table-hover">
-                <thead class="table-light">
-                  <tr>
-                    <th>ID</th>
-                    <th>Cliente fiscal</th>
-                    <th>Serie</th>
-                    <th>Folio</th>
-                    <th>Emisión</th>
-                    <th>Monto</th>
-                    <th>Pagado</th>
-                    <th>Pendiente</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for invoice in client_invoices %}
-                    <tr>
-                      <td><strong>#{{ invoice.id }}</strong></td>
-                      <td>{{ invoice.client.name }}</td>
-                      <td><code>{{ invoice.identifier }}</code></td>
-                      <td><code>{{ invoice.folio }}</code></td>
-                      <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"-" }}</td>
-                      <td>${{ invoice.amount|floatformat:2 }}</td>
-                      <td>${{ invoice.total_payments|floatformat:2 }}</td>
-                      <td class="{% if invoice.pending_amount > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
-                        ${{ invoice.pending_amount|floatformat:2 }}
-                      </td>
-                      <td>
-                        <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-sm btn-outline-dark">
-                          <i class="fas fa-file-invoice"></i>
-                        </a>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% else %}
-            <p class="text-muted mb-0">No hay facturas vinculadas a las ventas de este cliente.</p>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
-
-      <!-- Recent Orders -->
-      <div id="orders-history" class="card mb-4">
-        <div class="card-header section-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Ventas Recientes</h5>
-          <small class="text-muted">
-            {% if orders %}
-              Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
-            {% else %}
-              Sin ventas
-            {% endif %}
-          </small>
-        </div>
-        <div class="card-body">
+    <div class="card-body">
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Ventas Recientes</h2>
+            <small class="text-muted">
+              {% if orders %}
+                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
+              {% else %}
+                Sin ventas
+              {% endif %}
+            </small>
+          </div>
           {% if orders %}
             <div class="table-responsive">
-              <table class="table table-hover">
+              <table class="table table-hover align-middle">
                 <thead class="table-light">
                   <tr>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Estado</th>
-                    <th>Subtotal</th>
-                    <th>Descuento</th>
                     <th>Total</th>
                     <th>Productos</th>
                     <th>Pago</th>
-                   <th>Acciones</th>
+                    <th>Acciones</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -805,51 +342,32 @@
                       <td><strong>#{{ order.id }}</strong></td>
                       <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                       <td>
-                        <span class="badge bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning{% else %}danger{% endif %}">
+                        <span class="badge bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning text-dark{% else %}danger{% endif %}">
                           {{ order.get_status_display_fixed }}
                         </span>
                       </td>
-                      <td>${{ order.subtotal_amount|floatformat:2 }}</td>
-                      <td>
-                        ${{order.discount|floatformat:2}}
-                      </td>
                       <td>${{ order.total_amount|floatformat:2 }}</td>
-
                       <td>
                         <small>
                           {% for item in order.items.all %}
                             {{ item.product.name }} ({{ item.quantity }})<br>
+                          {% empty %}
+                            <span class="text-muted">Sin productos</span>
                           {% endfor %}
                         </small>
                       </td>
                       <td>
                         {% for payment in order.payments.all %}
-                             #{{ payment.id }}-  
-                          {% if payment.method == 'credit_card' %}
-  <span class="badge bg-primary">Tarjeta de Crédito</span>
-{% elif payment.method == 'debit_card' %}
-  <span class="badge bg-primary">Tarjeta de Débito</span>
-{% elif payment.method == 'cash' %}
-  <span class="badge bg-success">Efectivo</span>
-{% elif payment.method == 'balance' %}
-  <span class="badge bg-info">Saldo</span>
-{% elif payment.method == 'paypal' %}
-  <span class="badge bg-warning">PayPal</span>
-{% elif payment.method == 'credit' %}
-  <span class="badge bg-danger">Crédito</span>
-{% elif payment.method == 'bank_transfer' %}
-  <span class="badge bg-secondary">Transferencia Bancaria</span>
-{% else %}
-  <span class="badge bg-light text-dark">{{ payment.get_method_display }}</span>
-{% endif %}
-                          <br>
+                          <span class="badge bg-secondary">#{{ payment.id }} {{ payment.get_method_display }}</span><br>
+                        {% empty %}
+                          <span class="text-muted">Sin pago</span>
                         {% endfor %}
                       </td>
-                    <td>
+                      <td>
                         <a href="{% url 'orders:get_order' order.id %}" class="btn btn-sm btn-outline-primary">
                           <i class="fas fa-edit"></i>
                         </a>
-                      </td> 
+                      </td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -860,7 +378,7 @@
                 <ul class="pagination justify-content-end mb-0">
                   {% if orders.has_previous %}
                     <li class="page-item">
-                      <a class="page-link" href="?orders_page={{ orders.previous_page_number }}&payments_page={{ all_payment_data.number }}#orders-history">Anterior</a>
+                      <a class="page-link" href="?orders_page={{ orders.previous_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Anterior</a>
                     </li>
                   {% else %}
                     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -870,7 +388,7 @@
                   </li>
                   {% if orders.has_next %}
                     <li class="page-item">
-                      <a class="page-link" href="?orders_page={{ orders.next_page_number }}&payments_page={{ all_payment_data.number }}#orders-history">Siguiente</a>
+                      <a class="page-link" href="?orders_page={{ orders.next_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Siguiente</a>
                     </li>
                   {% else %}
                     <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
@@ -879,30 +397,27 @@
               </nav>
             {% endif %}
           {% else %}
-            <p class="text-muted">No hay ventas registrados para este cliente.</p>
+            <p class="text-muted">No hay ventas registradas para este cliente.</p>
             <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-primary">
-              <i class="fas fa-plus"></i> Crear Primer Pedido
+              <i class="fas fa-plus me-1"></i>Crear Primer Pedido
             </a>
           {% endif %}
         </div>
-      </div>
 
-      <!-- Recent Payments -->
-      <div id="payments-history" class="card">
-        <div class="card-header section-header d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><i class="fas fa-credit-card me-2"></i>Pagos Recientes</h5>
-          <small class="text-muted">
-            {% if all_payment_data %}
-              Mostrando {{ all_payment_data.start_index }}-{{ all_payment_data.end_index }} de {{ all_payment_data.paginator.count }}
-            {% else %}
-              Sin transacciones
-            {% endif %}
-          </small>
-        </div>
-        <div class="card-body">
+        <div class="tab-pane fade" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h5 mb-0">Pagos Recientes</h2>
+            <small class="text-muted">
+              {% if all_payment_data %}
+                Mostrando {{ all_payment_data.start_index }}-{{ all_payment_data.end_index }} de {{ all_payment_data.paginator.count }}
+              {% else %}
+                Sin transacciones
+              {% endif %}
+            </small>
+          </div>
           {% if all_payment_data %}
             <div class="table-responsive">
-              <table class="table table-hover">
+              <table class="table table-hover align-middle">
                 <thead class="table-light">
                   <tr>
                     <th>Tipo</th>
@@ -922,16 +437,16 @@
                         {% if payment_data.type == 'payment' %}
                           <span class="badge bg-primary">Pago</span>
                         {% elif payment_data.type == 'balance_transaction' %}
-                          <span class="badge bg-info">Saldo</span>
+                          <span class="badge bg-info text-dark">Saldo</span>
                         {% elif payment_data.type == 'credit_transaction' %}
-                          <span class="badge bg-warning">Crédito</span>
+                          <span class="badge bg-warning text-dark">Crédito</span>
                         {% endif %}
                       </td>
                       <td><strong>#{{ payment_data.id }}</strong></td>
                       <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
                       <td>
                         {% if payment_data.order_id %}
-                          <a href="#" class="text-decoration-none">#{{ payment_data.order_id }}</a>
+                          <a href="{% url 'orders:get_order' payment_data.order_id %}" class="text-decoration-none">#{{ payment_data.order_id }}</a>
                         {% else %}
                           <span class="text-muted">N/A</span>
                         {% endif %}
@@ -945,19 +460,13 @@
                       <td class="fw-bold">
                         {% if payment_data.type == 'payment' %}
                           <span class="text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                        {% elif payment_data.is_positive %}
+                          <span class="text-success">+${{ payment_data.amount|floatformat:2 }}</span>
                         {% else %}
-                          {% if payment_data.is_positive %}
-                            <span class="text-success">+${{ payment_data.amount|floatformat:2 }}</span>
-                          {% else %}
-                            <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
-                          {% endif %}
+                          <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
                         {% endif %}
                       </td>
-                         
-                
-                      <td>
-                        <small class="text-muted">{{ payment_data.created_by }}</small>
-                      </td>
+                      <td><small class="text-muted">{{ payment_data.created_by|default:"-" }}</small></td>
                     </tr>
                   {% endfor %}
                 </tbody>
@@ -968,7 +477,7 @@
                 <ul class="pagination justify-content-end mb-0">
                   {% if all_payment_data.has_previous %}
                     <li class="page-item">
-                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.previous_page_number }}#payments-history">Anterior</a>
+                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.previous_page_number }}#payments-tab-pane">Anterior</a>
                     </li>
                   {% else %}
                     <li class="page-item disabled"><span class="page-link">Anterior</span></li>
@@ -978,7 +487,7 @@
                   </li>
                   {% if all_payment_data.has_next %}
                     <li class="page-item">
-                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.next_page_number }}#payments-history">Siguiente</a>
+                      <a class="page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.next_page_number }}#payments-tab-pane">Siguiente</a>
                     </li>
                   {% else %}
                     <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
@@ -987,11 +496,289 @@
               </nav>
             {% endif %}
           {% else %}
-            <p class="text-muted">No hay transacciones registradas para este cliente.</p>
+            <p class="text-muted mb-0">No hay transacciones registradas para este cliente.</p>
           {% endif %}
+        </div>
+
+        {% if client.requires_billing %}
+          <div class="tab-pane fade" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h2 class="h5 mb-0">Facturas</h2>
+              <small class="text-muted">
+                {% if client_invoices %}
+                  {{ client_invoices|length }} registradas
+                {% else %}
+                  Sin facturas
+                {% endif %}
+              </small>
+            </div>
+            {% if client_invoices %}
+              <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>ID</th>
+                      <th>Cliente fiscal</th>
+                      <th>Serie</th>
+                      <th>Folio</th>
+                      <th>Emisión</th>
+                      <th>Monto</th>
+                      <th>Pagado</th>
+                      <th>Pendiente</th>
+                      <th>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for invoice in client_invoices %}
+                      <tr>
+                        <td><strong>#{{ invoice.id }}</strong></td>
+                        <td>{{ invoice.client.name }}</td>
+                        <td><code>{{ invoice.identifier }}</code></td>
+                        <td><code>{{ invoice.folio }}</code></td>
+                        <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"-" }}</td>
+                        <td>${{ invoice.amount|floatformat:2 }}</td>
+                        <td>${{ invoice.total_payments|floatformat:2 }}</td>
+                        <td class="{% if invoice.pending_amount > 0 %}text-danger fw-bold{% else %}text-success{% endif %}">
+                          ${{ invoice.pending_amount|floatformat:2 }}
+                        </td>
+                        <td>
+                          <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-sm btn-outline-dark">
+                            <i class="fas fa-file-invoice"></i>
+                          </a>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="text-muted mb-0">No hay facturas vinculadas a las ventas de este cliente.</p>
+            {% endif %}
+          </div>
+        {% endif %}
+
+        <div class="tab-pane fade" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
+          <h2 class="h5 mb-3">Rutas</h2>
+          {% if route_clients or upcoming_route_orders or recent_completed_routes %}
+            {% if route_clients %}
+              <h3 class="h6 text-primary">Rutas Regulares Asignadas</h3>
+              <div class="table-responsive mb-4">
+                <table class="table table-sm align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Ruta</th>
+                      <th>Día</th>
+                      <th>Frecuencia</th>
+                      <th>Secuencia</th>
+                      <th>Vehículo</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for route_client in route_clients %}
+                      <tr>
+                        <td>{{ route_client.route.name }}</td>
+                        <td>{{ route_client.route.get_weekday_display }}</td>
+                        <td>{{ route_client.get_frequency_display }}</td>
+                        <td>{{ route_client.sequence }}</td>
+                        <td>
+                          {% if route_client.route.transportation %}
+                            {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
+                          {% else %}
+                            <span class="text-muted">Sin vehículo asignado</span>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+
+            {% if upcoming_route_orders %}
+              <h3 class="h6 text-success">Próximas Visitas Programadas</h3>
+              <div class="table-responsive mb-4">
+                <table class="table table-sm align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Ruta</th>
+                      <th>Conductor</th>
+                      <th>Pedido</th>
+                      <th>Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for route_order in upcoming_route_orders %}
+                      <tr>
+                        <td>{{ route_order.visit_date|date:"d/m/Y" }}</td>
+                        <td>{{ route_order.route.name }} <small class="text-muted">Seq: {{ route_order.sequence }}</small></td>
+                        <td>
+                          {% if route_order.route.transportation.assigned_driver %}
+                            {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                          {% else %}
+                            <span class="text-muted">Sin asignar</span>
+                          {% endif %}
+                        </td>
+                        <td>#{{ route_order.order.id }} <small class="text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small></td>
+                        <td><span class="badge bg-info text-dark">Programado</span></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+
+            {% if recent_completed_routes %}
+              <h3 class="h6 text-secondary">Entregas Recientes Completadas</h3>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Completado</th>
+                      <th>Ruta</th>
+                      <th>Conductor</th>
+                      <th>Pedido</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for route_order in recent_completed_routes %}
+                      <tr>
+                        <td>{{ route_order.completed_at|date:"d/m/Y H:i" }}</td>
+                        <td>{{ route_order.route.name }}</td>
+                        <td>
+                          {% if route_order.route.transportation.assigned_driver %}
+                            {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                          {% else %}
+                            <span class="text-muted">N/A</span>
+                          {% endif %}
+                        </td>
+                        <td>#{{ route_order.order.id }}</td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% endif %}
+          {% else %}
+            <p class="text-muted mb-0">Este cliente no tiene rutas asignadas actualmente.</p>
+          {% endif %}
+        </div>
+
+        <div class="tab-pane fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+          <div class="client-profile-grid">
+            <section class="client-profile-section">
+              <h3><i class="fas fa-user me-2"></i>Contactos</h3>
+              {% if contacts %}
+                {% for contact in contacts %}
+                  <div class="border-bottom pb-2 mb-2">
+                    <strong>{{ contact.name }}</strong>
+                    {% if contact.position %}<small class="text-muted d-block">{{ contact.position }}</small>{% endif %}
+                    {% if contact.phone %}<div><i class="fas fa-phone me-1"></i>{{ contact.phone }}</div>{% endif %}
+                    {% if contact.email %}<div><i class="fas fa-envelope me-1"></i>{{ contact.email }}</div>{% endif %}
+                  </div>
+                {% endfor %}
+              {% else %}
+                <p class="text-muted mb-0">Sin contacto principal</p>
+              {% endif %}
+            </section>
+
+            <section class="client-profile-section client-header-addresses">
+              <h3><i class="fas fa-map-marker-alt me-2"></i>Direcciones</h3>
+              {% if addresses %}
+                {% for address in addresses %}
+                  <div class="border-bottom pb-2 mb-2">
+                    <span class="badge bg-secondary mb-1">{{ address.get_type_display }}</span>
+                    <div>{{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
+                  </div>
+                {% endfor %}
+                {% if client.address_link %}
+                  <a href="{{ client.address_link }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                    <i class="fas fa-map-marker-alt me-1"></i>Ver Ubicación en Google Maps
+                  </a>
+                {% endif %}
+              {% else %}
+                <p class="text-muted mb-0">Sin dirección activa</p>
+              {% endif %}
+            </section>
+
+            {% if client.type == 'corporate' %}
+              <section class="client-profile-section">
+                <h3><i class="fas fa-code-branch me-2"></i>Sucursales</h3>
+                {% if branches %}
+                  {% for branch in branches %}
+                    <div class="d-flex justify-content-between gap-2 border-bottom pb-2 mb-2">
+                      <a href="{% url 'clients:detail' branch.pk %}" class="fw-semibold text-decoration-none">{{ branch.name }}</a>
+                      <span class="badge bg-{% if branch.active %}success{% else %}secondary{% endif %}">{% if branch.active %}Activo{% else %}Inactivo{% endif %}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <p class="text-muted mb-0">No hay sucursales registradas.</p>
+                {% endif %}
+              </section>
+            {% endif %}
+
+            <section class="client-profile-section">
+              <h3><i class="fas fa-file-invoice-dollar me-2"></i>Datos Fiscales</h3>
+              {% if billing_data %}
+                <div><strong>RFC:</strong> {{ billing_data.rfc }}</div>
+                <div><strong>Razón Social:</strong> {{ billing_data.razon_social }}</div>
+              {% else %}
+                <p class="text-muted mb-0">Sin datos fiscales configurados</p>
+              {% endif %}
+            </section>
+
+            <section class="client-profile-section">
+              <h3><i class="fas fa-calendar-alt me-2"></i>Frecuencia de Facturación</h3>
+              {% if billing_frequency %}
+                <div><strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}</div>
+                <div><strong>Tipo de Fecha:</strong> {{ billing_frequency.get_billing_date_display }}</div>
+                <div>
+                  <strong>Estado:</strong>
+                  <span class="badge bg-{% if billing_frequency.is_active %}success{% else %}secondary{% endif %}">
+                    {% if billing_frequency.is_active %}Activo{% else %}Inactivo{% endif %}
+                  </span>
+                </div>
+                {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
+                  <div class="mt-2">
+                    <strong>Próxima Facturación:</strong>
+                    <span class="text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
+                  </div>
+                {% endif %}
+                {% if billing_frequency.notes %}
+                  <p class="small text-muted mt-2 mb-0">{{ billing_frequency.notes }}</p>
+                {% endif %}
+              {% else %}
+                <p class="text-muted mb-0">Sin frecuencia configurada</p>
+              {% endif %}
+            </section>
+
+            <section class="client-profile-section">
+              <h3><i class="fas fa-credit-card me-2"></i>Crédito</h3>
+              {% if client.credit_limit > 0 %}
+                <div><strong>Límite:</strong> ${{ client.credit_limit|floatformat:2 }}</div>
+                <div><strong>Disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
+                <div><strong>Uso:</strong> {{ debt_percentage }}%</div>
+                <div class="mt-2">
+                  <strong>Ciclo de vencimiento:</strong>
+                  {% if client.credit_config.payment_term_type == 'monthly_cutoff' %}
+                    {{ client.credit_config.get_cutoff_day_display }}
+                  {% elif client.credit_config.payment_term_type == 'invoice_due' %}
+                    {{ client.credit_config.max_payment_days }} días después de emitir la factura
+                  {% else %}
+                    <span class="text-muted">Sin configuración</span>
+                  {% endif %}
+                </div>
+                {% if pending_payment_data.nearest_due_date %}
+                  <div><strong>Próximo vencimiento:</strong> {{ pending_payment_data.nearest_due_date|date:"d/m/Y" }}</div>
+                {% endif %}
+              {% else %}
+                <p class="text-muted mb-0">Sin crédito habilitado</p>
+              {% endif %}
+            </section>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </div>
 {% endblock %}
