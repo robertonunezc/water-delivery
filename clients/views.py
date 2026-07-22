@@ -23,6 +23,7 @@ from .forms import (
     AddressInlineForm,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
+from .services.client_detail_service import build_client_detail_snapshot
 from .services.client_service import initialize_branch_credit_from_corporate
 from .services.corporate_branch_service import build_corporate_branch_workspace
 from orders.models import Order
@@ -649,6 +650,17 @@ def detail(request, pk):
     # Get pending payment data
     from clients.services.pending_payment_service import get_overdue_orders_for_client
     pending_payment_data = get_overdue_orders_for_client(client)
+    debt_percentage = int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0
+    client_invoices_list = tuple(client_invoices)
+    snapshot_context = build_client_detail_snapshot(
+        client=client,
+        billing_frequency=billing_frequency,
+        route_clients=route_clients,
+        upcoming_route_orders=upcoming_route_orders,
+        client_invoices=client_invoices_list,
+        pending_payment_data=pending_payment_data,
+        debt_percentage=debt_percentage,
+    )
 
     context = {
         'client': client,
@@ -663,8 +675,8 @@ def detail(request, pk):
         'route_clients': route_clients,
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,
-        'client_invoices': client_invoices,
-        'debt_percentage': int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0, 
+        'client_invoices': client_invoices_list,
+        'debt_percentage': debt_percentage,
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,
@@ -672,6 +684,7 @@ def detail(request, pk):
             'completed_orders': completed_orders,
         },
         'pending_payment_data': pending_payment_data,
+        **snapshot_context,
     }
     
     return render(request, 'client_detail.html', context)

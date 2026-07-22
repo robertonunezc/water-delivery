@@ -28,6 +28,7 @@ from .services.csv_import_service import (
     get_clients_csv_template,
     import_clients_from_csv,
 )
+from .services.client_detail_service import build_client_detail_snapshot
 from core.models import Transport
 from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderStatus
@@ -898,6 +899,109 @@ class ClientDetailLayoutTests(FastTenantTestCase):
         self.assertContains(response, 'Sucursal inactiva')
         self.assertContains(response, '<span class="badge bg-success">Activo</span>')
         self.assertContains(response, '<span class="badge bg-secondary">Inactivo</span>')
+
+
+class ClientDetailSnapshotServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.client_obj = Client.objects.create(
+            name='Cliente snapshot',
+            active=True,
+        )
+
+    def _build_snapshot(
+        self,
+        *,
+        billing_frequency: object | None = None,
+        client_invoices: list[object] | None = None,
+        pending_payment_data: dict[str, object] | None = None,
+        debt_percentage: int = 0,
+    ) -> dict[str, object]:
+        return build_client_detail_snapshot(
+            client=self.client_obj,
+            billing_frequency=billing_frequency,
+            route_clients=self.client_obj.client_routes.filter(is_active=True),
+            upcoming_route_orders=[],
+            client_invoices=client_invoices or [],
+            pending_payment_data=pending_payment_data or {
+                'total_overdue_amount': Decimal('0.00'),
+            },
+            debt_percentage=debt_percentage,
+        )
+
+    def test_snapshot_promotes_financial_risk_only_when_overdue_amount_exists(self) -> None:
+        clean_snapshot = self._build_snapshot()
+        risky_snapshot = self._build_snapshot(
+            pending_payment_data={
+                'total_overdue_amount': Decimal('100.00'),
+            },
+        )
+
+        self.assertFalse(clean_snapshot['has_financial_risk'])
+        self.assertTrue(risky_snapshot['has_financial_risk'])
+        self.assertEqual(
+            risky_snapshot['credit_report_url_label'],
+            'Ver reporte de crédito',
+        )
+
+    def test_snapshot_keeps_route_card_stable_when_client_has_no_route(self) -> None:
+        snapshot = self._build_snapshot()
+        route_card = next(
+            card for card in snapshot['snapshot_cards'] if card['label'] == 'Próxima visita'
+        )
+
+        self.assertEqual(route_card['value'], 'Sin ruta')
+        self.assertEqual(route_card['note'], 'Sin ruta asignada')
+
+    def test_snapshot_summarizes_credit_usage_when_credit_is_enabled(self) -> None:
+        self.client_obj.credit_limit = Decimal('100.00')
+        self.client_obj.current_debt = Decimal('20.00')
+        self.client_obj.save(update_fields=['credit_limit', 'current_debt', 'updated_at'])
+
+        snapshot = self._build_snapshot(debt_percentage=20)
+        credit_card = next(
+            card for card in snapshot['snapshot_cards'] if card['label'] == 'Crédito'
+        )
+
+        self.assertEqual(credit_card['value'], '20%')
+        self.assertEqual(credit_card['note'], 'Disponible: $80.00 de $100.00')
+
+    def test_snapshot_summarizes_next_billing_and_pending_invoices(self) -> None:
+        self.client_obj.requires_billing = True
+        self.client_obj.save(update_fields=['requires_billing', 'updated_at'])
+        billing_frequency = ClientBillingFrecuency.objects.create(
+            client=self.client_obj,
+            frequency='monthly',
+            billing_date='specific_date',
+            specific_day=8,
+            is_active=True,
+        )
+        ClientBillingFrecuency.objects.filter(pk=billing_frequency.pk).update(
+            next_billing_date=date(2026, 7, 8),
+        )
+        billing_frequency.refresh_from_db()
+        order = Order.objects.create(
+            client=self.client_obj,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('150.00'),
+        )
+        invoice = Invoice.objects.create(
+            client=self.client_obj,
+            amount=Decimal('150.00'),
+            identifier='SER-ACT',
+            folio='FOL-ACT',
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        snapshot = self._build_snapshot(
+            billing_frequency=billing_frequency,
+            client_invoices=[invoice],
+        )
+        billing_card = next(
+            card for card in snapshot['snapshot_cards'] if card['label'] == 'Facturación'
+        )
+
+        self.assertEqual(billing_card['value'], 'Próxima: 08/07/2026')
+        self.assertEqual(billing_card['note'], '1 factura pendiente')
 
 
 class ClientListModeTests(FastTenantTestCase):
