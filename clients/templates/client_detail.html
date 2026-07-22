@@ -179,8 +179,8 @@
           <i class="fas fa-credit-card me-1"></i>Reporte de crédito
         </a>
         {% if client.type == 'corporate' %}
-          <a href="{% url 'clients:corporate_branches' client.pk %}" class="btn btn-outline-info me-2">
-            <i class="fas fa-code-branch"></i> Ver sucursales / ventas
+          <a href="{% url 'clients:corporate_branches' client.pk %}" class="btn client-header-action">
+            <i class="fas fa-code-branch"></i> Ver sucursales
           </a>
         {% endif %}
         {% if request.user.is_staff %}
