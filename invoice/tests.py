@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import date, timedelta
 import json
 
+from django.contrib import admin
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase, RequestFactory
@@ -12,6 +13,8 @@ from clients.forms import InvoiceScheduleForm
 from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceSchedule
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
+from invoice.models import Invoice, InvoiceOrderLink
+from invoice.admin import InvoiceAdmin, InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 from tenant_client.test_utils import FastTenantTestCase
@@ -101,8 +104,8 @@ class InvoiceScheduleFormTests(InvoiceTenantTestCase):
 
 class BillingOrderAdminFormTests(InvoiceTenantTestCase):
 		def setUp(self):
-			self.client_a = Client.objects.create(name="Client A")
-			self.client_b = Client.objects.create(name="Client B")
+			self.client_a = Client.objects.create(name="Client A", type='corporate')
+			self.client_b = Client.objects.create(name="Client B", type='corporate')
 
 		def _set_datetime(self, obj, field_name, dt):
 			type(obj).objects.filter(pk=obj.pk).update(**{field_name: dt})
@@ -175,6 +178,53 @@ class BillingOrderAdminFormTests(InvoiceTenantTestCase):
 			self.assertNotIn(order_b_after_unbilled, qs)
 			self.assertNotIn(order_a_before_pending, qs)
 			self.assertNotIn(order_a_linked_elsewhere, qs)
+
+		def test_invoice_for_corporate_can_select_branch_order(self):
+			branch = Client.objects.create(
+				name='Client A Branch',
+				type='branch',
+				corporate=self.client_a,
+			)
+			invoice = Invoice.objects.create(
+				client=self.client_a,
+				amount=Decimal('100.00'),
+				identifier='SER-BR-001',
+				folio='FOL-BR-001',
+			)
+			branch_order = Order.objects.create(
+				client=branch,
+				total_amount=Decimal('40.00'),
+				status='COMPLETED',
+			)
+
+			form = InvoiceOrderLinkAdminForm(invoice=invoice)
+
+			self.assertIn(branch_order, form.fields['order'].queryset)
+
+		def test_add_order_to_invoice_rejects_order_from_different_fiscal_owner(self):
+			from django.core.exceptions import ValidationError
+			from invoice.services import add_order_to_invoice
+
+			other_corporate = Client.objects.create(name='Other Corporate', type='corporate')
+			other_branch = Client.objects.create(
+				name='Other Branch',
+				type='branch',
+				corporate=other_corporate,
+			)
+			invoice = Invoice.objects.create(
+				client=self.client_a,
+				amount=Decimal('100.00'),
+				identifier='SER-BR-002',
+				folio='FOL-BR-002',
+			)
+			other_order = Order.objects.create(
+				client=other_branch,
+				total_amount=Decimal('40.00'),
+				status='COMPLETED',
+			)
+
+			with self.assertRaisesMessage(ValidationError, 'cliente fiscal'):
+				add_order_to_invoice(invoice=invoice, order=other_order)
 
 		def test_order_queryset_includes_current_order_on_edit(self):
 			base_time = timezone.now()
@@ -434,7 +484,7 @@ class GetInvoiceableOrdersServiceTests(InvoiceTenantTestCase):
 	"""Documents the intent: no date-based upper-bound filtering is applied."""
 
 	def setUp(self):
-		self.client_a = Client.objects.create(name='Client A')
+		self.client_a = Client.objects.create(name='Client A', type='corporate')
 
 	def test_orders_after_invoice_date_are_included(self):
 		"""
@@ -452,6 +502,42 @@ class GetInvoiceableOrdersServiceTests(InvoiceTenantTestCase):
 
 		qs = get_invoiceable_orders_for_client(client=self.client_a)
 		self.assertIn(future_order, qs)
+
+	def test_fiscal_owner_scope_includes_corporate_and_branch_orders(self):
+		from invoice.services import get_invoiceable_orders_for_client
+
+		corporate = Client.objects.create(name='Fiscal Corp', type='corporate')
+		branch = Client.objects.create(name='Fiscal Branch', type='branch', corporate=corporate)
+		corporate_order = Order.objects.create(
+			client=corporate,
+			total_amount=Decimal('10.00'),
+			status='COMPLETED',
+		)
+		branch_order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('20.00'),
+			status='COMPLETED',
+		)
+
+		qs = get_invoiceable_orders_for_client(client=corporate, scope='fiscal_owner')
+
+		self.assertIn(corporate_order, qs)
+		self.assertIn(branch_order, qs)
+
+	def test_exact_scope_keeps_existing_single_client_filter(self):
+		from invoice.services import get_invoiceable_orders_for_client
+
+		corporate = Client.objects.create(name='Exact Corp', type='corporate')
+		branch = Client.objects.create(name='Exact Branch', type='branch', corporate=corporate)
+		branch_order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('20.00'),
+			status='COMPLETED',
+		)
+
+		qs = get_invoiceable_orders_for_client(client=corporate, scope='exact')
+
+		self.assertNotIn(branch_order, qs)
 
 
 class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
@@ -496,6 +582,44 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 		self.assertEqual(invoice.client, self.client_a)
 		self.assertEqual(invoice.invoice_links.count(), 2)
 		self.assertTrue(invoice.auto_amount)
+
+	def test_branch_order_invoice_is_issued_to_corporate(self):
+		from invoice.services import create_invoice_from_orders
+
+		branch = Client.objects.create(
+			name='Client A Branch',
+			type='branch',
+			corporate=self.client_a,
+		)
+		order = self._completed_order(branch, '50.00')
+
+		invoice = create_invoice_from_orders(orders=[order], client=branch)
+
+		self.assertEqual(invoice.client, self.client_a)
+		self.assertEqual(invoice.invoice_links.get().order, order)
+
+	def test_multi_branch_invoice_is_issued_to_shared_corporate(self):
+		from invoice.services import create_invoice_from_orders
+
+		branch_one = Client.objects.create(name='Branch One', type='branch', corporate=self.client_a)
+		branch_two = Client.objects.create(name='Branch Two', type='branch', corporate=self.client_a)
+		order_one = self._completed_order(branch_one, '25.00')
+		order_two = self._completed_order(branch_two, '35.00')
+
+		invoice = create_invoice_from_orders(orders=[order_one, order_two], client=branch_one)
+
+		self.assertEqual(invoice.client, self.client_a)
+		self.assertEqual(invoice.amount, Decimal('60.00'))
+
+	def test_rejects_branch_without_corporate(self):
+		from django.core.exceptions import ValidationError
+		from invoice.services import create_invoice_from_orders
+
+		branch = Client.objects.create(name='Orphan Branch', type='branch')
+		order = self._completed_order(branch, '10.00')
+
+		with self.assertRaisesMessage(ValidationError, 'corporativo'):
+			create_invoice_from_orders(orders=[order], client=branch)
 
 	def test_creates_invoice_order_links_for_each_order(self):
 		from invoice.services import create_invoice_from_orders
@@ -572,7 +696,7 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 	def setUp(self):
 		super().setUp()
 		self.superuser = User.objects.create_superuser(username='admin_staff', password='pass_staff')
-		self.client_obj = Client.objects.create(name='Test Client A')
+		self.client_obj = Client.objects.create(name='Test Client A', type='corporate')
 		self.invoice = Invoice.objects.create(
 			client=self.client_obj,
 			amount=Decimal('200.00'),
@@ -607,6 +731,27 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		self.assertEqual(response.status_code, 302) # Redirect to edit page
 		self.assertTrue(Invoice.objects.filter(identifier='SER-NEW').exists())
 
+	def test_create_invoice_admin_view_post_branch_uses_corporate(self):
+		branch = Client.objects.create(
+			name='Branch Invoice Client',
+			type='branch',
+			corporate=self.client_obj,
+		)
+		url = reverse('admin_create_invoice')
+		data = {
+			'client': branch.id,
+			'identifier': 'SER-BRANCH',
+			'folio': 'FOL-BRANCH',
+			'amount': '150.00',
+			'auto_amount': False
+		}
+
+		response = self.client.post(url, data)
+
+		self.assertEqual(response.status_code, 302)
+		invoice = Invoice.objects.get(identifier='SER-BRANCH')
+		self.assertEqual(invoice.client, self.client_obj)
+
 	def test_edit_invoice_admin_view_get(self):
 		url = reverse('admin_edit_invoice', args=[self.invoice.id])
 		response = self.client.get(url)
@@ -629,6 +774,38 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		response = self.client.post(url, data)
 		self.assertEqual(response.status_code, 302) # Redirect to edit page
 		self.assertTrue(InvoiceOrderLink.objects.filter(invoice=self.invoice, order=order).exists())
+
+
+class InvoiceAdminSaveModelTests(InvoiceTenantTestCase):
+	def setUp(self):
+		super().setUp()
+		self.superuser = User.objects.create_superuser(username='invoice_admin', password='pass_staff')
+		self.factory = RequestFactory()
+		self.invoice_admin = InvoiceAdmin(Invoice, admin.site)
+		self.corporate = Client.objects.create(name='Admin Corporate', type='corporate')
+
+	def test_save_model_normalizes_branch_client_to_corporate_on_create(self):
+		branch = Client.objects.create(
+			name='Admin Branch',
+			type='branch',
+			corporate=self.corporate,
+		)
+		request = self.factory.post('/admin/billing/invoice/add/')
+		request.user = self.superuser
+		invoice = Invoice(
+			client=branch,
+			amount=Decimal('75.00'),
+			identifier='ADM-BRANCH',
+			folio='ADM-BRANCH',
+		)
+
+		class FormStub:
+			changed_data = ['client']
+
+		self.invoice_admin.save_model(request, invoice, FormStub(), change=False)
+
+		invoice.refresh_from_db()
+		self.assertEqual(invoice.client, self.corporate)
 
 
 class InvoiceBalanceSnapshotServiceTests(InvoiceTenantTestCase):

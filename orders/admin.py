@@ -8,7 +8,7 @@ from django.shortcuts import redirect
 from decimal import Decimal
 import csv
 from .models import Order, OrderProduct, OrderStatus, OrderSplit
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from unfold.admin import ModelAdmin, TabularInline
 from core.admin_mixins import SoftDeleteAdminMixin
 
@@ -603,15 +603,6 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             )
             return
 
-        client_ids = {o.client_id for o in orders}
-        if len(client_ids) > 1:
-            self.message_user(
-                request,
-                'Todos los pedidos seleccionados deben pertenecer al mismo cliente.',
-                level='error',
-            )
-            return
-
         already_billed_ids = list(
             InvoiceOrderLink.objects.filter(order__in=orders).values_list('order_id', flat=True)
         )
@@ -625,11 +616,15 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             return
 
         client = orders[0].client
-        invoice = create_invoice_from_orders(orders=orders, client=client)
+        try:
+            invoice = create_invoice_from_orders(orders=orders, client=client)
+        except ValidationError as exc:
+            self.message_user(request, str(exc), level='error')
+            return
 
         self.message_user(
             request,
-            f'Factura #{invoice.id} creada para {client.name} por ${invoice.amount}. '
+            f'Factura #{invoice.id} creada para {invoice.client.name} por ${invoice.amount}. '
             f'Actualiza el identificador y folio antes de emitirla.',
         )
         url = reverse('admin:billing_invoice_change', args=[invoice.id])
@@ -950,4 +945,3 @@ class OrderSplitAdmin(SoftDeleteAdminMixin, ModelAdmin):
         
         return format_html(''.join(summary))
     split_summary.short_description = 'Resumen de la División'
-

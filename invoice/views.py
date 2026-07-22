@@ -24,10 +24,12 @@ def invoiceable_orders(request, client_pk):
             include_order_id = int(include_order_id)
         except (TypeError, ValueError):
             include_order_id = None
+    scope = request.GET.get('scope', 'exact')
 
     orders_data = get_invoiceable_orders_for_client(
         client=client,
         include_order_id=include_order_id,
+        scope=scope,
         as_dict=True,
     )
     return JsonResponse({'orders': orders_data})
@@ -151,7 +153,11 @@ def edit_invoice_admin(request, pk):
     if request.method == 'POST':
         # Check if the post action is adding an order link
         if 'add_order_link' in request.POST:
-            link_form = InvoiceOrderLinkForm(request.POST, client=invoice.client)
+            link_form = InvoiceOrderLinkForm(
+                request.POST,
+                client=invoice.client,
+                scope='fiscal_owner',
+            )
             if link_form.is_valid():
                 order = link_form.cleaned_data['order']
                 try:
@@ -180,10 +186,14 @@ def edit_invoice_admin(request, pk):
     linked_orders = invoice.invoice_links.select_related('order').all()
     
     # Form to add a new link
-    link_form = InvoiceOrderLinkForm(client=invoice.client)
+    link_form = InvoiceOrderLinkForm(client=invoice.client, scope='fiscal_owner')
     
     # Get raw billable orders as well for dynamic JS loading
-    billable_orders = get_invoiceable_orders_for_client(client=invoice.client, as_dict=True)
+    billable_orders = get_invoiceable_orders_for_client(
+        client=invoice.client,
+        scope='fiscal_owner',
+        as_dict=True,
+    )
 
     context = {
         'invoice': invoice,

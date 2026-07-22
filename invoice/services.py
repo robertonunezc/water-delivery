@@ -20,7 +20,7 @@ from core.utils import get_first_last_day_of_month
 from orders.models import Order
 
 
-def _get_invoice_billing_owner(client: Client) -> Client:
+def get_invoice_fiscal_owner(client: Client) -> Client:
     """Return the client whose fiscal data must be used for invoice generation."""
     if client.type == 'branch':
         if client.corporate_id is None:
@@ -29,6 +29,11 @@ def _get_invoice_billing_owner(client: Client) -> Client:
             )
         return client.corporate
     return client
+
+
+def _get_invoice_billing_owner(client: Client) -> Client:
+    """Backward-compatible alias for older billing terminology."""
+    return get_invoice_fiscal_owner(client)
 
 
 def _get_missing_invoice_data_fields(invoice_data: Optional[InvoiceData]) -> List[str]:
@@ -46,7 +51,7 @@ def _get_missing_invoice_data_fields(invoice_data: Optional[InvoiceData]) -> Lis
 
 def validate_client_invoice_generation_requirements(client: Client) -> None:
     """Validate the fiscal requirements needed to generate an invoice for a client."""
-    billing_owner = _get_invoice_billing_owner(client)
+    billing_owner = get_invoice_fiscal_owner(client)
     missing_messages: List[str] = []
     invoice_data = billing_owner.invoice_data if hasattr(billing_owner, 'invoice_data') else None
 
@@ -290,6 +295,12 @@ def add_order_to_invoice(
     if not invoice.pk:
         raise ValidationError("La factura debe guardarse primero antes de añadir ventas.")
 
+    validate_order_can_link_to_invoice(
+        invoice=invoice,
+        order=order,
+        exclude_invoice_order_link_id=exclude_invoice_order_link_id,
+    )
+
     validate_invoice_order_total(
         invoice=invoice,
         order=order,
@@ -308,6 +319,39 @@ def validate_invoice_orders_total_limit(invoice_amount: Decimal, order_amounts: 
         raise ValidationError(
             f"La suma de montos de las ventas asociadas ({total_selected}) "
             f"excede el monto de la factura ({invoice_amount})."
+        )
+
+
+def validate_order_can_link_to_invoice(
+    invoice: 'invoice.models.Invoice',
+    order: Order,
+    exclude_invoice_order_link_id: Optional[int] = None,
+) -> None:
+    """Validate that an order is eligible to be linked to an invoice."""
+    from invoice.models import InvoiceOrderLink
+    from orders.models import OrderStatus
+
+    current_link = None
+    if exclude_invoice_order_link_id:
+        current_link = InvoiceOrderLink.objects.filter(
+            pk=exclude_invoice_order_link_id,
+            invoice=invoice,
+            order=order,
+        ).first()
+
+    existing_links = InvoiceOrderLink.objects.filter(order=order)
+    if exclude_invoice_order_link_id:
+        existing_links = existing_links.exclude(pk=exclude_invoice_order_link_id)
+    if existing_links.exists():
+        raise ValidationError(f'El pedido #{order.id} ya esta vinculado a otra factura.')
+
+    if current_link is None and order.status != OrderStatus.COMPLETED.value:
+        raise ValidationError(f'Solo se pueden facturar pedidos completados. Pedido #{order.id}.')
+
+    order_fiscal_owner = get_invoice_fiscal_owner(order.client)
+    if order_fiscal_owner.pk != invoice.client_id:
+        raise ValidationError(
+            f'El pedido #{order.id} pertenece a otro cliente fiscal.'
         )
 
 
@@ -353,12 +397,14 @@ def get_invoiceable_orders_for_client(
     client: Client,
     include_order_id: Optional[int] = None,
     as_dict: bool = False,
+    scope: str = 'exact',
 ) -> List:
     """
     Get all invoiceable orders for a specific client.
 
     Eligibility rules:
-    - Order belongs to the provided client
+    - Exact scope: order belongs to the provided client
+    - Fiscal owner scope: order belongs to the fiscal owner or one of its branches
     - Order status is COMPLETED
     - Order has no invoice link (unless include_order_id is provided for edit mode)
 
@@ -366,14 +412,23 @@ def get_invoiceable_orders_for_client(
         client: Client instance or client ID
         include_order_id: Optional order ID to keep in queryset during edit mode
         as_dict: If True, return list of dicts for JSON serialization
+        scope: "exact" for the provided client only, or "fiscal_owner" for the
+            provided fiscal owner and all of its branches
 
     Returns:
         QuerySet or list of dicts with order information
     """
-    orders = Order.objects.unbilled_for_client(
-        client=client,
-        exclude_order_id=include_order_id,
-    )
+    if scope == 'fiscal_owner':
+        fiscal_owner = get_invoice_fiscal_owner(client)
+        orders = Order.objects.unbilled_for_fiscal_owner(
+            fiscal_owner=fiscal_owner,
+            exclude_order_id=include_order_id,
+        )
+    else:
+        orders = Order.objects.unbilled_for_client(
+            client=client,
+            exclude_order_id=include_order_id,
+        )
 
     if not as_dict:
         return orders
@@ -498,28 +553,23 @@ def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.
     if not orders:
         raise ValidationError("Debe seleccionar al menos un pedido.")
 
-    clients = {order.client for order in orders}
-    #Validate if all clients are corporate and if are branches they must belong to the same corporate
-    clients_corporate = []
-    
-    for client in clients:
-        if client.corporate is not None:
-            clients_corporate.append(client.corporate)
-        else:
-            clients_corporate.append(client)
-
-    if len(set(clients_corporate)) > 1:
+    fiscal_owners = {
+        get_invoice_fiscal_owner(order.client)
+        for order in orders
+    }
+    if len(fiscal_owners) > 1:
         raise ValidationError("Todos los pedidos deben pertenecer al mismo cliente corporativo.")
+    fiscal_owner = next(iter(fiscal_owners))
 
-    for order_client in clients:
-        validate_client_invoice_generation_requirements(order_client)
+    for order in orders:
+        validate_client_invoice_generation_requirements(order.client)
 
     total = sum(o.total_amount for o in orders)
     short_id = uuid.uuid4().hex[:8].upper()
 
     with transaction.atomic():
         invoice = Invoice.objects.create(
-            client=client,
+            client=fiscal_owner,
             amount=total,
             auto_amount=True,
             identifier=f'BORRADOR-{short_id}',

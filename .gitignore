@@ -117,6 +117,7 @@ dmypy.json
 # Django generated files
 /media/
 /staticfiles/
+.superpowers/
 
 # (optional) ignore only root-level static, not app static
 /static/

@@ -296,7 +296,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
 
     messages.success(
         request,
-        f'Factura #{invoice.id} creada para {client.name} por ${invoice.amount}. '
+        f'Factura #{invoice.id} creada para {invoice.client.name} por ${invoice.amount}. '
         'Actualiza el identificador y folio antes de emitirla.',
     )
     return redirect(reverse('admin_edit_invoice', args=[invoice.id]))

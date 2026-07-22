@@ -1,7 +1,8 @@
-from django.http import JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum, Q
+from django.db.models.query import QuerySet
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
@@ -22,7 +23,9 @@ from .forms import (
     AddressInlineForm,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
+from .services.client_detail_service import build_client_detail_snapshot
 from .services.client_service import initialize_branch_credit_from_corporate
+from .services.corporate_branch_service import build_corporate_branch_workspace
 from orders.models import Order
 from product.services import ensure_client_product_prices
 from routes.forms import ClientRouteAssignmentForm
@@ -493,6 +496,22 @@ def _paginate_client_detail_items(request: Any, items: Any, *, page_param: str) 
     return paginator.get_page(request.GET.get(page_param, 1))
 
 
+def _get_client_detail_invoices(client: Client) -> QuerySet[Any]:
+    """Return invoices linked to orders owned by this client."""
+    from invoice.models import Invoice
+
+    if not client.requires_billing:
+        return Invoice.objects.none()
+
+    return (
+        Invoice.objects.filter(invoice_links__order__client=client)
+        .select_related('client')
+        .prefetch_related('invoice_links__order__payments')
+        .distinct()
+        .order_by('-date', '-id')
+    )
+
+
 def _payment_status_class(status: str) -> str:
     if status == 'completed':
         return 'success'
@@ -599,6 +618,7 @@ def detail(request, pk):
         all_payment_data,
         page_param='payments_page',
     )
+    client_invoices = _get_client_detail_invoices(client)
     
     # Calculate client statistics
     total_orders = orders.count()
@@ -630,6 +650,17 @@ def detail(request, pk):
     # Get pending payment data
     from clients.services.pending_payment_service import get_overdue_orders_for_client
     pending_payment_data = get_overdue_orders_for_client(client)
+    debt_percentage = int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0
+    client_invoices_list = tuple(client_invoices)
+    snapshot_context = build_client_detail_snapshot(
+        client=client,
+        billing_frequency=billing_frequency,
+        route_clients=route_clients,
+        upcoming_route_orders=upcoming_route_orders,
+        client_invoices=client_invoices_list,
+        pending_payment_data=pending_payment_data,
+        debt_percentage=debt_percentage,
+    )
 
     context = {
         'client': client,
@@ -644,7 +675,8 @@ def detail(request, pk):
         'route_clients': route_clients,
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,
-        'debt_percentage': int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0, 
+        'client_invoices': client_invoices_list,
+        'debt_percentage': debt_percentage,
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,
@@ -652,9 +684,21 @@ def detail(request, pk):
             'completed_orders': completed_orders,
         },
         'pending_payment_data': pending_payment_data,
+        **snapshot_context,
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@login_required
+def corporate_branches(request: HttpRequest, pk: int) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk)
+    if client.type != 'corporate':
+        raise Http404('La vista de sucursales solo aplica a clientes corporativos.')
+
+    context = build_corporate_branch_workspace(client, request.GET)
+    return render(request, 'corporate_branch_workspace.html', context)
+
 
 @login_required
 def client_orders(request, client_pk):
