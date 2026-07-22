@@ -1,17 +1,27 @@
-from django.core.exceptions import ValidationError
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-from django.utils import timezone
-from decimal import Decimal
-from datetime import date, timedelta
 import csv
 import io
+from datetime import date, datetime, timedelta
+from decimal import Decimal
+
+from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.urls import reverse
+from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
-from .models import (
-    Client, InvoiceData, Address, BalanceTransaction, CreditTransaction,
-    Contact, ClientBillingFrecuency, ClientCreditConfig
-)
+
+from clients.services.corporate_branch_service import build_corporate_branch_workspace
+
 from .forms import AddressInlineForm
+from .models import (
+    Address,
+    BalanceTransaction,
+    Client,
+    ClientBillingFrecuency,
+    ClientCreditConfig,
+    Contact,
+    CreditTransaction,
+    InvoiceData,
+)
 from .services.csv_import_service import (
     _get_or_create_corporate,
     export_clients_to_csv,
@@ -25,6 +35,322 @@ from payment.models import Payment
 from routes.models import Route, RouteClient
 
 User = get_user_model()
+
+
+class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.corporate = Client.objects.create(
+            name='Corporativo Agua Norte',
+            type='corporate',
+        )
+        self.branch_a = Client.objects.create(
+            name='Sucursal A',
+            type='branch',
+            corporate=self.corporate,
+            current_debt=Decimal('30.00'),
+            active=True,
+        )
+        self.branch_b = Client.objects.create(
+            name='Sucursal B',
+            type='branch',
+            corporate=self.corporate,
+            current_debt=Decimal('70.00'),
+            active=True,
+        )
+        self.other_corporate = Client.objects.create(
+            name='Corporativo Otro',
+            type='corporate',
+        )
+        self.other_branch = Client.objects.create(
+            name='Sucursal Externa',
+            type='branch',
+            corporate=self.other_corporate,
+            active=True,
+        )
+
+        self.branch_a_completed = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('100.00'),
+            day=5,
+        )
+        self.branch_a_pending = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.PENDING.value,
+            amount=Decimal('50.00'),
+            day=6,
+        )
+        self.branch_a_cancelled = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.CANCELLED.value,
+            amount=Decimal('999.00'),
+            day=7,
+        )
+        self.branch_b_completed = self._create_order(
+            client=self.branch_b,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('200.00'),
+            day=8,
+        )
+        self.branch_a_outside_range = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('500.00'),
+            month=6,
+            day=30,
+        )
+
+        self.branch_a_payment = Payment.objects.create(
+            client=self.branch_a,
+            order=self.branch_a_completed,
+            amount=Decimal('80.00'),
+            method='cash',
+            status='completed',
+        )
+        self.pending_credit_payment = Payment.objects.create(
+            client=self.branch_a,
+            order=self.branch_a_pending,
+            amount=Decimal('50.00'),
+            method='pending_credit',
+            status='pending',
+        )
+        self.branch_b_payment = Payment.objects.create(
+            client=self.branch_b,
+            order=self.branch_b_completed,
+            amount=Decimal('200.00'),
+            method='bank_transfer',
+            status='completed',
+        )
+        self._set_payment_date(self.branch_a_payment, day=9)
+        self._set_payment_date(self.pending_credit_payment, day=10)
+        self._set_payment_date(self.branch_b_payment, day=11)
+
+    def _create_order(
+        self,
+        *,
+        client: Client,
+        status: str,
+        amount: Decimal,
+        day: int,
+        month: int = 7,
+        year: int = 2026,
+    ) -> Order:
+        order = Order.objects.create(
+            client=client,
+            status=status,
+            total_amount=amount,
+        )
+        Order.objects.filter(pk=order.pk).update(
+            order_date=timezone.make_aware(datetime(year, month, day, 9, 0)),
+        )
+        order.refresh_from_db()
+        return order
+
+    def _set_payment_date(
+        self,
+        payment: Payment,
+        *,
+        day: int,
+        month: int = 7,
+        year: int = 2026,
+    ) -> None:
+        Payment.objects.filter(pk=payment.pk).update(
+            date=timezone.make_aware(datetime(year, month, day, 12, 0)),
+        )
+        payment.refresh_from_db()
+
+    def test_build_workspace_defaults_to_first_active_branch_and_current_month(self) -> None:
+        context = build_corporate_branch_workspace(
+            self.corporate,
+            {},
+            today=date(2026, 7, 22),
+        )
+
+        self.assertEqual(context['selected_branch'], self.branch_a)
+        self.assertEqual(context['active_tab'], 'summary')
+        self.assertEqual(context['date_from'], date(2026, 7, 1))
+        self.assertEqual(context['date_to'], date(2026, 7, 31))
+
+    def test_build_workspace_summarizes_branch_orders_and_payments(self) -> None:
+        context = build_corporate_branch_workspace(
+            self.corporate,
+            {'branch': str(self.branch_a.pk)},
+            today=date(2026, 7, 22),
+        )
+
+        self.assertEqual(context['corporate_summary']['total_orders'], 4)
+        self.assertEqual(context['corporate_summary']['total_sales'], Decimal('350.00'))
+        self.assertEqual(context['corporate_summary']['total_payments'], Decimal('280.00'))
+        self.assertEqual(context['corporate_summary']['total_current_debt'], Decimal('100.00'))
+        self.assertEqual(context['selected_branch_summary']['order_count'], 3)
+        self.assertEqual(context['selected_branch_summary']['sales_total'], Decimal('150.00'))
+        self.assertEqual(context['selected_branch_summary']['payment_total'], Decimal('80.00'))
+        self.assertNotIn(self.branch_a_outside_range, context['orders_page'].object_list)
+
+    def test_build_workspace_ignores_branch_id_from_other_corporate(self) -> None:
+        context = build_corporate_branch_workspace(
+            self.corporate,
+            {'branch': str(self.other_branch.pk)},
+            today=date(2026, 7, 22),
+        )
+
+        self.assertEqual(context['selected_branch'], self.branch_a)
+
+
+class CorporateBranchWorkspaceViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='corporate-branch-workspace-user',
+            password='testpass123',
+        )
+        self.client.force_login(self.user)
+        self.corporate = Client.objects.create(
+            name='Corporativo Vista',
+            type='corporate',
+        )
+        self.branch_a = Client.objects.create(
+            name='Sucursal A',
+            type='branch',
+            corporate=self.corporate,
+            current_debt=Decimal('30.00'),
+            active=True,
+        )
+        self.branch_b = Client.objects.create(
+            name='Sucursal B',
+            type='branch',
+            corporate=self.corporate,
+            current_debt=Decimal('70.00'),
+            active=True,
+        )
+        self.branch_a_completed = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('100.00'),
+            day=5,
+        )
+        self.branch_a_pending = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.PENDING.value,
+            amount=Decimal('50.00'),
+            day=6,
+        )
+        self.branch_a_cancelled = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.CANCELLED.value,
+            amount=Decimal('999.00'),
+            day=7,
+        )
+        self.branch_b_completed = self._create_order(
+            client=self.branch_b,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('200.00'),
+            day=8,
+        )
+        self.branch_a_outside_range = self._create_order(
+            client=self.branch_a,
+            status=OrderStatus.COMPLETED.value,
+            amount=Decimal('500.00'),
+            month=6,
+            day=30,
+        )
+        self.branch_a_payment = Payment.objects.create(
+            client=self.branch_a,
+            order=self.branch_a_completed,
+            amount=Decimal('80.00'),
+            method='cash',
+            status='completed',
+        )
+        self.pending_credit_payment = Payment.objects.create(
+            client=self.branch_a,
+            order=self.branch_a_pending,
+            amount=Decimal('50.00'),
+            method='pending_credit',
+            status='pending',
+        )
+        self._set_payment_date(self.branch_a_payment, day=9)
+        self._set_payment_date(self.pending_credit_payment, day=10)
+
+    def _create_order(
+        self,
+        *,
+        client: Client,
+        status: str,
+        amount: Decimal,
+        day: int,
+        month: int = 7,
+        year: int = 2026,
+    ) -> Order:
+        order = Order.objects.create(
+            client=client,
+            status=status,
+            total_amount=amount,
+        )
+        Order.objects.filter(pk=order.pk).update(
+            order_date=timezone.make_aware(datetime(year, month, day, 9, 0)),
+        )
+        order.refresh_from_db()
+        return order
+
+    def _set_payment_date(
+        self,
+        payment: Payment,
+        *,
+        day: int,
+        month: int = 7,
+        year: int = 2026,
+    ) -> None:
+        Payment.objects.filter(pk=payment.pk).update(
+            date=timezone.make_aware(datetime(year, month, day, 12, 0)),
+        )
+        payment.refresh_from_db()
+
+    def test_corporate_detail_links_to_branch_workspace(self) -> None:
+        response = self.client.get(reverse('clients:detail', args=[self.corporate.pk]))
+
+        self.assertContains(
+            response,
+            reverse('clients:corporate_branches', args=[self.corporate.pk]),
+        )
+        self.assertContains(response, 'Ver sucursales / ventas')
+
+    def test_branch_client_cannot_open_branch_workspace(self) -> None:
+        response = self.client.get(
+            reverse('clients:corporate_branches', args=[self.branch_a.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_branch_workspace_renders_selected_branch_orders(self) -> None:
+        response = self.client.get(
+            reverse('clients:corporate_branches', args=[self.corporate.pk]),
+            {
+                'branch': self.branch_a.pk,
+                'tab': 'orders',
+                'date_from': '2026-07-01',
+                'date_to': '2026-07-31',
+            },
+        )
+
+        self.assertContains(response, 'Sucursal A')
+        self.assertContains(response, f'#{self.branch_a_completed.id}')
+        self.assertContains(response, f'#{self.branch_a_pending.id}')
+        self.assertContains(response, f'#{self.branch_a_cancelled.id}')
+        self.assertNotContains(response, f'#{self.branch_a_outside_range.id}')
+        self.assertNotContains(response, f'#{self.branch_b_completed.id}')
+
+    def test_branch_workspace_payments_tab_excludes_pending_credit_placeholder(self) -> None:
+        response = self.client.get(
+            reverse('clients:corporate_branches', args=[self.corporate.pk]),
+            {
+                'branch': self.branch_a.pk,
+                'tab': 'payments',
+                'date_from': '2026-07-01',
+                'date_to': '2026-07-31',
+            },
+        )
+
+        self.assertContains(response, f'#{self.branch_a_payment.id}')
+        self.assertNotContains(response, 'Crédito Pendiente')
 
 
 class ClientBillingInheritanceTestCase(FastTenantTestCase):

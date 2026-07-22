@@ -83,6 +83,11 @@
         <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-outline-primary me-2">
           <i class="fas fa-credit-card"></i> Reporte de crédito
         </a>
+        {% if client.type == 'corporate' %}
+          <a href="{% url 'clients:corporate_branches' client.pk %}" class="btn btn-outline-info me-2">
+            <i class="fas fa-code-branch"></i> Ver sucursales / ventas
+          </a>
+        {% endif %}
         {% if request.user.is_staff %}
           <a href="{% url 'clients:edit_v2' client.pk %}" class="btn btn-warning">
           <i class="fas fa-edit"></i> Editar Cliente
