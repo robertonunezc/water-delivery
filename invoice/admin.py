@@ -65,6 +65,7 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 			self.fields['order'].queryset = get_invoiceable_orders_for_client(
 				client=invoice.client,
 				include_order_id=current_order_id,
+				scope='fiscal_owner',
 				as_dict=False,
 			)
 		elif 'order' in self.fields:
@@ -83,7 +84,7 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 
 
 	def clean(self):
-		from invoice.services import validate_invoice_order_total
+		from invoice.services import validate_invoice_order_total, validate_order_can_link_to_invoice
 		from django.core.exceptions import ValidationError
 
 		cleaned = super().clean()
@@ -98,15 +99,24 @@ class InvoiceOrderLinkAdminForm(forms.ModelForm):
 		# Cap validation only applies to manually-created invoices (auto_amount=False).
 		# For action-created invoices the amount is derived from orders, so no cap.
 		# Only validate if invoice is already saved (has PK)
-		if invoice and order and invoice.pk and not getattr(invoice, 'auto_amount', False):
+		if invoice and order and invoice.pk:
 			try:
-				validate_invoice_order_total(
+				validate_order_can_link_to_invoice(
 					invoice=invoice,
 					order=order,
 					exclude_invoice_order_link_id=self.instance.pk,
 				)
 			except ValidationError as e:
 				raise ValidationError({'order': str(e)})
+			if not getattr(invoice, 'auto_amount', False):
+				try:
+					validate_invoice_order_total(
+						invoice=invoice,
+						order=order,
+						exclude_invoice_order_link_id=self.instance.pk,
+					)
+				except ValidationError as e:
+					raise ValidationError({'order': str(e)})
 
 		return cleaned
 
@@ -184,6 +194,12 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 			from invoice.services import sync_invoice_amount
 			sync_invoice_amount(form.instance)
 
+	def save_model(self, request, obj, form, change):
+		if obj.client_id and (not change or 'client' in form.changed_data):
+			from invoice.services import get_invoice_fiscal_owner
+			obj.client = get_invoice_fiscal_owner(obj.client)
+		super().save_model(request, obj, form, change)
+
 	def get_urls(self):
 		urls = super().get_urls()
 		custom_urls = [
@@ -213,6 +229,7 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 		orders_data = get_invoiceable_orders_for_client(
 			client=client,
 			include_order_id=include_order_id,
+			scope='fiscal_owner',
 			as_dict=True,
 		)
 		return JsonResponse({'orders': orders_data})
@@ -264,6 +281,7 @@ class InvoiceOrderLinkAdmin(SoftDeleteAdminMixin, ModelAdmin):
 		orders_data = get_invoiceable_orders_for_client(
 			client=client,
 			include_order_id=include_order_id,
+			scope='fiscal_owner',
 			as_dict=True,
 		)
 
