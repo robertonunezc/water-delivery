@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum, Q
@@ -25,6 +25,7 @@ from .forms import (
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from .services.client_detail_service import build_client_detail_snapshot
 from .services.client_service import initialize_branch_credit_from_corporate
+from .services.corporate_branch_service import build_corporate_branch_workspace
 from orders.models import Order
 from product.services import ensure_client_product_prices
 from routes.forms import ClientRouteAssignmentForm
@@ -687,6 +688,17 @@ def detail(request, pk):
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@login_required
+def corporate_branches(request: HttpRequest, pk: int) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk)
+    if client.type != 'corporate':
+        raise Http404('La vista de sucursales solo aplica a clientes corporativos.')
+
+    context = build_corporate_branch_workspace(client, request.GET)
+    return render(request, 'corporate_branch_workspace.html', context)
+
 
 @login_required
 def client_orders(request, client_pk):
