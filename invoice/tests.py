@@ -1,14 +1,18 @@
 from decimal import Decimal
-from datetime import timedelta
+from datetime import date, timedelta
 import json
 
 from django.contrib import admin
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.test import TestCase, RequestFactory
 from django.utils import timezone
 
 from clients.models import Address, Client, InvoiceData
+from clients.forms import InvoiceScheduleForm
 from orders.models import Order
+from invoice.models import Invoice, InvoiceOrderLink, InvoiceSchedule
+from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.admin import InvoiceAdmin, InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.services import validate_invoice_order_total
@@ -24,6 +28,78 @@ class InvoiceTenantTestCase(FastTenantTestCase):
 		tenant.paid_until = timezone.now().date() + timedelta(days=30)
 		tenant.on_trial = False
 		return tenant
+
+
+class InvoiceScheduleRecurrenceModelTests(InvoiceTenantTestCase):
+    def setUp(self):
+        self.client = Client.objects.create(
+            name="Client With Billing Schedule",
+            requires_billing=True,
+            active=True,
+        )
+
+    def test_schedule_has_required_start_date_field(self):
+        field_names = [field.name for field in InvoiceSchedule._meta.fields]
+
+        self.assertIn("start_date", field_names)
+
+        field = InvoiceSchedule._meta.get_field("start_date")
+        self.assertFalse(field.null)
+        self.assertFalse(field.blank)
+
+    def test_clean_requires_start_date(self):
+        schedule = InvoiceSchedule(
+            client=self.client,
+            frequency="monthly",
+            billing_date="first_day",
+            is_active=True,
+        )
+        schedule.start_date = None
+
+        with self.assertRaises(ValidationError) as context:
+            schedule.clean()
+
+        self.assertIn("start_date", context.exception.message_dict)
+
+    def test_weekly_clean_preserves_selected_weekday(self):
+        schedule = InvoiceSchedule(
+            client=self.client,
+            frequency="weekly",
+            weekday=2,
+            is_active=True,
+        )
+        schedule.start_date = date(2026, 7, 13)
+
+        schedule.clean()
+
+        self.assertEqual(schedule.weekday, 2)
+        self.assertIsNone(schedule.billing_date)
+        self.assertIsNone(schedule.occurrence)
+        self.assertIsNone(schedule.specific_day)
+
+    def test_monthly_weekday_occurrence_requires_weekday(self):
+        schedule = InvoiceSchedule(
+            client=self.client,
+            frequency="monthly",
+            billing_date="weekday_occurrence",
+            occurrence=1,
+            is_active=True,
+        )
+        schedule.start_date = date(2026, 7, 13)
+
+        with self.assertRaises(ValidationError) as context:
+            schedule.clean()
+
+        self.assertIn("weekday", context.exception.message_dict)
+
+
+class InvoiceScheduleFormTests(InvoiceTenantTestCase):
+    def test_form_exposes_required_start_date_without_monthly_ordinal_kind(self):
+        form = InvoiceScheduleForm()
+
+        self.assertIn("start_date", form.fields)
+        self.assertTrue(form.fields["start_date"].required)
+        self.assertNotIn("monthly_ordinal_day_kind", form.fields)
 
 
 class BillingOrderAdminFormTests(InvoiceTenantTestCase):

@@ -71,7 +71,10 @@
         }
 
         getActiveSelect(fieldName) {
-            const selector = fieldName === 'frequency' ? this.selectors.frequency : this.selectors.billingDate;
+            let selector = this.selectors.billingDate;
+            if (fieldName === 'frequency') {
+                selector = this.selectors.frequency;
+            }
             const fields = this.$(selector).filter((_, element) => {
                 const $element = this.$(element);
                 return !$element.closest('.empty-form').length;
@@ -186,9 +189,12 @@
          * Handle weekly frequency selection
          */
         handleWeeklyFrequency(elements) {
-            this.log('Weekly selected - hiding billing date field');
+            this.log('Weekly selected - showing weekday field only');
             elements.billingDateField.hide(300);
             elements.billingDateSelect.val('');
+            elements.containerSpecificDate.slideUp(300);
+            elements.containerOccurrence.slideUp(300);
+            elements.containerWeekday.slideDown(300);
         }
 
         /**
@@ -220,6 +226,10 @@
             };
 
             if (shouldHide) {
+                if (frequency === 'weekly') {
+                    elements.containerWeekday.slideDown(300);
+                    return;
+                }
                 hideAll();
                 return;
             }
@@ -234,8 +244,8 @@
 
             if (billingDate === 'weekday_occurrence' && frequency === 'monthly') {
                 elements.containerSpecificDate.slideUp(300);
-                elements.containerWeekday.slideDown(300);
                 elements.containerOccurrence.slideDown(300);
+                elements.containerWeekday.slideDown(300);
                 return;
             }
 

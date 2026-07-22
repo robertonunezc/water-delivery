@@ -309,8 +309,9 @@
 									<form method="post">
 										{% csrf_token %}
 										<input type="hidden" name="section" value="billing_frequency">
+										<div class="mb-2">{{ invoice_schedule_form.start_date.label_tag }}{{ invoice_schedule_form.start_date }}{{ invoice_schedule_form.start_date.errors }}</div>
 										<div class="mb-2">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
-										<div class="mb-2">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
+										<div class="mb-2" id="invoice-billing-date-wrapper">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
 										<div class="mb-2" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
 										<div class="mb-2" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
 										<div class="mb-2" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
@@ -403,33 +404,49 @@
 <script>
 	class InvoiceFrequencyFieldController {
 		constructor() {
+			this.frequencySelect = document.getElementById('id_invoice_schedule-frequency');
 			this.billingDateSelect = document.getElementById('id_invoice_schedule-billing_date');
+			this.billingDateWrapper = document.getElementById('invoice-billing-date-wrapper');
 			this.specificDayWrapper = document.getElementById('invoice-specific-day-wrapper');
 			this.weekdayWrapper = document.getElementById('invoice-weekday-wrapper');
 			this.occurrenceWrapper = document.getElementById('invoice-occurrence-wrapper');
 
-			if (!this.billingDateSelect || !this.specificDayWrapper || !this.weekdayWrapper || !this.occurrenceWrapper) {
+			if (!this.frequencySelect || !this.billingDateSelect || !this.billingDateWrapper || !this.specificDayWrapper || !this.weekdayWrapper || !this.occurrenceWrapper) {
 				return;
 			}
 
+			this.frequencySelect.addEventListener('change', () => this.updateVisibility());
 			this.billingDateSelect.addEventListener('change', () => this.updateVisibility());
 			this.updateVisibility();
 		}
 
 		updateVisibility() {
-			const selected = this.billingDateSelect.value;
+			const frequency = this.frequencySelect.value;
+			const billingDate = this.billingDateSelect.value;
 
+			this.billingDateWrapper.classList.remove('field-hidden');
 			this.specificDayWrapper.classList.add('field-hidden');
 			this.weekdayWrapper.classList.add('field-hidden');
 			this.occurrenceWrapper.classList.add('field-hidden');
 
-			if (selected === 'specific_date') {
+			if (frequency === 'weekly') {
+				this.billingDateWrapper.classList.add('field-hidden');
+				this.weekdayWrapper.classList.remove('field-hidden');
+				return;
+			}
+
+			if (frequency !== 'monthly') {
+				this.billingDateWrapper.classList.add('field-hidden');
+				return;
+			}
+
+			if (billingDate === 'specific_date') {
 				this.specificDayWrapper.classList.remove('field-hidden');
 			}
 
-			if (selected === 'weekday_occurrence') {
-				this.weekdayWrapper.classList.remove('field-hidden');
+			if (billingDate === 'weekday_occurrence') {
 				this.occurrenceWrapper.classList.remove('field-hidden');
+				this.weekdayWrapper.classList.remove('field-hidden');
 			}
 		}
 	}

@@ -10,74 +10,48 @@
             // Get the frequency and billing_date select elements
             var frequencySelect = $('#id_frequency');
             var billingDateSelect = $('#id_billing_date');
-            console.log('Frequency Select:', frequencySelect);
             if (frequencySelect.length === 0 || billingDateSelect.length === 0) {
                 return;
             }
-            console.log('Billing Date Select:', billingDateSelect);
+
             var frequency = frequencySelect.val();
             var billingDate = billingDateSelect.val();
-            console.log('Selected Frequency:', frequency);
-            console.log('Selected Billing Date:', billingDate);
-            // Find the fieldsets to toggle
-            var specificDateFieldset = $('.form-row').filter(function() {
-                return $(this).prev('h2').text().includes('Configuración de Fecha Específica') ||
-                       $(this).find('label[for*="specific_day"]').length > 0;
-            }).closest('.collapse');
-            
-            var weekdayFieldset = $('.form-row').filter(function() {
-                return $(this).prev('h2').text().includes('Configuración de Día de la Semana') ||
-                       $(this).find('label[for*="weekday"]').length > 0 ||
-                       $(this).find('label[for*="occurrence"]').length > 0;
-            }).closest('.collapse');
-            
-            // Alternative way to find fieldsets if the above doesn't work
-            if (specificDateFieldset.length === 0) {
-                specificDateFieldset = $('div.collapse').filter(function() {
-                    return $(this).find('label[for*="specific_day"]').length > 0;
-                });
-            }
-            
-            if (weekdayFieldset.length === 0) {
-                weekdayFieldset = $('div.collapse').filter(function() {
-                    return $(this).find('label[for*="weekday"]').length > 0 ||
-                           $(this).find('label[for*="occurrence"]').length > 0;
-                });
-            }
-            
-            // Logic: Hide both fieldsets if frequency is 'monthly' AND billing_date is 'last_day' or 'first_day'
-            var shouldHide = frequency === 'monthly' && (billingDate === 'last_day' || billingDate === 'first_day');
-            
-            if(frequency === 'biweekly'){
-                console.log('Biweekly selected - showing specific date drop box');
-                $('.field-billing_date').hide(300);
-                // reset the billingDate dropdown to first option, which is emtpy or non value
+
+            var billingDateField = $('.field-billing_date');
+            var specificDayField = $('.field-specific_day');
+            var weekdayField = $('.field-weekday');
+            var occurrenceField = $('.field-occurrence');
+
+            billingDateField.show(300);
+            specificDayField.hide(300);
+            weekdayField.hide(300);
+            occurrenceField.hide(300);
+
+            if (frequency === 'weekly') {
+                billingDateField.hide(300);
                 billingDateSelect.val('');
-
-                shouldHide = true;
+                weekdayField.show(300);
+                return;
             }
 
-            if(frequency === 'monthly'){
-                console.log('Monthly selected - showing billing date drop box');
-                $('.field-billing_date').show(300);
+            if (frequency === 'when_delivery' || frequency === 'biweekly') {
+                billingDateField.hide(300);
+                billingDateSelect.val('');
+                return;
             }
 
-            if (shouldHide) {
-                specificDateFieldset.slideUp(300);
-                weekdayFieldset.slideUp(300);
-            } else {
-                // Show fieldsets based on billing_date selection
-                if (billingDate === 'specific_date') {
-                    specificDateFieldset.slideDown(300);
-                    weekdayFieldset.slideUp(300);
-                } else if (billingDate === 'weekday_occurrence') {
-                    specificDateFieldset.slideUp(300);
-                    weekdayFieldset.slideDown(300);
-                } else {
-                    // For other billing_date options, hide both
-                    specificDateFieldset.slideUp(300);
-                    weekdayFieldset.slideUp(300);
-                }
+            if (frequency !== 'monthly') {
+                return;
+            }
+
+            if (billingDate === 'specific_date') {
+                specificDayField.show(300);
+                return;
+            }
+
+            if (billingDate === 'weekday_occurrence') {
+                occurrenceField.show(300);
+                weekdayField.show(300);
             }
         }
         
