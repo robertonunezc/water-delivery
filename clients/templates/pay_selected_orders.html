@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h4 mb-1">Pagar pedidos seleccionados</h1>
+      <p class="text-muted mb-0">{{ client.name }}</p>
+    </div>
+    <a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-secondary">Volver</a>
+  </div>
+
+  {% if error_message %}
+    <div class="alert alert-danger">{{ error_message }}</div>
+  {% endif %}
+
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header bg-white">
+          <strong>Pedidos a pagar</strong>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Pedido</th>
+                <th>Fecha</th>
+                <th>Total</th>
+                <th>Pagado</th>
+                <th>Pendiente</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for order in selected_orders %}
+                <tr>
+                  <td><a href="{% url 'orders:get_order' order.pk %}">#{{ order.pk }}</a></td>
+                  <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
+                  <td>${{ order.total_amount|floatformat:2 }}</td>
+                  <td>${{ order.total_paid|floatformat:2 }}</td>
+                  <td class="fw-semibold text-danger">${{ order.remaining_payment_amount|floatformat:2 }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <form method="post" class="card">
+        {% csrf_token %}
+        {% for order in selected_orders %}
+          <input type="hidden" name="orders" value="{{ order.pk }}">
+        {% endfor %}
+        <div class="card-body">
+          <div class="mb-3">
+            <div class="text-muted small">Total seleccionado</div>
+            <div class="fs-4 fw-bold">${{ selected_total|floatformat:2 }}</div>
+          </div>
+          <div class="mb-3">
+            <label for="amount" class="form-label">Monto recibido</label>
+            <input id="amount" name="amount" type="number" step="0.01" min="{{ selected_total|floatformat:2 }}" value="{{ payment_amount|floatformat:2 }}" class="form-control" required>
+            <div class="form-text">Debe cubrir el total seleccionado. El excedente se agrega al saldo.</div>
+          </div>
+          <div class="mb-3">
+            <label for="payment_method" class="form-label">Método de pago</label>
+            <select id="payment_method" name="payment_method" class="form-select" required>
+              {% for value, label in payment_types %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">Confirmar pago</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

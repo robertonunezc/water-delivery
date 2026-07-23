@@ -7,6 +7,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
+from decimal import Decimal, InvalidOperation
 from typing import Any, List
 from urllib.parse import urlencode
 from .models import Client, Address, Contact, InvoiceData, ClientCreditConfig, InvoiceSchedule
@@ -27,6 +28,8 @@ from .services.client_detail_service import build_client_detail_snapshot
 from .services.client_service import initialize_branch_credit_from_corporate
 from .services.corporate_branch_service import build_corporate_branch_workspace
 from orders.models import Order
+from payment import services as payment_services
+from payment.models import PAYMENT_METHOD_CHOICES
 from product.services import ensure_client_product_prices
 from routes.forms import ClientRouteAssignmentForm
 from routes.models import RouteClient
@@ -604,6 +607,103 @@ def _build_payment_history(client: Client) -> List[dict[str, Any]]:
 
     payment_history.sort(key=lambda item: item['date'], reverse=True)
     return payment_history
+
+
+def _parse_order_ids(request: HttpRequest) -> List[int]:
+    raw_order_ids = (
+        request.POST.getlist('orders')
+        if request.method == 'POST'
+        else request.GET.getlist('orders')
+    )
+    order_ids = []
+    for raw_order_id in raw_order_ids:
+        try:
+            order_ids.append(int(raw_order_id))
+        except (TypeError, ValueError):
+            continue
+    return order_ids
+
+
+def _parse_payment_amount(raw_amount: str) -> Decimal:
+    try:
+        return Decimal(str(raw_amount))
+    except (InvalidOperation, TypeError, ValueError):
+        raise payment_services.ClientOrderPaymentError('El monto de pago es inválido.')
+
+
+def _selected_order_payment_context(
+    client: Client,
+    selected_orders: List[Order],
+    *,
+    amount: Decimal | None = None,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    for order in selected_orders:
+        order.remaining_payment_amount = payment_services.get_unpaid_amount(order)
+
+    selected_total = sum(
+        (order.remaining_payment_amount for order in selected_orders),
+        Decimal('0.00'),
+    )
+    payment_types = [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value != 'pending_credit'
+    ]
+    return {
+        'client': client,
+        'selected_orders': selected_orders,
+        'selected_total': selected_total,
+        'payment_amount': amount if amount is not None else selected_total,
+        'payment_types': payment_types,
+        'error_message': error_message,
+    }
+
+
+@login_required
+def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk)
+    order_ids = _parse_order_ids(request)
+
+    try:
+        selected_orders = payment_services.get_selected_unpaid_orders(client, order_ids)
+    except payment_services.ClientOrderPaymentError as exc:
+        messages.error(request, str(exc))
+        return redirect('clients:detail', pk=client.pk)
+
+    if request.method == 'POST':
+        submitted_amount = Decimal('0.00')
+        try:
+            submitted_amount = _parse_payment_amount(request.POST.get('amount', '0'))
+            result = payment_services.pay_client_orders(
+                client=client,
+                orders=selected_orders,
+                payment_method=request.POST.get('payment_method', 'cash'),
+                amount=submitted_amount,
+                request_user=request.user,
+            )
+        except (payment_services.ClientOrderPaymentError, ValueError) as exc:
+            context = _selected_order_payment_context(
+                client,
+                selected_orders,
+                amount=submitted_amount,
+                error_message=str(exc),
+            )
+            return render(request, 'pay_selected_orders.html', context)
+
+        messages.success(
+            request,
+            f'Se registró el pago de {len(result["orders"])} pedido(s) por ${result["selected_total"]:.2f}.',
+        )
+        if result['balance_added'] > 0:
+            messages.info(
+                request,
+                f'Se agregó ${result["balance_added"]:.2f} al saldo del cliente.',
+            )
+        return redirect('clients:detail', pk=client.pk)
+
+    context = _selected_order_payment_context(client, selected_orders)
+    return render(request, 'pay_selected_orders.html', context)
 
 
 @login_required

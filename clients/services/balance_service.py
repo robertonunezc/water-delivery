@@ -91,10 +91,10 @@ def add_balance(
         raise ValueError("Amount must be positive")
 
     # Store previous balance
-    balance_before = client.balance
+    balance_before = Decimal(str(client.balance))
 
     # Update balance
-    client.balance += amount
+    client.balance = balance_before + amount
     balance_after = client.balance
 
     # Save client
