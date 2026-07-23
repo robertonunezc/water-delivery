@@ -180,7 +180,7 @@
         </a>
         {% if client.type == 'corporate' %}
           <a href="{% url 'clients:corporate_branches' client.pk %}" class="btn client-header-action">
-            <i class="fas fa-code-branch"></i> Ver sucursales
+            <i class="fas fa-code-branch"></i> Ver sucursales / ventas
           </a>
         {% endif %}
         {% if request.user.is_staff %}
