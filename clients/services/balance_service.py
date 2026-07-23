@@ -60,6 +60,7 @@ def add_balance(
     client: "Client",
     amount: Decimal,
     transaction_type: str = "deposit",
+    date: object = None,
     user: "User | None" = None,
     reference_order: "Order | None" = None,
     reference_payment: "Payment | None" = None,
@@ -78,7 +79,7 @@ def add_balance(
         reference_payment: Related payment (if applicable)
         transfer_to_client: Source/target client for transfers (if applicable)
         notes: Additional notes
-
+        date: Date of the transaction
     Returns:
         BalanceTransaction: The created transaction record
 
@@ -89,6 +90,7 @@ def add_balance(
 
     if amount <= 0:
         raise ValueError("Amount must be positive")
+    
 
     # Store previous balance
     balance_before = Decimal(str(client.balance))
@@ -113,6 +115,7 @@ def add_balance(
         reference_payment=reference_payment,
         transfer_to_client=transfer_to_client,
         created_by=user,
+        date=date,
     )
 
 

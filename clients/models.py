@@ -340,7 +340,7 @@ class BalanceTransaction(TimeStampedModel):
     balance_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Anterior")
     balance_after = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Saldo Posterior")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
-    
+    date = models.DateTimeField(verbose_name="Fecha de transacción", null=True, blank=True, help_text="Fecha y hora de la transacción. Si no se proporciona, se usará la fecha y hora actual.")
     # References to related objects
     reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")
     reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")

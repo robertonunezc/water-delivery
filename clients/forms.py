@@ -50,6 +50,15 @@ class ManualBalanceTransactionForm(forms.Form):
         })
     )
     
+    date = forms.DateField(
+        label="Fecha de Transacción",
+        help_text="Fecha y hora de la transacción",
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+    
     notes = forms.CharField(
         required=True,
         label="Notas detalladas",

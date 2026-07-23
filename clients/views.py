@@ -1074,6 +1074,7 @@ def add_balance(request, pk):
             amount = form.cleaned_data['amount']
             transaction_type = form.cleaned_data['transaction_type']
             notes = form.cleaned_data['notes']
+            date = form.cleaned_data['date']
             
             try:
                 from clients.services import balance_service
@@ -1082,6 +1083,7 @@ def add_balance(request, pk):
                     client=client,
                     amount=amount,
                     transaction_type=transaction_type,
+                    date=date,
                     user=request.user,
                     notes=f"[MANUAL]. Transacción manual realizada por {request.user.username}. {notes}"
                 )
