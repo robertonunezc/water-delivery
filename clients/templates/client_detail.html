@@ -140,6 +140,29 @@
       font-size: 1rem;
       margin-bottom: .75rem;
     }
+    .client-order-id-cell {
+      align-items: center;
+      display: inline-flex;
+      gap: .35rem;
+      white-space: nowrap;
+    }
+    .btn.client-order-note-trigger {
+      align-items: center;
+      border-color: #ced4da;
+      border-radius: 6px;
+      color: #495057;
+      display: inline-flex;
+      height: 1.75rem;
+      justify-content: center;
+      padding: 0;
+      width: 1.75rem;
+    }
+    .btn.client-order-note-trigger:hover,
+    .btn.client-order-note-trigger:focus {
+      background: #f8f9fa;
+      border-color: #adb5bd;
+      color: #212529;
+    }
     @media (max-width: 767.98px) {
       .client-action-bar {
         justify-content: flex-start;
@@ -372,7 +395,23 @@
                           <input class="form-check-input client-order-payment-checkbox" type="checkbox" name="orders" value="{{ order.pk }}" form="selected-orders-payment-form">
                         {% endif %}
                       </td>
-                      <td><strong>#{{ order.id }}</strong></td>
+                      <td>
+                        <span class="client-order-id-cell">
+                          <strong>#{{ order.id }}</strong>
+                          {% if order.notes %}
+                            <button
+                              type="button"
+                              class="btn btn-sm btn-outline-secondary client-order-note-trigger"
+                              data-bs-toggle="modal"
+                              data-bs-target="#order-note-modal-{{ order.pk }}"
+                              aria-label="Ver nota del pedido #{{ order.pk }}"
+                              title="Ver nota">
+                              <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                              <span class="visually-hidden">Ver nota</span>
+                            </button>
+                          {% endif %}
+                        </span>
+                      </td>
                       <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                       <td>
                         <span class="badge bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning text-dark{% else %}danger{% endif %}">
@@ -414,6 +453,23 @@
                 </tbody>
               </table>
             </div>
+            {% for order in orders %}
+              {% if order.notes %}
+                <div class="modal fade" id="order-note-modal-{{ order.pk }}" tabindex="-1" aria-labelledby="order-note-modal-{{ order.pk }}-label" aria-hidden="true">
+                  <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content">
+                      <div class="modal-header">
+                        <h3 class="modal-title h5" id="order-note-modal-{{ order.pk }}-label">Nota del pedido #{{ order.pk }}</h3>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                      </div>
+                      <div class="modal-body">
+                        {{ order.notes|linebreaksbr }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
             {% if orders.has_other_pages %}
               <nav class="mt-3" aria-label="Paginación de ventas del cliente">
                 <ul class="pagination justify-content-end mb-0">

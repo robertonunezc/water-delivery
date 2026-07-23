@@ -1168,6 +1168,33 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         self.assertNotContains(response, f'name="orders" value="{order.pk}"')
         self.assertNotContains(response, f'?orders={order.pk}"')
 
+    def test_recent_sales_order_with_notes_has_note_modal_trigger(self) -> None:
+        noted_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+            notes='Entregar solo en recepcion.',
+        )
+        plain_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('50.00'),
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertContains(response, f'id="order-note-modal-{noted_order.pk}"')
+        self.assertContains(
+            response,
+            f'aria-label="Ver nota del pedido #{noted_order.pk}"',
+        )
+        self.assertContains(response, 'Entregar solo en recepcion.')
+        self.assertNotContains(response, f'id="order-note-modal-{plain_order.pk}"')
+        self.assertNotContains(
+            response,
+            f'aria-label="Ver nota del pedido #{plain_order.pk}"',
+        )
+
     def test_overdue_order_pay_action_points_to_selected_payment_page(self) -> None:
         ClientCreditConfig.objects.create(
             client=self.customer,
