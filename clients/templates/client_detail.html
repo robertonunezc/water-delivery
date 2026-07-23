@@ -441,10 +441,21 @@
                             Acciones
                           </button>
                           <ul class="dropdown-menu dropdown-menu-end">
-                            <li><a class="dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
+                            {% if not order.is_closed %}
+                              <li><a class="dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
+                            {% endif %}
                             {% if not order.is_paid and order.status != 'CANCELLED' %}
                               <li><a class="dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
                             {% endif %}
+                            <li>
+                              <button
+                                type="button"
+                                class="dropdown-item text-danger client-order-cancel-action"
+                                data-cancel-url="{% url 'orders:cancel_order' order.id %}"
+                                aria-label="Cancelar pedido #{{ order.id }}">
+                                Cancelar
+                              </button>
+                            </li>
                           </ul>
                         </div>
                       </td>
@@ -878,4 +889,50 @@
     </div>
   </section>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const cancelButtons = Array.from(document.querySelectorAll('.client-order-cancel-action'));
+      const csrfToken = '{{ csrf_token }}';
+
+      cancelButtons.forEach((button) => {
+        button.addEventListener('click', async function () {
+          const confirmed = window.confirm('¿Desea cancelar este pedido? El pedido se marcará como cancelado y se revertirán los movimientos internos cuando aplique.');
+          if (!confirmed) {
+            return;
+          }
+
+          const cancelUrl = button.dataset.cancelUrl;
+          button.disabled = true;
+
+          try {
+            const response = await fetch(cancelUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+              },
+              body: JSON.stringify({}),
+            });
+            const data = await response.json().catch(() => ({}));
+
+            if (!response.ok || !data.success) {
+              const fallback = data.review_required
+                ? 'La cancelación requiere revisión de administración.'
+                : 'No se pudo cancelar el pedido.';
+              throw new Error(data.error || fallback);
+            }
+
+            window.alert(data.message || 'Pedido cancelado correctamente.');
+            window.location.reload();
+          } catch (error) {
+            button.disabled = false;
+            window.alert(error.message || 'No se pudo cancelar el pedido.');
+          }
+        });
+      });
+    });
+  </script>
 {% endblock %}
