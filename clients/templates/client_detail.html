@@ -199,6 +199,8 @@
     </div>
   </section>
 
+  <form id="selected-orders-payment-form" method="get" action="{% url 'clients:pay_selected_orders' client.pk %}"></form>
+
   {% if has_financial_risk %}
     <section class="alert alert-danger client-risk-alert shadow-sm mb-3" role="alert">
       <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
@@ -210,9 +212,16 @@
           </p>
         </div>
         <div>
-          <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-danger">
-            {{ credit_report_url_label }}
-          </a>
+          <div class="d-flex flex-wrap gap-2">
+            {% if pending_payment_data.overdue_orders %}
+              <button type="submit" class="btn btn-danger" form="selected-orders-payment-form">
+                Pagar seleccionados
+              </button>
+            {% endif %}
+            <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-outline-danger">
+              {{ credit_report_url_label }}
+            </a>
+          </div>
         </div>
       </div>
       {% if pending_payment_data.overdue_orders %}
@@ -220,6 +229,7 @@
           <table class="table table-sm table-hover mb-0">
             <thead class="table-danger">
               <tr>
+                <th style="width: 40px;"></th>
                 <th>Orden #</th>
                 <th>Fecha</th>
                 <th>Días Vencidos</th>
@@ -231,6 +241,11 @@
             <tbody>
               {% for overdue_order in pending_payment_data.overdue_orders %}
                 <tr>
+                  <td>
+                    {% if not overdue_order.is_paid and overdue_order.status != 'CANCELLED' %}
+                      <input class="form-check-input client-order-payment-checkbox" type="checkbox" name="orders" value="{{ overdue_order.pk }}" form="selected-orders-payment-form">
+                    {% endif %}
+                  </td>
                   <td>
                     <a href="{% url 'orders:get_order' overdue_order.id %}" class="text-danger fw-bold">
                       #{{ overdue_order.id }}
@@ -249,7 +264,7 @@
                     {% endfor %}
                   </td>
                   <td>
-                    <a href="{% url 'orders:get_order' overdue_order.id %}" class="btn btn-sm btn-danger">Pagar</a>
+                    <a href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ overdue_order.id }}" class="btn btn-sm btn-danger">Pagar</a>
                   </td>
                 </tr>
               {% endfor %}
@@ -319,19 +334,27 @@
         <div class="tab-pane fade show active" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h2 class="h5 mb-0">Ventas Recientes</h2>
-            <small class="text-muted">
+            <div class="d-flex flex-wrap gap-2 align-items-center justify-content-end">
               {% if orders %}
-                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
-              {% else %}
-                Sin ventas
+                <button type="submit" class="btn btn-primary btn-sm" form="selected-orders-payment-form">
+                  Pagar seleccionados
+                </button>
               {% endif %}
-            </small>
+              <small class="text-muted">
+                {% if orders %}
+                  Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
+                {% else %}
+                  Sin ventas
+                {% endif %}
+              </small>
+            </div>
           </div>
           {% if orders %}
             <div class="table-responsive">
               <table class="table table-hover align-middle">
                 <thead class="table-light">
                   <tr>
+                    <th style="width: 40px;"></th>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Estado</th>
@@ -344,6 +367,11 @@
                 <tbody>
                   {% for order in orders %}
                     <tr>
+                      <td>
+                        {% if not order.is_paid and order.status != 'CANCELLED' %}
+                          <input class="form-check-input client-order-payment-checkbox" type="checkbox" name="orders" value="{{ order.pk }}" form="selected-orders-payment-form">
+                        {% endif %}
+                      </td>
                       <td><strong>#{{ order.id }}</strong></td>
                       <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
                       <td>
@@ -369,9 +397,17 @@
                         {% endfor %}
                       </td>
                       <td>
-                        <a href="{% url 'orders:get_order' order.id %}" class="btn btn-sm btn-outline-primary">
-                          <i class="fas fa-edit"></i>
-                        </a>
+                        <div class="dropdown">
+                          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Acciones
+                          </button>
+                          <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
+                            {% if not order.is_paid and order.status != 'CANCELLED' %}
+                              <li><a class="dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
+                            {% endif %}
+                          </ul>
+                        </div>
                       </td>
                     </tr>
                   {% endfor %}

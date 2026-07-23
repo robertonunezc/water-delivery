@@ -1119,6 +1119,100 @@ class ClientSelectedOrderPaymentViewTests(FastTenantTestCase):
         self.assertFalse(Payment.objects.filter(order=first, method='cash').exists())
 
 
+class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-detail-pay-ui',
+            password='testpass123',
+        )
+        self.customer = Client.objects.create(
+            name='Cliente UI pagos',
+            active=True,
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.client.force_login(self.user)
+
+    def test_recent_sales_unpaid_order_has_checkbox_and_pay_action(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        pay_url = reverse('clients:pay_selected_orders', args=[self.customer.pk])
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, 'Pagar seleccionados')
+        self.assertContains(response, f'href="{pay_url}?orders={order.pk}"')
+        self.assertContains(response, 'Editar')
+
+    def test_recent_sales_paid_order_has_no_payment_checkbox_or_pay_action(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=order,
+            amount=Decimal('100.00'),
+            method='cash',
+            status='completed',
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertNotContains(response, f'name="orders" value="{order.pk}"')
+        self.assertNotContains(response, f'?orders={order.pk}"')
+
+    def test_overdue_order_pay_action_points_to_selected_payment_page(self) -> None:
+        ClientCreditConfig.objects.create(
+            client=self.customer,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='1',
+        )
+        self.customer.current_debt = Decimal('100.00')
+        self.customer.save(update_fields=['current_debt', 'updated_at'])
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+            type='credito',
+        )
+        Order.objects.filter(pk=order.pk).update(
+            order_date=timezone.now() - timedelta(days=60),
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=order,
+            amount=Decimal('100.00'),
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=self.customer,
+            transaction_type='purchase',
+            amount=Decimal('100.00'),
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('100.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        pay_url = reverse('clients:pay_selected_orders', args=[self.customer.pk])
+        self.assertContains(response, '¡Atención! Pagos Vencidos')
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, f'href="{pay_url}?orders={order.pk}"')
+
+
 class ClientDetailLayoutTests(FastTenantTestCase):
     def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
         user = User.objects.create_user(
