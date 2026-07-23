@@ -1143,10 +1143,15 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
 
         pay_url = reverse('clients:pay_selected_orders', args=[self.customer.pk])
+        edit_url = reverse('orders:get_order', args=[order.pk])
         self.assertContains(response, f'name="orders" value="{order.pk}"')
         self.assertContains(response, 'Pagar seleccionados')
         self.assertContains(response, f'href="{pay_url}?orders={order.pk}"')
-        self.assertContains(response, 'Editar')
+        self.assertContains(response, f'<a class="dropdown-item" href="{edit_url}">Editar</a>')
+        self.assertContains(
+            response,
+            f'data-cancel-url="{reverse("orders:cancel_order", args=[order.pk])}"',
+        )
 
     def test_recent_sales_paid_order_has_no_payment_checkbox_or_pay_action(self) -> None:
         order = Order.objects.create(
@@ -1167,6 +1172,15 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
 
         self.assertNotContains(response, f'name="orders" value="{order.pk}"')
         self.assertNotContains(response, f'?orders={order.pk}"')
+        edit_url = reverse("orders:get_order", args=[order.pk])
+        self.assertNotContains(
+            response,
+            f'<a class="dropdown-item" href="{edit_url}">Editar</a>',
+        )
+        self.assertContains(
+            response,
+            f'data-cancel-url="{reverse("orders:cancel_order", args=[order.pk])}"',
+        )
 
     def test_recent_sales_order_with_notes_has_note_modal_trigger(self) -> None:
         noted_order = Order.objects.create(
@@ -1354,6 +1368,7 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
             client=self.client_obj,
             frequency='monthly',
             billing_date='specific_date',
+            start_date=date(2026, 7, 1),
             specific_day=8,
             is_active=True,
         )
