@@ -1040,6 +1040,85 @@ class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
         )
 
 
+class ClientSelectedOrderPaymentViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='selected-pay-view-user',
+            password='testpass123',
+        )
+        self.customer = Client.objects.create(
+            name='Cliente vista pagos',
+            active=True,
+        )
+        self.client.force_login(self.user)
+
+    def _order(self, total: Decimal) -> Order:
+        return Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=total,
+        )
+
+    def test_payment_page_prefills_selected_total(self) -> None:
+        first = self._order(Decimal('100.00'))
+        second = self._order(Decimal('80.00'))
+
+        response = self.client.get(
+            reverse('clients:pay_selected_orders', args=[self.customer.pk]),
+            {'orders': [str(first.pk), str(second.pk)]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['selected_total'], Decimal('180.00'))
+        self.assertContains(response, 'value="180.00"')
+        self.assertContains(response, f'#{first.pk}')
+        self.assertContains(response, f'#{second.pk}')
+
+    def test_payment_page_requires_selected_orders(self) -> None:
+        response = self.client.get(
+            reverse('clients:pay_selected_orders', args=[self.customer.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('clients:detail', args=[self.customer.pk]))
+
+    def test_payment_page_posts_payment_and_redirects_to_client_detail(self) -> None:
+        first = self._order(Decimal('100.00'))
+        second = self._order(Decimal('80.00'))
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.customer.pk]),
+            {
+                'orders': [str(first.pk), str(second.pk)],
+                'amount': '180.00',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('clients:detail', args=[self.customer.pk]))
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertTrue(first.is_paid)
+        self.assertTrue(second.is_paid)
+
+    def test_payment_page_rejects_underpayment(self) -> None:
+        first = self._order(Decimal('100.00'))
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.customer.pk]),
+            {
+                'orders': [str(first.pk)],
+                'amount': '99.99',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'menor al total seleccionado')
+        self.assertFalse(Payment.objects.filter(order=first, method='cash').exists())
+
+
 class ClientDetailLayoutTests(FastTenantTestCase):
     def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
         user = User.objects.create_user(
