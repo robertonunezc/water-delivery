@@ -1,5 +1,5 @@
 from decimal import Decimal
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from dataclasses import dataclass, asdict
 from django.contrib.auth.models import User
 from django.db import transaction
@@ -8,6 +8,9 @@ from clients.services import balance_service
 from orders.models import Order, OrderStatus
 
 from .models import Payment
+
+if TYPE_CHECKING:
+    from clients.models import Client
 
 
 VALID_SETTLEMENT_METHODS = {
@@ -19,6 +22,11 @@ VALID_SETTLEMENT_METHODS = {
     'bank_transfer',
 }
 
+
+class ClientOrderPaymentError(ValueError):
+    """Raised when a client-level order payment cannot be processed."""
+
+
 @dataclass
 class PaymentRequestData:
     payments_data: Optional[list[dict]] = None
@@ -28,6 +36,125 @@ class PaymentRequestData:
     amount: Optional[Decimal] = None
     credit_note: Optional[str] = None
     notes: Optional[str] = None
+
+
+def get_unpaid_amount(order: Order) -> Decimal:
+    """Return the remaining unpaid amount for an order."""
+    return max(
+        Decimal(str(order.total_amount)) - Decimal(str(order.total_paid)),
+        Decimal('0.00'),
+    )
+
+
+def get_selected_unpaid_orders(client: "Client", order_ids: list[int]) -> list[Order]:
+    """Return selected unpaid orders for a client, preserving submitted order."""
+    if not order_ids:
+        raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
+
+    deduped_ids = list(dict.fromkeys(order_ids))
+    orders_by_id = {
+        order.id: order
+        for order in Order.objects.filter(pk__in=deduped_ids)
+        .select_related('client')
+        .prefetch_related('payments')
+    }
+    selected_orders = []
+    for order_id in deduped_ids:
+        order = orders_by_id.get(order_id)
+        if order is None:
+            raise ClientOrderPaymentError(f'Pedido #{order_id} no encontrado.')
+        selected_orders.append(order)
+
+    _validate_selected_orders(client=client, orders=selected_orders)
+    return selected_orders
+
+
+def _validate_selected_orders(client: "Client", orders: list[Order]) -> None:
+    if not orders:
+        raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
+
+    for order in orders:
+        if order.client_id != client.id:
+            raise ClientOrderPaymentError(f'El pedido #{order.id} no pertenece al cliente.')
+        if order.status == OrderStatus.CANCELLED.value:
+            raise ClientOrderPaymentError(f'El pedido #{order.id} está cancelado.')
+        if get_unpaid_amount(order) <= 0:
+            raise ClientOrderPaymentError(f'El pedido #{order.id} ya está pagado.')
+
+
+@transaction.atomic
+def pay_client_orders(
+    client: "Client",
+    orders: list[Order],
+    payment_method: str,
+    amount: Decimal,
+    request_user: User,
+) -> dict[str, object]:
+    """Pay selected unpaid client orders and add overpayment to balance."""
+    selected_orders = get_selected_unpaid_orders(
+        client=client,
+        order_ids=[order.id for order in orders],
+    )
+    amount = Decimal(str(amount))
+    selected_total = sum(
+        (get_unpaid_amount(order) for order in selected_orders),
+        Decimal('0.00'),
+    )
+    if amount < selected_total:
+        raise ClientOrderPaymentError(
+            f'El monto ${amount:.2f} es menor al total seleccionado ${selected_total:.2f}.'
+        )
+
+    created_payments = []
+    for order in selected_orders:
+        order_amount = get_unpaid_amount(order)
+        if order_amount <= 0:
+            raise ClientOrderPaymentError(f'El pedido #{order.id} ya está pagado.')
+
+        pending_credit = order.payments.select_for_update().filter(
+            method='pending_credit',
+            status='pending',
+        ).first()
+        if pending_credit:
+            payment, error = settle_credit_order_payment(
+                order=order,
+                payment_method=payment_method,
+                amount=order_amount,
+                request_user=request_user,
+            )
+        else:
+            payment, error = process_single_payment(
+                order=order,
+                payment_method=payment_method,
+                amount=order_amount,
+                request_user=request_user,
+            )
+        if error:
+            raise ClientOrderPaymentError(error['error'])
+        created_payments.append(payment)
+
+    balance_added = amount - selected_total
+    if balance_added > 0:
+        balance_service.add_balance(
+            client=client,
+            amount=balance_added,
+            transaction_type='added_in_order',
+            user=request_user,
+            reference_order=selected_orders[-1],
+            notes=(
+                f'Saldo agregado por excedente en pago de pedidos '
+                f'{", ".join(f"#{order.id}" for order in selected_orders)}. '
+                f'Excedente: ${balance_added:.2f}.'
+            ),
+        )
+
+    return {
+        'selected_total': selected_total,
+        'amount_received': amount,
+        'balance_added': balance_added,
+        'payments': created_payments,
+        'orders': selected_orders,
+    }
 
 
 def process_payment_request(

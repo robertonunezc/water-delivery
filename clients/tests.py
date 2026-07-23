@@ -862,6 +862,184 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         self.assertContains(response, '<span class="text-muted">-</span>')
 
 
+class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='selected-pay-user',
+            password='testpass123',
+        )
+        self.customer = Client.objects.create(
+            name='Cliente pagos seleccionados',
+            active=True,
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.other_customer = Client.objects.create(
+            name='Cliente ajeno',
+            active=True,
+        )
+
+    def _order(
+        self,
+        client: Client,
+        total: Decimal,
+        status: str = OrderStatus.COMPLETED.value,
+    ) -> Order:
+        return Order.objects.create(
+            client=client,
+            status=status,
+            total_amount=total,
+        )
+
+    def test_pay_client_orders_pays_multiple_unpaid_orders(self) -> None:
+        from payment import services as payment_services
+
+        first = self._order(self.customer, Decimal('100.00'))
+        second = self._order(self.customer, Decimal('80.00'))
+
+        result = payment_services.pay_client_orders(
+            client=self.customer,
+            orders=[first, second],
+            payment_method='cash',
+            amount=Decimal('180.00'),
+            request_user=self.user,
+        )
+
+        first.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(result['selected_total'], Decimal('180.00'))
+        self.assertEqual(result['balance_added'], Decimal('0.00'))
+        self.assertTrue(first.is_paid)
+        self.assertTrue(second.is_paid)
+        self.assertEqual(
+            Payment.objects.filter(
+                order__in=[first, second],
+                method='cash',
+                status='completed',
+            ).count(),
+            2,
+        )
+
+    def test_pay_client_orders_blocks_underpayment(self) -> None:
+        from payment import services as payment_services
+
+        first = self._order(self.customer, Decimal('100.00'))
+        second = self._order(self.customer, Decimal('80.00'))
+
+        with self.assertRaisesRegex(
+            payment_services.ClientOrderPaymentError,
+            'menor al total seleccionado',
+        ):
+            payment_services.pay_client_orders(
+                client=self.customer,
+                orders=[first, second],
+                payment_method='cash',
+                amount=Decimal('179.99'),
+                request_user=self.user,
+            )
+
+        self.assertFalse(
+            Payment.objects.filter(
+                order__in=[first, second],
+                method='cash',
+            ).exists(),
+        )
+
+    def test_pay_client_orders_rejects_order_from_another_client(self) -> None:
+        from payment import services as payment_services
+
+        own_order = self._order(self.customer, Decimal('100.00'))
+        other_order = self._order(self.other_customer, Decimal('80.00'))
+
+        with self.assertRaisesRegex(
+            payment_services.ClientOrderPaymentError,
+            'no pertenece al cliente',
+        ):
+            payment_services.pay_client_orders(
+                client=self.customer,
+                orders=[own_order, other_order],
+                payment_method='cash',
+                amount=Decimal('180.00'),
+                request_user=self.user,
+            )
+
+    def test_pay_client_orders_settles_credit_and_preserves_history(self) -> None:
+        from payment import services as payment_services
+
+        self.customer.current_debt = Decimal('100.00')
+        self.customer.save(update_fields=['current_debt', 'updated_at'])
+        order = self._order(self.customer, Decimal('100.00'))
+        order.type = 'credito'
+        order.save(update_fields=['type', 'updated_at'])
+        pending_credit = Payment.objects.create(
+            client=self.customer,
+            order=order,
+            amount=Decimal('100.00'),
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=self.customer,
+            transaction_type='purchase',
+            amount=Decimal('100.00'),
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('100.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            reference_payment=pending_credit,
+            created_by=self.user,
+        )
+
+        payment_services.pay_client_orders(
+            client=self.customer,
+            orders=[order],
+            payment_method='cash',
+            amount=Decimal('100.00'),
+            request_user=self.user,
+        )
+
+        order.refresh_from_db()
+        pending_credit.refresh_from_db()
+        self.customer.refresh_from_db()
+        self.assertEqual(order.type, 'credito')
+        self.assertTrue(order.is_paid)
+        self.assertEqual(pending_credit.status, 'completed')
+        self.assertEqual(self.customer.current_debt, Decimal('0.00'))
+        self.assertTrue(
+            CreditTransaction.objects.filter(
+                reference_order=order,
+                transaction_type='payment',
+            ).exists(),
+        )
+
+    def test_pay_client_orders_adds_overpayment_to_balance(self) -> None:
+        from payment import services as payment_services
+
+        first = self._order(self.customer, Decimal('100.00'))
+        second = self._order(self.customer, Decimal('80.00'))
+
+        result = payment_services.pay_client_orders(
+            client=self.customer,
+            orders=[first, second],
+            payment_method='cash',
+            amount=Decimal('200.00'),
+            request_user=self.user,
+        )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(result['balance_added'], Decimal('20.00'))
+        self.assertEqual(self.customer.balance, Decimal('20.00'))
+        self.assertTrue(
+            BalanceTransaction.objects.filter(
+                client=self.customer,
+                amount=Decimal('20.00'),
+                reference_order=second,
+            ).exists(),
+        )
+
+
 class ClientDetailLayoutTests(FastTenantTestCase):
     def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
         user = User.objects.create_user(
