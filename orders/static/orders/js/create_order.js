@@ -23,16 +23,22 @@ class PageConfig {
   }
 }
 
+function setElementVisible(element, visible) {
+  if (!element) return;
+  element.hidden = !visible;
+  element.classList.toggle('pg-hidden', !visible);
+}
+
 class AlertManager {
   show(type, title, message, timeout = 5000) {
     const alertDiv = document.createElement('div');
-    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.className = `pg-alert pg-alert-${type} pg-alert-dismissible`;
     alertDiv.innerHTML = `
       <strong>${title}</strong> ${message}
-      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      <button type="button" class="pg-modal-close" data-pg-dismiss="alert" aria-label="Close"></button>
     `;
 
-    const container = document.querySelector('.container-fluid.mt-4');
+    const container = document.getElementById('order-page');
     const firstChild = container?.firstElementChild;
     if (container) {
       container.insertBefore(alertDiv, firstChild || null);
@@ -154,8 +160,8 @@ class AffordabilityStatusManager {
 
     if (total <= clientBalance) {
       this.statusElement.innerHTML = `
-        <div class="badge bg-success">
-          <i class="fas fa-check-circle me-1"></i>
+        <div class="pg-badge pg-bg-success">
+          <i class="fas fa-check-circle pg-me-1"></i>
           Puede pagar con saldo
         </div>
       `;
@@ -163,8 +169,8 @@ class AffordabilityStatusManager {
     } else {
       const shortfall = total - clientBalance;
       this.statusElement.innerHTML = `
-        <div class="badge bg-warning">
-          <i class="fas fa-info-circle me-1"></i>
+        <div class="pg-badge pg-bg-warning">
+          <i class="fas fa-info-circle pg-me-1"></i>
           Requiere otro método<br>
           <small>Falta cubrir: $${shortfall.toFixed(2)}</small>
         </div>
@@ -208,7 +214,7 @@ class PaymentBreakdownManager {
     this.remainingSection = document.getElementById('remaining-payment-section');
     this.noBalanceSection = document.getElementById('no-balance-payment-section');
     this.summaryMessage = document.getElementById('payment-breakdown-message');
-    this.paymentMethodCard = document.querySelector('#payment-method-select')?.closest('.card');
+    this.paymentMethodCard = document.querySelector('#payment-method-select')?.closest('.pg-card');
     this.paymentMethodSelectContainer = document.getElementById('payment-method-select-container');
     this.paymentMethodLabel = document.getElementById('payment-method-select-label');
     this.balanceAmount = document.getElementById('balance-payment-amount');
@@ -293,15 +299,13 @@ class PaymentBreakdownManager {
   setPaymentMethodLabel(isMixedPayment) {
     if (this.paymentMethodLabel) {
       this.paymentMethodLabel.innerHTML = isMixedPayment
-        ? '<i class="fas fa-credit-card me-1"></i>Método para cubrir el restante'
-        : '<i class="fas fa-credit-card me-1"></i>Método de pago';
+        ? '<i class="fas fa-credit-card pg-me-1"></i>Método para cubrir el restante'
+        : '<i class="fas fa-credit-card pg-me-1"></i>Método de pago';
     }
   }
 
   showPaymentMethodSelector(visible) {
-    if (this.paymentMethodSelectContainer) {
-      this.paymentMethodSelectContainer.style.display = visible ? 'block' : 'none';
-    }
+    setElementVisible(this.paymentMethodSelectContainer, visible);
   }
 
   updateUI(breakdown, orderTotal) {
@@ -311,12 +315,12 @@ class PaymentBreakdownManager {
     const total = parseFloat(orderTotal) || 0;
     if (total === 0) {
       if (this.summaryMessage) {
-        this.summaryMessage.innerHTML = '<i class="fas fa-info-circle me-1"></i>Agregue productos para ver el desglose de pago';
+        this.summaryMessage.innerHTML = '<i class="fas fa-info-circle pg-me-1"></i>Agregue productos para ver el desglose de pago';
       }
-      if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'block';
-      if (this.balanceSection) this.balanceSection.style.display = 'none';
-      if (this.remainingSection) this.remainingSection.style.display = 'none';
-      if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
+      setElementVisible(this.paymentMethodCard, true);
+      setElementVisible(this.balanceSection, false);
+      setElementVisible(this.remainingSection, false);
+      setElementVisible(this.noBalanceSection, false);
       this.setPaymentMethodLabel(false);
       this.showPaymentMethodSelector(true);
       this.unlockPaymentMethodSelection();
@@ -325,16 +329,16 @@ class PaymentBreakdownManager {
 
     const shouldShowCard = breakdown.use_balance && !breakdown.balance_covers_order;
     if (this.paymentMethodCard) {
-      this.paymentMethodCard.style.display = 'block';
+      setElementVisible(this.paymentMethodCard, true);
     }
     const breakdownCard = document.getElementById('payment-breakdown-card');
     if (breakdownCard) {
-      breakdownCard.style.display = shouldShowCard ? 'block' : 'none';
+      setElementVisible(breakdownCard, shouldShowCard);
     }
 
     if (breakdown.use_balance) {
       if (this.balanceSection) {
-        this.balanceSection.style.display = 'block';
+        setElementVisible(this.balanceSection, true);
         if (this.balanceAmount) this.balanceAmount.textContent = '$' + parseFloat(breakdown.balance_amount).toFixed(2);
       }
 
@@ -344,23 +348,23 @@ class PaymentBreakdownManager {
         this.showPaymentMethodSelector(false);
         if (this.summaryMessage) {
           this.summaryMessage.innerHTML = `
-            <i class="fas fa-check-circle text-success me-1"></i>
-            <strong class="text-success">${breakdown.message}</strong>
+            <i class="fas fa-check-circle pg-text-success pg-me-1"></i>
+            <strong class="pg-text-success">${breakdown.message}</strong>
           `;
         }
-        if (this.balanceSection) this.balanceSection.style.display = 'none';
+        setElementVisible(this.balanceSection, false);
       } else {
         this.unlockPaymentMethodSelection();
         this.setPaymentMethodLabel(true);
         this.showPaymentMethodSelector(true);
         if (this.remainingSection) {
-          this.remainingSection.style.display = 'block';
+          setElementVisible(this.remainingSection, true);
           if (this.remainingAmount) this.remainingAmount.textContent = '$' + parseFloat(breakdown.remaining_amount).toFixed(2);
         }
         if (this.summaryMessage) {
           this.summaryMessage.innerHTML = `
-            <i class="fas fa-calculator text-warning me-1"></i>
-            <strong class="text-warning">${breakdown.message}</strong>
+            <i class="fas fa-calculator pg-text-warning pg-me-1"></i>
+            <strong class="pg-text-warning">${breakdown.message}</strong>
           `;
         }
       }
@@ -368,17 +372,17 @@ class PaymentBreakdownManager {
       this.unlockPaymentMethodSelection();
       this.setPaymentMethodLabel(false);
       this.showPaymentMethodSelector(true);
-      if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
+      setElementVisible(this.noBalanceSection, false);
       if (this.summaryMessage) this.summaryMessage.innerHTML = '';
-      if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'block';
+      setElementVisible(this.paymentMethodCard, true);
     }
   }
 
   hideSections() {
-    if (this.balanceSection) this.balanceSection.style.display = 'none';
-    if (this.remainingSection) this.remainingSection.style.display = 'none';
-    if (this.noBalanceSection) this.noBalanceSection.style.display = 'none';
-    if (this.paymentMethodCard) this.paymentMethodCard.style.display = 'none';
+    setElementVisible(this.balanceSection, false);
+    setElementVisible(this.remainingSection, false);
+    setElementVisible(this.noBalanceSection, false);
+    setElementVisible(this.paymentMethodCard, false);
   }
 }
 
@@ -413,9 +417,9 @@ class OrderSummaryManager {
       const orderId = document.querySelector('[data-order]')?.getAttribute('data-order');
 
       if (existingItem) {
-        const productNameDiv = existingItem.querySelector('.fw-bold, .flex-grow-1 > div:first-child');
+        const productNameDiv = existingItem.querySelector('.pg-fw-bold, .pg-flex-grow > div:first-child');
         const quantitySmall = existingItem.querySelector('small');
-        const badge = existingItem.querySelector('.badge');
+        const badge = existingItem.querySelector('.pg-badge');
         if (productNameDiv) productNameDiv.textContent = fullProductName;
         if (quantitySmall) quantitySmall.textContent = `Cantidad: ${quantity}`;
         if (badge) badge.textContent = `$${itemTotal}`;
@@ -425,29 +429,29 @@ class OrderSummaryManager {
         newItem.setAttribute('data-order-id', orderId || '');
 
         if (isMobile) {
-          newItem.className = 'list-group-item d-flex justify-content-between align-items-center';
+          newItem.className = 'pg-list-item pg-flex pg-justify-between pg-align-center';
           newItem.innerHTML = `
-            <div class="flex-grow-1">
-              <div class="fw-bold">${fullProductName}</div>
-              <small class="text-muted">Cantidad: ${quantity}</small>
+            <div class="pg-flex-grow">
+              <div class="pg-fw-bold">${fullProductName}</div>
+              <small class="pg-text-muted">Cantidad: ${quantity}</small>
             </div>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-primary rounded-pill me-2">$${itemTotal}</span>
-              <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn-mobile" data-product-id="${productId}" data-order-id="${orderId}">
+            <div class="pg-flex pg-align-center">
+              <span class="pg-badge pg-bg-primary pg-rounded-pill pg-me-2">$${itemTotal}</span>
+              <button type="button" class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn-mobile" data-product-id="${productId}" data-order-id="${orderId}">
                 <i class="fas fa-times"></i>
               </button>
             </div>
           `;
         } else {
-          newItem.className = 'list-group-item d-flex justify-content-between align-items-center border-0 px-0';
+          newItem.className = 'pg-list-item pg-flex pg-justify-between pg-align-center pg-border-0 pg-px-0';
           newItem.innerHTML = `
-            <div class="flex-grow-1">
-              <div class="fw-bold">${fullProductName}</div>
-              <small class="text-muted">Cantidad: ${quantity}</small>
+            <div class="pg-flex-grow">
+              <div class="pg-fw-bold">${fullProductName}</div>
+              <small class="pg-text-muted">Cantidad: ${quantity}</small>
             </div>
-            <div class="d-flex align-items-center">
-              <span class="badge bg-primary rounded-pill me-2">$${itemTotal}</span>
-              <button type="button" class="btn btn-sm btn-outline-danger remove-item-btn btn-touch" data-product-id="${productId}" data-order-id="${orderId}" title="Remover producto">
+            <div class="pg-flex pg-align-center">
+              <span class="pg-badge pg-bg-primary pg-rounded-pill pg-me-2">$${itemTotal}</span>
+              <button type="button" class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn pg-touch" data-product-id="${productId}" data-order-id="${orderId}" title="Remover producto">
                 <i class="fas fa-times"></i>
               </button>
             </div>
@@ -460,9 +464,11 @@ class OrderSummaryManager {
       existingItem.remove();
       if (listElement.children.length === 0) {
         const emptyItem = document.createElement('li');
-        emptyItem.className = isMobile ? 'list-group-item text-muted text-center py-4' : 'list-group-item border-0 px-0 text-muted text-center py-4';
+        emptyItem.className = isMobile
+          ? 'pg-list-item pg-text-muted pg-text-center pg-py-4'
+          : 'pg-list-item pg-border-0 pg-px-0 pg-text-muted pg-text-center pg-py-4';
         emptyItem.innerHTML = `
-          <i class="fas fa-shopping-cart fa-2x mb-2 d-block"></i>
+          <i class="fas fa-shopping-cart fa-2x pg-mb-2 pg-block"></i>
           No hay productos en el pedido
         `;
         listElement.appendChild(emptyItem);
@@ -556,27 +562,27 @@ class AmountFieldManager {
 
     if (cantidadCobrada < orderTotal) {
       input.setCustomValidity('La cantidad cobrada no puede ser menor al total de la orden');
-      input.classList.add('is-invalid');
-      alertElement.style.display = 'none';
-      if (otherAlert) otherAlert.style.display = 'none';
+      input.classList.add('pg-is-invalid');
+      setElementVisible(alertElement, false);
+      setElementVisible(otherAlert, false);
     } else if (cantidadCobrada > orderTotal) {
       const excess = cantidadCobrada - orderTotal;
       input.setCustomValidity('');
-      input.classList.remove('is-invalid');
-      input.classList.add('is-valid');
-      alertElement.style.display = 'block';
-      alertElement.className = isMobile ? 'alert alert-info alert-sm mt-1 p-2' : 'alert alert-info mt-2';
+      input.classList.remove('pg-is-invalid');
+      input.classList.add('pg-is-valid');
+      setElementVisible(alertElement, true);
+      alertElement.className = isMobile ? 'pg-alert pg-alert-info pg-alert-sm pg-mt-1 pg-p-2' : 'pg-alert pg-alert-info pg-mt-2';
       textElement.innerHTML = `Vas a agregar <strong>$${excess.toFixed(2)}</strong> al saldo del cliente`;
       if (otherAlert && otherText) {
-        otherAlert.style.display = 'block';
-        otherAlert.className = isMobile ? 'alert alert-info mt-2' : 'alert alert-info alert-sm mt-1 p-2';
+        setElementVisible(otherAlert, true);
+        otherAlert.className = isMobile ? 'pg-alert pg-alert-info pg-mt-2' : 'pg-alert pg-alert-info pg-alert-sm pg-mt-1 pg-p-2';
         otherText.innerHTML = `Vas a agregar <strong>$${excess.toFixed(2)}</strong> al saldo del cliente`;
       }
     } else {
       input.setCustomValidity('');
-      input.classList.remove('is-invalid', 'is-valid');
-      alertElement.style.display = 'none';
-      if (otherAlert) otherAlert.style.display = 'none';
+      input.classList.remove('pg-is-invalid', 'pg-is-valid');
+      setElementVisible(alertElement, false);
+      setElementVisible(otherAlert, false);
     }
 
     document.dispatchEvent(new CustomEvent('amount-validation-changed'));
@@ -788,8 +794,8 @@ class QuantityController {
   }
 
   bindAddRemove() {
-    const addButtons = document.querySelectorAll('button.btn-success[data-product]');
-    const removeButtons = document.querySelectorAll('button.btn-danger[data-product]');
+    const addButtons = document.querySelectorAll('button.pg-button-success[data-product]');
+    const removeButtons = document.querySelectorAll('button.pg-button-danger[data-product]');
 
     addButtons.forEach(button => {
       button.addEventListener('click', () => this.handleQuantityChange(button, 0, true));
@@ -894,7 +900,7 @@ class PaymentController {
     if (!this.feedbackElement) {
       return;
     }
-    this.feedbackElement.style.display = 'none';
+    setElementVisible(this.feedbackElement, false);
     this.feedbackElement.textContent = '';
   }
 
@@ -903,7 +909,7 @@ class PaymentController {
       return;
     }
     this.feedbackElement.textContent = message;
-    this.feedbackElement.style.display = 'block';
+    setElementVisible(this.feedbackElement, true);
   }
 
   validateFinishButtonState() {
@@ -922,10 +928,10 @@ class PaymentController {
       }
     }
 
-    if (this.finishButton && !this.finishButton.innerHTML.includes('spinner-border')) {
+    if (this.finishButton && !this.finishButton.innerHTML.includes('pg-spinner')) {
       this.finishButton.disabled = !isValid;
     }
-    if (this.finishButtonMobile && !this.finishButtonMobile.innerHTML.includes('spinner-border')) {
+    if (this.finishButtonMobile && !this.finishButtonMobile.innerHTML.includes('pg-spinner')) {
       this.finishButtonMobile.disabled = !isValid;
     }
   }
@@ -967,26 +973,26 @@ class PaymentController {
 
     // Hide/show payment method containers
     if (paymentMethodDesktop) {
-      const container = paymentMethodDesktop.closest('.mb-3');
-      if (container) container.style.display = isCredit ? 'none' : 'block';
+      const container = paymentMethodDesktop.closest('.pg-mb-3');
+      setElementVisible(container, !isCredit);
     }
     if (paymentMethodMobile) {
-      const container = paymentMethodMobile.closest('.mb-3');
-      if (container) container.style.display = isCredit ? 'none' : 'block';
+      const container = paymentMethodMobile.closest('.pg-mb-3');
+      setElementVisible(container, !isCredit);
     }
 
     // Hide/show cantidad cobrada containers
     if (cantidadCobradaDesktop) {
-      const container = cantidadCobradaDesktop.closest('.mb-3');
-      if (container) container.style.display = isCredit ? 'none' : 'block';
+      const container = cantidadCobradaDesktop.closest('.pg-mb-3');
+      setElementVisible(container, !isCredit);
     }
     if (cantidadCobradaMobile) {
-      const container = cantidadCobradaMobile.closest('.mb-3');
-      if (container) container.style.display = isCredit ? 'none' : 'block';
+      const container = cantidadCobradaMobile.closest('.pg-mb-3');
+      setElementVisible(container, !isCredit);
     }
 
     if (paymentBreakdownCard && isCredit) {
-      paymentBreakdownCard.style.display = 'none';
+      setElementVisible(paymentBreakdownCard, false);
     }
 
     if (helpText) {
@@ -997,14 +1003,14 @@ class PaymentController {
 
     if (this.finishButton) {
       this.finishButton.innerHTML = isCreditRegistration
-        ? '<i class="fas fa-hourglass-half me-2"></i>Registrar Como Pendiente'
-        : '<i class="fas fa-check-circle me-2"></i>Terminar Pedido';
+        ? '<i class="fas fa-hourglass-half pg-me-2"></i>Registrar Como Pendiente'
+        : '<i class="fas fa-check-circle pg-me-2"></i>Terminar Pedido';
     }
 
     if (this.finishButtonMobile) {
       this.finishButtonMobile.innerHTML = isCreditRegistration
-        ? '<i class="fas fa-hourglass-half me-2"></i>Pendiente'
-        : '<i class="fas fa-check-circle me-2"></i>Terminar';
+        ? '<i class="fas fa-hourglass-half pg-me-2"></i>Pendiente'
+        : '<i class="fas fa-check-circle pg-me-2"></i>Terminar';
     }
 
     if (!isCredit) {
@@ -1102,22 +1108,22 @@ class PaymentController {
   disableButtons() {
     if (this.finishButton) {
       this.finishButton.disabled = true;
-      this.finishButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
+      this.finishButton.innerHTML = '<span class="pg-spinner pg-me-2" role="status"></span>Procesando...';
     }
     if (this.finishButtonMobile) {
       this.finishButtonMobile.disabled = true;
-      this.finishButtonMobile.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Procesando...';
+      this.finishButtonMobile.innerHTML = '<span class="pg-spinner pg-me-2" role="status"></span>Procesando...';
     }
   }
 
   enableButtons() {
     if (this.finishButton) {
       this.finishButton.disabled = false;
-      this.finishButton.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar Pedido';
+      this.finishButton.innerHTML = '<i class="fas fa-check-circle pg-me-2"></i>Terminar Pedido';
     }
     if (this.finishButtonMobile) {
       this.finishButtonMobile.disabled = false;
-      this.finishButtonMobile.innerHTML = '<i class="fas fa-check-circle me-2"></i>Terminar';
+      this.finishButtonMobile.innerHTML = '<i class="fas fa-check-circle pg-me-2"></i>Terminar';
     }
     this.validateFinishButtonState();
   }
@@ -1200,8 +1206,8 @@ class PaymentController {
     let message = 'El pedido se ha completado correctamente.';
 
     if (data.payments?.length) {
-      message += '<br><div class="mt-2 p-2 bg-light border rounded">';
-      message += '<strong><i class="fas fa-receipt me-1"></i>Pagos registrados:</strong><ul class="mb-0 mt-1">';
+      message += '<br><div class="pg-mt-2 pg-p-2 pg-bg-light pg-border pg-rounded">';
+      message += '<strong><i class="fas fa-receipt pg-me-1"></i>Pagos registrados:</strong><ul class="pg-mb-0 pg-mt-1">';
       data.payments.forEach(p => {
         message += `<li>${p.method}: $${p.amount}</li>`;
       });
@@ -1211,8 +1217,8 @@ class PaymentController {
     }
 
     if (data.balance_added && data.cantidad_cobrada) {
-      message += '<br><div class="mt-2 p-2 bg-info bg-opacity-10 border border-info rounded">';
-      message += '<i class="fas fa-plus-circle text-success me-1"></i>';
+      message += '<br><div class="pg-mt-2 pg-p-2 pg-bg-info pg-border pg-border-info pg-rounded">';
+      message += '<i class="fas fa-plus-circle pg-text-success pg-me-1"></i>';
       message += `<strong>Saldo agregado:</strong> $${data.balance_added}<br>`;
       message += `<small>Cantidad cobrada: $${data.cantidad_cobrada} | Total orden: $${data.order_total}</small><br>`;
       message += `<small>Nuevo saldo del cliente: $${data.new_client_balance}</small>`;
@@ -1238,16 +1244,16 @@ class PaymentController {
   markCompleted() {
     if (this.finishButton) {
       this.finishButton.innerHTML = '✓ Pedido Completado';
-      this.finishButton.classList.remove('btn-success');
-      this.finishButton.classList.add('btn-secondary');
+      this.finishButton.classList.remove('pg-button-success');
+      this.finishButton.classList.add('pg-button-secondary');
     }
     if (this.finishButtonMobile) {
       this.finishButtonMobile.innerHTML = '✓ Completado';
-      this.finishButtonMobile.classList.remove('btn-success');
-      this.finishButtonMobile.classList.add('btn-secondary');
+      this.finishButtonMobile.classList.remove('pg-button-success');
+      this.finishButtonMobile.classList.add('pg-button-secondary');
     }
-    document.querySelectorAll('button:not(.btn-close), select, input').forEach(element => {
-      if (!element.classList.contains('btn-close')) element.disabled = true;
+    document.querySelectorAll('button:not(.pg-modal-close), select, input').forEach(element => {
+      if (!element.classList.contains('pg-modal-close')) element.disabled = true;
     });
   }
 }

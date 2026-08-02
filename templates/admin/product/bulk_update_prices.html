@@ -1,32 +1,38 @@
 {% extends "admin/base_site.html" %}
-{% load i18n %}
+{% load i18n static %}
+
+{% block extrastyle %}{{ block.super }}
+  <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
+{% endblock %}
 
 {% block content %}
-  <div class="unfold-container" style="max-width: 720px; margin: 0 auto;">
-    <div class="unfold-card" style="padding: 20px; background: var(--uf-surface, #fff); border: 1px solid var(--uf-border, #e5e7eb); border-radius: 10px; box-shadow: var(--uf-shadow-sm, 0 1px 2px rgba(0,0,0,0.05));">
+  <div class="pg-container pg-admin-narrow">
+    <div class="pg-panel">
       <!-- Create an alert to display messages -->
-            <div class="unfold-alert" style="padding: 12px; border-radius: 6px; margin-bottom: 8px; background: var(--uf-error-bg, #fef2f2); color: var(--uf-error-text, #b91c1c); border: 1px solid var(--uf-error-border, #fca5a5);">
-                <strong style="font-weight: 600;">¡Atención!</strong> Esta acción actualizará los precios de los productos seleccionados para todos los clientes. Asegúrate de revisar los cambios antes de aplicar el incremento.
+      <div class="pg-panel-body pg-stack">
+            <div class="pg-alert pg-alert-danger">
+                <strong class="pg-fw-semibold">¡Atención!</strong> Esta acción actualizará los precios de los productos seleccionados para todos los clientes. Asegúrate de revisar los cambios antes de aplicar el incremento.
             </div>
-      <div class="unfold-divider" style="height: 1px; background: var(--uf-border, #e5e7eb); margin: 16px 0;"></div>
+      <div class="pg-divider"></div>
 
       {% if product %}
-        <p style="margin-bottom: 12px;"><strong>Producto:</strong> {{ product.name }} ({{ product.presentation }}) Precio Actual:<strong>${{ product.price }}</strong></p>
+        <p class="pg-mb-3"><strong>Producto:</strong> {{ product.name }} ({{ product.presentation }}) Precio Actual:<strong>${{ product.price }}</strong></p>
       {% else %}
-        <p style="color: #b91c1c; margin-bottom: 12px;">Debe seleccionar un producto.</p>
+        <p class="pg-text-danger pg-mb-3">Debe seleccionar un producto.</p>
       {% endif %}
 
       <form action="{% url 'admin:product_bulk_update_prices' %}" method="post" novalidate>
         {% csrf_token %}
-        <div class="unfold-form" style="display: grid; gap: 12px;">
+        <div class="pg-stack">
           {{ form.as_p }}
         </div>
-      <div class="unfold-divider" style="height: 1px; background: var(--uf-border, #e5e7eb); margin: 16px 0;"></div>
+      <div class="pg-divider"></div>
 
-        <div style="margin-top: 25px; display: flex; gap: 8px;">
-          <button type="submit" class="bg-primary-600 block border border-transparent cursor-pointer font-medium px-3 py-2 rounded-default text-white w-full lg:w-auto" style="padding: 8px 14px;">Aplicar incremento</button>
+        <div class="pg-flex pg-gap-2 pg-mt-4">
+          <button type="submit" class="pg-button pg-button-primary">Aplicar incremento</button>
         </div>
       </form>
+      </div>
     </div>
   </div>
 {% endblock %}

@@ -2,9 +2,12 @@ import csv
 import io
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
@@ -1147,7 +1150,7 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         self.assertContains(response, f'name="orders" value="{order.pk}"')
         self.assertContains(response, 'Pagar seleccionados')
         self.assertContains(response, f'href="{pay_url}?orders={order.pk}"')
-        self.assertContains(response, f'<a class="dropdown-item" href="{edit_url}">Editar</a>')
+        self.assertContains(response, f'<a class="pg-dropdown-item" href="{edit_url}">Editar</a>')
         self.assertContains(
             response,
             f'data-cancel-url="{reverse("orders:cancel_order", args=[order.pk])}"',
@@ -1175,7 +1178,7 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         edit_url = reverse("orders:get_order", args=[order.pk])
         self.assertNotContains(
             response,
-            f'<a class="dropdown-item" href="{edit_url}">Editar</a>',
+            f'<a class="pg-dropdown-item" href="{edit_url}">Editar</a>',
         )
         self.assertContains(
             response,
@@ -1293,8 +1296,8 @@ class ClientDetailLayoutTests(FastTenantTestCase):
         )
         self.assertContains(response, 'Sucursal activa')
         self.assertContains(response, 'Sucursal inactiva')
-        self.assertContains(response, '<span class="badge bg-success">Activo</span>')
-        self.assertContains(response, '<span class="badge bg-secondary">Inactivo</span>')
+        self.assertContains(response, '<span class="pg-badge pg-bg-success">Activo</span>')
+        self.assertContains(response, '<span class="pg-badge pg-bg-secondary">Inactivo</span>')
 
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):
@@ -1483,6 +1486,36 @@ class ClientListModeTests(FastTenantTestCase):
         self.assertContains(response, 'name="mode" value="credits"')
         self.assertContains(response, 'mode=credits')
         self.assertContains(response, 'search=Credito+paginado')
+
+
+class ClientDesignConsistencyTests(SimpleTestCase):
+    def _read_template(self, relative_path: str) -> str:
+        return Path(settings.BASE_DIR, relative_path).read_text()
+
+    def test_client_list_uses_admin_client_search_and_table_shell(self) -> None:
+        list_template = self._read_template('clients/templates/list_clients.html')
+        table_template = self._read_template('core/templates/includes/client_table.html')
+
+        self.assertIn('class="pg-card dashboard-card pg-mb-3"', list_template)
+        self.assertIn('class="pg-row pg-gap-2 pg-align-end"', list_template)
+        self.assertIn('class="pg-card dashboard-card pg-hidden pg-d-md-block"', table_template)
+        self.assertIn('class="pg-table pg-table-hover pg-align-middle pg-mb-0', table_template)
+        self.assertIn('<thead class="pg-table-light">', table_template)
+        self.assertNotIn('search-form', list_template)
+        self.assertNotIn('pg-table-dark', table_template)
+        self.assertNotIn('pg-table-striped', table_template)
+
+    def test_client_balance_and_credit_forms_use_admin_client_form_shell(self) -> None:
+        templates = [
+            self._read_template('clients/templates/add_balance.html'),
+            self._read_template('clients/templates/pay_credit.html'),
+        ]
+
+        for template in templates:
+            self.assertIn('dashboard-card', template)
+            self.assertIn('class="pg-card-body pg-p-4"', template)
+            self.assertNotIn('pg-shadow', template)
+            self.assertNotIn('pg-card-header pg-bg-', template)
 
 
 class ClientRouteAssignmentTabTests(FastTenantTestCase):

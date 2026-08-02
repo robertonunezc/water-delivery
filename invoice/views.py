@@ -1,13 +1,15 @@
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render, redirect
-from django.contrib.auth.decorators import login_required
-from django.contrib.admin.views.decorators import staff_member_required
-from django.db import transaction
-from invoice.models import Invoice
-from clients.models import Client
-from django.core.paginator import Paginator
-from django.db.models import Sum, Q, Count
 from datetime import date
+from decimal import Decimal
+
+from clients.models import Client
+from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Count, Q, Sum
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from invoice.models import Invoice
 
 # Existing API Views
 
@@ -101,9 +103,16 @@ def list_invoices_admin(request):
     paginator = Paginator(invoices, 15)
     page_number = request.GET.get('page', 1)
     invoices_page = paginator.get_page(page_number)
+    page_stats = {
+        'total_amount': sum(
+            (invoice.amount for invoice in invoices_page),
+            Decimal('0.00'),
+        ),
+    }
 
     context = {
         'invoices': invoices_page,
+        'page_stats': page_stats,
         'all_clients': all_clients,
         'filters': {
             'client': client_filter,

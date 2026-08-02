@@ -21,7 +21,7 @@ class SplitOrderForm(forms.Form):
                     initial=0,
                     required=True,
                     widget=forms.NumberInput(attrs={
-                        'class': 'form-control',
+                        'class': 'pg-input',
                         'placeholder': f'Max: {item.quantity}'
                     }),
                     help_text=f'Precio unitario: ${item.unit_price} | Total disponible: ${item.get_total_price()}'
@@ -92,7 +92,7 @@ class OrderForm(forms.ModelForm):
         decimal_places=2,
         required=False,
         widget=forms.NumberInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'step': '0.01',
             'placeholder': '0.00',
             'id': 'cantidad_cobrada'

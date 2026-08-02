@@ -4,20 +4,20 @@
 {% block title %}Rutas - Entrega de Agua{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">Rutas</h3>
+<div class="pg-container-fluid">
+    <div class="pg-row">
+        <div class="pg-col-12">
+            <div class="pg-card">
+                <div class="pg-card-header">
+                    <h3 class="pg-card-title">Rutas</h3>
                 </div>
-                <div class="card-body">
+                <div class="pg-card-body">
                     <!-- Filter Form -->
-                    <form method="GET" class="mb-4">
-                        <div class="row">
-                            <div class="col-md-4">
+                    <form method="GET" class="pg-mb-4">
+                        <div class="pg-row">
+                            <div class="pg-col-md-4">
                                 <label for="transportation">Vehiculos:</label>
-                                <select name="transportation" id="transportation" class="form-control">
+                                <select name="transportation" id="transportation" class="pg-input">
                                     <option value="">Todos los Vehiculos</option>
                                     {% for transport in transportations %}
                                         <option value="{{ transport.id }}" 
@@ -27,9 +27,9 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="pg-col-md-4">
                                 <label for="weekday">Dia:</label>
-                                <select name="weekday" id="weekday" class="form-control">
+                                <select name="weekday" id="weekday" class="pg-input">
                                     <option value="">Todos los Dias</option>
                                     {% for value, display in weekday_choices %}
                                         <option value="{{ value }}" 
@@ -39,18 +39,18 @@
                                     {% endfor %}
                                 </select>
                             </div>
-                            <div class="col-md-4">
+                            <div class="pg-col-md-4">
                                 <label>&nbsp;</label><br>
-                                <button type="submit" class="btn btn-primary">Filtrar</button>
-                                <a href="{% url 'routes:list' %}" class="btn btn-secondary">Limpiar</a>
+                                <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
+                                <a href="{% url 'routes:list' %}" class="pg-button pg-button-secondary">Limpiar</a>
                             </div>
                         </div>
                     </form>
 
                     <!-- Routes Table -->
                     {% if routes %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered table-striped">
+                        <div class="pg-table-responsive">
+                            <table class="pg-table pg-table-bordered pg-table-striped">
                                 <thead>
                                     <tr>
                                         <th>Nombre de Ruta</th>
@@ -67,18 +67,18 @@
                                             <td><strong>{{ route.name }}</strong></td>
                                             <td>
                                                 {{ route.transportation.license_plate }}<br>
-                                                <small class="text-muted">{{ route.transportation.model }}</small>
+                                                <small class="pg-text-muted">{{ route.transportation.model }}</small>
                                             </td>
                                             <td>{{ route.get_weekday_display }}</td>
                                             <td>
-                                                <span class="badge bg-info">
+                                                <span class="pg-badge pg-bg-info">
                                                     {{ route.route_clients.count }} clientes
                                                 </span>
                                             </td>
                                             <td>{{ route.description|default:"—"|truncatechars:50 }}</td>
                                             <td>
                                                 <a href="{% url 'routes:detail' route.id %}" 
-                                                   class="btn btn-sm btn-primary">Detalles</a>
+                                                   class="pg-button pg-button-sm pg-button-primary">Detalles</a>
                                              
                                             </td>
                                         </tr>
@@ -87,7 +87,7 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="alert alert-info">
+                        <div class="pg-alert pg-alert-info">
                             <h4>No routes found</h4>
                             <p>No routes match your current filters. Try adjusting the filters above or contact your administrator to set up routes.</p>
                         </div>

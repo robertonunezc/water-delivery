@@ -1,168 +1,135 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-<style>
-  .dashboard-kpi {
-    border-radius: 12px;
-    color: #fff;
-    padding: 1rem;
-    height: 100%;
-  }
-  .dashboard-kpi h6 {
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    opacity: 0.9;
-  }
-  .dashboard-kpi .value {
-    font-size: 1.5rem;
-    font-weight: 800;
-    line-height: 1.1;
-  }
-  .kpi-blue { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
-  .kpi-amber { background: linear-gradient(135deg, #b45309, #d97706); }
-  .kpi-emerald { background: linear-gradient(135deg, #047857, #059669); }
-  .kpi-slate { background: linear-gradient(135deg, #334155, #475569); }
-  .kpi-red { background: linear-gradient(135deg, #b91c1c, #dc2626); }
-
-  .dashboard-card {
-    border: 0;
-    border-radius: 14px;
-    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
-  }
-
-  .status-pill {
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 0.3rem 0.55rem;
-    border-radius: 999px;
-  }
-
-  .status-PENDING { background: #fef3c7; color: #92400e; }
-  .status-COMPLETED { background: #dcfce7; color: #166534; }
-  .status-CANCELLED { background: #fee2e2; color: #991b1b; }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+<div class="pg-container-fluid pg-mt-3">
+  <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
     <div>
-      <h1 class="h3 mb-1">Pedidos</h1>
-      <p class="text-muted mb-0">Vista administrativa con filtros y paginador.</p>
+      <h1 class="pg-h3 pg-mb-1">Pedidos</h1>
+      <p class="pg-text-muted pg-mb-0">Vista administrativa con filtros y paginador.</p>
     </div>
-    <!-- <a href="{% url 'clients:list' %}" class="btn btn-primary">Nuevo Pedido</a> -->
+    <!-- <a href="{% url 'clients:list' %}" class="pg-button pg-button-primary">Nuevo Pedido</a> -->
   </div>
 
-  <div class="row g-3 mb-3">
-    <div class="col-md">
-      <div class="dashboard-kpi kpi-blue">
-        <h6>Total pedidos</h6>
-        <div class="value">{{ total_orders }}</div>
+  <div class="metric-grid">
+    <div class="metric-card metric-orders">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-clipboard-list"></i></span>
+        Total pedidos
       </div>
+      <div class="metric-value">{{ total_orders }}</div>
+      <div class="metric-note">Pedidos registrados</div>
     </div>
-    <div class="col-md">
-      <div class="dashboard-kpi kpi-amber">
-        <h6>Pedidos en página</h6>
-        <div class="value">{{ page_stats.count|default:0 }}</div>
+    <div class="metric-card metric-pending">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-list-ol"></i></span>
+        Pedidos en página
       </div>
+      <div class="metric-value">{{ page_stats.count|default:0 }}</div>
+      <div class="metric-note">Resultado visible</div>
     </div>
-    <div class="col-md">
-      <div class="dashboard-kpi kpi-emerald">
-        <h6>Total página</h6>
-        <div class="value">${{ page_stats.total_amount|floatformat:2 }}</div>
+    <div class="metric-card metric-sales">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
+        Total página
       </div>
+      <div class="metric-value">${{ page_stats.total_amount|floatformat:2 }}</div>
+      <div class="metric-note">Vendido en esta página</div>
     </div>
-    <div class="col-md">
-      <a href="?status=REVIEW_REQUIRED" class="text-decoration-none">
-        <div class="dashboard-kpi kpi-red">
-          <h6>Cancelaciones por revisar</h6>
-          <div class="value">{{ review_required_count }}</div>
-        </div>
-      </a>
-    </div>
-    <div class="col-md">
-      <div class="dashboard-kpi kpi-slate">
-        <h6>Hoy</h6>
-        <div class="value">{{ today|date:'d/m/Y' }}</div>
+    <a href="?status=REVIEW_REQUIRED" class="metric-card metric-risk metric-card-link">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
+        Cancelaciones por revisar
       </div>
+      <div class="metric-value">{{ review_required_count }}</div>
+      <div class="metric-note">Ver pedidos pendientes</div>
+    </a>
+    <div class="metric-card metric-neutral">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-calendar-day"></i></span>
+        Hoy
+      </div>
+      <div class="metric-value">{{ today|date:'d/m/Y' }}</div>
+      <div class="metric-note">Fecha de consulta</div>
     </div>
   </div>
 
-  <div class="card dashboard-card mb-3">
-    <div class="card-body">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label" for="search">Buscar</label>
-          <input id="search" name="search" value="{{ filters.search }}" class="form-control" placeholder="ID, cliente, producto...">
+  <div class="pg-card dashboard-card pg-mb-3">
+    <div class="pg-card-body">
+      <form method="get" class="pg-row pg-gap-2 pg-align-end">
+        <div class="pg-col-md-4">
+          <label class="pg-label" for="search">Buscar</label>
+          <input id="search" name="search" value="{{ filters.search }}" class="pg-input" placeholder="ID, cliente, producto...">
         </div>
-        <div class="col-md-2">
-          <label class="form-label" for="status">Estado</label>
-          <select id="status" name="status" class="form-select">
+        <div class="pg-col-md-2">
+          <label class="pg-label" for="status">Estado</label>
+          <select id="status" name="status" class="pg-select">
             <option value="">Todos</option>
             {% for status_value, status_display in status_choices %}
               <option value="{{ status_value }}" {% if filters.status == status_value %}selected{% endif %}>{{ status_display }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-3">
-          <label class="form-label" for="client">Cliente</label>
-          <select id="client" name="client" class="form-select">
+        <div class="pg-col-md-3">
+          <label class="pg-label" for="client">Cliente</label>
+          <select id="client" name="client" class="pg-select">
             <option value="">Todos</option>
             {% for client in all_clients %}
               <option value="{{ client.id }}" {% if filters.client == client.id|stringformat:'s' %}selected{% endif %}>{{ client.name }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-1">
-          <label class="form-label" for="date_from">Desde</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="form-control">
+        <div class="pg-col-md-1">
+          <label class="pg-label" for="date_from">Desde</label>
+          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="pg-input">
         </div>
-        <div class="col-md-1">
-          <label class="form-label" for="date_to">Hasta</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="form-control">
+        <div class="pg-col-md-1">
+          <label class="pg-label" for="date_to">Hasta</label>
+          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="pg-input">
         </div>
-        <div class="col-md-1 d-grid">
-          <button type="submit" class="btn btn-primary">Filtrar</button>
+        <div class="pg-col-md-1 pg-grid">
+          <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
         </div>
       </form>
-      <div class="mt-2">
-        <a href="{% url 'admin_orders' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+      <div class="pg-mt-2">
+        <a href="{% url 'admin_orders' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
       </div>
     </div>
   </div>
 
-  <div class="card dashboard-card">
-    <div class="card-header bg-white border-0 pt-3 pb-2">
+  <div class="pg-card dashboard-card">
+    <div class="pg-card-header pg-bg-white pg-border-0 pg-pt-3 pg-pb-2">
       <form id="bulk-orders-form" method="post" action="{{ request.get_full_path }}">
         {% csrf_token %}
-        <div class="row g-2 align-items-end">
-          <div class="col-md-4 col-lg-3">
-            <label class="form-label" for="bulk-action">Acciones masivas</label>
-            <select id="bulk-action" name="bulk_action" class="form-select">
+        <div class="pg-row pg-gap-2 pg-align-end">
+          <div class="pg-col-md-4 pg-col-lg-3">
+            <label class="pg-label" for="bulk-action">Acciones masivas</label>
+            <select id="bulk-action" name="bulk_action" class="pg-select">
               <option value="">Selecciona una acción</option>
               {% for action in bulk_actions %}
                 <option value="{{ action.value }}">{{ action.label }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="col-md-4 col-lg-3">
-            <button type="submit" id="bulk-action-submit" class="btn btn-dark w-100" disabled>
+          <div class="pg-col-md-4 pg-col-lg-3">
+            <button type="submit" id="bulk-action-submit" class="pg-button pg-button-dark pg-w-100" disabled>
               Ejecutar acción
             </button>
           </div>
-          <div class="col-md-4 col-lg-6 text-md-end">
-            <small class="text-muted d-block mt-md-4" id="bulk-selection-summary">0 pedidos seleccionados</small>
+          <div class="pg-col-md-4 pg-col-lg-6 pg-text-md-end">
+            <small class="pg-text-muted pg-block pg-mt-md-4" id="bulk-selection-summary">0 pedidos seleccionados</small>
           </div>
         </div>
       </form>
     </div>
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
+    <div class="pg-table-responsive">
+      <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
+        <thead class="pg-table-light">
           <tr>
-            <th style="width: 48px;">
-              <input type="checkbox" id="select-all-orders" class="form-check-input">
+            <th class="pg-w-12">
+              <input type="checkbox" id="select-all-orders" class="pg-checkbox-input">
             </th>
             <th>ID</th>
             <th>Cliente</th>
@@ -174,7 +141,7 @@
             <th>Estado</th>
             <th>Pagado</th>
             <th>Facturado</th>
-            <th class="text-end">Acciones</th>
+            <th class="pg-text-end">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -183,7 +150,7 @@
               <td>
                 <input
                   type="checkbox"
-                  class="form-check-input order-select-checkbox"
+                  class="pg-checkbox-input order-select-checkbox"
                   name="selected_orders"
                   value="{{ order.id }}"
                   form="bulk-orders-form"
@@ -191,7 +158,7 @@
               </td>
               <td>#{{ order.id }}</td>
               <td>
-                <a href="{% url 'clients:detail' order.client.pk %}" class="text-decoration-none fw-semibold">
+                <a href="{% url 'clients:detail' order.client.pk %}" class="pg-text-decoration-none pg-fw-semibold">
                   {{ order.client.name }}
                 </a>
               </td>
@@ -211,21 +178,21 @@
                 <span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span>
                 {% if order.cancellation_review_required %}
                   <span
-                    class="badge bg-danger ms-1"
+                    class="pg-badge pg-bg-danger pg-ms-1"
                     title="{{ order.cancellation_review_reason|default:'Requiere revisión' }}"
                   >
                     Requiere revisión de cancelación
                   </span>
                   {% if order.cancellation_review_reason %}
-                    <div class="small text-danger mt-1">{{ order.cancellation_review_reason }}</div>
+                    <div class="pg-small pg-text-danger pg-mt-1">{{ order.cancellation_review_reason }}</div>
                   {% endif %}
                 {% endif %}
               </td>
               <td>
                 {% if order.is_paid %}
-                  <span class="badge bg-success ms-1">Pagado</span>
+                  <span class="pg-badge pg-bg-success pg-ms-1">Pagado</span>
                 {%else %}
-                  <span class="badge bg-warning ms-1">Pendiente</span>
+                  <span class="pg-badge pg-bg-warning pg-ms-1">Pendiente</span>
 
                 {% endif %}
               </td>
@@ -235,28 +202,28 @@
                       <a href="{% url 'admin_edit_invoice' link.invoice.pk %}">Ver factura</a>
                   {% endfor %}
                 {%else %}
-                  <span class="badge bg-warning ms-1">No facturado</span>
+                  <span class="pg-badge pg-bg-warning pg-ms-1">No facturado</span>
 
                 {% endif %}
               </td>
-              <td class="text-end">
-                <div class="dropdown">
-                  <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <td class="pg-text-end">
+                <div class="pg-dropdown">
+                  <button class="pg-button pg-button-sm pg-button-outline-secondary pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
                     Opciones
                   </button>
-                  <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item" href="{% url 'clients:detail' order.client.pk %}">Cliente</a></li>
+                  <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                    <li><a class="pg-dropdown-item" href="{% url 'clients:detail' order.client.pk %}">Cliente</a></li>
                     {% if order.status == 'COMPLETED' %}
-                      <li><a class="dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
+                      <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                     {% endif %}
                     {% if order.status == 'PENDING' %}
-                      <li><a class="dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
+                      <li><a class="pg-dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
                     {% endif %}
                     {% if order.cancellation_review_required %}
-                      <li><a class="dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
+                      <li><a class="pg-dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
                     {% endif %}
                     {% if not order.is_paid %}
-                      <li><a class="dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
+                      <li><a class="pg-dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
                     {% endif %}
                   </ul>
                 </div>
@@ -264,7 +231,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="10" class="text-center py-4 text-muted">No hay pedidos para mostrar.</td>
+              <td colspan="10" class="pg-text-center pg-py-4 pg-text-muted">No hay pedidos para mostrar.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -272,25 +239,25 @@
     </div>
 
     {% if orders.has_other_pages %}
-      <div class="card-footer bg-white">
+      <div class="pg-card-footer pg-bg-white">
         <nav>
-          <ul class="pagination justify-content-center mb-0">
+          <ul class="pg-pagination pg-justify-center pg-mb-0">
             {% if orders.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.previous_page_number }}">Anterior</a>
+              <li class="pg-page-item">
+                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.previous_page_number }}">Anterior</a>
               </li>
             {% else %}
-              <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
             {% endif %}
 
-            <li class="page-item disabled"><span class="page-link">Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span></li>
+            <li class="pg-page-item pg-disabled"><span class="pg-page-link">Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span></li>
 
             {% if orders.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.next_page_number }}">Siguiente</a>
+              <li class="pg-page-item">
+                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.next_page_number }}">Siguiente</a>
               </li>
             {% else %}
-              <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
             {% endif %}
           </ul>
         </nav>

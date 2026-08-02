@@ -6,22 +6,22 @@
 
 
 {% block content %}
-  <div class="container mt-5">
-    <div class="row justify-content-center">
-      <div class="col-md-6 text-center">
-        <i class="fas fa-lock fa-5x text-warning mb-4"></i>
-        <h2 class="text-danger">Acceso Denegado</h2>
-        <p class="lead text-muted">
+  <div class="pg-container pg-mt-5">
+    <div class="pg-row pg-justify-center">
+      <div class="pg-col-md-6 pg-text-center">
+        <i class="fas fa-lock fa-5x pg-text-warning pg-mb-4"></i>
+        <h2 class="pg-text-danger">Acceso Denegado</h2>
+        <p class="pg-lead pg-text-muted">
           No tienes permiso para ver esta ruta.
         </p>
-        <p class="text-muted">
+        <p class="pg-text-muted">
           Solo puedes ver las rutas que te han sido asignadas.
         </p>
-        <div class="mt-4">
-          <a href="{% url 'routes:list' %}" class="btn btn-primary me-2">
+        <div class="pg-mt-4">
+          <a href="{% url 'routes:list' %}" class="pg-button pg-button-primary pg-me-2">
             <i class="fas fa-arrow-left"></i> Volver a Mis Rutas
           </a>
-          <a href="{% url 'core:home' %}" class="btn btn-outline-secondary">
+          <a href="{% url 'core:home' %}" class="pg-button pg-button-outline-secondary">
             <i class="fas fa-home"></i> Ir al Inicio
           </a>
         </div>

@@ -18,7 +18,7 @@ class RouteClientInline(TabularInline):
     class Media:
         js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
-            'all': ('routes/css/route_admin.css', 'admin/css/widgets.css')
+            'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }
     
     def get_form(self, request, obj=None, **kwargs):
@@ -45,7 +45,7 @@ class RouteAdmin(SoftDeleteAdminMixin, ModelAdmin):
     class Media:
         js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
-            'all': ('routes/css/route_admin.css', 'admin/css/widgets.css')
+            'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }
     
     def client_count(self, obj):
@@ -69,7 +69,7 @@ class RouteClientAdmin(SoftDeleteAdminMixin, ModelAdmin):
     class Media:
         js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
-            'all': ('routes/css/route_admin.css', 'admin/css/widgets.css')
+            'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }
     
     def get_form(self, request, obj=None, **kwargs):

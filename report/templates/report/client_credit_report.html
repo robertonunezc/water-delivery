@@ -1,131 +1,104 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-  <style>
-    .credit-summary-card {
-      border-left: 4px solid #0d6efd;
-    }
-    .metric-label {
-      color: #6c757d;
-      font-size: 0.82rem;
-      text-transform: uppercase;
-    }
-    .metric-value {
-      font-size: 1.3rem;
-      font-weight: 700;
-    }
-    .table th {
-      background-color: #f8f9fa;
-      border-top: none;
-    }
-    .amount-overdue {
-      color: #dc3545;
-      font-weight: 700;
-    }
-    .amount-current {
-      font-weight: 700;
-    }
-  </style>
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
-    <div class="row mb-4 align-items-start">
-      <div class="col-md-8">
-        <h1><i class="fas fa-credit-card me-2"></i>Reporte de crédito</h1>
-        <h4 class="text-muted">{{ client.name }}</h4>
+  <div class="pg-container pg-mt-4">
+    <div class="pg-row pg-mb-4 pg-align-start">
+      <div class="pg-col-md-8">
+        <h1><i class="fas fa-credit-card pg-me-2"></i>Reporte de crédito</h1>
+        <h4 class="pg-text-muted">{{ client.name }}</h4>
       </div>
-      <div class="col-md-4 text-md-end">
-        <a href="{% url 'report:credit_report' %}" class="btn btn-outline-secondary me-2">
-          <i class="fas fa-arrow-left me-1"></i>Reporte global
+      <div class="pg-col-md-4 pg-text-md-end">
+        <a href="{% url 'report:credit_report' %}" class="pg-button pg-button-outline-secondary pg-me-2">
+          <i class="fas fa-arrow-left pg-me-1"></i>Reporte global
         </a>
-        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-primary">
+        <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-primary">
           Ver cliente
         </a>
       </div>
     </div>
 
     {% if report_data.has_reconciliation_warning %}
-      <div class="alert alert-warning">
+      <div class="pg-alert pg-alert-warning">
         <strong>Diferencia de conciliación:</strong>
         La deuda actual del cliente no coincide con el total abierto por órdenes.
         Diferencia: ${{ report_data.reconciliation_difference|floatformat:2 }}.
       </div>
     {% endif %}
 
-    <div class="row g-3 mb-4">
-      <div class="col-md-3">
-        <div class="card credit-summary-card h-100">
-          <div class="card-body">
-            <div class="metric-label">Crédito vigente</div>
-            <div class="metric-value">${{ report_data.current_credit|floatformat:2 }}</div>
-          </div>
+    <div class="metric-grid">
+      <div class="metric-card metric-invoice">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-credit-card"></i></span>
+          Crédito vigente
         </div>
+        <div class="metric-value">${{ report_data.current_credit|floatformat:2 }}</div>
+        <div class="metric-note">Crédito usado</div>
       </div>
-      <div class="col-md-3">
-        <div class="card credit-summary-card h-100">
-          <div class="card-body">
-            <div class="metric-label">Línea autorizada</div>
-            <div class="metric-value">${{ report_data.authorized_credit_line|floatformat:2 }}</div>
-          </div>
+      <div class="metric-card metric-capacity">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-gauge-high"></i></span>
+          Línea autorizada
         </div>
+        <div class="metric-value">${{ report_data.authorized_credit_line|floatformat:2 }}</div>
+        <div class="metric-note">Crédito aprobado</div>
       </div>
-      <div class="col-md-3">
-        <div class="card credit-summary-card h-100">
-          <div class="card-body">
-            <div class="metric-label">Disponible</div>
-            <div class="metric-value">${{ report_data.available_credit|floatformat:2 }}</div>
-          </div>
+      <div class="metric-card metric-sales">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-circle-check"></i></span>
+          Disponible
         </div>
+        <div class="metric-value">${{ report_data.available_credit|floatformat:2 }}</div>
+        <div class="metric-note">Capacidad restante</div>
       </div>
-      <div class="col-md-3">
-        <div class="card credit-summary-card h-100">
-          <div class="card-body">
-            <div class="metric-label">Monto vencido</div>
-            <div class="metric-value {% if report_data.overdue_amount > 0 %}text-danger{% endif %}">
-              ${{ report_data.overdue_amount|floatformat:2 }}
-            </div>
-          </div>
+      <div class="metric-card {% if report_data.overdue_amount > 0 %}metric-risk{% else %}metric-neutral{% endif %}">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
+          Monto vencido
         </div>
+        <div class="metric-value">${{ report_data.overdue_amount|floatformat:2 }}</div>
+        <div class="metric-note">Deuda vencida</div>
       </div>
     </div>
 
-    <div class="row g-3 mb-4">
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <div class="metric-label">Ventas a crédito facturadas</div>
-            <div class="metric-value">${{ report_data.invoiced_credit_total|floatformat:2 }}</div>
-          </div>
+    <div class="metric-grid">
+      <div class="metric-card metric-invoice">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
+          Ventas a crédito facturadas
         </div>
+        <div class="metric-value">${{ report_data.invoiced_credit_total|floatformat:2 }}</div>
+        <div class="metric-note">Crédito ligado a factura</div>
       </div>
-      <div class="col-md-6">
-        <div class="card h-100">
-          <div class="card-body">
-            <div class="metric-label">Ventas a crédito no facturadas</div>
-            <div class="metric-value">${{ report_data.uninvoiced_credit_total|floatformat:2 }}</div>
-          </div>
+      <div class="metric-card metric-pending">
+        <div class="metric-label">
+          <span class="metric-icon"><i class="fas fa-file-circle-plus"></i></span>
+          Ventas a crédito no facturadas
         </div>
+        <div class="metric-value">${{ report_data.uninvoiced_credit_total|floatformat:2 }}</div>
+        <div class="metric-note">Crédito pendiente de factura</div>
       </div>
     </div>
 
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5 class="mb-0">
-          <i class="fas fa-file-invoice-dollar me-2"></i>Ventas a crédito facturadas
+    <div class="pg-card pg-mb-4">
+      <div class="pg-card-header">
+        <h5 class="pg-mb-0">
+          <i class="fas fa-file-invoice-dollar pg-me-2"></i>Ventas a crédito facturadas
         </h5>
       </div>
-      <div class="card-body p-0">
+      <div class="pg-card-body pg-p-0">
         {% if report_data.invoice_items %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
+          <div class="pg-table-responsive">
+            <table class="pg-table pg-table-hover pg-mb-0">
               <thead>
                 <tr>
                   <th>Factura</th>
-                  <th class="text-end">Monto abierto</th>
-                  <th class="text-end">Monto vencido</th>
-                  <th class="text-center">Vencimiento</th>
-                  <th class="text-center">Estado</th>
+                  <th class="pg-text-end">Monto abierto</th>
+                  <th class="pg-text-end">Monto vencido</th>
+                  <th class="pg-text-center">Vencimiento</th>
+                  <th class="pg-text-center">Estado</th>
                 </tr>
               </thead>
               <tbody>
@@ -133,25 +106,25 @@
                   <tr>
                     <td>
                       <strong>{{ item.invoice.identifier }} {{ item.invoice.folio }}</strong>
-                      <br><small class="text-muted">{{ item.orders|length }} venta{{ item.orders|length|pluralize }}</small>
+                      <br><small class="pg-text-muted">{{ item.orders|length }} venta{{ item.orders|length|pluralize }}</small>
                     </td>
-                    <td class="text-end amount-current">${{ item.open_amount|floatformat:2 }}</td>
-                    <td class="text-end">
+                    <td class="pg-text-end amount-current">${{ item.open_amount|floatformat:2 }}</td>
+                    <td class="pg-text-end">
                       {% if item.overdue_amount > 0 %}
                         <span class="amount-overdue">${{ item.overdue_amount|floatformat:2 }}</span>
                       {% else %}
-                        <span class="text-muted">$0.00</span>
+                        <span class="pg-text-muted">$0.00</span>
                       {% endif %}
                     </td>
-                    <td class="text-center">
+                    <td class="pg-text-center">
                       {% if item.due_date %}
                         {{ item.due_date|date:"d/m/Y" }}
                       {% else %}
-                        <span class="text-muted">Sin fecha</span>
+                        <span class="pg-text-muted">Sin fecha</span>
                       {% endif %}
                     </td>
-                    <td class="text-center">
-                      <span class="badge {% if item.is_overdue %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+                    <td class="pg-text-center">
+                      <span class="pg-badge {% if item.is_overdue %}pg-bg-danger{% else %}pg-bg-warning pg-text-dark{% endif %}">
                         {{ item.status }}
                       </span>
                     </td>
@@ -161,54 +134,54 @@
             </table>
           </div>
         {% else %}
-          <div class="p-4 text-muted">No hay ventas a crédito facturadas abiertas.</div>
+          <div class="pg-p-4 pg-text-muted">No hay ventas a crédito facturadas abiertas.</div>
         {% endif %}
       </div>
     </div>
 
-    <div class="card mb-4">
-      <div class="card-header">
-        <h5 class="mb-0">
-          <i class="fas fa-receipt me-2"></i>Ventas a crédito no facturadas
+    <div class="pg-card pg-mb-4">
+      <div class="pg-card-header">
+        <h5 class="pg-mb-0">
+          <i class="fas fa-receipt pg-me-2"></i>Ventas a crédito no facturadas
         </h5>
       </div>
-      <div class="card-body p-0">
+      <div class="pg-card-body pg-p-0">
         {% if report_data.uninvoiced_orders %}
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
+          <div class="pg-table-responsive">
+            <table class="pg-table pg-table-hover pg-mb-0">
               <thead>
                 <tr>
                   <th>ID</th>
                   <th>Fecha</th>
-                  <th class="text-end">Monto abierto</th>
-                  <th class="text-center">Vencimiento</th>
-                  <th class="text-center">Estado</th>
+                  <th class="pg-text-end">Monto abierto</th>
+                  <th class="pg-text-center">Vencimiento</th>
+                  <th class="pg-text-center">Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in report_data.uninvoiced_orders %}
                   <tr>
                     <td>
-                      <a href="{% url 'orders:get_order' item.order.id %}" class="fw-bold text-decoration-none">
+                      <a href="{% url 'orders:get_order' item.order.id %}" class="pg-fw-bold pg-text-decoration-none">
                         #{{ item.order.id }}
                       </a>
                     </td>
                     <td>{{ item.order.order_date|date:"d/m/Y" }}</td>
-                    <td class="text-end amount-current">${{ item.remaining_amount|floatformat:2 }}</td>
-                    <td class="text-center">
+                    <td class="pg-text-end amount-current">${{ item.remaining_amount|floatformat:2 }}</td>
+                    <td class="pg-text-center">
                       {% if item.due_date %}
                         {{ item.due_date|date:"d/m/Y" }}
                       {% else %}
-                        <span class="text-muted">Pendiente de factura</span>
+                        <span class="pg-text-muted">Pendiente de factura</span>
                       {% endif %}
                     </td>
-                    <td class="text-center">
+                    <td class="pg-text-center">
                       {% if item.is_overdue %}
-                        <span class="badge bg-danger">Vencida</span>
+                        <span class="pg-badge pg-bg-danger">Vencida</span>
                       {% elif item.due_date %}
-                        <span class="badge bg-warning text-dark">En plazo</span>
+                        <span class="pg-badge pg-bg-warning pg-text-dark">En plazo</span>
                       {% else %}
-                        <span class="badge bg-secondary">Sin vencimiento</span>
+                        <span class="pg-badge pg-bg-secondary">Sin vencimiento</span>
                       {% endif %}
                     </td>
                   </tr>
@@ -217,7 +190,7 @@
             </table>
           </div>
         {% else %}
-          <div class="p-4 text-muted">No hay ventas a crédito no facturadas abiertas.</div>
+          <div class="pg-p-4 pg-text-muted">No hay ventas a crédito no facturadas abiertas.</div>
         {% endif %}
       </div>
     </div>

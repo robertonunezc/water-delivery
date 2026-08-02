@@ -67,7 +67,10 @@
         if ($clientSelect.length === 0) return;
         
         // Hide confirmation checkbox initially
-        $confirmContainer.hide();
+        $confirmContainer.addClass('pg-hidden');
+        $confirmContainer.prop('hidden', true);
+        $confirmCheckbox.addClass('pg-hidden');
+        $confirmCheckbox.prop('hidden', true);
         
         // Handle client selection change
         $clientSelect.on('change', function() {
@@ -86,7 +89,7 @@
             var clientId = $clientSelect.val();
             var hasConflict = $formRow.hasClass('has-duplicate-warning') || $confirmContainer.hasClass('has-conflict');
             var isConfirmed = $confirmCheckbox.is(':checked');
-            var checkboxVisible = $confirmCheckbox.is(':visible') && $confirmCheckbox.css('display') !== 'none';
+            var checkboxVisible = !$confirmCheckbox.prop('hidden') && !$confirmContainer.hasClass('pg-hidden');
             
             if (clientId && hasConflict && checkboxVisible && !isConfirmed) {
                 event.preventDefault();
@@ -159,17 +162,14 @@
         // Position the confirmation field as an overlay
         if ($formRow.closest('.tabular').length) {
             // For tabular inline, position as overlay
-            $confirmContainer.css({
-                'position': 'absolute',
-                'top': '100%',
-                'left': '0',
-                'right': '35px',
-                'z-index': '100'
-            });
+            $confirmContainer.addClass('route-confirm-overlay');
         }
         
         // Show the container and reset checkbox
-        $confirmContainer.show();
+        $confirmContainer.removeClass('pg-hidden');
+        $confirmContainer.prop('hidden', false);
+        $confirmCheckbox.removeClass('pg-hidden');
+        $confirmCheckbox.prop('hidden', false);
         $confirmCheckbox.prop('checked', false);
         
         // Add visual styling to indicate required attention
@@ -184,7 +184,10 @@
         var $confirmContainer = $formRow.find('.field-confirm_duplicate_assignment');
         var $confirmCheckbox = $formRow.find('.confirm-duplicate-checkbox');
         
-        $confirmContainer.hide();
+        $confirmContainer.addClass('pg-hidden');
+        $confirmContainer.prop('hidden', true);
+        $confirmCheckbox.addClass('pg-hidden');
+        $confirmCheckbox.prop('hidden', true);
         $confirmCheckbox.prop('checked', false);
         $confirmContainer.removeClass('duplicate-assignment-warning');
         $formRow.removeClass('has-duplicate-warning');
@@ -232,21 +235,21 @@
                     $formRow.addClass('has-duplicate-warning');
                     $confirmContainer.addClass('has-conflict');
 
-                    // Remove the inline display:none and make checkbox visible
                     $confirmCheckbox.removeAttr('style');
-                    $confirmCheckbox.css('display', 'inline-block');
-                    $confirmCheckbox.show();
+                    $confirmCheckbox.addClass('pg-inline-block');
+                    $confirmCheckbox.prop('hidden', false);
 
                     // Show the container itself (may be hidden)
-                    $confirmContainer.show();
+                    $confirmContainer.removeClass('pg-hidden');
+                    $confirmContainer.prop('hidden', false);
 
                     // Create or update label
                     var $existingLabel = $confirmContainer.find('label');
                     if ($existingLabel.length) {
+                        $existingLabel.addClass('pg-inline-block pg-small pg-text-warning pg-fw-bold');
                         $existingLabel.html('').append($confirmCheckbox).append(' ✓ Confirmar duplicado');
-                        $existingLabel.show();
                     } else {
-                        var $newLabel = $('<label style="display: inline-block; font-size: 12px; color: #856404; font-weight: bold;"></label>');
+                        var $newLabel = $('<label class="pg-inline-block pg-small pg-text-warning pg-fw-bold"></label>');
                         $newLabel.append($confirmCheckbox).append(' ✓ Confirmar duplicado');
                         $confirmContainer.prepend($newLabel);
                     }

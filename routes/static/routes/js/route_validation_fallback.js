@@ -3,32 +3,28 @@
 
 function showDuplicateConfirmation(formRow, confirmContainer, confirmCheckbox) {
     // Show the checkbox
-    confirmCheckbox.style.display = 'inline-block';
-    confirmCheckbox.style.marginRight = '5px';
+    confirmCheckbox.classList.remove('pg-hidden');
+    confirmCheckbox.classList.add('pg-inline-block', 'pg-me-1');
+    confirmCheckbox.hidden = false;
 
     // Add or update label
     var label = confirmContainer.querySelector('label');
     if (label) {
-        label.style.display = 'inline-block';
-        label.style.fontSize = '11px';
-        label.style.color = '#856404';
-        label.style.fontWeight = 'bold';
+        label.classList.add('pg-inline-block', 'pg-small', 'pg-text-warning', 'pg-fw-bold');
         label.innerHTML = '';
         label.appendChild(confirmCheckbox);
         label.appendChild(document.createTextNode(' ✓ Confirmar duplicado'));
     } else {
         var newLabel = document.createElement('label');
-        newLabel.style.display = 'inline-block';
-        newLabel.style.fontSize = '11px';
-        newLabel.style.color = '#856404';
-        newLabel.style.fontWeight = 'bold';
+        newLabel.className = 'pg-inline-block pg-small pg-text-warning pg-fw-bold';
         newLabel.appendChild(confirmCheckbox);
         newLabel.appendChild(document.createTextNode(' ✓ Confirmar duplicado'));
         confirmContainer.insertBefore(newLabel, confirmContainer.firstChild);
     }
 
     // Show the container itself (may be hidden)
-    confirmContainer.style.display = '';
+    confirmContainer.hidden = false;
+    confirmContainer.classList.remove('pg-hidden');
 
     // Add visual styling to the row
     formRow.classList.add('has-duplicate-warning');

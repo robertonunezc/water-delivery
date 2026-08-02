@@ -25,10 +25,10 @@ def _apply_route_form_styles(route_form: RouteForm) -> RouteForm:
     for field in route_form.fields.values():
         widget = field.widget
         if isinstance(widget, django_forms.CheckboxInput):
-            widget.attrs['class'] = 'form-check-input'
+            widget.attrs['class'] = 'pg-checkbox-input'
             continue
 
-        default_class = 'form-select' if isinstance(widget, django_forms.Select) else 'form-control'
+        default_class = 'pg-select' if isinstance(widget, django_forms.Select) else 'pg-input'
         existing_classes = widget.attrs.get('class', '')
         widget.attrs['class'] = f"{existing_classes} {default_class}".strip()
 
@@ -53,10 +53,10 @@ def _apply_route_client_formset_styles(route_client_formset):
             widget = field.widget
             if isinstance(widget, django_forms.CheckboxInput):
                 existing_classes = widget.attrs.get('class', '')
-                widget.attrs['class'] = f"{existing_classes} form-check-input".strip()
+                widget.attrs['class'] = f"{existing_classes} pg-checkbox-input".strip()
                 continue
 
-            default_class = 'form-select' if isinstance(widget, django_forms.Select) else 'form-control'
+            default_class = 'pg-select' if isinstance(widget, django_forms.Select) else 'pg-input'
             existing_classes = widget.attrs.get('class', '')
             widget.attrs['class'] = f"{existing_classes} {default_class}".strip()
 

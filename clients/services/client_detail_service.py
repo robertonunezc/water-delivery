@@ -136,12 +136,12 @@ def build_client_detail_snapshot(
                 "action_url_name": "clients:pay_credit",
                 "action_icon": "fas fa-credit-card",
             },
-            {
-                "label": "Próxima visita",
-                "value": visit_value,
-                "note": visit_note,
-                "tone": "primary" if visit_note != "Sin ruta asignada" else "muted",
-            },
+            # {
+            #     "label": "Próxima visita",
+            #     "value": visit_value,
+            #     "note": visit_note,
+            #     "tone": "primary" if visit_note != "Sin ruta asignada" else "muted",
+            # },
             {
                 "label": "Facturación",
                 "value": billing_value,

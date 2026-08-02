@@ -47,8 +47,8 @@ class RouteClientInlineForm(RouteClientForm):
         help_text="Cliente ya asignado a otra ruta. Marque para confirmar.",
         widget=forms.CheckboxInput(
             attrs={
-                'class': 'confirm-duplicate-checkbox',
-                'style': 'display: none;',  # Hidden by default, shown via JavaScript
+                'class': 'confirm-duplicate-checkbox pg-hidden',
+                'hidden': True,
             }
         ),
     )
@@ -113,7 +113,7 @@ class ClientRouteAssignmentForm(forms.ModelForm):
         label='Fecha de inicio de ciclo',
         widget=forms.DateInput(
             format='%Y-%m-%d',
-            attrs={'type': 'date', 'class': 'form-control'},
+            attrs={'type': 'date', 'class': 'pg-input'},
         ),
         input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
     )
@@ -122,11 +122,11 @@ class ClientRouteAssignmentForm(forms.ModelForm):
         model = RouteClient
         fields = ['route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
         widgets = {
-            'route': forms.Select(attrs={'class': 'form-select'}),
-            'sequence': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
-            'interval_weeks': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '4'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'route': forms.Select(attrs={'class': 'pg-select'}),
+            'sequence': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1'}),
+            'interval_weeks': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1', 'max': '4'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
         }
         labels = {
             'interval_weeks': 'Intervalo',

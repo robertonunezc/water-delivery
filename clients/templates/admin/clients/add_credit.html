@@ -5,34 +5,7 @@
 
 {% block extrahead %}
 {{ block.super }}
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-<style>
-    .credit-form-shell {
-        max-width: 860px;
-    }
-
-    .credit-form-shell .card {
-        border: 1px solid #dee2e6;
-        border-radius: 0.75rem;
-    }
-
-    .credit-form-shell .form-label {
-        font-weight: 600;
-    }
-
-    .credit-form-shell .help-text {
-        color: #6c757d;
-        font-size: 0.875rem;
-        margin-top: 0.25rem;
-    }
-
-    .credit-form-shell .errorlist {
-        margin: 0.4rem 0 0;
-        padding-left: 1rem;
-        color: #dc3545;
-        font-size: 0.875rem;
-    }
-</style>
+<link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -45,31 +18,31 @@
 {% endblock %}
 
 {% block content %}
-<div class="credit-form-shell container-fluid px-0">
-    <h1 class="mb-4">{{ title }}</h1>
+<div class="credit-form-shell pg-container-fluid pg-px-0">
+    <h1 class="pg-mb-4">{{ title }}</h1>
 
     {% if client %}
-    <div class="card shadow-sm mb-4">
-        <div class="card-body p-4">
-            <h2 class="h5 mb-3">Información del Cliente</h2>
-            <div class="row g-3">
-                <div class="col-md-6"><strong>Cliente:</strong> {{ client.name }}</div>
-                <div class="col-md-6"><strong>Saldo actual:</strong> ${{ client.balance }}</div>
-                <div class="col-md-6"><strong>Deuda actual:</strong> ${{ client.current_debt }}</div>
-                <div class="col-md-6"><strong>Límite de crédito:</strong> ${{ client.credit_limit }}</div>
-                <div class="col-md-6"><strong>Crédito disponible:</strong> ${{ client.get_available_credit }}</div>
+    <div class="pg-card dashboard-card pg-mb-4">
+        <div class="pg-card-body pg-p-4">
+            <h2 class="pg-h5 pg-mb-3">Información del Cliente</h2>
+            <div class="pg-row pg-gap-3">
+                <div class="pg-col-md-6"><strong>Cliente:</strong> {{ client.name }}</div>
+                <div class="pg-col-md-6"><strong>Saldo actual:</strong> ${{ client.balance }}</div>
+                <div class="pg-col-md-6"><strong>Deuda actual:</strong> ${{ client.current_debt }}</div>
+                <div class="pg-col-md-6"><strong>Límite de crédito:</strong> ${{ client.credit_limit }}</div>
+                <div class="pg-col-md-6"><strong>Crédito disponible:</strong> ${{ client.get_available_credit }}</div>
             </div>
         </div>
     </div>
     {% endif %}
 
-    <div class="card shadow-sm mb-4">
-        <div class="card-body p-4">
+    <div class="pg-card dashboard-card pg-mb-4">
+        <div class="pg-card-body pg-p-4">
             <form method="post" action="" novalidate>
                 {% csrf_token %}
 
-                <div class="mb-3">
-                    <label for="id_client" class="form-label">{{ form.client.label }}</label>
+                <div class="pg-mb-3">
+                    <label for="id_client" class="pg-label">{{ form.client.label }}</label>
                     {{ form.client }}
                     {% if form.client.errors %}
                         <ul class="errorlist">
@@ -80,8 +53,8 @@
                     {% endif %}
                 </div>
 
-                <div class="mb-3">
-                    <label for="id_transaction_type" class="form-label">{{ form.transaction_type.label }}</label>
+                <div class="pg-mb-3">
+                    <label for="id_transaction_type" class="pg-label">{{ form.transaction_type.label }}</label>
                     {{ form.transaction_type }}
                     {% if form.transaction_type.errors %}
                         <ul class="errorlist">
@@ -92,8 +65,8 @@
                     {% endif %}
                 </div>
 
-                <div class="mb-3">
-                    <label for="id_amount" class="form-label">{{ form.amount.label }}</label>
+                <div class="pg-mb-3">
+                    <label for="id_amount" class="pg-label">{{ form.amount.label }}</label>
                     {{ form.amount }}
                     {% if form.amount.errors %}
                         <ul class="errorlist">
@@ -107,8 +80,8 @@
                     {% endif %}
                 </div>
 
-                <div class="mb-3" id="credit_limit_row" style="display: none;">
-                    <label for="id_new_credit_limit" class="form-label">{{ form.new_credit_limit.label }}</label>
+                <div class="pg-mb-3" id="credit_limit_row" hidden>
+                    <label for="id_new_credit_limit" class="pg-label">{{ form.new_credit_limit.label }}</label>
                     {{ form.new_credit_limit }}
                     {% if form.new_credit_limit.errors %}
                         <ul class="errorlist">
@@ -122,8 +95,8 @@
                     {% endif %}
                 </div>
 
-                <div class="mb-3">
-                    <label for="id_description" class="form-label">{{ form.description.label }}</label>
+                <div class="pg-mb-3">
+                    <label for="id_description" class="pg-label">{{ form.description.label }}</label>
                     {{ form.description }}
                     {% if form.description.errors %}
                         <ul class="errorlist">
@@ -137,8 +110,8 @@
                     {% endif %}
                 </div>
 
-                <div class="mb-4">
-                    <label for="id_notes" class="form-label">{{ form.notes.label }}</label>
+                <div class="pg-mb-4">
+                    <label for="id_notes" class="pg-label">{{ form.notes.label }}</label>
                     {{ form.notes }}
                     {% if form.notes.errors %}
                         <ul class="errorlist">
@@ -152,24 +125,24 @@
                     {% endif %}
                 </div>
 
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary">Procesar Transacción</button>
-                    <a href="{% url 'admin:clients_client_changelist' %}" class="btn btn-outline-secondary">Cancelar</a>
+                <div class="pg-flex pg-flex-wrap pg-gap-2">
+                    <button type="submit" class="pg-button pg-button-primary">Procesar Transacción</button>
+                    <a href="{% url 'admin:clients_client_changelist' %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
                 </div>
             </form>
         </div>
     </div>
 
-    <div class="alert alert-info" role="alert">
-        <h2 class="h5 mb-3">Tipos de Transacción</h2>
-        <ul class="mb-3">
+    <div class="pg-alert pg-alert-info" role="alert">
+        <h2 class="pg-h5 pg-mb-3">Tipos de Transacción</h2>
+        <ul class="pg-mb-3">
             <li><strong>Ajuste manual de deuda:</strong> Modificar deuda por razones administrativas</li>
             <li><strong>Pago de deuda:</strong> Cliente pagó su deuda pendiente</li>
             <li><strong>Condonación de deuda:</strong> Perdonar deuda por autorización especial</li>
             <li><strong>Corrección:</strong> Corrección de error previo</li>
             <li><strong>Cambio de límite de crédito:</strong> Modificar el límite de crédito del cliente</li>
         </ul>
-        <p class="mb-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.</p>
+        <p class="pg-mb-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.</p>
     </div>
 </div>
 
@@ -195,16 +168,18 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             if (field.tagName === 'SELECT' || field.tagName === 'TEXTAREA' || field.tagName === 'INPUT') {
-                field.classList.add('form-control');
+                field.classList.add('pg-input');
             }
         });
     
     function toggleCreditLimitField() {
         if (transactionTypeField.value === 'limit_change') {
-            creditLimitRow.style.display = 'block';
+            creditLimitRow.hidden = false;
+            creditLimitRow.classList.remove('pg-hidden');
             newCreditLimitField.required = true;
         } else {
-            creditLimitRow.style.display = 'none';
+            creditLimitRow.hidden = true;
+            creditLimitRow.classList.add('pg-hidden');
             newCreditLimitField.required = false;
         }
     }

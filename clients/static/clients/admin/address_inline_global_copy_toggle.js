@@ -30,9 +30,9 @@
 
         buildToggleMarkup() {
             return this.$(`
-                <div class="form-row field-${this.fieldName}" style="margin-bottom: 12px;">
+                <div class="form-row field-${this.fieldName} pg-mb-3">
                     <div>
-                        <label style="display: flex; align-items: center; gap: 8px; font-weight: 600;">
+                        <label class="pg-flex pg-align-center pg-gap-2 pg-fw-semibold">
                             <input type="checkbox" name="${this.fieldName}" id="id_${this.fieldName}">
                                 Copiar esta dirección como direccion fiscal 
                         </label>
