@@ -1,3 +1,4 @@
+from importlib import import_module
 from decimal import Decimal
 from datetime import date, timedelta
 import json
@@ -5,6 +6,9 @@ import json
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db import connection
+from django.db.migrations.operations.base import Operation
+from django.db.migrations.state import ProjectState
 from django.test import TestCase, RequestFactory
 from django.utils import timezone
 
@@ -100,6 +104,86 @@ class InvoiceScheduleFormTests(InvoiceTenantTestCase):
         self.assertIn("start_date", form.fields)
         self.assertTrue(form.fields["start_date"].required)
         self.assertNotIn("monthly_ordinal_day_kind", form.fields)
+
+
+class InvoiceScheduleSchemaDriftMigrationTests(InvoiceTenantTestCase):
+    obsolete_column = "monthly_ordinal_day_kind"
+    table_name = "clients_clientbillingfrecuency"
+
+    def test_obsolete_monthly_ordinal_column_is_made_nullable_by_migration(self) -> None:
+        operation = self._load_relax_column_operation()
+        self._add_obsolete_column()
+
+        self.assertEqual(self._obsolete_column_nullability(), "NO")
+
+        with connection.schema_editor() as schema_editor:
+            operation.database_forwards(
+                "billing",
+                schema_editor,
+                ProjectState(),
+                ProjectState(),
+            )
+
+        self.assertEqual(self._obsolete_column_nullability(), "YES")
+        client = Client.objects.create(
+            name="Schedule Schema Drift Client",
+            requires_billing=True,
+            active=True,
+        )
+        InvoiceSchedule.objects.create(
+            client=client,
+            frequency="monthly",
+            billing_date="last_day",
+            start_date=date(2026, 8, 2),
+            is_active=True,
+        )
+
+    def _load_relax_column_operation(self) -> Operation:
+        migration_path = (
+            "invoice.migrations.0023_relax_obsolete_monthly_ordinal_day_kind"
+        )
+        try:
+            migration_module = import_module(migration_path)
+        except ModuleNotFoundError as exc:
+            if exc.name != migration_path:
+                raise
+            self.fail(
+                "Expected billing migration to relax obsolete "
+                "monthly_ordinal_day_kind column constraint."
+            )
+
+        return migration_module.Migration.operations[0]
+
+    def _add_obsolete_column(self) -> None:
+        table_name = connection.ops.quote_name(self.table_name)
+        column_name = connection.ops.quote_name(self.obsolete_column)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"ALTER TABLE {table_name} DROP COLUMN IF EXISTS {column_name}"
+            )
+            cursor.execute(
+                f"ALTER TABLE {table_name} "
+                f"ADD COLUMN {column_name} varchar(50) NOT NULL DEFAULT 'legacy'"
+            )
+            cursor.execute(
+                f"ALTER TABLE {table_name} ALTER COLUMN {column_name} DROP DEFAULT"
+            )
+
+    def _obsolete_column_nullability(self) -> str | None:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT is_nullable
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = %s
+                  AND column_name = %s
+                """,
+                [self.table_name, self.obsolete_column],
+            )
+            row = cursor.fetchone()
+            return row[0] if row else None
 
 
 class BillingOrderAdminFormTests(InvoiceTenantTestCase):

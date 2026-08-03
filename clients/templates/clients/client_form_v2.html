@@ -30,27 +30,27 @@
 		<div class="pg-card-body">
 			<ul class="pg-nav pg-tabs" role="tablist">
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'basic' %}active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+					<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'addresses' %}active{% endif %} {% if not client %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-addresses" type="button" role="tab">Direcciones</button>
+					<button class="pg-tab {% if active_tab == 'addresses' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-addresses" type="button" role="tab" {% if not client %}disabled{% endif %}>Direcciones</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'contacts' %}active{% endif %} {% if not client %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab">Contactos</button>
+					<button class="pg-tab {% if active_tab == 'contacts' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab" {% if not client %}disabled{% endif %}>Contactos</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'routes' %}active{% endif %} {% if not client %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab">Rutas</button>
+					<button class="pg-tab {% if active_tab == 'routes' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab" {% if not client %}disabled{% endif %}>Rutas</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'billing' %}active{% endif %} {% if not client %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-billing" type="button" role="tab">Facturación</button>
+					<button class="pg-tab {% if active_tab == 'billing' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-billing" type="button" role="tab" {% if not client %}disabled{% endif %}>Facturación</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'credit' %}active{% endif %} {% if not client %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-credit" type="button" role="tab">Crédito</button>
+					<button class="pg-tab {% if active_tab == 'credit' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-credit" type="button" role="tab" {% if not client %}disabled{% endif %}>Crédito</button>
 				</li>
 			</ul>
 
 			<div class="tab-content">
-				<div class="tab-pane pg-fade {% if active_tab == 'basic' %}show active{% endif %}" id="tab-basic" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'basic' %}pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
 					<form method="post">
 						{% csrf_token %}
 						<input type="hidden" name="section" value="basic">
@@ -111,7 +111,7 @@
 					</form>
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'addresses' %}show active{% endif %}" id="tab-addresses" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'addresses' %}pg-show pg-active{% endif %}" id="tab-addresses" role="tabpanel">
 					{% if client %}
 						<form method="post">
 							{% csrf_token %}
@@ -154,7 +154,7 @@
 					{% endif %}
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'contacts' %}show active{% endif %}" id="tab-contacts" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'contacts' %}pg-show pg-active{% endif %}" id="tab-contacts" role="tabpanel">
 					{% if client %}
 						<form method="post">
 							{% csrf_token %}
@@ -182,7 +182,7 @@
 					{% endif %}
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'routes' %}show active{% endif %}" id="tab-routes" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'routes' %}pg-show pg-active{% endif %}" id="tab-routes" role="tabpanel">
 					{% if client %}
 						{% if not has_delivery_address %}
 							<div class="pg-alert pg-alert-warning">
@@ -222,7 +222,7 @@
 					{% endif %}
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'billing' %}show active{% endif %}" id="tab-billing" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'billing' %}pg-show pg-active{% endif %}" id="tab-billing" role="tabpanel">
 					{% if client %}
 						{% if not client.billing_info.effective.has_address and not billing_read_only %}
 							<div class="pg-alert pg-alert-warning">
@@ -319,7 +319,7 @@
 					{% endif %}
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'credit' %}show active{% endif %}" id="tab-credit" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'credit' %}pg-show pg-active{% endif %}" id="tab-credit" role="tabpanel">
 					{% if client %}
 						{% if credit_read_only %}
 							<div class="pg-alert pg-alert-warning">La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>

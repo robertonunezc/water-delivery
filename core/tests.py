@@ -1,4 +1,5 @@
 from datetime import date
+from html.parser import HTMLParser
 import re
 from pathlib import Path
 from unittest.mock import patch
@@ -19,6 +20,15 @@ from .admin import EmployeeAdmin
 from . import views
 from clients.models import Client
 from tenant_client.test_utils import FastTenantTestCase
+
+
+class _HtmlTagParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tags: list[tuple[str, dict[str, str]]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags.append((tag, {name: value or "" for name, value in attrs}))
 
 
 class DesignSystemMigrationTests(SimpleTestCase):
@@ -113,6 +123,10 @@ class DesignSystemMigrationTests(SimpleTestCase):
                     offenders.append(token)
         return offenders
 
+    def _legacy_tab_state_class(self, attrs: dict[str, str]) -> bool:
+        class_value = attrs.get("class", "")
+        return bool(re.search(r"%}\s*(?:show\s+)?active\s*{%", class_value))
+
     def test_base_layouts_load_shared_design_system_assets(self) -> None:
         base_templates = [
             settings.BASE_DIR / "core/templates/base.html",
@@ -148,6 +162,46 @@ class DesignSystemMigrationTests(SimpleTestCase):
             content = file_path.read_text()
             if self._bootstrap_class_tokens(content):
                 offenders.append(self._relative(file_path))
+
+        self.assertEqual(offenders, [])
+
+    def test_pg_tab_triggers_target_design_system_tab_panes(self) -> None:
+        offenders: list[str] = []
+        for file_path in self._project_ui_files():
+            if file_path.suffix != ".html":
+                continue
+
+            parser = _HtmlTagParser()
+            parser.feed(file_path.read_text())
+            tab_triggers = [
+                attrs
+                for _, attrs in parser.tags
+                if attrs.get("data-pg-toggle") == "tab"
+            ]
+            target_ids = [
+                attrs["data-pg-target"].removeprefix("#")
+                for attrs in tab_triggers
+                if attrs.get("data-pg-target", "").startswith("#")
+            ]
+            panes_by_id = {
+                attrs["id"]: attrs
+                for _, attrs in parser.tags
+                if attrs.get("id") in target_ids
+            }
+
+            for trigger in tab_triggers:
+                if self._legacy_tab_state_class(trigger):
+                    offenders.append(f"{self._relative(file_path)}: legacy active tab trigger")
+
+            for target_id in target_ids:
+                pane_attrs = panes_by_id.get(target_id)
+                if pane_attrs is None:
+                    offenders.append(f"{self._relative(file_path)}: missing #{target_id}")
+                    continue
+                if "pg-tab-pane" not in pane_attrs.get("class", "").split():
+                    offenders.append(f"{self._relative(file_path)}: #{target_id} missing pg-tab-pane")
+                if self._legacy_tab_state_class(pane_attrs):
+                    offenders.append(f"{self._relative(file_path)}: #{target_id} uses legacy active state")
 
         self.assertEqual(offenders, [])
 

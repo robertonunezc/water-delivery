@@ -182,7 +182,7 @@
         </li>
       </ul>
       <div class="tab-content">
-        <div class="tab-pane pg-fade pg-show pg-active" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade pg-show pg-active" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
           <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
             <h2 class="pg-h5 pg-mb-0">Ventas Recientes</h2>
             <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-center pg-justify-end">
@@ -340,7 +340,7 @@
           {% endif %}
         </div>
 
-        <div class="tab-pane pg-fade" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
           <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
             <h2 class="pg-h5 pg-mb-0">Pagos Recientes</h2>
             <small class="pg-text-muted">
@@ -437,7 +437,7 @@
         </div>
 
         {% if client.requires_billing %}
-          <div class="tab-pane pg-fade" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
+          <div class="pg-tab-pane pg-fade" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
             <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
               <h2 class="pg-h5 pg-mb-0">Facturas</h2>
               <small class="pg-text-muted">
@@ -493,7 +493,7 @@
           </div>
         {% endif %}
 
-        <div class="tab-pane pg-fade" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
           <h2 class="pg-h5 pg-mb-3">Rutas</h2>
           {% if route_clients or upcoming_route_orders or recent_completed_routes %}
             {% if route_clients %}
@@ -600,7 +600,7 @@
           {% endif %}
         </div>
 
-        <div class="tab-pane pg-fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
           <div class="client-profile-grid">
             <section class="client-profile-section">
               <h3><i class="fas fa-user pg-me-2"></i>Contactos</h3>

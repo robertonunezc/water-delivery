@@ -29,15 +29,15 @@
 		<div class="pg-card-body">
 			<ul class="pg-nav pg-tabs" role="tablist">
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'basic' %}active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+					<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
 				</li>
 				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'prices' %}active{% endif %} {% if not product %}disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab">Precios por Cliente</button>
+					<button class="pg-tab {% if active_tab == 'prices' %}pg-active{% endif %} {% if not product %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab" {% if not product %}disabled{% endif %}>Precios por Cliente</button>
 				</li>
 			</ul>
 
 			<div class="tab-content">
-				<div class="tab-pane pg-fade {% if active_tab == 'basic' %}show active{% endif %}" id="tab-basic" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'basic' %}pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
 					<form method="post">
 						{% csrf_token %}
 						<input type="hidden" name="section" value="basic">
@@ -98,7 +98,7 @@
 					</form>
 				</div>
 
-				<div class="tab-pane pg-fade {% if active_tab == 'prices' %}show active{% endif %}" id="tab-prices" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'prices' %}pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
 					{% if product %}
 						<form method="post">
 							{% csrf_token %}
