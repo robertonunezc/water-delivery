@@ -130,82 +130,150 @@ def _get_clients_with_debt_count() -> int:
     return Client.objects.filter(active=True, current_debt__gt=0).count()
 
 
+def _get_driver_dashboard_actions(current_date: date) -> list[dict[str, Any]]:
+    return [
+        {
+            'key': 'route',
+            'title': 'Ruta del día',
+            'description': 'Abrir la ruta programada para hoy e iniciar ventas.',
+            'url': reverse('routes:today'),
+            'icon': 'fa-route',
+            'variant': 'primary',
+            'badge_count': None,
+            'meta': 'Programa de visitas del día',
+        },
+        {
+            'key': 'outside_route_sales',
+            'title': 'Ventas fuera de ruta',
+            'description': 'Seleccionar un cliente para crear una venta manual.',
+            'url': _url_with_query('clients:list', {'mode': 'outside_route_sales'}),
+            'icon': 'fa-cart-plus',
+            'variant': 'success',
+            'badge_count': None,
+            'meta': 'Búsqueda general de clientes',
+        },
+        {
+            'key': 'clients',
+            'title': 'Clientes',
+            'description': 'Consultar clientes, ventas y pagos registrados.',
+            'url': reverse('clients:list'),
+            'icon': 'fa-users',
+            'variant': 'secondary',
+            'badge_count': None,
+            'meta': 'Información y acciones por cliente',
+        },
+        {
+            'key': 'day_report',
+            'title': 'Reporte de hoy',
+            'description': 'Revisar el corte de ventas y formas de pago del día.',
+            'url': _url_with_query(
+                'report:breakdown_payment_method',
+                {'date': current_date.isoformat()},
+            ),
+            'icon': 'fa-clipboard-check',
+            'variant': 'info',
+            'badge_count': None,
+            'meta': 'Resumen operativo del día',
+        },
+        {
+            'key': 'credits',
+            'title': 'Créditos',
+            'description': 'Consultar clientes con deuda y registrar pagos.',
+            'url': reverse('report:credit_report'),
+            'icon': 'fa-credit-card',
+            'variant': 'warning',
+            'badge_count': _get_clients_with_debt_count(),
+            'meta': 'Clientes con saldo pendiente',
+        },
+    ]
+
+
+def _get_staff_dashboard_actions(current_date: date) -> list[dict[str, Any]]:
+    return [
+        {
+            'key': 'sales',
+            'title': 'Ventas',
+            'description': 'Seleccionar un cliente para crear una venta.',
+            'url': _url_with_query('clients:list', {'mode': 'outside_route_sales'}),
+            'icon': 'fa-cart-plus',
+            'variant': 'primary',
+            'badge_count': None,
+            'meta': 'La venta inicia desde el cliente',
+        },
+        {
+            'key': 'clients',
+            'title': 'Clientes',
+            'description': 'Buscar clientes y revisar su resumen operativo.',
+            'url': reverse('clients:list'),
+            'icon': 'fa-users',
+            'variant': 'secondary',
+            'badge_count': None,
+            'meta': 'Información, ventas y pagos',
+        },
+        {
+            'key': 'routes',
+            'title': 'Rutas',
+            'description': 'Consultar rutas y clientes programados.',
+            'url': reverse('routes:list'),
+            'icon': 'fa-route',
+            'variant': 'success',
+            'badge_count': None,
+            'meta': 'Agenda de entrega',
+        },
+        {
+            'key': 'day_report',
+            'title': 'Reporte de hoy',
+            'description': 'Revisar ventas y pagos registrados en el día.',
+            'url': _url_with_query(
+                'report:breakdown_payment_method',
+                {'date': current_date.isoformat()},
+            ),
+            'icon': 'fa-clipboard-check',
+            'variant': 'info',
+            'badge_count': None,
+            'meta': 'Corte por forma de pago',
+        },
+        {
+            'key': 'credits',
+            'title': 'Créditos',
+            'description': 'Consultar clientes con deuda y registrar pagos.',
+            'url': reverse('report:credit_report'),
+            'icon': 'fa-credit-card',
+            'variant': 'warning',
+            'badge_count': _get_clients_with_debt_count(),
+            'meta': 'Clientes con saldo pendiente',
+        },
+        {
+            'key': 'overdue_payments',
+            'title': 'Pagos vencidos',
+            'description': 'Revisar clientes con pagos atrasados.',
+            'url': reverse('report:pending_payments'),
+            'icon': 'fa-triangle-exclamation',
+            'variant': 'danger',
+            'badge_count': None,
+            'meta': 'Seguimiento de cobranza',
+        },
+    ]
+
+
 def get_delivery_dashboard_context(
     *,
     user: Any,
     today: date | None = None,
 ) -> dict[str, Any]:
-    """Build the operational dashboard context for route delivery users."""
+    """Build the operational dashboard context for delivery and sales users."""
     current_date = today or timezone.localdate()
+    # Staff navigation proposal is intentionally hidden until the dashboard
+    # direction is approved.
+    # if get_employee_position(user) == 'staff':
+    #     dashboard_actions = _get_staff_dashboard_actions(current_date)
+    dashboard_actions = _get_driver_dashboard_actions(current_date)
     return {
         'is_authenticated': True,
         'user': user,
         'today': current_date,
-        'dashboard_actions': [
-            {
-                'key': 'route',
-                'title': 'Ruta',
-                'description': 'Abrir la ruta programada para hoy e iniciar ventas.',
-                'url': reverse('routes:today'),
-                'icon': 'fa-route',
-                'variant': 'primary',
-                'is_enabled': True,
-                'status_label': '',
-                'badge_count': None,
-                'meta': 'Programa de visitas del día',
-            },
-            {
-                'key': 'future_reminders',
-                'title': 'Pedidos futuros y recordatorios',
-                'description': 'Programación de pedidos especiales y recordatorios de clientes.',
-                'url': '',
-                'icon': 'fa-calendar-plus',
-                'variant': 'secondary',
-                'is_enabled': False,
-                'status_label': 'Próximamente',
-                'badge_count': None,
-                'meta': 'Pendiente de modelo operativo',
-            },
-            {
-                'key': 'outside_route_sales',
-                'title': 'Ventas fuera de ruta',
-                'description': 'Buscar cualquier cliente y crear una venta manual.',
-                'url': _url_with_query('clients:list', {'mode': 'outside_route_sales'}),
-                'icon': 'fa-cart-plus',
-                'variant': 'success',
-                'is_enabled': True,
-                'status_label': '',
-                'badge_count': None,
-                'meta': 'Búsqueda general de clientes',
-            },
-            {
-                'key': 'credits',
-                'title': 'Créditos',
-                'description': 'Consultar clientes con deuda y registrar pagos.',
-                'url': reverse('report:credit_report'),
-                'icon': 'fa-credit-card',
-                'variant': 'warning',
-                'is_enabled': True,
-                'status_label': '',
-                'badge_count': _get_clients_with_debt_count(),
-                'meta': 'Clientes con saldo pendiente',
-            },
-            {
-                'key': 'day_close',
-                'title': 'Cierre de día',
-                'description': 'Revisar el corte de ventas y formas de pago del día.',
-                'url': _url_with_query(
-                    'report:breakdown_payment_method',
-                    {'date': current_date.isoformat()},
-                ),
-                'icon': 'fa-clipboard-check',
-                'variant': 'info',
-                'is_enabled': True,
-                'status_label': '',
-                'badge_count': None,
-                'meta': 'Inventario pendiente para una siguiente versión',
-            },
-        ],
+        'dashboard_title': 'Panel del repartidor',
+        'dashboard_actions': dashboard_actions,
     }
 
 
@@ -279,6 +347,116 @@ def _get_dashboard_links(
     return links
 
 
+def _get_manager_dashboard_actions(
+    *,
+    selected_range: DashboardDateRange,
+    today: date,
+) -> list[dict[str, Any]]:
+    return [
+        {
+            'key': 'sales',
+            'title': 'Ventas',
+            'description': 'Revisar pedidos y registrar ventas.',
+            'url': reverse('admin_orders'),
+            'icon': 'fa-cart-shopping',
+            'variant': 'primary',
+            'meta': 'Panel de pedidos',
+        },
+        {
+            'key': 'clients',
+            'title': 'Clientes',
+            'description': 'Buscar, crear y editar clientes.',
+            'url': reverse('admin_clients'),
+            'icon': 'fa-users',
+            'variant': 'secondary',
+            'meta': 'Resumen y datos del cliente',
+        },
+        {
+            'key': 'invoices',
+            'title': 'Facturas',
+            'description': 'Administrar facturas emitidas y pendientes.',
+            'url': reverse('admin_invoices'),
+            'icon': 'fa-file-invoice-dollar',
+            'variant': 'info',
+            'meta': 'Facturación',
+        },
+        {
+            'key': 'routes',
+            'title': 'Rutas',
+            'description': 'Configurar rutas y clientes asignados.',
+            'url': reverse('admin_routes'),
+            'icon': 'fa-route',
+            'variant': 'success',
+            'meta': 'Operación de entrega',
+        },
+        {
+            'key': 'vehicles',
+            'title': 'Vehículos',
+            'description': 'Administrar vehículos y choferes asignados.',
+            'url': reverse('admin:core_transport_changelist'),
+            'icon': 'fa-truck',
+            'variant': 'secondary',
+            'meta': 'Django admin',
+        },
+        {
+            'key': 'products',
+            'title': 'Productos',
+            'description': 'Administrar productos y precios.',
+            'url': reverse('admin_products'),
+            'icon': 'fa-box',
+            'variant': 'secondary',
+            'meta': 'Catálogo',
+        },
+        {
+            'key': 'reports',
+            'title': 'Reportes',
+            'description': 'Consultar pedidos por rango de fechas.',
+            'url': _url_with_query(
+                'report:orders_report',
+                {
+                    'date_filter': 'custom',
+                    'start_date': selected_range.start_date.isoformat(),
+                    'end_date': selected_range.end_date.isoformat(),
+                    'employee': 'all',
+                },
+            ),
+            'icon': 'fa-chart-line',
+            'variant': 'primary',
+            'meta': 'Pedidos y ventas',
+        },
+        {
+            'key': 'day_report',
+            'title': 'Reporte de hoy',
+            'description': 'Revisar el corte por método de pago.',
+            'url': _url_with_query(
+                'report:breakdown_payment_method',
+                {'date': today.isoformat()},
+            ),
+            'icon': 'fa-clipboard-check',
+            'variant': 'info',
+            'meta': 'Corte diario',
+        },
+        {
+            'key': 'credits',
+            'title': 'Créditos',
+            'description': 'Consultar reporte de crédito y cobranza.',
+            'url': reverse('report:credit_report'),
+            'icon': 'fa-credit-card',
+            'variant': 'warning',
+            'meta': 'Reporte de crédito',
+        },
+        {
+            'key': 'overdue_payments',
+            'title': 'Pagos vencidos',
+            'description': 'Revisar clientes con pagos atrasados.',
+            'url': reverse('report:pending_payments'),
+            'icon': 'fa-triangle-exclamation',
+            'variant': 'danger',
+            'meta': 'Cobranza',
+        },
+    ]
+
+
 def get_manager_dashboard_context(
     *,
     user: Any,
@@ -319,5 +497,11 @@ def get_manager_dashboard_context(
             'count': route_services.get_route_clients_due_count(today),
             'date': today,
         },
+        # Manager navigation proposal is intentionally hidden in favor of the
+        # dashboard snapshot until approved.
+        # 'dashboard_actions': _get_manager_dashboard_actions(
+        #     selected_range=selected_range,
+        #     today=today,
+        # ),
         'links': _get_dashboard_links(user=user, selected_range=selected_range),
     }

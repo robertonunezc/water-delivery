@@ -42,6 +42,36 @@
         </div>
     </form>
 
+    {% comment %}
+    Manager navigation proposal hidden in favor of the dashboard snapshot.
+    <section class="dashboard-section">
+        <div class="section-title">Accesos</div>
+        <div class="metric-grid">
+            {% for action in dashboard_actions %}
+                <article class="pg-card delivery-action pg-border-{{ action.variant }}">
+                    <div class="pg-card-body pg-flex pg-flex-column pg-gap-3">
+                        <div class="pg-flex pg-justify-between pg-align-start pg-gap-3">
+                            <span class="delivery-action-icon pg-text-{{ action.variant }}">
+                                <i class="fas {{ action.icon }} fa-lg"></i>
+                            </span>
+                        </div>
+                        <div>
+                            <h2 class="pg-h5 pg-mb-2">{{ action.title }}</h2>
+                            <p class="pg-text-muted pg-mb-2">{{ action.description }}</p>
+                            <div class="delivery-action-meta pg-small pg-text-muted">{{ action.meta }}</div>
+                        </div>
+                        <div class="pg-mt-auto">
+                            <a href="{{ action.url }}" class="pg-button pg-button-{{ action.variant }} pg-w-100">
+                                Abrir
+                            </a>
+                        </div>
+                    </div>
+                </article>
+            {% endfor %}
+        </div>
+    </section>
+    {% endcomment %}
+
     <section class="dashboard-section">
         <div class="section-title">Ventas</div>
         <div class="metric-grid">

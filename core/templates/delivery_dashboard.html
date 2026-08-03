@@ -9,7 +9,7 @@
 <div class="delivery-shell pg-mx-auto">
   <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-end pg-gap-2 pg-mb-4">
     <div>
-      <h1 class="pg-h3 pg-mb-1">Panel del repartidor</h1>
+      <h1 class="pg-h3 pg-mb-1">{{ dashboard_title }}</h1>
       <p class="pg-text-muted pg-mb-0">{{ today|date:"d/m/Y" }}</p>
     </div>
     <a href="{% url 'core:home' %}" class="pg-button pg-button-outline-secondary pg-button-sm">
@@ -20,18 +20,15 @@
   <div class="pg-row pg-gap-3">
     {% for action in dashboard_actions %}
       <div class="pg-col-12 pg-col-md-6 pg-col-xl-4">
-        <article class="pg-card delivery-action {% if not action.is_enabled %}delivery-action-disabled{% else %}pg-border-{{ action.variant }}{% endif %}">
+        <article class="pg-card delivery-action pg-border-{{ action.variant }}">
           <div class="pg-card-body pg-flex pg-flex-column pg-gap-3">
             <div class="pg-flex pg-justify-between pg-align-start pg-gap-3">
-              <span class="delivery-action-icon text-{{ action.variant }}">
+              <span class="delivery-action-icon pg-text-{{ action.variant }}">
                 <i class="fas {{ action.icon }} fa-lg"></i>
               </span>
               <div class="pg-flex pg-flex-wrap pg-justify-end pg-gap-2">
                 {% if action.badge_count is not None %}
                   <span class="pg-badge pg-badge-light">{{ action.badge_count }}</span>
-                {% endif %}
-                {% if action.status_label %}
-                  <span class="pg-badge pg-badge-secondary">{{ action.status_label }}</span>
                 {% endif %}
               </div>
             </div>
@@ -43,15 +40,9 @@
             </div>
 
             <div class="pg-mt-auto">
-              {% if action.is_enabled %}
-                <a href="{{ action.url }}" class="pg-button pg-button-{{ action.variant }} pg-w-100">
-                  Abrir
-                </a>
-              {% else %}
-                <button type="button" class="pg-button pg-button-outline-secondary pg-w-100" disabled>
-                  No disponible
-                </button>
-              {% endif %}
+              <a href="{{ action.url }}" class="pg-button pg-button-{{ action.variant }} pg-w-100">
+                Abrir
+              </a>
             </div>
           </div>
         </article>
