@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.operations.base import Operation
 from django.db.migrations.state import ProjectState
-from django.test import TestCase, RequestFactory
+from django.test import TestCase, RequestFactory, override_settings
 from django.utils import timezone
 
 from clients.models import Address, Client, InvoiceData
@@ -23,6 +23,16 @@ from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 from tenant_client.test_utils import FastTenantTestCase
 from django.urls import reverse
+
+
+TEST_STATIC_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 
 class InvoiceTenantTestCase(FastTenantTestCase):
@@ -778,6 +788,9 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 
 class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 	def setUp(self):
+		self.staticfiles_override = override_settings(STORAGES=TEST_STATIC_STORAGES)
+		self.staticfiles_override.enable()
+		self.addCleanup(self.staticfiles_override.disable)
 		super().setUp()
 		self.superuser = User.objects.create_superuser(username='admin_staff', password='pass_staff')
 		self.client_obj = Client.objects.create(name='Test Client A', type='corporate')
