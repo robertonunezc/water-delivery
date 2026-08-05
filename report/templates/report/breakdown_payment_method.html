@@ -25,32 +25,34 @@
         </a>
       </div>
     </div>
-    <div class="pg-row pg-mb-2">
-      <form method="get" class="pg-row pg-gap-2 pg-align-end">
-        <div class="pg-col-auto">
-          <label for="date" class="pg-label pg-mb-1">Seleccionar Fecha:</label>
-          <input id="date" type="date" name="date" class="pg-input" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
-        </div>
-        {% if can_filter_by_user %}
-          <div class="pg-col-auto">
-            <label for="employee" class="pg-label pg-mb-1">Usuario:</label>
-            <select id="employee" name="employee" class="pg-select" onchange="this.form.submit()">
-              <option value="" {% if not employee_filter or employee_filter == 'all' %}selected{% endif %}>Todos</option>
-              {% for employee in employees %}
-                <option value="{{ employee.pk }}" {% if employee_filter == employee.pk|stringformat:'s' %}selected{% endif %}>
-                  {{ employee.get_full_name|default:employee.username }}
-                </option>
-              {% endfor %}
-            </select>
+    <div class="pg-card dashboard-card pg-mb-3">
+      <div class="pg-card-body">
+        <form method="get" class="pg-row pg-gap-2 pg-align-end" aria-label="Filtros del reporte">
+          <div class="pg-col-md-3">
+            <label for="date" class="pg-label">Fecha</label>
+            <input id="date" type="date" name="date" class="pg-input" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
           </div>
-        {% endif %}
-        <div class="pg-col-auto">
-          <button type="submit" class="pg-button pg-button-primary">
-            <i class="fas fa-filter pg-me-2"></i>Filtrar
-          </button>
-        </div>
-      </form>
-    </div>  
+          {% if can_filter_by_user %}
+            <div class="pg-col-md-4">
+              <label for="employee" class="pg-label">Usuario</label>
+              <select id="employee" name="employee" class="pg-select" onchange="this.form.submit()">
+                <option value="" {% if not employee_filter or employee_filter == 'all' %}selected{% endif %}>Todos</option>
+                {% for employee in employees %}
+                  <option value="{{ employee.pk }}" {% if employee_filter == employee.pk|stringformat:'s' %}selected{% endif %}>
+                    {{ employee.get_full_name|default:employee.username }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+          <div class="pg-col-md-2 pg-grid">
+            <button type="submit" class="pg-button pg-button-primary">
+              <i class="fas fa-filter pg-me-2"></i>Filtrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
     <!-- Overall Statistics -->
     {% if stats.total_orders %}
       <div class="metric-grid">
@@ -102,7 +104,7 @@
       {% for method_key, method_data in payment_method_stats.items %}
         {% if method_data.order_count > 0 %}
           <div class="payment-method-section">
-            <h3 class="payment-method-title">
+            <h3 class="payment-method-title pg-border-bottom pg-pb-2">
               {{ method_data.name }}: Total ${{ method_data.total_amount|floatformat:2 }}
               {% if method_data.total_discount %}
                 | Descuento ${{ method_data.total_discount|floatformat:2 }}

@@ -4,6 +4,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -17,9 +18,22 @@ from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
+TEST_STATIC_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
 
 class BreakdownPaymentMethodReportTests(FastTenantTestCase):
     def setUp(self) -> None:
+        self.staticfiles_override = override_settings(STORAGES=TEST_STATIC_STORAGES)
+        self.staticfiles_override.enable()
+        self.addCleanup(self.staticfiles_override.disable)
+
         self.user = User.objects.create_user(
             username="report_user",
             password="testpass123",
@@ -105,6 +119,21 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         self.assertContains(response, "$10.00")
         self.assertContains(response, f"#{discounted_order.id}")
         self.assertContains(response, f"#{paid_order.id}")
+
+    def test_breakdown_report_uses_shared_filter_card_and_divider_section_titles(self) -> None:
+        self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("10.00"),
+            total=Decimal("70.00"),
+            with_payment=True,
+        )
+
+        response = self.client.get(reverse("report:breakdown_payment_method"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="pg-card dashboard-card pg-mb-3"')
+        self.assertContains(response, 'class="pg-card-body"')
+        self.assertContains(response, 'class="payment-method-title pg-border-bottom pg-pb-2"')
 
     def test_breakdown_report_csv_includes_discount_column_and_net_totals(self) -> None:
         self._create_order(
