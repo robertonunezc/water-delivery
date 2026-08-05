@@ -8,9 +8,20 @@ import hashlib
 import re
 from datetime import date, timedelta
 from django.db import connection
+from django.test import override_settings
 from django_tenants.test.cases import TenantTestCase
 from django_tenants.test.client import TenantClient
 from .models import ClientTenant, Domain
+
+
+TEST_STATIC_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 
 class TenantTestMixin:
@@ -169,6 +180,11 @@ class FastTenantTestCase(TenantTestCase):
         lifecycle steps may leave the DB connection on ``public``. Tenant app
         tests must restore both pieces before each test method runs.
         """
+        self._test_staticfiles_override = override_settings(
+            STORAGES=TEST_STATIC_STORAGES
+        )
+        self._test_staticfiles_override.enable()
+        self.addCleanup(self._test_staticfiles_override.disable)
         super()._pre_setup()
         connection.set_tenant(self.tenant)
         self.client = TenantClient(self.tenant)

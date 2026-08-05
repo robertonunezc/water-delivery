@@ -886,7 +886,7 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '¡Atención! Pagos Vencidos')
         self.assertContains(response, '<th>Factura</th>')
-        self.assertContains(response, '<span class="text-muted">-</span>')
+        self.assertContains(response, '<span class="pg-text-muted">-</span>')
 
 
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
