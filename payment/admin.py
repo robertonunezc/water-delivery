@@ -1,6 +1,8 @@
-from django.contrib import admin
 from django.apps import apps
+from django.contrib import admin
+from django.utils.html import format_html
 from unfold.admin import ModelAdmin
+
 from .models import Payment
 from core.admin_mixins import SoftDeleteAdminMixin
 
@@ -15,6 +17,11 @@ class PaymentAdmin(SoftDeleteAdminMixin, ModelAdmin):
     
     # Make columns clickable for navigation
     list_display_links = ('id', 'amount')
+
+    class Media:
+        css = {
+            'all': ('core/css/design-system.css',)
+        }
     
     fieldsets = (
         ('Información Básica', {
@@ -32,21 +39,23 @@ class PaymentAdmin(SoftDeleteAdminMixin, ModelAdmin):
     
     def get_payment_breakdown_display(self, obj):
         """Display payment breakdown in a readable format"""
-        from django.utils.html import format_html
-        
         if obj.method in ['balance', 'credit']:
             breakdown = []
             if obj.balance_used > 0:
-                breakdown.append(f'<span style="color: green;">Saldo: ${obj.balance_used:.2f}</span>')
+                breakdown.append(f'<span class="pg-text-success pg-fw-semibold">Saldo: ${obj.balance_used:.2f}</span>')
             if obj.credit_used > 0:
-                breakdown.append(f'<span style="color: orange;">Crédito: ${obj.credit_used:.2f}</span>')
+                breakdown.append(f'<span class="pg-text-warning pg-fw-semibold">Crédito: ${obj.credit_used:.2f}</span>')
             
             if breakdown:
                 return format_html(' + '.join(breakdown))
             else:
-                return format_html('<span style="color: gray;">No desglosado</span>')
+                return format_html('<span class="pg-text-muted">No desglosado</span>')
         else:
-            return format_html(f'<span style="color: blue;">{obj.get_method_display()}: ${obj.amount:.2f}</span>')
+            return format_html(
+                '<span class="pg-text-info pg-fw-semibold">{}: ${}</span>',
+                obj.get_method_display(),
+                f'{obj.amount:.2f}',
+            )
     
     get_payment_breakdown_display.short_description = 'Desglose'
     

@@ -1,6 +1,6 @@
 <!-- Client Table Row Data - Reusable component for client information -->
 <td>
-    <a href="{% url 'clients:detail' client.pk %}" class="text-decoration-none fw-bold">
+    <a href="{% url 'clients:detail' client.pk %}" class="pg-text-decoration-none pg-fw-bold">
         {% if has_search and search_query %}
             {{ client.name|default:"Sin nombre" }}
         {% else %}
@@ -10,19 +10,19 @@
 </td>
 
 <td>
-    <small class="text-muted">
+    <small class="pg-text-muted">
         {% for contact in client.contacts.all %}
-            <div><i class="fas fa-phone me-1"></i>{{ contact.phone }}</div>
+            <div><i class="fas fa-phone pg-me-1"></i>{{ contact.phone }}</div>
             {% if contact.email %}
-                <div><i class="fas fa-envelope me-1"></i>{{ contact.email|truncatechars:20 }}</div>
+                <div><i class="fas fa-envelope pg-me-1"></i>{{ contact.email|truncatechars:20 }}</div>
             {% endif %}
         {% empty %}
-            <span class="text-muted">Sin contacto</span>
+            <span class="pg-text-muted">Sin contacto</span>
         {% endfor %}
     </small>
 </td>
 <td>
-    <small class="text-muted">
+    <small class="pg-text-muted">
         {% for address in client.addresses.all %}
             {% if address.active %}
                 <div>{{ address.street|truncatechars:25 }}</div>
@@ -30,7 +30,7 @@
                 {% if forloop.first %}{% endif %}
             {% endif %}
         {% empty %}
-            <span class="text-muted">Sin direcciones</span>
+            <span class="pg-text-muted">Sin direcciones</span>
         {% endfor %}
     </small>
 </td>

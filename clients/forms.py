@@ -27,14 +27,14 @@ class ManualBalanceTransactionForm(forms.Form):
         queryset=Client.objects.filter(active=True),
         empty_label="Seleccionar cliente",
         label="Cliente",
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'pg-select'})
     )
     
     transaction_type = forms.ChoiceField(
         choices=BALANCE_TRANSACTION_TYPES,
         label="Tipo de Transacción",
         initial='deposit',
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'pg-select'})
     )
     
     amount = forms.DecimalField(
@@ -44,7 +44,7 @@ class ManualBalanceTransactionForm(forms.Form):
         label="Monto",
         help_text="Cantidad a agregar al saldo del cliente",
         widget=forms.NumberInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'step': '0.01',
             'min': '0.01'
         })
@@ -54,7 +54,7 @@ class ManualBalanceTransactionForm(forms.Form):
         label="Fecha de Transacción",
         help_text="Fecha y hora de la transacción",
         widget=forms.DateInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'type': 'date'
         })
     )
@@ -64,7 +64,7 @@ class ManualBalanceTransactionForm(forms.Form):
         label="Notas detalladas",
         help_text="Motivo detallado para esta transacción (OBLIGATORIO)",
         widget=forms.Textarea(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'rows': 4,
             'placeholder': 'Explique el motivo de esta transacción manual, incluya referencias como números de transferencia, autorizaciones, etc.'
         })
@@ -99,14 +99,14 @@ class ManualCreditTransactionForm(forms.Form):
         queryset=Client.objects.filter(active=True),
         empty_label="Seleccionar cliente",
         label="Cliente",
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'pg-select'})
     )
     
     transaction_type = forms.ChoiceField(
         choices=CREDIT_TRANSACTION_TYPES,
         label="Tipo de Transacción",
         initial='adjustment',
-        widget=forms.Select(attrs={'class': 'form-control'})
+        widget=forms.Select(attrs={'class': 'pg-select'})
     )
     
     amount = forms.DecimalField(
@@ -116,7 +116,7 @@ class ManualCreditTransactionForm(forms.Form):
         label="Monto",
         help_text="Para pagos/condonaciones: reduce la deuda. Para ajustes: puede aumentar o reducir según el tipo.",
         widget=forms.NumberInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'step': '0.01',
             'min': '0.01'
         })
@@ -127,7 +127,7 @@ class ManualCreditTransactionForm(forms.Form):
         label="Descripción",
         help_text="Breve descripción de la transacción",
         widget=forms.TextInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'placeholder': 'Ej: Pago en efectivo recibido'
         })
     )
@@ -137,7 +137,7 @@ class ManualCreditTransactionForm(forms.Form):
         label="Notas detalladas",
         help_text="Motivo detallado para esta transacción (OBLIGATORIO)",
         widget=forms.Textarea(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'rows': 4,
             'placeholder': 'Explique el motivo de esta transacción manual, incluya autorizaciones, referencias, etc.'
         })
@@ -152,16 +152,11 @@ class ManualCreditTransactionForm(forms.Form):
         label="Nuevo límite de crédito",
         help_text="Solo para cambios de límite de crédito",
         widget=forms.NumberInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'step': '0.01',
             'min': '0.00'
         })
     )
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Hide credit limit field initially
-        self.fields['new_credit_limit'].widget.attrs['style'] = 'display: none;'
     
     def clean(self):
         cleaned_data = super().clean()
@@ -221,7 +216,7 @@ class BulkBalanceDepositForm(forms.Form):
         label="Monto por cliente",
         help_text="Cantidad a agregar a cada cliente seleccionado",
         widget=forms.NumberInput(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'step': '0.01',
             'min': '0.01'
         })
@@ -231,7 +226,7 @@ class BulkBalanceDepositForm(forms.Form):
         max_length=255,
         label="Descripción",
         initial="Depósito masivo",
-        widget=forms.TextInput(attrs={'class': 'form-control'})
+        widget=forms.TextInput(attrs={'class': 'pg-input'})
     )
     
     notes = forms.CharField(
@@ -239,7 +234,7 @@ class BulkBalanceDepositForm(forms.Form):
         label="Notas detalladas",
         help_text="Motivo del depósito masivo (OBLIGATORIO)",
         widget=forms.Textarea(attrs={
-            'class': 'form-control',
+            'class': 'pg-input',
             'rows': 3,
             'placeholder': 'Explique el motivo del depósito masivo...'
         })
@@ -277,20 +272,20 @@ class ClientBillingFrequencyForm(forms.ModelForm):
             'notes',
         ]
         widgets = {
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'frequency': forms.Select(attrs={'class': 'form-control'}),
-            'billing_date': forms.Select(attrs={'class': 'form-control'}),
+            'start_date': forms.DateInput(attrs={'class': 'pg-input', 'type': 'date'}),
+            'frequency': forms.Select(attrs={'class': 'pg-select'}),
+            'billing_date': forms.Select(attrs={'class': 'pg-select'}),
             'specific_day': forms.NumberInput(attrs={
-                'class': 'form-control',
+                'class': 'pg-input',
                 'min': '1',
                 'max': '31',
                 'placeholder': 'Día del mes (1-31)'
             }),
-            'weekday': forms.Select(attrs={'class': 'form-control'}),
-            'occurrence': forms.Select(attrs={'class': 'form-control'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'weekday': forms.Select(attrs={'class': 'pg-select'}),
+            'occurrence': forms.Select(attrs={'class': 'pg-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
             'notes': forms.Textarea(attrs={
-                'class': 'form-control',
+                'class': 'pg-input',
                 'rows': 3,
                 'placeholder': 'Notas adicionales sobre la frecuencia de facturación'
             }),
@@ -354,7 +349,7 @@ class AddressInlineForm(forms.ModelForm):
         label='Misma dirección que la anterior',
     )
 
-    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING, widget=forms.Select(attrs={'class': 'form-control'}))
+    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING, widget=forms.Select(attrs={'class': 'pg-select'}))
 
     class Meta:
         model = Address
@@ -365,11 +360,11 @@ class AddressInlineForm(forms.ModelForm):
 
         for name, field in self.fields.items():
             if name in ['active', 'same_as_previous', 'DELETE']:
-                css_class = 'form-check-input'
+                css_class = 'pg-checkbox-input'
             elif name == 'type':
-                css_class = 'form-select'
+                css_class = 'pg-select'
             else:
-                css_class = 'form-control'
+                css_class = 'pg-input'
 
             existing = field.widget.attrs.get('class', '')
             if css_class not in existing.split():
@@ -413,15 +408,15 @@ class ClientCoreForm(forms.ModelForm):
             'credit_override_enabled',
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'external_id': forms.TextInput(attrs={'class': 'form-control'}),
-            'type': forms.Select(attrs={'class': 'form-select'}),
-            'corporate': forms.Select(attrs={'class': 'form-select'}),
-            'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'address_link': forms.URLInput(attrs={'class': 'form-control'}),
-            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'credit_override_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'name': forms.TextInput(attrs={'class': 'pg-input'}),
+            'external_id': forms.TextInput(attrs={'class': 'pg-input'}),
+            'type': forms.Select(attrs={'class': 'pg-select'}),
+            'corporate': forms.Select(attrs={'class': 'pg-select'}),
+            'note': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
+            'address_link': forms.URLInput(attrs={'class': 'pg-input'}),
+            'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'requires_billing': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'credit_override_enabled': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
         labels = {
             'requires_billing': 'Requiere facturación recurrente',
@@ -463,8 +458,8 @@ class ClientCreditPolicyForm(forms.ModelForm):
             'credit_limit': 'Monto máximo de deuda activa autorizado.',
         }
         widgets = {
-            'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'credit_limit': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'can_pay_with_credit': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'credit_limit': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01', 'min': '0'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -484,10 +479,10 @@ class ContactForm(forms.ModelForm):
         model = Contact
         fields = ['name', 'email', 'phone', 'position']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control'}),
-            'position': forms.TextInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'pg-input'}),
+            'email': forms.EmailInput(attrs={'class': 'pg-input'}),
+            'phone': forms.TextInput(attrs={'class': 'pg-input'}),
+            'position': forms.TextInput(attrs={'class': 'pg-input'}),
         }
 
 
@@ -496,9 +491,9 @@ class InvoiceDataForm(forms.ModelForm):
         model = InvoiceData
         fields = ['rfc', 'razon_social', 'curp']
         widgets = {
-            'rfc': forms.TextInput(attrs={'class': 'form-control'}),
-            'razon_social': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'curp': forms.TextInput(attrs={'class': 'form-control'}),
+            'rfc': forms.TextInput(attrs={'class': 'pg-input'}),
+            'razon_social': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+            'curp': forms.TextInput(attrs={'class': 'pg-input'}),
         }
 
 
@@ -507,7 +502,7 @@ class ClientRecurringBillingForm(forms.ModelForm):
         model = Client
         fields = ['requires_billing']
         widgets = {
-            'requires_billing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'requires_billing': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
         labels = {
             'requires_billing': 'Requiere facturación recurrente',
@@ -531,14 +526,14 @@ class InvoiceScheduleForm(forms.ModelForm):
             'notes',
         ]
         widgets = {
-            'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'frequency': forms.Select(attrs={'class': 'form-select'}),
-            'billing_date': forms.Select(attrs={'class': 'form-select'}),
-            'specific_day': forms.NumberInput(attrs={'class': 'form-control', 'min': '1', 'max': '31'}),
-            'weekday': forms.Select(attrs={'class': 'form-select'}),
-            'occurrence': forms.Select(attrs={'class': 'form-select'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'start_date': forms.DateInput(attrs={'class': 'pg-input', 'type': 'date'}),
+            'frequency': forms.Select(attrs={'class': 'pg-select'}),
+            'billing_date': forms.Select(attrs={'class': 'pg-select'}),
+            'specific_day': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1', 'max': '31'}),
+            'weekday': forms.Select(attrs={'class': 'pg-select'}),
+            'occurrence': forms.Select(attrs={'class': 'pg-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
         }
 
 
@@ -551,9 +546,9 @@ class ClientCreditConfigForm(forms.ModelForm):
             'max_payment_days',
         ]
         widgets = {
-            'payment_term_type': forms.Select(attrs={'class': 'form-select'}),
-            'cutoff_day': forms.Select(attrs={'class': 'form-select'}),
-            'max_payment_days': forms.NumberInput(attrs={'class': 'form-control', 'min': '1'}),
+            'payment_term_type': forms.Select(attrs={'class': 'pg-select'}),
+            'cutoff_day': forms.Select(attrs={'class': 'pg-select'}),
+            'max_payment_days': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1'}),
         }
         labels = {
             'max_payment_days': (

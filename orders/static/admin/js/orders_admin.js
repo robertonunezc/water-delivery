@@ -60,8 +60,9 @@ function calculateRowTotal(row, quantityField, priceField, totalDisplay) {
     
     if (totalDisplay) {
         totalDisplay.textContent = `$${total.toFixed(2)}`;
-        totalDisplay.style.fontWeight = 'bold';
-        totalDisplay.style.color = total > 0 ? '#28a745' : '#6c757d';
+        totalDisplay.classList.toggle('pg-text-success', total > 0);
+        totalDisplay.classList.toggle('pg-text-muted', total <= 0);
+        totalDisplay.classList.add('pg-fw-bold');
     }
     
     // Update order total if needed
@@ -75,15 +76,15 @@ function addQuickCalculations() {
         const calculator = document.createElement('div');
         calculator.className = 'order-calculator';
         calculator.innerHTML = `
-            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0;">
-                <h4 style="margin-top: 0;">Calculadora de Pedido</h4>
-                <div id="calc-total" style="font-size: 1.2em; font-weight: bold; color: #28a745;">
+            <div class="pg-panel pg-panel-body pg-stack pg-mt-3 pg-mb-3">
+                <h4 class="pg-mt-0">Calculadora de Pedido</h4>
+                <div id="calc-total" class="pg-fs-5 pg-fw-bold pg-text-success">
                     Total: $0.00
                 </div>
-                <div id="calc-items" style="color: #6c757d;">
+                <div id="calc-items" class="pg-text-muted">
                     0 items
                 </div>
-                <button type="button" id="recalculate" class="btn btn-sm btn-secondary" style="margin-top: 10px;">
+                <button type="button" id="recalculate" class="pg-button pg-button-sm pg-button-secondary pg-mt-2">
                     Recalcular
                 </button>
             </div>
@@ -135,7 +136,8 @@ function updateOrderTotal() {
     const totalAmountField = document.querySelector('input[name="total_amount"]');
     if (totalAmountField) {
         totalAmountField.value = totalAmount.toFixed(2);
-        totalAmountField.style.backgroundColor = totalAmount > 0 ? '#d1edda' : '#fff3cd';
+        totalAmountField.classList.toggle('pg-input-success', totalAmount > 0);
+        totalAmountField.classList.toggle('pg-input-warning', totalAmount <= 0);
     }
 }
 
@@ -185,17 +187,16 @@ function autoRefreshPaymentStatus() {
         // Add a refresh button to payment cells
         if (!cell.querySelector('.refresh-payment')) {
             const refreshBtn = document.createElement('button');
-            refreshBtn.className = 'refresh-payment';
+            refreshBtn.className = 'refresh-payment pg-icon-button';
             refreshBtn.innerHTML = '🔄';
-            refreshBtn.style.cssText = 'background: none; border: none; cursor: pointer; margin-left: 5px; opacity: 0.6;';
             refreshBtn.title = 'Actualizar estado de pago';
             
             refreshBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 // Here you could implement AJAX to refresh payment status
-                cell.style.opacity = '0.5';
+                cell.classList.add('pg-loading');
                 setTimeout(() => {
-                    cell.style.opacity = '1';
+                    cell.classList.remove('pg-loading');
                     // In a real implementation, you'd make an AJAX call here
                 }, 500);
             });
@@ -215,8 +216,7 @@ function formatCurrency(amount) {
 
 function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = `alert alert-${type}`;
-    notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 300px;';
+    notification.className = `pg-alert pg-alert-${type} pg-toast`;
     notification.textContent = message;
     
     document.body.appendChild(notification);

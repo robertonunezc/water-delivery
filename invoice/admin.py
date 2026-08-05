@@ -5,6 +5,7 @@ from django.http import JsonResponse, HttpResponse
 from django.urls import path
 from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
+from django.templatetags.static import static
 from collections import Counter
 
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
@@ -389,6 +390,9 @@ class InvoiceScheduleAdmin(ModelAdmin):
 	readonly_fields = ('get_billing_description',)
 
 	class Media:
+		css = {
+			'all': ('core/css/design-system.css',)
+		}
 		js = (
 			'billing/admin/toggle_billing_frequency_fields.js',
 		)
@@ -421,63 +425,21 @@ class InvoiceScheduleAdmin(ModelAdmin):
 	def response_add(self, request, obj, post_url_continue=None):
 		"""Custom response for popup mode - show success message"""
 		if "_popup" in request.GET or "_popup" in request.POST:
-			return HttpResponse('''
+			css_url = static('core/css/design-system.css')
+			return HttpResponse(f'''
 				<!DOCTYPE html>
 				<html>
 				<head>
 					<title>Frecuencia de Facturación Agregada</title>
-					<style>
-						body {
-							font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-							display: flex;
-							justify-content: center;
-							align-items: center;
-							height: 100vh;
-							margin: 0;
-							background-color: #f5f5f5;
-						}
-						.success-container {
-							text-align: center;
-							padding: 40px;
-							background: white;
-							border-radius: 8px;
-							box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-							max-width: 400px;
-						}
-						.success-icon {
-							font-size: 64px;
-							color: #28a745;
-							margin-bottom: 20px;
-						}
-						h2 {
-							color: #333;
-							margin-bottom: 10px;
-						}
-						p {
-							color: #666;
-							margin-bottom: 25px;
-						}
-						.close-btn {
-							background-color: #417690;
-							color: white;
-							border: none;
-							padding: 12px 30px;
-							font-size: 16px;
-							border-radius: 4px;
-							cursor: pointer;
-						}
-						.close-btn:hover {
-							background-color: #205067;
-						}
-					</style>
+					<link rel="stylesheet" href="{css_url}">
 				</head>
-				<body>
-					<div class="success-container">
-						<div class="success-icon">&#10004;</div>
-						<h2>Frecuencia de Facturación Agregada</h2>
-						<p>La frecuencia de facturación ha sido guardada exitosamente. Puede cerrar esta ventana.</p>
-						<button class="close-btn" onclick="window.close();">Cerrar Ventana</button>
-					</div>
+				<body class="pg-centered-screen">
+					<main class="pg-card pg-dialog-card">
+						<div class="pg-success-icon">&#10004;</div>
+						<h2 class="pg-h3 pg-mb-2">Frecuencia de Facturación Agregada</h2>
+						<p class="pg-text-muted pg-mb-4">La frecuencia de facturación ha sido guardada exitosamente. Puede cerrar esta ventana.</p>
+						<button class="pg-button pg-button-primary" onclick="window.close();">Cerrar Ventana</button>
+					</main>
 				</body>
 				</html>
 			''')

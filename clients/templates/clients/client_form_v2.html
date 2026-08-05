@@ -1,228 +1,191 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-<style>
-	.dashboard-card {
-		border: 0;
-		border-radius: 14px;
-		box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
-	}
-
-	.form-section-title {
-		font-size: 1rem;
-		font-weight: 700;
-		margin-bottom: 0.75rem;
-	}
-
-	.section-muted {
-		font-size: 0.85rem;
-		color: #64748b;
-	}
-
-	.status-pill {
-		font-size: 0.75rem;
-		font-weight: 700;
-		padding: 0.3rem 0.55rem;
-		border-radius: 999px;
-		display: inline-block;
-	}
-
-	.status-active { background: #dcfce7; color: #166534; }
-	.status-inactive { background: #fee2e2; color: #991b1b; }
-
-	.tab-pane {
-		padding-top: 1rem;
-	}
-
-	.field-hidden {
-		display: none;
-	}
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3 mb-4">
-	<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+<div class="pg-container-fluid pg-mt-3 pg-mb-4">
+	<div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
 		<div>
-			<h1 class="h3 mb-1">{% if client %}Editar Cliente {{ client.name }}{% else %}Crear Cliente{% endif %}</h1>
+			<h1 class="pg-h3 pg-mb-1">{% if client %}Editar Cliente {{ client.name }}{% else %}Crear Cliente{% endif %}</h1>
 		</div>
-		<div class="d-flex align-items-center gap-2">
+		<div class="pg-flex pg-align-center pg-gap-2">
 			{% if client %}
 				<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
 					{% if client.active %}Activo{% else %}Inactivo{% endif %}
 				</span>
-				<a href="{% url 'clients:detail' client.pk %}" class="btn btn-outline-primary">Ver detalles</a>
+				<a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-primary">Ver detalles</a>
 			{% endif %}
-			<a href="{% url 'admin_clients' %}" class="btn btn-outline-secondary">Volver a lista</a>
+			<a href="{% url 'admin_clients' %}" class="pg-button pg-button-outline-secondary">Volver a lista</a>
 		</div>
 	</div>
 
 	{% if not client %}
-		<div class="alert alert-info">
+		<div class="pg-alert pg-alert-info">
 			Primero guarda los datos básicos del cliente. Después se habilitan Direcciones, Contactos, Rutas, Facturación y Crédito.
 		</div>
 	{% endif %}
 
-	<div class="card dashboard-card">
-		<div class="card-body">
-			<ul class="nav nav-tabs" role="tablist">
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'basic' %}active{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+	<div class="pg-card dashboard-card">
+		<div class="pg-card-body">
+			<ul class="pg-nav pg-tabs" role="tablist">
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
 				</li>
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'addresses' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-addresses" type="button" role="tab">Direcciones</button>
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'addresses' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-addresses" type="button" role="tab" {% if not client %}disabled{% endif %}>Direcciones</button>
 				</li>
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'contacts' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-contacts" type="button" role="tab">Contactos</button>
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'contacts' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab" {% if not client %}disabled{% endif %}>Contactos</button>
 				</li>
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'routes' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-routes" type="button" role="tab">Rutas</button>
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'routes' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab" {% if not client %}disabled{% endif %}>Rutas</button>
 				</li>
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'billing' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-billing" type="button" role="tab">Facturación</button>
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'billing' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-billing" type="button" role="tab" {% if not client %}disabled{% endif %}>Facturación</button>
 				</li>
-				<li class="nav-item" role="presentation">
-					<button class="nav-link {% if active_tab == 'credit' %}active{% endif %} {% if not client %}disabled{% endif %}" data-bs-toggle="tab" data-bs-target="#tab-credit" type="button" role="tab">Crédito</button>
+				<li class="pg-tab-item" role="presentation">
+					<button class="pg-tab {% if active_tab == 'credit' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-credit" type="button" role="tab" {% if not client %}disabled{% endif %}>Crédito</button>
 				</li>
 			</ul>
 
 			<div class="tab-content">
-				<div class="tab-pane fade {% if active_tab == 'basic' %}show active{% endif %}" id="tab-basic" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'basic' %}pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
 					<form method="post">
 						{% csrf_token %}
 						<input type="hidden" name="section" value="basic">
-						<div class="row g-3">
-							<div class="col-md-6">
-								<label class="form-label">{{ core_form.name.label }}</label>
+						<div class="pg-row pg-gap-3">
+							<div class="pg-col-md-6">
+								<label class="pg-label">{{ core_form.name.label }}</label>
 								{{ core_form.name }}
 								{{ core_form.name.errors }}
 							</div>
-							<div class="col-md-3">
-								<label class="form-label">{{ core_form.type.label }}</label>
+							<div class="pg-col-md-3">
+								<label class="pg-label">{{ core_form.type.label }}</label>
 								{{ core_form.type }}
 								{{ core_form.type.errors }}
 							</div>
-							<div class="col-md-3">
-								<label class="form-label">{{ core_form.corporate.label }}</label>
+							<div class="pg-col-md-3">
+								<label class="pg-label">{{ core_form.corporate.label }}</label>
 								{{ core_form.corporate }}
 								{{ core_form.corporate.errors }}
 							</div>
 
-							<div class="col-md-4">
-								<label class="form-label">{{ core_form.external_id.label }}</label>
+							<div class="pg-col-md-4">
+								<label class="pg-label">{{ core_form.external_id.label }}</label>
 								{{ core_form.external_id }}
 								{{ core_form.external_id.errors }}
 							</div>
-							<div class="col-md-8">
-								<label class="form-label">{{ core_form.address_link.label }}</label>
+							<div class="pg-col-md-8">
+								<label class="pg-label">{{ core_form.address_link.label }}</label>
 								{{ core_form.address_link }}
 								{{ core_form.address_link.errors }}
 							</div>
 
-							<div class="col-12">
-								<label class="form-label">{{ core_form.note.label }}</label>
+							<div class="pg-col-12">
+								<label class="pg-label">{{ core_form.note.label }}</label>
 								{{ core_form.note }}
 								{{ core_form.note.errors }}
 							</div>
 
-							<div class="col-md-3 form-check">
+							<div class="pg-col-md-3 pg-checkbox">
 								{{ core_form.active }}
-								<label class="form-check-label">{{ core_form.active.label }}</label>
+								<label class="pg-checkbox-label">{{ core_form.active.label }}</label>
 							</div>
 
 							{% if core_form.type.value == 'branch' %}
-								<div class="col-md-4 form-check">
+								<div class="pg-col-md-4 pg-checkbox">
 									{{ core_form.credit_override_enabled }}
-									<label class="form-check-label">{{ core_form.credit_override_enabled.label }}</label>
-									<div class="form-text">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
+									<label class="pg-checkbox-label">{{ core_form.credit_override_enabled.label }}</label>
+									<div class="pg-field-help">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
 									{{ core_form.credit_override_enabled.errors }}
 								</div>
 							{% endif %}
 						</div>
 						{% if core_form.non_field_errors %}
-							<div class="alert alert-danger mt-3 mb-0">{{ core_form.non_field_errors }}</div>
+							<div class="pg-alert pg-alert-danger pg-mt-3 pg-mb-0">{{ core_form.non_field_errors }}</div>
 						{% endif %}
-						<div class="mt-3 d-flex justify-content-end">
-							<button type="submit" class="btn btn-primary">{% if client %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
+						<div class="pg-mt-3 pg-flex pg-justify-end">
+							<button type="submit" class="pg-button pg-button-primary">{% if client %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
 						</div>
 					</form>
 				</div>
 
-				<div class="tab-pane fade {% if active_tab == 'addresses' %}show active{% endif %}" id="tab-addresses" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'addresses' %}pg-show pg-active{% endif %}" id="tab-addresses" role="tabpanel">
 					{% if client %}
 						<form method="post">
 							{% csrf_token %}
 							<input type="hidden" name="section" value="addresses">
 							{{ address_formset.management_form }}
 							{% if address_formset.non_form_errors %}
-								<div class="alert alert-danger">{{ address_formset.non_form_errors }}</div>
+								<div class="pg-alert pg-alert-danger">{{ address_formset.non_form_errors }}</div>
 							{% endif %}
-							<div class="row g-3">
+							<div class="pg-row pg-gap-3">
 								{% for form in address_formset.forms %}
-									<div class="col-12 border rounded p-3">
-										<div class="row g-2">
+									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
+										<div class="pg-row pg-gap-2">
 											{{ form.errors }}
-											<div class="col-md-2">{{ form.type.label_tag }}{{ form.type }}</div>
-											<div class="col-md-4">{{ form.street.label_tag }}{{ form.street }}</div>
-											<div class="col-md-2">{{ form.exterior_number.label_tag }}{{ form.exterior_number }}</div>
-											<div class="col-md-2">{{ form.interior_number.label_tag }}{{ form.interior_number }}</div>
-											<div class="col-md-2">{{ form.zip_code.label_tag }}{{ form.zip_code }}</div>
-											<div class="col-md-3">{{ form.locality.label_tag }}{{ form.locality }}</div>
-											<div class="col-md-3">{{ form.municipality.label_tag }}{{ form.municipality }}</div>
-											<div class="col-md-3">{{ form.state.label_tag }}{{ form.state }}</div>
-											<div class="col-md-3">{{ form.country.label_tag }}{{ form.country }}</div>
-											<div class="col-md-10">{{ form.reference.label_tag }}{{ form.reference }}</div>
-											<div class="col-md-1 mt-4"><div class="form-check">{{ form.active }} <label class="form-check-label">Activo</label></div></div>
-											{% if form.DELETE %}<div class="col-md-1 mt-4"><div class="form-check">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div></div>{% endif %}
+											<div class="pg-col-md-2">{{ form.type.label_tag }}{{ form.type }}</div>
+											<div class="pg-col-md-4">{{ form.street.label_tag }}{{ form.street }}</div>
+											<div class="pg-col-md-2">{{ form.exterior_number.label_tag }}{{ form.exterior_number }}</div>
+											<div class="pg-col-md-2">{{ form.interior_number.label_tag }}{{ form.interior_number }}</div>
+											<div class="pg-col-md-2">{{ form.zip_code.label_tag }}{{ form.zip_code }}</div>
+											<div class="pg-col-md-3">{{ form.locality.label_tag }}{{ form.locality }}</div>
+											<div class="pg-col-md-3">{{ form.municipality.label_tag }}{{ form.municipality }}</div>
+											<div class="pg-col-md-3">{{ form.state.label_tag }}{{ form.state }}</div>
+											<div class="pg-col-md-3">{{ form.country.label_tag }}{{ form.country }}</div>
+											<div class="pg-col-md-10">{{ form.reference.label_tag }}{{ form.reference }}</div>
+											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.active }} <label class="pg-checkbox-label">Activo</label></div></div>
+											{% if form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
 											{{ form.id }}
 										</div>
 										{{ form.non_field_errors }}
 									</div>
 								{% endfor %}
 							</div>
-							<div class="form-check mt-3">
-								<input class="form-check-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
-								<label class="form-check-label" for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
+							<div class="pg-checkbox pg-mt-3">
+								<input class="pg-checkbox-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
+								<label class="pg-checkbox-label" for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
 							</div>
-							<div class="mt-3 d-flex justify-content-end">
-								<button type="submit" class="btn btn-primary">Guardar Direcciones</button>
+							<div class="pg-mt-3 pg-flex pg-justify-end">
+								<button type="submit" class="pg-button pg-button-primary">Guardar Direcciones</button>
 							</div>
 						</form>
 					{% endif %}
 				</div>
 
-				<div class="tab-pane fade {% if active_tab == 'contacts' %}show active{% endif %}" id="tab-contacts" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'contacts' %}pg-show pg-active{% endif %}" id="tab-contacts" role="tabpanel">
 					{% if client %}
 						<form method="post">
 							{% csrf_token %}
 							<input type="hidden" name="section" value="contacts">
 							{{ contact_formset.management_form }}
-							<div class="row g-3">
+							<div class="pg-row pg-gap-3">
 								{% for form in contact_formset.forms %}
-									<div class="col-12 border rounded p-3">
-										<div class="row g-2">
-											<div class="col-md-3">{{ form.name.label_tag }}{{ form.name }}</div>
-											<div class="col-md-3">{{ form.email.label_tag }}{{ form.email }}</div>
-											<div class="col-md-3">{{ form.phone.label_tag }}{{ form.phone }}</div>
-											<div class="col-md-2">{{ form.position.label_tag }}{{ form.position }}</div>
-											{% if form.DELETE %}<div class="col-md-1 form-check mt-4">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div>{% endif %}
+									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
+										<div class="pg-row pg-gap-2">
+											<div class="pg-col-md-3">{{ form.name.label_tag }}{{ form.name }}</div>
+											<div class="pg-col-md-3">{{ form.email.label_tag }}{{ form.email }}</div>
+											<div class="pg-col-md-3">{{ form.phone.label_tag }}{{ form.phone }}</div>
+											<div class="pg-col-md-2">{{ form.position.label_tag }}{{ form.position }}</div>
+											{% if form.DELETE %}<div class="pg-col-md-1 pg-checkbox pg-mt-4">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div>{% endif %}
 											{{ form.id }}
 										</div>
 										{{ form.non_field_errors }}
 									</div>
 								{% endfor %}
 							</div>
-							<div class="mt-3 d-flex justify-content-end">
-								<button type="submit" class="btn btn-primary">Guardar Contactos</button>
+							<div class="pg-mt-3 pg-flex pg-justify-end">
+								<button type="submit" class="pg-button pg-button-primary">Guardar Contactos</button>
 							</div>
 						</form>
 					{% endif %}
 				</div>
 
-				<div class="tab-pane fade {% if active_tab == 'routes' %}show active{% endif %}" id="tab-routes" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'routes' %}pg-show pg-active{% endif %}" id="tab-routes" role="tabpanel">
 					{% if client %}
 						{% if not has_delivery_address %}
-							<div class="alert alert-warning">
+							<div class="pg-alert pg-alert-warning">
 								Para asignar rutas, primero agregue una dirección activa de tipo <b>Ubicacion fisica</b> en la pestaña de Direcciones.
 							</div>
 						{% endif %}
@@ -231,101 +194,101 @@
 							<input type="hidden" name="section" value="routes">
 							{{ route_assignment_formset.management_form }}
 							{% if route_assignment_formset.non_form_errors %}
-								<div class="alert alert-danger">{{ route_assignment_formset.non_form_errors }}</div>
+								<div class="pg-alert pg-alert-danger">{{ route_assignment_formset.non_form_errors }}</div>
 							{% endif %}
 							<div class="form-section-title">Asignaciones de Ruta</div>
-							<div class="row g-3">
+							<div class="pg-row pg-gap-3">
 								{% for form in route_assignment_formset.forms %}
-									<div class="col-12 border rounded p-3">
+									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
 										{{ form.id }}
-										<div class="row g-2 align-items-start">
+										<div class="pg-row pg-gap-2 pg-align-start">
 											{{ form.errors }}
-											<div class="col-md-4">{{ form.route.label_tag }}{{ form.route }}{{ form.route.errors }}</div>
-											<div class="col-md-2">{{ form.sequence.label_tag }}{{ form.sequence }}{{ form.sequence.errors }}</div>
-											<div class="col-md-2">{{ form.interval_weeks.label_tag }}{{ form.interval_weeks }}{{ form.interval_weeks.errors }}</div>
-											<div class="col-md-2">{{ form.anchor_date.label_tag }}{{ form.anchor_date }}{{ form.anchor_date.errors }}</div>
-											<div class="col-md-1 mt-4"><div class="form-check">{{ form.is_active }} <label class="form-check-label">Activo</label></div></div>
-											{% if form.DELETE %}<div class="col-md-1 mt-4"><div class="form-check">{{ form.DELETE }} <label class="form-check-label">Eliminar</label></div></div>{% endif %}
-											<div class="col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+											<div class="pg-col-md-4">{{ form.route.label_tag }}{{ form.route }}{{ form.route.errors }}</div>
+											<div class="pg-col-md-2">{{ form.sequence.label_tag }}{{ form.sequence }}{{ form.sequence.errors }}</div>
+											<div class="pg-col-md-2">{{ form.interval_weeks.label_tag }}{{ form.interval_weeks }}{{ form.interval_weeks.errors }}</div>
+											<div class="pg-col-md-2">{{ form.anchor_date.label_tag }}{{ form.anchor_date }}{{ form.anchor_date.errors }}</div>
+											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.is_active }} <label class="pg-checkbox-label">Activo</label></div></div>
+											{% if form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
+											<div class="pg-col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
 										</div>
 										{{ form.non_field_errors }}
 									</div>
 								{% endfor %}
 							</div>
-							<div class="mt-3 d-flex justify-content-end">
-								<button type="submit" class="btn btn-primary">Guardar Rutas</button>
+							<div class="pg-mt-3 pg-flex pg-justify-end">
+								<button type="submit" class="pg-button pg-button-primary">Guardar Rutas</button>
 							</div>
 						</form>
 					{% endif %}
 				</div>
 
-				<div class="tab-pane fade {% if active_tab == 'billing' %}show active{% endif %}" id="tab-billing" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'billing' %}pg-show pg-active{% endif %}" id="tab-billing" role="tabpanel">
 					{% if client %}
 						{% if not client.billing_info.effective.has_address and not billing_read_only %}
-							<div class="alert alert-warning">
+							<div class="pg-alert pg-alert-warning">
 								<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
 							</div>
 						{% endif %}
 						{% if billing_read_only %}
-							<div class="alert alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
+							<div class="pg-alert pg-alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
 						{% endif %}
 						{% if not client.requires_billing %}
-							<div class="alert alert-secondary">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
+							<div class="pg-alert pg-alert-light">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
 						{% endif %}
 
-						<div class="row g-3">
-							<div class="col-lg-7">
-								<div class="border rounded p-3 h-100">
+						<div class="pg-row pg-gap-3">
+							<div class="pg-col-lg-7">
+								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 									<div class="form-section-title">Datos de Facturación</div>
 									<form method="post">
 										{% csrf_token %}
 										<input type="hidden" name="section" value="billing_data">
-										<div class="mb-2">{{ invoice_data_form.rfc.label_tag }}{{ invoice_data_form.rfc }}{{ invoice_data_form.rfc.errors }}</div>
-										<div class="mb-2">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
-										<div class="mb-2">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
-										<div class="d-flex justify-content-end">
-											<button type="submit" class="btn btn-primary" {% if billing_data_disabled %}disabled{% endif %}>Guardar Datos</button>
+										<div class="pg-mb-2">{{ invoice_data_form.rfc.label_tag }}{{ invoice_data_form.rfc }}{{ invoice_data_form.rfc.errors }}</div>
+										<div class="pg-mb-2">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
+										<div class="pg-mb-2">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
+										<div class="pg-flex pg-justify-end">
+											<button type="submit" class="pg-button pg-button-primary" {% if billing_data_disabled %}disabled{% endif %}>Guardar Datos</button>
 										</div>
 									</form>
 								</div>
 							</div>
-							<div class="col-lg-5">
-								<div class="border rounded p-3 h-100">
+							<div class="pg-col-lg-5">
+								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 									<div class="form-section-title">Frecuencia de Facturación</div>
-									<div class="mb-3" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
-										<div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-start gap-2">
+									<div class="pg-mb-3" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
+										<div class="pg-flex pg-flex-column pg-flex-sm-row pg-justify-between pg-align-sm-start pg-gap-2">
 											<div>
-												<div class="form-check mb-1">
+												<div class="pg-checkbox pg-mb-1">
 													{{ recurring_billing_form.requires_billing }}
-													<label class="form-check-label">{{ recurring_billing_form.requires_billing.label }}</label>
+													<label class="pg-checkbox-label">{{ recurring_billing_form.requires_billing.label }}</label>
 												</div>
-												<div class="form-text">{{ recurring_billing_form.requires_billing.help_text }}</div>
+												<div class="pg-field-help">{{ recurring_billing_form.requires_billing.help_text }}</div>
 												{{ recurring_billing_form.requires_billing.errors }}
 											</div>
 										</div>
-										<div id="recurring-billing-feedback" class="mt-2"></div>
+										<div id="recurring-billing-feedback" class="pg-mt-2"></div>
 									</div>
-									<hr class="my-3">
+									<hr class="pg-my-3">
 									<form method="post">
 										{% csrf_token %}
 										<input type="hidden" name="section" value="billing_frequency">
-										<div class="mb-2">{{ invoice_schedule_form.start_date.label_tag }}{{ invoice_schedule_form.start_date }}{{ invoice_schedule_form.start_date.errors }}</div>
-										<div class="mb-2">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
-										<div class="mb-2" id="invoice-billing-date-wrapper">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
-										<div class="mb-2" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
-										<div class="mb-2" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
-										<div class="mb-2" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
-										<div class="form-check mb-2">{{ invoice_schedule_form.is_active }} <label class="form-check-label">{{ invoice_schedule_form.is_active.label }}</label></div>
-										<div class="mb-2">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
-										<div class="d-flex justify-content-end">
-											<button type="submit" class="btn btn-primary" {% if billing_frequency_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
+										<div class="pg-mb-2">{{ invoice_schedule_form.start_date.label_tag }}{{ invoice_schedule_form.start_date }}{{ invoice_schedule_form.start_date.errors }}</div>
+										<div class="pg-mb-2">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
+										<div class="pg-mb-2" id="invoice-billing-date-wrapper">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
+										<div class="pg-mb-2" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
+										<div class="pg-mb-2" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
+										<div class="pg-mb-2" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
+										<div class="pg-checkbox pg-mb-2">{{ invoice_schedule_form.is_active }} <label class="pg-checkbox-label">{{ invoice_schedule_form.is_active.label }}</label></div>
+										<div class="pg-mb-2">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
+										<div class="pg-flex pg-justify-end">
+											<button type="submit" class="pg-button pg-button-primary" {% if billing_frequency_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
 										</div>
 									</form>
 								</div>
 							</div>
 						</div>
 
-							<div class="mt-3 p-3 border rounded bg-light">
+							<div class="pg-mt-3 pg-p-3 pg-border pg-rounded pg-bg-light">
 								<div class="form-section-title">Información Facturacion</div>
 								<div class="section-muted">
 									{% if effective_billing_data %}
@@ -356,40 +319,40 @@
 					{% endif %}
 				</div>
 
-				<div class="tab-pane fade {% if active_tab == 'credit' %}show active{% endif %}" id="tab-credit" role="tabpanel">
+				<div class="pg-tab-pane pg-fade {% if active_tab == 'credit' %}pg-show pg-active{% endif %}" id="tab-credit" role="tabpanel">
 					{% if client %}
 						{% if credit_read_only %}
-							<div class="alert alert-warning">La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
+							<div class="pg-alert pg-alert-warning">La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
 						{% endif %}
 						<form method="post">
 							{% csrf_token %}
 							<input type="hidden" name="section" value="credit">
-							<div class="row g-3">
-								<div class="col-lg-6">
-									<div class="border rounded p-3 h-100">
+							<div class="pg-row pg-gap-3">
+								<div class="pg-col-lg-6">
+									<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 										<div class="form-section-title">Política de Crédito</div>
-										<div class="form-check mb-2">
-											{{ credit_policy_form.can_pay_with_credit }} <label class="form-check-label">{{ credit_policy_form.can_pay_with_credit.label }}</label>
-											<div class="form-text">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
+										<div class="pg-checkbox pg-mb-2">
+											{{ credit_policy_form.can_pay_with_credit }} <label class="pg-checkbox-label">{{ credit_policy_form.can_pay_with_credit.label }}</label>
+											<div class="pg-field-help">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
 										</div>
-										<div class="mb-2">
+										<div class="pg-mb-2">
 											{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}
-											<div class="form-text">{{ credit_policy_form.credit_limit.help_text }}</div>
+											<div class="pg-field-help">{{ credit_policy_form.credit_limit.help_text }}</div>
 											{{ credit_policy_form.credit_limit.errors }}
 										</div>
 									</div>
 								</div>
-								<div class="col-lg-6">
-									<div class="border rounded p-3 h-100">
+								<div class="pg-col-lg-6">
+									<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 										<div class="form-section-title">Condiciones de Pago</div>
-										<div class="mb-2">{{ credit_config_form.payment_term_type.label_tag }}{{ credit_config_form.payment_term_type }}{{ credit_config_form.payment_term_type.errors }}</div>
-										<div class="mb-2" id="credit-cutoff-day-wrapper">{{ credit_config_form.cutoff_day.label_tag }}{{ credit_config_form.cutoff_day }}{{ credit_config_form.cutoff_day.errors }}</div>
-										<div class="mb-2" id="credit-payment-days-wrapper">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
+										<div class="pg-mb-2">{{ credit_config_form.payment_term_type.label_tag }}{{ credit_config_form.payment_term_type }}{{ credit_config_form.payment_term_type.errors }}</div>
+										<div class="pg-mb-2" id="credit-cutoff-day-wrapper">{{ credit_config_form.cutoff_day.label_tag }}{{ credit_config_form.cutoff_day }}{{ credit_config_form.cutoff_day.errors }}</div>
+										<div class="pg-mb-2" id="credit-payment-days-wrapper">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
 									</div>
 								</div>
 							</div>
-							<div class="mt-3 d-flex justify-content-end">
-								<button type="submit" class="btn btn-primary" {% if credit_read_only %}disabled{% endif %}>Guardar Configuración de Crédito</button>
+							<div class="pg-mt-3 pg-flex pg-justify-end">
+								<button type="submit" class="pg-button pg-button-primary" {% if credit_read_only %}disabled{% endif %}>Guardar Configuración de Crédito</button>
 							</div>
 						</form>
 					{% endif %}
@@ -474,7 +437,7 @@
 				if (!this.feedback) {
 					return;
 				}
-				this.feedback.innerHTML = `<div class="alert alert-${level} py-2 mb-0">${message}</div>`;
+				this.feedback.innerHTML = `<div class="pg-alert pg-alert-${level} pg-py-2 pg-mb-0">${message}</div>`;
 			}
 
 			async handleChange() {

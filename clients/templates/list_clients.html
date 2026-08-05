@@ -1,194 +1,120 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-  <style>
-    .search-results-info {
-      background-color: #f8f9fa;
-      border: 1px solid #dee2e6;
-      border-radius: 0.375rem;
-      padding: 0.75rem 1rem;
-      margin-bottom: 1rem;
-    }
-    
-    .pagination .page-link {
-      color: #0d6efd;
-    }
-    
-    .pagination .page-item.active .page-link {
-      background-color: #0d6efd;
-      border-color: #0d6efd;
-    }
-    
-    .search-form {
-      max-width: 500px;
-    }
-
-    .client-mobile-card {
-      border-radius: 0.5rem;
-      border: 1px solid var(--bs-border-color);
-      box-shadow: none;
-    }
-
-    .new-client-btn {
-      width: 100%;
-    }
-
-    @media (max-width: 767.98px) {
-      .search-form {
-        max-width: 100%;
-      }
-
-      .search-form .input-group {
-        flex-wrap: nowrap;
-      }
-
-      .search-form .form-control {
-        font-size: 1rem;
-      }
-
-      .search-form .btn {
-        white-space: nowrap;
-      }
-
-      .pagination {
-        flex-wrap: wrap;
-        gap: 0.25rem;
-      }
-    }
-
-    @media (min-width: 768px) {
-      .new-client-btn {
-        width: auto;
-      }
-    }
-  </style>
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
-    <!-- Header Section -->
-    <div class="row mb-4 g-3 align-items-center">
-      <div class="col-12 col-md-3">
-        <h1>
-          {% if client_list_mode == 'credits' %}
-            <i class="fas fa-credit-card me-2"></i>
-          {% elif client_list_mode == 'outside_route_sales' %}
-            <i class="fas fa-cart-plus me-2"></i>
-          {% else %}
-            <i class="fas fa-users me-2"></i>
-          {% endif %}
-          {{ page_title|default:"Clientes" }}
-        </h1>
+  <div class="pg-container-fluid pg-mt-3 pg-mb-4">
+    <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
+      <div>
+        <h1 class="pg-h3 pg-mb-1">{{ page_title|default:"Clientes" }}</h1>
         {% if page_subtitle %}
-          <p class="text-muted mb-1">{{ page_subtitle }}</p>
+          <p class="pg-text-muted pg-mb-1">{{ page_subtitle }}</p>
         {% endif %}
         {% if has_search %}
-          <p class="text-muted mb-0">
+          <p class="pg-text-muted pg-mb-0">
             Mostrando resultados para: <strong>"{{ search_query }}"</strong>
           </p>
         {% endif %}
       </div>
-      <div class="col-12 col-md-7">
-        <form method="get" action="{% url 'clients:list' %}" class="search-form mx-auto">
-          <div class="input-group">
-            {% if client_list_mode %}
-              <input type="hidden" name="mode" value="{{ client_list_mode }}">
-            {% endif %}
-            <input type="search" 
-                   class="form-control form-control-lg" 
-                   name="search" 
-                   value="{{ search_query }}" 
-                   placeholder="Buscar clientes por nombre, contacto, dirección, RFC..."
-                   aria-label="Buscar clientes">
-            <button class="btn btn-primary" type="submit">
-              <i class="fas fa-search me-2"></i>Buscar
-            </button>
-            {% if has_search %}
-              <a href="{{ client_list_clear_url }}" class="btn btn-outline-secondary">
-                <i class="fas fa-times me-2"></i>Limpiar
-              </a>
-            {% endif %}
-          </div>
-        </form>
-      </div>
-      <!-- <div class="col-12 col-md-2 text-md-end d-grid d-md-block">
-        <a href="{% url 'clients:create_v2' %}" class="btn btn-primary new-client-btn">
-          <i class="fas fa-plus"></i> Nuevo Cliente
-        </a>
-      </div> -->
     </div>
 
-    <!-- Results Info -->
+    <div class="pg-card dashboard-card pg-mb-3">
+      <div class="pg-card-body">
+        <form method="get" action="{% url 'clients:list' %}" class="pg-row pg-gap-2 pg-align-end">
+          {% if client_list_mode %}
+            <input type="hidden" name="mode" value="{{ client_list_mode }}">
+          {% endif %}
+          <div class="pg-col-md-10">
+            <label class="pg-label" for="client-search">Buscar</label>
+            <input
+              id="client-search"
+              type="search"
+              class="pg-input"
+              name="search"
+              value="{{ search_query }}"
+              placeholder="Nombre, contacto, dirección, RFC..."
+              aria-label="Buscar clientes"
+            >
+          </div>
+          <div class="pg-col-md-2 pg-grid">
+            <button class="pg-button pg-button-primary" type="submit">Filtrar</button>
+          </div>
+        </form>
+        {% if has_search %}
+          <div class="pg-mt-2">
+            <a href="{{ client_list_clear_url }}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
 
-
-    <!-- Clients Table -->
     {% if clients %}
       {% include 'includes/client_table.html' with items=clients table_context='client_list' client_list_mode=client_list_mode show_id=True show_sequence=False show_frequency=False has_search=has_search search_query=search_query %}
 
-      <!-- Pagination -->
       {% if clients.has_other_pages %}
-        <div class="row mt-4">
-          <div class="col-12">
+        <div class="pg-row pg-mt-4">
+          <div class="pg-col-12">
             <nav aria-label="Navegación de páginas de clientes">
-              <ul class="pagination justify-content-center">
+              <ul class="pg-pagination pg-justify-center">
                 {% if clients.has_previous %}
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page=1" aria-label="Primera página">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page=1" aria-label="Primera página">
                       <i class="fas fa-angle-double-left"></i>
                     </a>
                   </li>
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.previous_page_number }}" aria-label="Página anterior">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.previous_page_number }}" aria-label="Página anterior">
                       <i class="fas fa-angle-left"></i>
                     </a>
                   </li>
                 {% else %}
-                  <li class="page-item disabled">
-                    <span class="page-link"><i class="fas fa-angle-double-left"></i></span>
+                  <li class="pg-page-item pg-disabled">
+                    <span class="pg-page-link"><i class="fas fa-angle-double-left"></i></span>
                   </li>
-                  <li class="page-item disabled">
-                    <span class="page-link"><i class="fas fa-angle-left"></i></span>
+                  <li class="pg-page-item pg-disabled">
+                    <span class="pg-page-link"><i class="fas fa-angle-left"></i></span>
                   </li>
                 {% endif %}
 
                 <!-- Page numbers -->
                 {% for page_num in clients.paginator.page_range %}
                   {% if page_num == clients.number %}
-                    <li class="page-item active">
-                      <span class="page-link">{{ page_num }}</span>
+                    <li class="pg-page-item pg-active">
+                      <span class="pg-page-link">{{ page_num }}</span>
                     </li>
                   {% elif page_num > clients.number|add:'-3' and page_num < clients.number|add:'3' %}
-                    <li class="page-item">
-                      <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    <li class="pg-page-item">
+                      <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == 1 or page_num == clients.paginator.num_pages %}
-                    <li class="page-item">
-                      <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    <li class="pg-page-item">
+                      <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == clients.number|add:'-4' or page_num == clients.number|add:'4' %}
-                    <li class="page-item disabled">
-                      <span class="page-link">...</span>
+                    <li class="pg-page-item pg-disabled">
+                      <span class="pg-page-link">...</span>
                     </li>
                   {% endif %}
                 {% endfor %}
 
                 {% if clients.has_next %}
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.next_page_number }}" aria-label="Página siguiente">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.next_page_number }}" aria-label="Página siguiente">
                       <i class="fas fa-angle-right"></i>
                     </a>
                   </li>
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.paginator.num_pages }}" aria-label="Última página">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if pagination_query %}{{ pagination_query }}&{% endif %}page={{ clients.paginator.num_pages }}" aria-label="Última página">
                       <i class="fas fa-angle-double-right"></i>
                     </a>
                   </li>
                 {% else %}
-                  <li class="page-item disabled">
-                    <span class="page-link"><i class="fas fa-angle-right"></i></span>
+                  <li class="pg-page-item pg-disabled">
+                    <span class="pg-page-link"><i class="fas fa-angle-right"></i></span>
                   </li>
-                  <li class="page-item disabled">
-                    <span class="page-link"><i class="fas fa-angle-double-right"></i></span>
+                  <li class="pg-page-item pg-disabled">
+                    <span class="pg-page-link"><i class="fas fa-angle-double-right"></i></span>
                   </li>
                 {% endif %}
               </ul>
@@ -199,26 +125,26 @@
 
     {% else %}
       <!-- Empty State -->
-      <div class="text-center py-5">
+      <div class="pg-text-center pg-py-5">
         {% if has_search %}
-          <i class="fas fa-search fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No se encontraron resultados</h4>
-          <p class="text-muted">
+          <i class="fas fa-search fa-4x pg-text-muted pg-mb-3"></i>
+          <h4 class="pg-text-muted">No se encontraron resultados</h4>
+          <p class="pg-text-muted">
             No se encontraron clientes que coincidan con "<strong>{{ search_query }}</strong>"
           </p>
-          <div class="mt-3">
-            <a href="{% url 'clients:list' %}" class="btn btn-outline-primary me-2">
-              <i class="fas fa-arrow-left me-2"></i>Ver todos los clientes
+          <div class="pg-mt-3">
+            <a href="{% url 'clients:list' %}" class="pg-button pg-button-outline-primary pg-me-2">
+              <i class="fas fa-arrow-left pg-me-2"></i>Ver todos los clientes
             </a>
-            <a href="{% url 'clients:create_v2' %}" class="btn btn-primary">
-              <i class="fas fa-plus me-2"></i>Agregar nuevo cliente
+            <a href="{% url 'clients:create_v2' %}" class="pg-button pg-button-primary">
+              <i class="fas fa-plus pg-me-2"></i>Agregar nuevo cliente
             </a>
           </div>
         {% else %}
-          <i class="fas fa-users fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No hay clientes registrados</h4>
-          <p class="text-muted">Comienza agregando tu primer cliente</p>
-          <a href="{% url 'clients:create_v2' %}" class="btn btn-primary">
+          <i class="fas fa-users fa-4x pg-text-muted pg-mb-3"></i>
+          <h4 class="pg-text-muted">No hay clientes registrados</h4>
+          <p class="pg-text-muted">Comienza agregando tu primer cliente</p>
+          <a href="{% url 'clients:create_v2' %}" class="pg-button pg-button-primary">
             <i class="fas fa-plus"></i> Agregar Primer Cliente
           </a>
         {% endif %}

@@ -2,26 +2,26 @@
 
 /* Order status styling */
 .status-pending {
-    background-color: #fff3cd !important;
-    color: #856404 !important;
-    border-left: 4px solid #ffc107 !important;
+    background-color: var(--pg-warning-soft) !important;
+    color: var(--pg-warning-foreground) !important;
+    border-left: 4px solid var(--pg-warning) !important;
 }
 
 .status-completed {
-    background-color: #d1edda !important;
-    color: #155724 !important;
-    border-left: 4px solid #28a745 !important;
+    background-color: var(--pg-success-soft) !important;
+    color: var(--pg-success) !important;
+    border-left: 4px solid var(--pg-success) !important;
 }
 
 .status-cancelled {
-    background-color: #f8d7da !important;
-    color: #721c24 !important;
-    border-left: 4px solid #dc3545 !important;
+    background-color: #fff1f2 !important;
+    color: var(--pg-destructive) !important;
+    border-left: 4px solid var(--pg-destructive) !important;
 }
 
 /* Enhanced table styling */
 #result_list tbody tr:hover {
-    background-color: #f8f9fa !important;
+    background-color: var(--pg-muted) !important;
 }
 
 /* Badge styling */
@@ -37,45 +37,45 @@
     border-radius: 0.25rem;
 }
 
-.admin-badge-primary {
-    color: #fff;
-    background-color: #007bff;
+.admin-pg-badge-primary {
+    color: var(--pg-accent-foreground);
+    background-color: var(--pg-accent);
 }
 
-.admin-badge-success {
-    color: #fff;
-    background-color: #28a745;
+.admin-pg-badge-success {
+    color: var(--pg-success-foreground);
+    background-color: var(--pg-success);
 }
 
-.admin-badge-warning {
-    color: #212529;
-    background-color: #ffc107;
+.admin-pg-badge-warning {
+    color: var(--pg-warning-foreground);
+    background-color: var(--pg-warning);
 }
 
 .admin-badge-danger {
-    color: #fff;
-    background-color: #dc3545;
+    color: var(--pg-destructive-foreground);
+    background-color: var(--pg-destructive);
 }
 
 /* Inline styling improvements */
 .inline-related {
-    border: 1px solid #ddd;
+    border: 1px solid var(--pg-border);
     border-radius: 4px;
     margin-bottom: 10px;
     padding: 10px;
 }
 
 .inline-related h3 {
-    background-color: #f8f9fa;
+    background-color: var(--pg-muted);
     margin: -10px -10px 10px -10px;
     padding: 10px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--pg-border);
 }
 
 /* Improved fieldset styling */
 .module h2, .module caption, .inline-group h2 {
-    background: linear-gradient(to right, #417690, #4a90a4);
-    color: white;
+    background: var(--pg-primary);
+    color: var(--pg-primary-foreground);
     padding: 8px 10px;
     margin: 0;
     border-radius: 4px 4px 0 0;
@@ -83,8 +83,8 @@
 
 /* Custom filter styling */
 #changelist-filter h3 {
-    background-color: #417690;
-    color: white;
+    background-color: var(--pg-primary);
+    color: var(--pg-primary-foreground);
     padding: 8px;
     margin: 0 0 5px 0;
 }
@@ -109,8 +109,8 @@
 }
 
 #changelist .results table th {
-    background: linear-gradient(to bottom, #f8f9fa, #e9ecef);
-    border-bottom: 2px solid #417690;
+    background: linear-gradient(to bottom, var(--pg-muted), var(--pg-muted));
+    border-bottom: 2px solid var(--pg-primary);
     font-weight: 600;
     text-transform: uppercase;
     font-size: 0.85rem;
@@ -119,8 +119,8 @@
 
 /* Action styling */
 .actions {
-    background-color: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background-color: var(--pg-muted);
+    border: 1px solid var(--pg-border);
     border-radius: 4px;
     padding: 10px;
     margin-bottom: 10px;
@@ -133,16 +133,16 @@
 
 /* Custom info boxes */
 .order-info-box {
-    background: #e3f2fd;
-    border-left: 4px solid #2196f3;
+    background: var(--pg-info-soft);
+    border-left: 4px solid var(--pg-info);
     padding: 10px;
     margin: 10px 0;
     border-radius: 0 4px 4px 0;
 }
 
 .client-info-box {
-    background: #f3e5f5;
-    border-left: 4px solid #9c27b0;
+    background: var(--pg-accent-soft);
+    border-left: 4px solid var(--pg-accent);
     padding: 10px;
     margin: 10px 0;
     border-radius: 0 4px 4px 0;
@@ -160,6 +160,6 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    color: #666;
+    color: var(--pg-muted-foreground);
     font-style: italic;
 }

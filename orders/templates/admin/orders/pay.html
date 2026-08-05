@@ -3,142 +3,6 @@
 
 {% block extra_css %}
     {{ block.super }}
-    <style>
-        .pay-order-container {
-            max-width: 800px;
-            margin: 20px auto;
-            padding: 20px;
-        }
-        
-        .order-info {
-            background: #f8f9fa;
-            border-left: 4px solid #417690;
-            padding: 15px;
-            margin-bottom: 30px;
-            border-radius: 4px;
-        }
-        
-        .order-info h2 {
-            margin-top: 0;
-            color: #417690;
-        }
-        
-        .order-info .info-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-top: 15px;
-        }
-        
-        .order-info .info-item {
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
-        }
-        
-        .order-info .info-label {
-            font-weight: bold;
-            color: #666;
-            font-size: 12px;
-            text-transform: uppercase;
-            margin-bottom: 5px;
-        }
-        
-        .order-info .info-value {
-            font-size: 16px;
-            color: #333;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .form-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #333;
-        }
-        
-        .form-group select, .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        .form-group select:focus, .form-group input:focus {
-            outline: none;
-            border-color: #417690;
-        }
-        
-        .form-actions {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 4px;
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border-radius: 4px;
-            text-decoration: none;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            font-size: 14px;
-        }
-        
-        .btn-primary {
-            background: #417690;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #2e5568;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #545b62;
-        }
-        
-        .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 4px;
-        }
-        
-        .alert-info {
-            background: #d1ecf1;
-            border-left: 4px solid #17a2b8;
-            color: #0c5460;
-        }
-
-        .alert-warning {
-            background: #fff3cd;
-            border-left: 4px solid #ffc107;
-            color: #856404;
-        }
-        
-        .alert-error {
-            background: #f8d7da;
-            border-left: 4px solid #dc3545;
-            color: #721c24;
-            display: none;
-        }
-    </style>
 {% endblock %}
 
 {% block content %}
@@ -154,7 +18,7 @@
             </div>
             <div class="info-item">
                 <div class="info-label">Saldo Disponible</div>
-                <div class="info-value" style="color: #417690;">${{ order.client.balance }}</div>
+                <div class="info-value pg-text-info">${{ order.client.balance }}</div>
             </div>
             <div class="info-item">
                 <div class="info-label">Estado</div>
@@ -162,17 +26,17 @@
             </div>
             <div class="info-item">
                 <div class="info-label">Total a Pagar</div>
-                <div class="info-value" style="color: #28a745; font-weight: bold;">${{ payment_amount }}</div>
+                <div class="info-value pg-text-success pg-fw-bold">${{ payment_amount }}</div>
             </div>
         </div>
     </div>
     
-    <div class="alert alert-info">
+    <div class="pg-alert pg-alert-info">
         <strong>💡 Sugerencia de Pago:</strong><br>
         {{ payment_breakdown.message }}
     </div>
 
-    <div id="errorMessage" class="alert alert-error">
+    <div id="errorMessage" class="pg-alert pg-alert-danger pg-hidden">
         <strong>Error:</strong> <span id="errorText"></span>
     </div>
     
@@ -181,14 +45,14 @@
         <input type="hidden" id="orderId" value="{{ order.id }}">
         
         <div class="form-group">
-            <label for="amount">Monto (Total del pedido)</label>
-            <input type="number" id="amount" value="{{ payment_amount }}" step="0.01" min="0.01" readonly style="background: #f8f9fa;">
-            <small style="color: #666; display: block; margin-top: 5px;">El pago debe cubrir el saldo pendiente de la orden.</small>
+            <label for="amount" class="pg-label">Monto (Total del pedido)</label>
+            <input type="number" id="amount" class="pg-input pg-bg-light" value="{{ payment_amount }}" step="0.01" min="0.01" readonly>
+            <small class="pg-field-help pg-block pg-mt-1">El pago debe cubrir el saldo pendiente de la orden.</small>
         </div>
 
         <div class="form-group">
-            <label for="payment_method">Método de Pago</label>
-            <select id="payment_method" name="payment_method" required>
+            <label for="payment_method" class="pg-label">Método de Pago</label>
+            <select id="payment_method" name="payment_method" class="pg-select" required>
                 {% for value, label in payment_types %}
                     <option value="{{ value }}">{{ label }}</option>
                 {% endfor %}
@@ -196,10 +60,10 @@
         </div>
         
         <div class="form-actions">
-            <a href="{% url 'admin:orders_order_change' order.id %}" class="btn btn-secondary">
+            <a href="{% url 'admin:orders_order_change' order.id %}" class="pg-button pg-button-secondary">
                 ← Cancelar
             </a>
-            <button type="submit" id="submitBtn" class="btn btn-primary">
+            <button type="submit" id="submitBtn" class="pg-button pg-button-primary">
                 💳 Confirmar Pago
             </button>
         </div>
@@ -227,13 +91,13 @@ class OrderPaymentHandler {
     
     showError(message) {
         this.errorText.textContent = message;
-        this.errorAlert.style.display = 'block';
+        this.errorAlert.classList.remove('pg-hidden');
         this.submitBtn.disabled = false;
         this.submitBtn.innerHTML = '💳 Confirmar Pago';
     }
     
     hideError() {
-        this.errorAlert.style.display = 'none';
+        this.errorAlert.classList.add('pg-hidden');
     }
     
     async handleSubmit(e) {

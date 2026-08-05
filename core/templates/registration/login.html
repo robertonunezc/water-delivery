@@ -3,15 +3,15 @@
 {% block title %}Iniciar Sesión - PuriGest{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white text-center">
-                <h4 class="mb-0"><i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión</h4>
+<div class="pg-row pg-justify-center">
+    <div class="pg-col-md-6 pg-col-lg-4">
+        <div class="pg-card pg-shadow">
+            <div class="pg-card-header pg-bg-primary pg-text-white pg-text-center">
+                <h4 class="pg-mb-0"><i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión</h4>
             </div>
-            <div class="card-body">
+            <div class="pg-card-body">
                 {% if form.errors %}
-                    <div class="alert alert-danger">
+                    <div class="pg-alert pg-alert-danger">
                         <strong>Error:</strong>
                         {% for field, errors in form.errors.items %}
                             {% for error in errors %}
@@ -22,7 +22,7 @@
                 {% endif %}
 
                 {% if form.non_field_errors %}
-                    <div class="alert alert-danger">
+                    <div class="pg-alert pg-alert-danger">
                         {% for error in form.non_field_errors %}
                             <div>{{ error }}</div>
                         {% endfor %}
@@ -32,18 +32,18 @@
                 <form method="post">
                     {% csrf_token %}
                     
-                    <div class="mb-3">
-                        <label for="{{ form.username.id_for_label }}" class="form-label">
-                            <i class="fas fa-user me-1"></i>Usuario
+                    <div class="pg-mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="pg-label">
+                            <i class="fas fa-user pg-me-1"></i>Usuario
                         </label>
                         <input type="text" 
-                               class="form-control {% if form.username.errors %}is-invalid{% endif %}" 
+                               class="pg-input {% if form.username.errors %}is-invalid{% endif %}" 
                                id="{{ form.username.id_for_label }}"
                                name="{{ form.username.name }}"
                                value="{{ form.username.value|default:'' }}"
                                required>
                         {% if form.username.errors %}
-                            <div class="invalid-feedback">
+                            <div class="pg-invalid-feedback">
                                 {% for error in form.username.errors %}
                                     {{ error }}
                                 {% endfor %}
@@ -51,17 +51,17 @@
                         {% endif %}
                     </div>
 
-                    <div class="mb-3">
-                        <label for="{{ form.password.id_for_label }}" class="form-label">
-                            <i class="fas fa-lock me-1"></i>Contraseña
+                    <div class="pg-mb-3">
+                        <label for="{{ form.password.id_for_label }}" class="pg-label">
+                            <i class="fas fa-lock pg-me-1"></i>Contraseña
                         </label>
                         <input type="password" 
-                               class="form-control {% if form.password.errors %}is-invalid{% endif %}" 
+                               class="pg-input {% if form.password.errors %}is-invalid{% endif %}" 
                                id="{{ form.password.id_for_label }}"
                                name="{{ form.password.name }}"
                                required>
                         {% if form.password.errors %}
-                            <div class="invalid-feedback">
+                            <div class="pg-invalid-feedback">
                                 {% for error in form.password.errors %}
                                     {{ error }}
                                 {% endfor %}
@@ -69,18 +69,18 @@
                         {% endif %}
                     </div>
 
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-sign-in-alt me-2"></i>Iniciar Sesión
+                    <div class="pg-grid">
+                        <button type="submit" class="pg-button pg-button-primary">
+                            <i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión
                         </button>
                     </div>
 
                     <input type="hidden" name="next" value="{{ next }}">
                 </form>
             </div>
-            <div class="card-footer text-center text-muted">
+            <div class="pg-card-footer pg-text-center pg-text-muted">
                 <small>
-                    <i class="fas fa-shield-alt me-1"></i>
+                    <i class="fas fa-shield-alt pg-me-1"></i>
                     Ingresa con tu cuenta para acceder al sistema
                 </small>
             </div>

@@ -1,142 +1,91 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-<style>
-  .dashboard-kpi {
-    border-radius: 12px;
-    color: #fff;
-    padding: 1rem;
-    height: 100%;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .dashboard-kpi:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-  }
-  .dashboard-kpi h6 {
-    margin-bottom: 0.25rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    opacity: 0.9;
-  }
-  .dashboard-kpi .value {
-    font-size: 1.5rem;
-    font-weight: 800;
-    line-height: 1.1;
-  }
-  .kpi-blue { background: linear-gradient(135deg, #1d4ed8, #2563eb); }
-  .kpi-amber { background: linear-gradient(135deg, #b45309, #d97706); }
-  .kpi-emerald { background: linear-gradient(135deg, #047857, #059669); }
-  .kpi-slate { background: linear-gradient(135deg, #334155, #475569); }
-
-  .dashboard-card {
-    border: 0;
-    border-radius: 14px;
-    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.08);
-    transition: box-shadow 0.2s ease;
-  }
-  .dashboard-card:hover {
-    box-shadow: 0 12px 32px rgba(2, 6, 23, 0.12);
-  }
-
-  .status-pill {
-    font-size: 0.75rem;
-    font-weight: 700;
-    padding: 0.3rem 0.55rem;
-    border-radius: 999px;
-    display: inline-block;
-  }
-
-  .status-auto { background: #dbeafe; color: #1e40af; }
-  .status-manual { background: #f3f4f6; color: #374151; }
-  .status-has-file { background: #dcfce7; color: #166534; }
-  .status-no-file { background: #fee2e2; color: #991b1b; }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-  <div class="d-flex justify-content-between align-items-center mb-3">
+<div class="pg-container-fluid pg-mt-3">
+  <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
     <div>
-      <h1 class="h3 mb-1">Facturas</h1>
-      <p class="text-muted mb-0">Administrar facturas, subir archivos PDF/XML y vincular ventas del cliente.</p>
+      <h1 class="pg-h3 pg-mb-1">Facturas</h1>
+      <p class="pg-text-muted pg-mb-0">Administrar facturas, subir archivos PDF/XML y vincular ventas del cliente.</p>
     </div>
-    <div class="d-flex gap-2">
-      <a href="{% url 'admin_create_invoice' %}" class="btn btn-primary">Nueva Factura</a>
-      <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="btn btn-outline-dark">Reporte de Programación de Facturación</a>
+    <div class="pg-flex pg-gap-2">
+      <a href="{% url 'admin_create_invoice' %}" class="pg-button pg-button-primary">Nueva Factura</a>
+      <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="pg-button pg-button-outline-dark">Reporte de Programación de Facturación</a>
     </div>
   </div>
 
-  <!-- KPIs Panel -->
-  <div class="row g-3 mb-3">
-    <div class="col-md-3">
-      <div class="dashboard-kpi kpi-blue">
-        <h6>Total Facturas</h6>
-        <div class="value">{{ total_invoices }}</div>
+  <div class="metric-grid">
+    <div class="metric-card metric-invoice">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
+        Total facturas
       </div>
+      <div class="metric-value">{{ total_invoices }}</div>
+      <div class="metric-note">Facturas registradas</div>
     </div>
-    <div class="col-md-3">
-      <div class="dashboard-kpi kpi-amber">
-        <h6>Facturas en la Página</h6>
-        <div class="value">{{ invoices|length }}</div>
+    <div class="metric-card metric-pending">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-list-ol"></i></span>
+        Facturas en página
       </div>
+      <div class="metric-value">{{ invoices|length }}</div>
+      <div class="metric-note">Resultado visible</div>
     </div>
-    <div class="col-md-3">
-      <div class="dashboard-kpi kpi-emerald">
-        <h6>Monto Total de la Página</h6>
-        <div class="value">${{ page_stats.total_amount|floatformat:2 }}</div>
+    <div class="metric-card metric-sales">
+      <div class="metric-label">
+        <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
+        Monto total de la página
       </div>
+      <div class="metric-value">${{ page_stats.total_amount|floatformat:2 }}</div>
+      <div class="metric-note">Importe visible</div>
     </div>
-    <div class="col-md-3">
-      <div class="dashboard-kpi kpi-slate">
-        <h6>Fecha de Hoy</h6>
-        <div class="value">{{ today|date:'d/m/Y' }}</div>
-      </div>
-    </div>
+    
   </div>
 
   <!-- Filter Card -->
-  <div class="card dashboard-card mb-3">
-    <div class="card-body">
-      <form method="get" class="row g-2 align-items-end">
-        <div class="col-md-4">
-          <label class="form-label" for="search">Buscar</label>
-          <input id="search" name="search" value="{{ filters.search }}" class="form-control" placeholder="Serie, Folio, Nombre del cliente...">
+  <div class="pg-card dashboard-card pg-mb-3">
+    <div class="pg-card-body">
+      <form method="get" class="pg-row pg-gap-2 pg-align-end">
+        <div class="pg-col-md-4">
+          <label class="pg-label" for="search">Buscar</label>
+          <input id="search" name="search" value="{{ filters.search }}" class="pg-input" placeholder="Serie, Folio, Nombre del cliente...">
         </div>
-        <div class="col-md-3">
-          <label class="form-label" for="client">Cliente</label>
-          <select id="client" name="client" class="form-select">
+        <div class="pg-col-md-3">
+          <label class="pg-label" for="client">Cliente</label>
+          <select id="client" name="client" class="pg-select">
             <option value="">Todos los clientes</option>
             {% for client in all_clients %}
               <option value="{{ client.id }}" {% if filters.client == client.id|stringformat:'s' %}selected{% endif %}>{{ client.name }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-2">
-          <label class="form-label" for="date_from">Desde</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="form-control">
+        <div class="pg-col-md-2">
+          <label class="pg-label" for="date_from">Desde</label>
+          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="pg-input">
         </div>
-        <div class="col-md-2">
-          <label class="form-label" for="date_to">Hasta</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="form-control">
+        <div class="pg-col-md-2">
+          <label class="pg-label" for="date_to">Hasta</label>
+          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="pg-input">
         </div>
-        <div class="col-md-1 d-grid">
-          <button type="submit" class="btn btn-primary">Filtrar</button>
+        <div class="pg-col-md-1 pg-grid">
+          <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
         </div>
       </form>
-      <div class="mt-2">
-        <a href="{% url 'admin_invoices' %}" class="btn btn-sm btn-outline-secondary">Limpiar</a>
+      <div class="pg-mt-2">
+        <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
       </div>
     </div>
   </div>
 
   <!-- Invoices Table -->
-  <div class="card dashboard-card">
-    <div class="table-responsive">
-      <table class="table table-hover align-middle mb-0">
-        <thead class="table-light">
+  <div class="pg-card dashboard-card">
+    <div class="pg-table-responsive">
+      <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
+        <thead class="pg-table-light">
           <tr>
-            <th style="width: 80px;">ID</th>
+            <th class="pg-w-20">ID</th>
             <th>Cliente</th>
             <th>Serie</th>
             <th>Folio</th>
@@ -148,7 +97,7 @@
             <th>Total Pagado</th>
             <th>Saldo pendiente</th>
             
-            <th class="text-end">Acciones</th>
+            <th class="pg-text-end">Acciones</th>
           </tr>
         </thead>
         <tbody>
@@ -156,13 +105,13 @@
             <tr>
               <td><strong>#{{ invoice.id }}</strong></td>
               <td>
-                <div class="fw-bold">
+                <div class="pg-fw-bold">
                   <a href="{% url 'clients:detail' invoice.client.id %}">
                     {{ invoice.client.name }}
                   </a>
                 </div>
                 {% if invoice.client.rfc %}
-                  <small class="text-muted">RFC: {{ invoice.client.rfc }}</small>
+                  <small class="pg-text-muted">RFC: {{ invoice.client.rfc }}</small>
                 {% endif %}
               </td>
               <td><code>{{ invoice.identifier }}</code></td>
@@ -170,7 +119,7 @@
               <td>{{ invoice.emmited_at|date:'d/m/Y'|default:'-' }}</td>
               <!-- <td>
                 {% if invoice.payment_status == "Pagada" %}
-                  <span class="status-pill kpi-emerald">Pagada</span>
+                  <span class="status-pill status-has-file">Pagada</span>
                 {% elif invoice.payment_status == "No Pagada" %}
                   <span class="status-pill status-no-file">No Pagada</span>
                 {% else %}
@@ -186,21 +135,21 @@
               </td> -->
               <td>
                 {% if invoice.file %}
-                  <a href="{{ invoice.file.url }}" class="status-pill status-has-file text-decoration-none" target="_blank">
-                    📄 Descargar archivo
+                  <a href="{{ invoice.file.url }}" class="status-pill status-has-file pg-text-decoration-none" target="_blank">
+                    📄 Descargar
                   </a>
                 {% else %}
-                  <span class="status-pill status-no-file">Sin archivo adjunto</span>
+                  <span class="status-pill status-no-file">No</span>
                 {% endif %}
               </td>
               <td>
-                <strong class="text-success">${{ invoice.amount|floatformat:2 }}</strong>
+                <strong class="pg-text-success">${{ invoice.amount|floatformat:2 }}</strong>
               </td>
               <td>
                 {% if invoice.total_payments == invoice.amount %}
-                  <strong class="text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
+                  <strong class="pg-text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
                 {% else %}
-                  <strong class="text-danger">${{ invoice.total_payments|floatformat:2 }}</strong>
+                  <strong class="pg-text-danger">${{ invoice.total_payments|floatformat:2 }}</strong>
                 {% endif %}
               </td>
               <td>
@@ -210,13 +159,13 @@
                   <span class="status-pill status-has-file">${{ invoice.pending_amount|floatformat:2 }}</span>
                 {% endif %}
               </td>
-              <td class="text-end">
-                <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-sm btn-dark">Gestionar y editar</a>
+              <td class="pg-text-end">
+                <a href="{% url 'admin_edit_invoice' invoice.id %}" class="pg-button pg-button-sm pg-button-dark">Gestionar y editar</a>
               </td>
             </tr>
           {% empty %}
             <tr>
-              <td colspan="9" class="text-center py-4 text-muted">No se encontraron facturas.</td>
+              <td colspan="9" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron facturas.</td>
             </tr>
           {% endfor %}
         </tbody>
@@ -225,27 +174,27 @@
 
     <!-- Pagination -->
     {% if invoices.has_other_pages %}
-      <div class="card-footer bg-white">
+      <div class="pg-card-footer pg-bg-white">
         <nav>
-          <ul class="pagination justify-content-center mb-0">
+          <ul class="pg-pagination pg-justify-center pg-mb-0">
             {% if invoices.has_previous %}
-              <li class="page-item">
-                <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.previous_page_number }}">Anterior</a>
+              <li class="pg-page-item">
+                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.previous_page_number }}">Anterior</a>
               </li>
             {% else %}
-              <li class="page-item disabled"><span class="page-link">Anterior</span></li>
+              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
             {% endif %}
 
-            <li class="page-item disabled">
-              <span class="page-link">Página {{ invoices.number }} de {{ invoices.paginator.num_pages }}</span>
+            <li class="pg-page-item pg-disabled">
+              <span class="pg-page-link">Página {{ invoices.number }} de {{ invoices.paginator.num_pages }}</span>
             </li>
 
             {% if invoices.has_next %}
-              <li class="page-item">
-                <a class="page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.next_page_number }}">Siguiente</a>
+              <li class="pg-page-item">
+                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.next_page_number }}">Siguiente</a>
               </li>
             {% else %}
-              <li class="page-item disabled"><span class="page-link">Siguiente</span></li>
+              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
             {% endif %}
           </ul>
         </nav>

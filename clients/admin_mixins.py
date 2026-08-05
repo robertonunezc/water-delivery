@@ -20,15 +20,15 @@ class BalanceDisplayMixin:
 	
 	def get_balance_status(self, obj):
 		"""Display balance and debt status with color coding"""
-		balance_color = 'green' if obj.balance > 0 else 'orange' if obj.balance == 0 else 'red'
-		debt_color = 'red' if obj.current_debt > 0 else 'green'
+		balance_class = 'pg-text-success' if obj.balance > 0 else 'pg-text-warning' if obj.balance == 0 else 'pg-text-danger'
+		debt_class = 'pg-text-danger' if obj.current_debt > 0 else 'pg-text-success'
 		
 		return format_html(
-			'<div><strong>Saldo:</strong> <span style="color: {};">${:.2f}</span></div>'
-			'<div><strong>Deuda:</strong> <span style="color: {};">${:.2f}</span></div>'
+			'<div><strong>Saldo:</strong> <span class="{}">${:.2f}</span></div>'
+			'<div><strong>Deuda:</strong> <span class="{}">${:.2f}</span></div>'
 			'<div><strong>Crédito Disponible:</strong> ${:.2f}</div>',
-			balance_color, obj.balance,
-			debt_color, obj.current_debt,
+			balance_class, obj.balance,
+			debt_class, obj.current_debt,
 			obj.get_available_credit()
 		)
 	get_balance_status.short_description = 'Estado Financiero'
@@ -50,8 +50,7 @@ class BillingDisplayMixin:
 		if not billing.is_complete:
 			missing_errors = [missing_messages.get(m, m) for m in billing.missing_components]
 			return format_html(
-				'<div style="background-color: #fff3cd; border: 1px solid #ffc107; '
-				'border-radius: 4px; color: #856404; margin-bottom: 10px; padding: 10px;">'
+				'<div class="pg-alert pg-alert-warning pg-mb-3">'
 				'<strong>⚠️ Importante:</strong> '
 				'Para poder facturar debe agregar los sugientes datos {}:'
 				'<ul>{}</ul>'
@@ -71,15 +70,15 @@ class BillingDisplayMixin:
 			has_frequency = hasattr(obj, 'invoice_schedule')
 			
 			if has_billing and has_frequency:
-				status = '<span style="color: green;">✓ Configurado</span>'
+				status = '<span class="pg-text-success pg-fw-bold">✓ Configurado</span>'
 			elif has_billing or has_frequency:
-				status = '<span style="color: orange;">⚠ Parcialmente configurado</span>'
+				status = '<span class="pg-text-warning pg-fw-bold">⚠ Parcialmente configurado</span>'
 			else:
-				status = '<span style="color: red;">✗ No configurado</span>'
+				status = '<span class="pg-text-danger pg-fw-bold">✗ No configurado</span>'
 			
 			return format_html(
-				'<div style="padding: 10px;">{}<br><br>'
-				'<a href="{}" class="button" style="margin-top: 10px;">'
+				'<div class="pg-stack pg-p-3">{}'
+				'<a href="{}" class="pg-button pg-button-primary pg-button-sm">'
 				'Gestionar Datos de Facturación</a></div>',
 				status, url
 			)
@@ -94,20 +93,20 @@ class BillingDisplayMixin:
 		billing = obj.billing_info
 		
 		if not billing.effective.has_any:
-			return format_html('<span style="color: red;">Sin datos de facturación</span>')
+			return format_html('<span class="pg-text-danger pg-fw-bold">Sin datos de facturación</span>')
 
 		source_label = {
 			'own': '✓ Propios',
 			'corporate': '⬆ Heredados del corporativo',
 			'none': '✗ No disponible'
 		}.get(billing.source, 'Desconocido')
-		source_color = {
-			'own': 'green',
-			'corporate': 'blue',
-			'none': 'red'
-		}.get(billing.source, 'gray')
+		source_class = {
+			'own': 'pg-text-success',
+			'corporate': 'pg-text-info',
+			'none': 'pg-text-danger'
+		}.get(billing.source, 'pg-text-muted')
 
-		result = f'<div><strong>Origen:</strong> <span style="color: {source_color};">{source_label}</span></div>'
+		result = f'<div><strong>Origen:</strong> <span class="{source_class}">{source_label}</span></div>'
 
 		if billing.effective.data:
 			result += f'<div><strong>RFC:</strong> {billing.effective.data.rfc}</div>'
@@ -116,7 +115,7 @@ class BillingDisplayMixin:
 		if billing.effective.address:
 			result += f'<div><strong>Dirección Fiscal:</strong> {str(billing.effective.address)[:80]}...</div>'
 		else:
-			result += '<div style="color: orange;"><strong>⚠ Sin dirección fiscal</strong></div>'
+			result += '<div class="pg-text-warning"><strong>⚠ Sin dirección fiscal</strong></div>'
 		return format_html(result)
 
 	get_effective_billing_info.short_description = 'Datos de Facturación Efectivos'
@@ -134,14 +133,14 @@ class BillingDisplayMixin:
 			'corporate': '⬆ Heredados del corporativo',
 			'none': '✗ No disponible'
 		}.get(billing.source, 'Desconocido')
-		source_color = {
-			'own': 'green',
-			'corporate': 'blue',
-			'none': 'red'
-		}.get(billing.source, 'gray')
+		source_class = {
+			'own': 'pg-text-success',
+			'corporate': 'pg-text-info',
+			'none': 'pg-text-danger'
+		}.get(billing.source, 'pg-text-muted')
 
 		sections = [
-			f'<div><strong>Origen:</strong> <span style="color: {source_color};">{source_label}</span></div>'
+			f'<div><strong>Origen:</strong> <span class="{source_class}">{source_label}</span></div>'
 		]
 
 		if effective.frequency:
@@ -160,18 +159,18 @@ class BillingDisplayMixin:
 			if getattr(frequency, 'next_billing_date', None):
 				next_date = f" · Próxima: {frequency.next_billing_date:%d/%m/%Y}"
 			date_label = f" · {billing_date_label}" if billing_date_label else ''
-			frequency_color = 'green' if getattr(frequency, 'is_active', False) else 'orange'
+			frequency_class = 'pg-text-success' if getattr(frequency, 'is_active', False) else 'pg-text-warning'
 			sections.append(
 				f'<div><strong>Frecuencia:</strong> {frequency_label}{date_label}{specifics} '
-				f'<span style="color: {frequency_color};">({frequency_status})</span>{next_date}</div>'
+				f'<span class="{frequency_class}">({frequency_status})</span>{next_date}</div>'
 			)
 		else:
-			sections.append('<div style="color: red;"><strong>✗ Sin frecuencia de facturación configurada.</strong></div>')
+			sections.append('<div class="pg-text-danger"><strong>✗ Sin frecuencia de facturación configurada.</strong></div>')
 
 		if effective.address:
 			sections.append(f'<div><strong>Dirección Fiscal:</strong> {str(effective.address)}</div>')
 		else:
-			sections.append('<div style="color: orange;"><strong>⚠ Sin dirección fiscal disponible.</strong></div>')
+			sections.append('<div class="pg-text-warning"><strong>⚠ Sin dirección fiscal disponible.</strong></div>')
 
 		return format_html(''.join(sections))
 
@@ -183,14 +182,12 @@ class BillingDisplayMixin:
 			return 'Guarde el cliente primero para agregar frecuencia de facturación.'
 		if obj.has_billing_frequency():
 			return format_html(
-				'<span style="color: green;">✓ Frecuencia de facturación ya configurada.</span>'
+				'<span class="pg-text-success pg-fw-bold">✓ Frecuencia de facturación ya configurada.</span>'
 			)
 		add_url = f"/admin/invoice/invoiceschedule/add/?client={obj.pk}"
 		return format_html(
-			'<a href="{}" class="button add-billing-frequency-popup" '
-			'data-popup="true" '
-			'style="padding: 5px 10px; background-color: #417690; color: white; '
-			'text-decoration: none; border-radius: 4px; display: inline-block;">'
+			'<a href="{}" class="pg-button pg-button-primary pg-button-sm add-billing-frequency-popup" '
+			'data-popup="true">'
 			'+ Agregar Frecuencia de Facturación</a>',
 			add_url
 		)

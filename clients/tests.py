@@ -2,9 +2,13 @@ import csv
 import io
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from html.parser import HTMLParser
+from pathlib import Path
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
@@ -36,6 +40,29 @@ from payment.models import Payment
 from routes.models import Route, RouteClient
 
 User = get_user_model()
+
+
+TEST_STATIC_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+
+class _TabMarkupParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tags: list[tuple[str, dict[str, str]]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags.append((tag, {name: value or "" for name, value in attrs}))
+
+
+def _class_tokens(attrs: dict[str, str]) -> set[str]:
+    return set(attrs.get("class", "").split())
 
 
 class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
@@ -1147,7 +1174,7 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         self.assertContains(response, f'name="orders" value="{order.pk}"')
         self.assertContains(response, 'Pagar seleccionados')
         self.assertContains(response, f'href="{pay_url}?orders={order.pk}"')
-        self.assertContains(response, f'<a class="dropdown-item" href="{edit_url}">Editar</a>')
+        self.assertContains(response, f'<a class="pg-dropdown-item" href="{edit_url}">Editar</a>')
         self.assertContains(
             response,
             f'data-cancel-url="{reverse("orders:cancel_order", args=[order.pk])}"',
@@ -1175,7 +1202,7 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
         edit_url = reverse("orders:get_order", args=[order.pk])
         self.assertNotContains(
             response,
-            f'<a class="dropdown-item" href="{edit_url}">Editar</a>',
+            f'<a class="pg-dropdown-item" href="{edit_url}">Editar</a>',
         )
         self.assertContains(
             response,
@@ -1255,6 +1282,68 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
 
 
 class ClientDetailLayoutTests(FastTenantTestCase):
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_detail_tabs_follow_design_system_contract(self) -> None:
+        user = User.objects.create_user(
+            username='client-detail-tabs-user',
+            password='testpass123',
+        )
+        customer = Client.objects.create(
+            name='Cliente detalle tabs',
+            active=True,
+            requires_billing=True,
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse('clients:detail', args=[customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        parser = _TabMarkupParser()
+        parser.feed(response.content.decode())
+
+        tab_triggers = [
+            attrs
+            for _, attrs in parser.tags
+            if attrs.get("data-pg-toggle") == "tab"
+        ]
+        target_ids = [
+            attrs["data-pg-target"].removeprefix("#")
+            for attrs in tab_triggers
+            if attrs.get("data-pg-target", "").startswith("#")
+        ]
+        panes_by_id = {
+            attrs["id"]: attrs
+            for _, attrs in parser.tags
+            if attrs.get("id") in target_ids
+        }
+
+        self.assertEqual(set(panes_by_id), set(target_ids))
+        self.assertEqual(
+            [
+                target_id
+                for target_id, attrs in panes_by_id.items()
+                if "pg-tab-pane" not in _class_tokens(attrs)
+            ],
+            [],
+        )
+        self.assertEqual(
+            [
+                attrs["data-pg-target"]
+                for attrs in tab_triggers
+                if "pg-active" in _class_tokens(attrs)
+            ],
+            ["#sales-tab-pane"],
+        )
+        self.assertEqual(
+            [
+                target_id
+                for target_id, attrs in panes_by_id.items()
+                if "pg-active" in _class_tokens(attrs)
+            ],
+            ["sales-tab-pane"],
+        )
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
     def test_corporate_detail_lists_all_branches_with_status_badges(self) -> None:
         user = User.objects.create_user(
             username='client-detail-layout-user',
@@ -1293,8 +1382,8 @@ class ClientDetailLayoutTests(FastTenantTestCase):
         )
         self.assertContains(response, 'Sucursal activa')
         self.assertContains(response, 'Sucursal inactiva')
-        self.assertContains(response, '<span class="badge bg-success">Activo</span>')
-        self.assertContains(response, '<span class="badge bg-secondary">Inactivo</span>')
+        self.assertContains(response, '<span class="pg-badge pg-bg-success">Activo</span>')
+        self.assertContains(response, '<span class="pg-badge pg-bg-secondary">Inactivo</span>')
 
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):
@@ -1485,6 +1574,36 @@ class ClientListModeTests(FastTenantTestCase):
         self.assertContains(response, 'search=Credito+paginado')
 
 
+class ClientDesignConsistencyTests(SimpleTestCase):
+    def _read_template(self, relative_path: str) -> str:
+        return Path(settings.BASE_DIR, relative_path).read_text()
+
+    def test_client_list_uses_admin_client_search_and_table_shell(self) -> None:
+        list_template = self._read_template('clients/templates/list_clients.html')
+        table_template = self._read_template('core/templates/includes/client_table.html')
+
+        self.assertIn('class="pg-card dashboard-card pg-mb-3"', list_template)
+        self.assertIn('class="pg-row pg-gap-2 pg-align-end"', list_template)
+        self.assertIn('class="pg-card dashboard-card pg-hidden pg-d-md-block"', table_template)
+        self.assertIn('class="pg-table pg-table-hover pg-align-middle pg-mb-0', table_template)
+        self.assertIn('<thead class="pg-table-light">', table_template)
+        self.assertNotIn('search-form', list_template)
+        self.assertNotIn('pg-table-dark', table_template)
+        self.assertNotIn('pg-table-striped', table_template)
+
+    def test_client_balance_and_credit_forms_use_admin_client_form_shell(self) -> None:
+        templates = [
+            self._read_template('clients/templates/add_balance.html'),
+            self._read_template('clients/templates/pay_credit.html'),
+        ]
+
+        for template in templates:
+            self.assertIn('dashboard-card', template)
+            self.assertIn('class="pg-card-body pg-p-4"', template)
+            self.assertNotIn('pg-shadow', template)
+            self.assertNotIn('pg-card-header pg-bg-', template)
+
+
 class ClientRouteAssignmentTabTests(FastTenantTestCase):
     """Tests for managing RouteClient assignments from the client edit form."""
 
@@ -1537,6 +1656,7 @@ class ClientRouteAssignmentTabTests(FastTenantTestCase):
             'routes-0-notes': 'Visita semanal',
         }
 
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
     def test_edit_form_renders_routes_tab(self) -> None:
         response = self.client.get(f'{self._edit_url()}?tab=routes')
 
@@ -1546,6 +1666,57 @@ class ClientRouteAssignmentTabTests(FastTenantTestCase):
         self.assertContains(response, 'Fecha de inicio de ciclo')
         self.assertNotContains(response, 'Anchor date')
 
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_edit_form_tabs_follow_design_system_contract(self) -> None:
+        response = self.client.get(self._edit_url())
+
+        self.assertEqual(response.status_code, 200)
+        parser = _TabMarkupParser()
+        parser.feed(response.content.decode())
+
+        tab_triggers = [
+            attrs
+            for _, attrs in parser.tags
+            if attrs.get("data-pg-toggle") == "tab"
+        ]
+        target_ids = [
+            attrs["data-pg-target"].removeprefix("#")
+            for attrs in tab_triggers
+            if attrs.get("data-pg-target", "").startswith("#")
+        ]
+        panes_by_id = {
+            attrs["id"]: attrs
+            for _, attrs in parser.tags
+            if attrs.get("id") in target_ids
+        }
+
+        self.assertEqual(set(panes_by_id), set(target_ids))
+        self.assertEqual(
+            [
+                target_id
+                for target_id, attrs in panes_by_id.items()
+                if "pg-tab-pane" not in _class_tokens(attrs)
+            ],
+            [],
+        )
+        self.assertEqual(
+            [
+                attrs["data-pg-target"]
+                for attrs in tab_triggers
+                if "pg-active" in _class_tokens(attrs)
+            ],
+            ["#tab-basic"],
+        )
+        self.assertEqual(
+            [
+                target_id
+                for target_id, attrs in panes_by_id.items()
+                if "pg-active" in _class_tokens(attrs)
+            ],
+            ["tab-basic"],
+        )
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
     def test_route_select_only_offers_active_routes_for_new_assignment(self) -> None:
         response = self.client.get(f'{self._edit_url()}?tab=routes')
 
@@ -1575,6 +1746,7 @@ class ClientRouteAssignmentTabTests(FastTenantTestCase):
             ).exists()
         )
 
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
     def test_missing_delivery_address_keeps_user_on_routes_tab_with_errors(self) -> None:
         response = self.client.post(
             self._edit_url(),

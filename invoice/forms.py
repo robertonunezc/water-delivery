@@ -9,13 +9,13 @@ class InvoiceForm(forms.ModelForm):
         model = Invoice
         fields = ['client', 'identifier', 'folio', 'amount', 'emmited_at', 'file', 'auto_amount']
         widgets = {
-            'emmited_at': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'client': forms.Select(attrs={'class': 'form-select'}),
-            'identifier': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'SER-XXX'}),
-            'folio': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'FOL-XXX'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'file': forms.ClearableFileInput(attrs={'class': 'form-control'}),
-            'auto_amount': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'emmited_at': forms.DateInput(attrs={'type': 'date', 'class': 'pg-input'}),
+            'client': forms.Select(attrs={'class': 'pg-select'}),
+            'identifier': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'SER-XXX'}),
+            'folio': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'FOL-XXX'}),
+            'amount': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+            'file': forms.ClearableFileInput(attrs={'class': 'pg-input'}),
+            'auto_amount': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -49,7 +49,7 @@ class InvoiceOrderLinkForm(forms.ModelForm):
         model = InvoiceOrderLink
         fields = ['order']
         widgets = {
-            'order': forms.Select(attrs={'class': 'form-select'}),
+            'order': forms.Select(attrs={'class': 'pg-select'}),
         }
 
     def __init__(self, *args, **kwargs):

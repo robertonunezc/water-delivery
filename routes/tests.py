@@ -2,6 +2,7 @@ from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.test import override_settings
 from django.urls import reverse
 
 from clients.models import Address, Client, Contact
@@ -13,6 +14,16 @@ from .models import Route, RouteClient
 from .services import get_route_detail_payload
 
 User = get_user_model()
+
+
+TEST_STATIC_STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
 
 
 class RouteClientValidationTest(FastTenantTestCase):
@@ -316,6 +327,38 @@ class RouteDashboardSummaryServiceTest(FastTenantTestCase):
         self.assertEqual(count, 1)
 
 
+class RouteListDesignConsistencyTest(FastTenantTestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='route_list_user',
+            password='testpass123',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='DSN-001',
+            model='Design Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        Route.objects.create(
+            name='Design Route',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+
+    def test_route_list_uses_shared_table_shell(self):
+        self.client.login(username='route_list_user', password='testpass123')
+
+        with override_settings(STORAGES=TEST_STATIC_STORAGES):
+            response = self.client.get(reverse('routes:list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="pg-table pg-table-hover pg-align-middle pg-mb-0"')
+        self.assertContains(response, '<thead class="pg-table-light">')
+        self.assertNotContains(response, 'pg-table-bordered')
+        self.assertNotContains(response, 'pg-table-striped')
+
+
 class RouteDetailRefactorTest(FastTenantTestCase):
     def setUp(self):
         self.user = User.objects.create_user(
@@ -384,10 +427,11 @@ class RouteDetailRefactorTest(FastTenantTestCase):
         client = self.client
         client.login(username='route_user', password='testpass123')
 
-        response = client.get(
-            reverse('routes:detail', kwargs={'route_id': self.route.id}),
-            {'q': 'Norte'},
-        )
+        with override_settings(STORAGES=TEST_STATIC_STORAGES):
+            response = client.get(
+                reverse('routes:detail', kwargs={'route_id': self.route.id}),
+                {'q': 'Norte'},
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'routes/route_detail.html')

@@ -1,78 +1,81 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
     
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+    <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
     <!-- Font Awesome -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
     {% block extra_css %}{% endblock %}
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'core:home' %}">PuriGest</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
+    <div class="pg-app">
+    <nav class="pg-app-nav">
+        <div class="pg-container pg-app-nav-inner">
+            <a class="pg-brand" href="{% url 'core:home' %}">
+                <span class="pg-brand-mark"><i class="fas fa-tint"></i></span>
+                PuriGest
+            </a>
+            <button class="pg-nav-toggle" type="button" data-pg-toggle="nav" data-pg-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir navegacion">
+                <span class="pg-nav-toggle-lines"></span>
             </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
+            <div class="pg-nav-menu" id="navbarNav">
+                <ul class="pg-nav-list">
                     {% if user.is_authenticated %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'clients:list' %}">Clientes</a>
+                        <li>
+                            <a class="pg-nav-link" href="{% url 'clients:list' %}">Clientes</a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'routes:list' %}">Rutas</a>
+                        <li>
+                            <a class="pg-nav-link" href="{% url 'routes:list' %}">Rutas</a>
                         </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="reportsDropdown" role="button" data-bs-toggle="dropdown">
+                        <li class="pg-dropdown">
+                            <button class="pg-dropdown-trigger" type="button" id="reportsDropdown" data-pg-toggle="dropdown">
                                 Reportes
-                            </a>
-                            <ul class="dropdown-menu">
-                                <!-- <li><a class="dropdown-item" href="{% url 'report:client_debt' %}">Clientes con Deuda</a></li> -->
-                                 <li><a class="dropdown-item" href="{% url 'report:orders_report' %}">Pedidos</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'report:breakdown_payment_method' %}">Reporte de Hoy</a></li>
-                                    <li><hr class="dropdown-divider"></li>
-                                    <li><a class="dropdown-item" href="{% url 'report:credit_report' %}">Crédito</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'report:pending_payments' %}">Pagos Vencidos</a></li>
+                                <i class="fas fa-chevron-down pg-small"></i>
+                            </button>
+                            <ul class="pg-dropdown-menu">
+                                <li><a class="pg-dropdown-item" href="{% url 'report:orders_report' %}">Pedidos</a></li>
+                                <li><a class="pg-dropdown-item" href="{% url 'report:breakdown_payment_method' %}">Reporte de Hoy</a></li>
+                                <li><hr class="pg-dropdown-divider"></li>
+                                <li><a class="pg-dropdown-item" href="{% url 'report:credit_report' %}">Crédito</a></li>
+                                <li><a class="pg-dropdown-item" href="{% url 'report:pending_payments' %}">Pagos Vencidos</a></li>
                             </ul>
-                          
                         </li>
                         {% if user.is_staff %}
-                            <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+                            <li class="pg-dropdown">
+                                <button class="pg-dropdown-trigger" type="button" id="adminDropdown" data-pg-toggle="dropdown">
                                     Administrador
-                                </a>
-                                <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="{% url 'admin_orders' %}">Pedidos</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'admin_clients' %}">Clientes</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'admin_products' %}">Productos</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'admin_routes' %}">Rutas</a></li>
-                                    <li><a class="dropdown-item" href="{% url 'admin_invoices' %}">Facturas</a></li>
+                                    <i class="fas fa-chevron-down pg-small"></i>
+                                </button>
+                                <ul class="pg-dropdown-menu">
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin_orders' %}">Pedidos</a></li>
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin_clients' %}">Clientes</a></li>
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin_products' %}">Productos</a></li>
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin_routes' %}">Rutas</a></li>
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin_invoices' %}">Facturas</a></li>
                                 </ul>
                             </li>
                         {% endif %}
                     {% endif %}
                 </ul>
-                <ul class="navbar-nav ms-auto">
+                <ul class="pg-action-list">
                     {% if user.is_authenticated %}
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                        <li class="pg-dropdown">
+                            <button class="pg-dropdown-trigger" type="button" id="navbarDropdown" data-pg-toggle="dropdown">
                                 <i class="fas fa-user"></i> {{ user.get_full_name|default:user.username }}
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li><a class="dropdown-item" href="#">Mi Perfil</a></li>
-                                <li><hr class="dropdown-divider"></li>
+                                <i class="fas fa-chevron-down pg-small"></i>
+                            </button>
+                            <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                                <li><a class="pg-dropdown-item" href="#">Mi Perfil</a></li>
+                                <li><hr class="pg-dropdown-divider"></li>
                                 <li>
-                                    <form method="post" action="{% url 'core:logout' %}" style="display: inline;">
+                                    <form method="post" action="{% url 'core:logout' %}">
                                         {% csrf_token %}
-                                        <button type="submit" class="dropdown-item" style="background: none; border: none; cursor: pointer; width: 100%; text-align: left;">
+                                        <button type="submit" class="pg-dropdown-item">
                                             Cerrar Sesión
                                         </button>
                                     </form>
@@ -80,8 +83,8 @@
                             </ul>
                         </li>
                     {% else %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'core:login' %}">Iniciar Sesión</a>
+                        <li>
+                            <a class="pg-nav-link" href="{% url 'core:login' %}">Iniciar Sesión</a>
                         </li>
                     {% endif %}
                 </ul>
@@ -91,30 +94,29 @@
 
     <!-- Messages -->
     {% if messages %}
-        <div class="container mt-3">
+        <div class="pg-container pg-mt-3">
             {% for message in messages %}
-                <div class="alert {% if 'error' in message.tags %}alert-danger{% else %}alert-{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+                <div class="pg-alert {% if 'error' in message.tags %}pg-alert-danger{% else %}pg-alert-{{ message.tags }}{% endif %} pg-alert-dismissible" role="alert">
                     {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    <button type="button" class="pg-alert-close" data-pg-dismiss="alert"></button>
                 </div>
             {% endfor %}
         </div>
     {% endif %}
 
     <!-- Main Content -->
-    <main class="container mt-4">
+    <main class="pg-page">
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Footer -->
-    <footer class="bg-light mt-5 py-4">
-        <div class="container text-center">
+    <footer class="pg-footer">
+        <div class="pg-container">
             <p>&copy; {% now "Y" %} Gestion Purificadora. All rights reserved.</p>
         </div>
     </footer>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    </div>
+    <script src="{% static 'core/js/design-system.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

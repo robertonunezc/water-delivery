@@ -4,26 +4,26 @@
 {% block title %}Today's Route - {{ transportation.license_plate }}{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="card-title">
+<div class="pg-container-fluid">
+    <div class="pg-row">
+        <div class="pg-col-12">
+            <div class="pg-card">
+                <div class="pg-card-header pg-bg-primary pg-text-white">
+                    <h3 class="pg-card-title">
                         <i class="fas fa-route"></i> Ruta de hoy - {{ today|date:"l, F d, Y" }}
                     </h3>
-                    <div class="card-tools">
-                        <span class="badge badge-light">{{ transportation.license_plate }}</span>
+                    <div class="pg-card-tools">
+                        <span class="pg-badge pg-badge-light">{{ transportation.license_plate }}</span>
                     </div>
                 </div>
-                <div class="card-body">
+                <div class="pg-card-body">
                     <!-- Route Info -->
-                    <div class="row mb-4">
-                        <div class="col-md-6">
+                    <div class="pg-row pg-mb-4">
+                        <div class="pg-col-md-6">
                             <h5>{{ route.name }}</h5>
-                            <p class="text-muted">{{ route.description|default:"No description available" }}</p>
+                            <p class="pg-text-muted">{{ route.description|default:"No description available" }}</p>
                         </div>
-                        <div class="col-md-6 text-right">
+                        <div class="pg-col-md-6 text-right">
                             <h6>Detalles del Transporte:</h6>
                             <p>
                                 <strong>{{ transportation.license_plate }}</strong><br>
@@ -36,8 +36,8 @@
                     <!-- Today's Scheduled Orders -->
                     {% if today_orders %}
                         <h5><i class="fas fa-clipboard-list"></i> Hoy</h5>
-                        <div class="table-responsive mb-4">
-                            <table class="table table-bordered">
+                        <div class="pg-table-responsive pg-mb-4">
+                            <table class="pg-table pg-table-bordered">
                                 <thead class="thead-light">
                                     <tr>
                                         <th>#</th>
@@ -50,31 +50,31 @@
                                 </thead>
                                 <tbody>
                                     {% for route_order in today_orders %}
-                                        <tr class="{% if route_order.is_completed %}table-success{% endif %}">
+                                        <tr class="{% if route_order.is_completed %}pg-table-success{% endif %}">
                                             <td>{{ route_order.sequence }}</td>
                                             <td>
                                                 <strong>{{ route_order.client.name }}</strong><br>
                                                 {% for address in route_order.client.addresses.all %}
                                                     {% if address.active %}
-                                                        <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
+                                                        <small class="pg-text-muted">{{ address.street }}, {{ address.city }}</small>
                                                         {% if forloop.first %}{% endif %}
                                                     {% endif %}
                                                 {% endfor %}
                                             </td>
                                             <td>
                                                 Order #{{ route_order.order.id }}<br>
-                                                <small class="text-muted">${{ route_order.order.total_amount }}</small>
+                                                <small class="pg-text-muted">${{ route_order.order.total_amount }}</small>
                                             </td>
                                             <td>
                                                 {% if route_order.is_completed %}
-                                                    <span class="badge badge-success">
+                                                    <span class="pg-badge pg-badge-success">
                                                         <i class="fas fa-check"></i> Completed
                                                     </span>
                                                     {% if route_order.completed_at %}
-                                                        <br><small class="text-muted">{{ route_order.completed_at|time:"H:i" }}</small>
+                                                        <br><small class="pg-text-muted">{{ route_order.completed_at|time:"H:i" }}</small>
                                                     {% endif %}
                                                 {% else %}
-                                                    <span class="badge badge-warning">
+                                                    <span class="pg-badge pg-badge-warning">
                                                         <i class="fas fa-clock"></i> Pending
                                                     </span>
                                                 {% endif %}
@@ -82,12 +82,12 @@
                                             <td>{{ route_order.notes|default:"—" }}</td>
                                             <td>
                                                 {% if not route_order.is_completed %}
-                                                    <button class="btn btn-sm btn-success complete-order-btn" 
+                                                    <button class="pg-button pg-button-sm pg-button-success complete-order-btn" 
                                                             data-order-id="{{ route_order.id }}">
                                                         <i class="fas fa-check"></i> Marcar como Completada
                                                     </button>
                                                 {% else %}
-                                                    <span class="text-success">
+                                                    <span class="pg-text-success">
                                                         <i class="fas fa-check-circle"></i> Hecho
                                                     </span>
                                                 {% endif %}
@@ -102,8 +102,8 @@
                     <!-- Regular Clients (for manual order creation) -->
                     <h5><i class="fas fa-users"></i> Regular Clients on This Route</h5>
                     {% if regular_clients %}
-                        <div class="table-responsive">
-                            <table class="table table-bordered">
+                        <div class="pg-table-responsive">
+                            <table class="pg-table pg-table-bordered">
                                 <thead class="thead-light">
                                     <tr>
                                         <th>#</th>
@@ -121,7 +121,7 @@
                                                 <strong>{{ route_client.client.name }}</strong><br>
                                                 {% for address in route_client.client.addresses.all %}
                                                     {% if address.active %}
-                                                        <small class="text-muted">{{ address.street }}, {{ address.city }}</small>
+                                                        <small class="pg-text-muted">{{ address.street }}, {{ address.city }}</small>
                                                         {% if forloop.first %}{% endif %}
                                                     {% endif %}
                                                 {% endfor %}
@@ -131,13 +131,13 @@
                                                 {% for contact in route_client.client.contacts.all %}
                                                     {% if forloop.first %}
                                                         {{ contact.name }}<br>
-                                                        <small class="text-muted">{{ contact.phone }}</small>
+                                                        <small class="pg-text-muted">{{ contact.phone }}</small>
                                                     {% endif %}
                                                 {% endfor %}
                                             </td>
                                             <td>
                                                 <a href="/orders/create/{{ route_client.client.id }}/" 
-                                                   class="btn btn-sm btn-primary">
+                                                   class="pg-button pg-button-sm pg-button-primary">
                                                     <i class="fas fa-plus"></i> Create Order
                                                 </a>
                                             </td>
@@ -147,7 +147,7 @@
                             </table>
                         </div>
                     {% else %}
-                        <div class="alert alert-info">
+                        <div class="pg-alert pg-alert-info">
                             <h6>No regular clients</h6>
                             <p>This route doesn't have any regular clients assigned yet.</p>
                         </div>
@@ -182,18 +182,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (data.success) {
                         // Update the UI
                         const row = button.closest('tr');
-                        row.classList.add('table-success');
+                        row.classList.add('pg-table-success');
                         
                         const statusCell = row.querySelector('td:nth-child(4)');
                         statusCell.innerHTML = `
-                            <span class="badge badge-success">
+                            <span class="pg-badge pg-badge-success">
                                 <i class="fas fa-check"></i> Completed
                             </span>
-                            <br><small class="text-muted">${new Date().toLocaleTimeString()}</small>
+                            <br><small class="pg-text-muted">${new Date().toLocaleTimeString()}</small>
                         `;
                         
                         button.outerHTML = `
-                            <span class="text-success">
+                            <span class="pg-text-success">
                                 <i class="fas fa-check-circle"></i> Done
                             </span>
                         `;

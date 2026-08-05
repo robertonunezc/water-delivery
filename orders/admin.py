@@ -169,7 +169,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     
     class Media:
         css = {
-           # 'all': ('admin/css/orders_admin.css',)
+           'all': ('core/css/design-system.css', 'admin/css/orders_admin.css')
         }
         js = ('admin/js/orders_admin.js',)
     
@@ -298,15 +298,15 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     client_link.admin_order_field = 'client__name'
     
     def status_display(self, obj):
-        colors = {
-            'PENDING': '#ffc107',
-            'COMPLETED': '#28a745',
-            'CANCELLED': '#dc3545'
+        status_classes = {
+            'PENDING': 'pg-text-warning',
+            'COMPLETED': 'pg-text-success',
+            'CANCELLED': 'pg-text-danger'
         }
-        color = colors.get(obj.status, '#6c757d')
+        status_class = status_classes.get(obj.status, 'pg-text-muted')
         return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
+            '<span class="{} pg-fw-bold">{}</span>',
+            status_class,
             obj.get_status_display()
         )
     status_display.short_description = 'Estado'
@@ -319,7 +319,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     
     def total_amount_display(self, obj):
         return format_html(
-            '<strong style="color: #28a745;">${}</strong>',
+            '<strong class="pg-text-success">${}</strong>',
             obj.total_amount
         )
     total_amount_display.short_description = 'Total'
@@ -335,17 +335,17 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             for item in items
         ]
         return format_html(
-            '<div style="line-height: 1.3;">{}</div>',
+            '<div class="pg-leading-sm">{}</div>',
             mark_safe('<br>'.join(product_lines))
         )
     products_summary.short_description = 'Productos'
     
     def payment_status(self, obj):
         if obj.is_paid:
-            return format_html('<span style="color: #28a745; font-weight: bold;">✓ Pagado</span>')
+            return format_html('<span class="pg-text-success pg-fw-bold">✓ Pagado</span>')
         if obj.total_paid > 0:
-            return format_html('<span style="color: #ffc107; font-weight: bold;">⚠ Parcial</span>')
-        return format_html('<span style="color: #dc3545; font-weight: bold;">✗ Pendiente</span>')
+            return format_html('<span class="pg-text-warning pg-fw-bold">⚠ Parcial</span>')
+        return format_html('<span class="pg-text-danger pg-fw-bold">✗ Pendiente</span>')
     payment_status.short_description = 'Pago'
     
     def billing_status(self, obj):
@@ -355,7 +355,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             invoice_links = InvoiceOrderLink.objects.filter(order=obj).select_related('invoice')
             
             if not invoice_links.exists():
-                return format_html('<span style="color: #6c757d;">-</span>')
+                return format_html('<span class="pg-text-muted">-</span>')
             
             billing_info = []
             for invoice_link in invoice_links:
@@ -364,20 +364,20 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
                 
                 if invoice_link.is_paid:
                     status_icon = '✓'
-                    color = '#28a745'
+                    status_class = 'pg-text-success'
                     status_text = 'Pagado'
                 elif invoice_link.partially_paid:
                     status_icon = '⚠'
-                    color = '#ffc107'
+                    status_class = 'pg-text-warning'
                     status_text = f'Parcial ${invoice_link.amount_paid}'
                 else:
                     status_icon = '✗'
-                    color = '#dc3545'
+                    status_class = 'pg-text-danger'
                     status_text = 'Pendiente'
                 
                 billing_info.append(
-                    f'<div style="margin: 2px 0;">'
-                    f'<a href="{url}" target="_blank" style="color: {color}; text-decoration: none;" title="{status_text}">'
+                    f'<div class="pg-my-1">'
+                    f'<a href="{url}" target="_blank" class="{status_class} pg-text-decoration-none" title="{status_text}">'
                     f'{status_icon} {identifier}'
                     f'</a>'
                     f'</div>'
@@ -417,7 +417,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             )
         
         return format_html(
-            '<div style="font-family: monospace; white-space: pre-line;">{}</div>',
+            '<div class="pg-mono pg-pre-line">{}</div>',
             '\n'.join(summary)
         )
     order_summary.short_description = 'Resumen de Productos'
@@ -450,7 +450,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
                 info.append(f'  • {addr.street}, {addr.city}, {addr.state}')
         
         return format_html(
-            '<div style="line-height: 1.4;">{}</div>',
+            '<div class="pg-leading">{}</div>',
             '<br>'.join(info)
         )
     client_info_display.short_description = 'Información del Cliente'
@@ -473,7 +473,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             split_by_name = as_child.split_by.username if as_child.split_by else "N/A"
             split_date = as_child.created_at.strftime("%d/%m/%Y %H:%M")
             history.append(
-                '<div style="padding: 10px; background: #e3f2fd; border-left: 4px solid #2196f3; margin-bottom: 10px;">'
+                '<div class="pg-callout pg-callout-info pg-mb-3">'
                 '<strong>📥 Derivada de:</strong> '
                 '<a href="{}" target="_blank">Orden #{}</a><br>'
                 '<small>Dividida por: {}</small><br>'
@@ -504,10 +504,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             history.append('</ul>')
         
         if not history:
-            return format_html('<p style="color: #999;">Esta orden no tiene historial de divisiones.</p>')
+            return format_html('<p class="pg-text-muted">Esta orden no tiene historial de divisiones.</p>')
         
         return format_html(
-            '<div style="line-height: 1.6;">{}</div>',
+            '<div class="pg-leading-lg">{}</div>',
             ''.join(history)
         )
     split_history_display.short_description = 'Historial de Divisiones'
@@ -770,15 +770,15 @@ class OrderProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
     total_price_display.short_description = 'Total'
     
     def order_status(self, obj):
-        colors = {
-            'PENDING': '#ffc107',
-            'COMPLETED': '#28a745',
-            'CANCELLED': '#dc3545'
+        status_classes = {
+            'PENDING': 'pg-text-warning',
+            'COMPLETED': 'pg-text-success',
+            'CANCELLED': 'pg-text-danger'
         }
-        color = colors.get(obj.order.status, '#6c757d')
+        status_class = status_classes.get(obj.order.status, 'pg-text-muted')
         return format_html(
-            '<span style="color: {}; font-weight: bold;">{}</span>',
-            color,
+            '<span class="{} pg-fw-bold">{}</span>',
+            status_class,
             obj.order.get_status_display()
         )
     order_status.short_description = 'Estado del Pedido'
@@ -806,7 +806,7 @@ class OrderProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
         info.append(f'<strong>Total del Pedido:</strong> ${obj.order.total_amount}')
         
         return format_html(
-            '<div style="line-height: 1.4;">{}</div>',
+            '<div class="pg-leading">{}</div>',
             '<br>'.join(info)
         )
     order_info_display.short_description = 'Información del Pedido'
@@ -913,7 +913,7 @@ class OrderSplitAdmin(SoftDeleteAdminMixin, ModelAdmin):
         child_items = obj.child_order.items.select_related('product').all()
         
         summary = []
-        summary.append('<div style="font-family: monospace;">')
+        summary.append('<div class="pg-mono">')
         summary.append('<h3>📦 Orden Original #{}</h3>'.format(obj.source_order.id))
         summary.append('<ul>')
         

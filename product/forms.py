@@ -10,7 +10,7 @@ class ProductForm(forms.ModelForm):
         initial=False,
         label="Agregar para todos los clientes existentes",
         help_text="Si se activa, este producto se asignará a todos los clientes existentes con el precio base configurado.",
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        widget=forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'})
     )
 
     class Meta:
@@ -25,13 +25,13 @@ class ProductForm(forms.ModelForm):
             'active'
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'presentation': forms.TextInput(attrs={'class': 'form-control'}),
-            'unit_of_measure': forms.Select(attrs={'class': 'form-select'}),
-            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'category': forms.Select(attrs={'class': 'form-select'}),
-            'note': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'name': forms.TextInput(attrs={'class': 'pg-input'}),
+            'presentation': forms.TextInput(attrs={'class': 'pg-input'}),
+            'unit_of_measure': forms.Select(attrs={'class': 'pg-select'}),
+            'price': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+            'category': forms.Select(attrs={'class': 'pg-select'}),
+            'note': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
+            'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
 
@@ -40,10 +40,10 @@ class ProductClientPriceForm(forms.ModelForm):
         model = ProductClientPrice
         fields = ['client', 'price', 'active', 'note']
         widgets = {
-            'client': forms.Select(attrs={'class': 'form-select'}),
-            'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'note': forms.TextInput(attrs={'class': 'form-control'}),
+            'client': forms.Select(attrs={'class': 'pg-select'}),
+            'price': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+            'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'note': forms.TextInput(attrs={'class': 'pg-input'}),
         }
 
 ProductClientPriceFormSet = inlineformset_factory(

@@ -3,19 +3,19 @@
 {% block title %}No tiene transporte asignado{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h4 class="card-title mb-0">No tiene transporte asignado</h4>
+<div class="pg-container-fluid">
+    <div class="pg-row pg-justify-center">
+        <div class="pg-col-md-6">
+            <div class="pg-card">
+                <div class="pg-card-header pg-bg-warning pg-text-dark">
+                    <h4 class="pg-card-title pg-mb-0">No tiene transporte asignado</h4>
                 </div>
-                <div class="card-body text-center">
-                    <i class="fas fa-truck fa-4x text-warning mb-3"></i>
+                <div class="pg-card-body pg-text-center">
+                    <i class="fas fa-truck fa-4x pg-text-warning pg-mb-3"></i>
                     <h5>Hola {{ employee.user.get_full_name }},</h5>
                     <p>No tienes ningún transporte asignado todavía.</p>
-                    <p class="text-muted">Contacte al administrador para obtener un vehículo asignado y poder acceder a sus rutas.</p>
-                    <a href="{% url 'core:home' %}" class="btn btn-primary">Ir a Inicio</a>
+                    <p class="pg-text-muted">Contacte al administrador para obtener un vehículo asignado y poder acceder a sus rutas.</p>
+                    <a href="{% url 'core:home' %}" class="pg-button pg-button-primary">Ir a Inicio</a>
                 </div>
             </div>
         </div>

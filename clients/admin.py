@@ -124,6 +124,9 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	change_form_template = 'admin/clients/client_change_form.html'
 
 	class Media:
+		css = {
+			'all': ('core/css/design-system.css',)
+		}
 		js = (
 			'clients/admin/toggle_billing_frequency_fields.js',
 			'clients/admin/toggle_corporate_field.js',
@@ -380,11 +383,11 @@ class BalanceTransactionAdmin(ModelAdmin):
 		if obj.balance_before is None or obj.balance_after is None:
 			return '-'
 		change = obj.balance_after - obj.balance_before
-		color = 'green' if change > 0 else 'red' if change < 0 else 'blue'
+		color_class = 'pg-text-success' if change > 0 else 'pg-text-danger' if change < 0 else 'pg-text-info'
 		symbol = '+' if change > 0 else ''
 		return format_html(
-			'<span style="color: {}; font-weight: bold;">{}{:.2f}</span>',
-			color, symbol, change
+			'<span class="{} pg-fw-bold">{}{:.2f}</span>',
+			color_class, symbol, change
 		)
 	get_balance_change.short_description = 'Cambio en Saldo'
 	
@@ -459,11 +462,11 @@ class CreditTransactionAdmin(ModelAdmin):
 	def get_debt_change(self, obj):
 		"""Display the debt change with color coding"""
 		change = obj.debt_after - obj.debt_before
-		color = 'red' if change > 0 else 'green' if change < 0 else 'blue'
+		color_class = 'pg-text-danger' if change > 0 else 'pg-text-success' if change < 0 else 'pg-text-info'
 		symbol = '+' if change > 0 else ''
 		return format_html(
-			'<span style="color: {}; font-weight: bold;">{}{:.2f}</span>',
-			color, symbol, change
+			'<span class="{} pg-fw-bold">{}{:.2f}</span>',
+			color_class, symbol, change
 		)
 	get_debt_change.short_description = 'Cambio en Deuda'
 	
@@ -472,11 +475,11 @@ class CreditTransactionAdmin(ModelAdmin):
 		if obj.credit_limit_before is not None and obj.credit_limit_after is not None:
 			change = obj.credit_limit_after - obj.credit_limit_before
 			if change != 0:
-				color = 'green' if change > 0 else 'red'
+				color_class = 'pg-text-success' if change > 0 else 'pg-text-danger'
 				symbol = '+' if change > 0 else ''
 				return format_html(
-					'<span style="color: {}; font-weight: bold;">{}{:.2f}</span>',
-					color, symbol, change
+					'<span class="{} pg-fw-bold">{}{:.2f}</span>',
+					color_class, symbol, change
 				)
 		return '-'
 	get_credit_limit_change.short_description = 'Cambio en Límite'

@@ -3,47 +3,14 @@
 {% block extra_css %}
   <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-  <style>
-    .route-card {
-      transition: transform 0.2s;
-      border: 1px solid #dee2e6;
-    }
-    
-    .route-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    
-    .client-sequence {
-      background: #007bff;
-      color: white;
-      border-radius: 50%;
-      width: 25px;
-      height: 25px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.8rem;
-      font-weight: bold;
-    }
-    
-    .day-badge {
-      font-size: 0.75rem;
-      padding: 0.25rem 0.5rem;
-    }
-    
-    .search-form {
-      max-width: 500px;
-    }
-  </style>
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-4">
+  <div class="pg-container pg-mt-4">
     <!-- Header Section -->
-    <div class="row mb-4">
-      <div class="col-md-8">
-        <h1><i class="fas fa-route me-2"></i>
+    <div class="pg-row pg-mb-4">
+      <div class="pg-col-md-8">
+        <h1><i class="fas fa-route pg-me-2"></i>
           {% if employee %}
             Mis Rutas Asignadas
           {% else %}
@@ -51,14 +18,14 @@
           {% endif %}
         </h1>
         {% if has_search %}
-          <p class="text-muted mb-0">
+          <p class="pg-text-muted pg-mb-0">
             Mostrando resultados para: <strong>"{{ search_query }}"</strong>
           </p>
         {% endif %}
       </div>
-      <div class="col-md-4 text-md-end">
+      <div class="pg-col-md-4 pg-text-md-end">
         {% if user.is_staff %}
-          <a href="{% url 'admin:routes_route_add' %}" class="btn btn-primary">
+          <a href="{% url 'admin:routes_route_add' %}" class="pg-button pg-button-primary">
             <i class="fas fa-plus"></i> Nueva Ruta
           </a>
         {% endif %}
@@ -66,22 +33,22 @@
     </div>
 
     <!-- Search Form -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <form method="get" action="{% url 'routes:list' %}" class="search-form mx-auto">
-          <div class="input-group">
+    <div class="pg-row pg-mb-4">
+      <div class="pg-col-12">
+        <form method="get" action="{% url 'routes:list' %}" class="search-form pg-mx-auto">
+          <div class="pg-input-group">
             <input type="search" 
-                   class="form-control form-control-lg" 
+                   class="pg-input pg-input-lg" 
                    name="search" 
                    value="{{ search_query }}" 
                    placeholder="Buscar rutas por nombre, descripción o cliente..."
                    aria-label="Buscar rutas">
-            <button class="btn btn-primary" type="submit">
-              <i class="fas fa-search me-2"></i>Buscar
+            <button class="pg-button pg-button-primary" type="submit">
+              <i class="fas fa-search pg-me-2"></i>Buscar
             </button>
             {% if has_search %}
-              <a href="{% url 'routes:list' %}" class="btn btn-outline-secondary">
-                <i class="fas fa-times me-2"></i>Limpiar
+              <a href="{% url 'routes:list' %}" class="pg-button pg-button-outline-secondary">
+                <i class="fas fa-times pg-me-2"></i>Limpiar
               </a>
             {% endif %}
           </div>
@@ -91,8 +58,8 @@
 
     <!-- Results Info -->
     {% if total_routes > 0 %}
-      <div class="alert alert-info">
-        <i class="fas fa-info-circle me-2"></i>
+      <div class="pg-alert pg-alert-info">
+        <i class="fas fa-info-circle pg-me-2"></i>
         {% if has_search %}
           Se encontraron <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} 
           que coincide{{ total_routes|pluralize:"," }} con "<strong>{{ search_query }}</strong>"
@@ -108,68 +75,68 @@
 
     <!-- Routes List -->
     {% if routes %}
-      <div class="row">
+      <div class="pg-row">
         {% for route in routes %}
-          <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card route-card h-100">
-              <div class="card-header bg-primary text-white">
-                <h5 class="card-title mb-0">
-                  <i class="fas fa-route me-2"></i>{{ route.name }}
+          <div class="pg-col-md-6 pg-col-lg-4 pg-mb-4">
+            <div class="pg-card route-card pg-h-100">
+              <div class="pg-card-header pg-bg-primary pg-text-white">
+                <h5 class="pg-card-title pg-mb-0">
+                  <i class="fas fa-route pg-me-2"></i>{{ route.name }}
                 </h5>
               </div>
-              <div class="card-body">
+              <div class="pg-card-body">
                 {% if route.description %}
-                  <p class="card-text text-muted">{{ route.description|truncatechars:100 }}</p>
+                  <p class="pg-card-text pg-text-muted">{{ route.description|truncatechars:100 }}</p>
                 {% endif %}
                 
                 <!-- Route Stats -->
-                <div class="row text-center mb-3">
-                  <div class="col-6">
-                    <div class="border-end">
-                      <h6 class="text-primary">{{ route.route_clients.count }}</h6>
-                      <small class="text-muted">Clientes</small>
+                <div class="pg-row pg-text-center pg-mb-3">
+                  <div class="pg-col-6">
+                    <div class="pg-border-end">
+                      <h6 class="pg-text-primary">{{ route.route_clients.count }}</h6>
+                      <small class="pg-text-muted">Clientes</small>
                     </div>
                   </div>
-                  <div class="col-6">
-                    <h6 class="text-success">{{ route.route_employees.count }}</h6>
-                    <small class="text-muted">Empleados</small>
+                  <div class="pg-col-6">
+                    <h6 class="pg-text-success">{{ route.route_employees.count }}</h6>
+                    <small class="pg-text-muted">Empleados</small>
                   </div>
                 </div>
                 
                 <!-- First few clients preview -->
                 {% if route.route_clients.all %}
-                  <h6 class="fw-bold mb-2">Clientes en ruta:</h6>
-                  <div class="mb-3">
+                  <h6 class="pg-fw-bold pg-mb-2">Clientes en ruta:</h6>
+                  <div class="pg-mb-3">
                     {% for route_client in route.route_clients.all|slice:":3" %}
-                      <div class="d-flex align-items-center mb-2">
-                        <span class="client-sequence me-2">{{ route_client.sequence }}</span>
-                        <div class="flex-grow-1">
+                      <div class="pg-flex pg-align-center pg-mb-2">
+                        <span class="client-sequence pg-me-2">{{ route_client.sequence }}</span>
+                        <div class="pg-flex-grow">
                           <strong>{{ route_client.client.name }}</strong>
-                          <div class="small">
-                            <span class="badge day-badge bg-secondary">{{ route_client.get_day_to_visit_display }}</span>
-                            <span class="badge day-badge bg-info">{{ route_client.get_frecuency_display }}</span>
+                          <div class="pg-small">
+                            <span class="pg-badge day-badge pg-bg-secondary">{{ route_client.get_day_to_visit_display }}</span>
+                            <span class="pg-badge day-badge pg-bg-info">{{ route_client.get_frecuency_display }}</span>
                           </div>
                         </div>
                       </div>
                     {% endfor %}
                     {% if route.route_clients.count > 3 %}
-                      <small class="text-muted">
+                      <small class="pg-text-muted">
                         y {{ route.route_clients.count|add:"-3" }} cliente{{ route.route_clients.count|add:"-3"|pluralize }} más...
                       </small>
                     {% endif %}
                   </div>
                 {% else %}
-                  <p class="text-muted">Sin clientes asignados</p>
+                  <p class="pg-text-muted">Sin clientes asignados</p>
                 {% endif %}
               </div>
               
-              <div class="card-footer">
-                <div class="btn-group w-100" role="group">
-                  <a href="{% url 'routes:detail' route.id %}" class="btn btn-primary">
+              <div class="pg-card-footer">
+                <div class="pg-button-group pg-w-100" role="group">
+                  <a href="{% url 'routes:detail' route.id %}" class="pg-button pg-button-primary">
                     <i class="fas fa-eye"></i> Ver Ruta
                   </a>
                   {% if user.is_staff %}
-                    <a href="{% url 'admin:routes_route_change' route.id %}" class="btn btn-outline-secondary">
+                    <a href="{% url 'admin:routes_route_change' route.id %}" class="pg-button pg-button-outline-secondary">
                       <i class="fas fa-edit"></i> Editar
                     </a>
                   {% endif %}
@@ -182,18 +149,18 @@
 
       <!-- Pagination -->
       {% if routes.has_other_pages %}
-        <div class="row mt-4">
-          <div class="col-12">
+        <div class="pg-row pg-mt-4">
+          <div class="pg-col-12">
             <nav aria-label="Navegación de páginas de rutas">
-              <ul class="pagination justify-content-center">
+              <ul class="pg-pagination pg-justify-center">
                 {% if routes.has_previous %}
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page=1">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page=1">
                       <i class="fas fa-angle-double-left"></i>
                     </a>
                   </li>
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.previous_page_number }}">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.previous_page_number }}">
                       <i class="fas fa-angle-left"></i>
                     </a>
                   </li>
@@ -201,24 +168,24 @@
 
                 {% for page_num in routes.paginator.page_range %}
                   {% if page_num == routes.number %}
-                    <li class="page-item active">
-                      <span class="page-link">{{ page_num }}</span>
+                    <li class="pg-page-item pg-active">
+                      <span class="pg-page-link">{{ page_num }}</span>
                     </li>
                   {% elif page_num > routes.number|add:'-3' and page_num < routes.number|add:'3' %}
-                    <li class="page-item">
-                      <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                    <li class="pg-page-item">
+                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% endif %}
                 {% endfor %}
 
                 {% if routes.has_next %}
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.next_page_number }}">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.next_page_number }}">
                       <i class="fas fa-angle-right"></i>
                     </a>
                   </li>
-                  <li class="page-item">
-                    <a class="page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.paginator.num_pages }}">
+                  <li class="pg-page-item">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.paginator.num_pages }}">
                       <i class="fas fa-angle-double-right"></i>
                     </a>
                   </li>
@@ -231,26 +198,26 @@
 
     {% else %}
       <!-- Empty State -->
-      <div class="text-center py-5">
+      <div class="pg-text-center pg-py-5">
         {% if has_search %}
-          <i class="fas fa-search fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">No se encontraron rutas</h4>
-          <p class="text-muted">
+          <i class="fas fa-search fa-4x pg-text-muted pg-mb-3"></i>
+          <h4 class="pg-text-muted">No se encontraron rutas</h4>
+          <p class="pg-text-muted">
             No se encontraron rutas que coincidan con "<strong>{{ search_query }}</strong>"
           </p>
-          <a href="{% url 'routes:list' %}" class="btn btn-outline-primary">
-            <i class="fas fa-arrow-left me-2"></i>Ver todas las rutas
+          <a href="{% url 'routes:list' %}" class="pg-button pg-button-outline-primary">
+            <i class="fas fa-arrow-left pg-me-2"></i>Ver todas las rutas
           </a>
         {% else %}
-          <i class="fas fa-route fa-4x text-muted mb-3"></i>
-          <h4 class="text-muted">
+          <i class="fas fa-route fa-4x pg-text-muted pg-mb-3"></i>
+          <h4 class="pg-text-muted">
             {% if employee %}
               No tienes rutas asignadas
             {% else %}
               No hay rutas registradas
             {% endif %}
           </h4>
-          <p class="text-muted">
+          <p class="pg-text-muted">
             {% if employee %}
               Contacta con tu supervisor para que te asignen rutas
             {% else %}
@@ -258,7 +225,7 @@
             {% endif %}
           </p>
           {% if user.is_staff %}
-            <a href="{% url 'admin:routes_route_add' %}" class="btn btn-primary">
+            <a href="{% url 'admin:routes_route_add' %}" class="pg-button pg-button-primary">
               <i class="fas fa-plus"></i> Crear Primera Ruta
             </a>
           {% endif %}

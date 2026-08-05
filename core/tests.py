@@ -1,4 +1,7 @@
 from datetime import date
+from html.parser import HTMLParser
+import re
+from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
@@ -17,6 +20,216 @@ from .admin import EmployeeAdmin
 from . import views
 from clients.models import Client
 from tenant_client.test_utils import FastTenantTestCase
+
+
+class _HtmlTagParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.tags: list[tuple[str, dict[str, str]]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        self.tags.append((tag, {name: value or "" for name, value in attrs}))
+
+
+class DesignSystemMigrationTests(SimpleTestCase):
+    bootstrap_asset_pattern = re.compile(r"bootstrap(?:\.min)?\.(?:css|js|bundle)", re.IGNORECASE)
+    inline_style_pattern = re.compile(r"(<style\b|style=|style\.cssText|\.style\.(?:background|backgroundColor|border|borderRadius|boxShadow|color|display|font|fontSize|fontWeight|margin|opacity|padding|width))")
+    class_attribute_pattern = re.compile(r'class="([^"]*)"')
+    bootstrap_class_token_pattern = re.compile(
+        r"^(?:"
+        r"btn(?:-[a-z0-9-]+)?|card(?:-[a-z0-9-]+)?|alert(?:-[a-z0-9-]+)?|badge(?:-[a-z0-9-]+)?|"
+        r"navbar(?:-[a-z0-9-]+)?|dropdown(?:-[a-z0-9-]+)?|modal(?:-[a-z0-9-]+)?|"
+        r"container(?:-fluid)?|row|col(?:-[a-z0-9-]+)?|form-control|form-select|"
+        r"form-check(?:-[a-z0-9-]+)?|form-switch|input-group(?:-[a-z0-9-]+)?|table(?:-[a-z0-9-]+)?|"
+        r"nav(?:-[a-z0-9-]+)?|pagination|page-(?:item|link)|jumbotron|"
+        r"d-(?:none|flex|grid|block|inline|inline-block)|"
+        r"text-(?:primary|secondary|success|danger|warning|info|dark|white|muted|center|end)|"
+        r"bg-(?:primary|secondary|success|danger|warning|info|dark|light|white)|"
+        r"m[bsteyx]?-[0-5]|p[bsteyx]?-[0-5]|g(?:ap)?-[0-5]|"
+        r"justify-content-[a-z-]+|align-items-[a-z-]+|flex-[a-z-]+|"
+        r"w-100|h-100|shadow(?:-sm)?|rounded(?:-[a-z]+)?|align-middle"
+        r")$",
+        re.IGNORECASE,
+    )
+    allowed_inline_style_fragments = (
+        "display:none",
+        "display: none",
+    )
+    legacy_tile_pattern = re.compile(
+        r"\b(?:"
+        r"dashboard-kpi|kpi-(?:blue|amber|emerald|slate|red)|"
+        r"(?:debt|credit|order)-stats-card|(?:debt|credit|order)-stat-(?:item|value|label)|"
+        r"stats-card|stat-grid|stat-item|stat-value|stat-label|"
+        r"workspace-summary-card|credit-summary-card"
+        r")\b"
+    )
+
+    def _project_ui_files(self) -> list[Path]:
+        roots = [
+            settings.BASE_DIR / "core",
+            settings.BASE_DIR / "clients",
+            settings.BASE_DIR / "orders",
+            settings.BASE_DIR / "routes",
+            settings.BASE_DIR / "report",
+            settings.BASE_DIR / "product",
+            settings.BASE_DIR / "invoice",
+            settings.BASE_DIR / "tenant_client",
+            settings.BASE_DIR / "templates",
+        ]
+        files: list[Path] = []
+        for root in roots:
+            for suffix in ("*.html", "*.js", "*.css"):
+                files.extend(root.rglob(suffix))
+        return [
+            file_path
+            for file_path in files
+            if "migrations" not in file_path.parts
+            and "staticfiles" not in file_path.parts
+            and "html_template" not in file_path.parts
+        ]
+
+    def _project_python_ui_files(self) -> list[Path]:
+        roots = [
+            settings.BASE_DIR / "clients",
+            settings.BASE_DIR / "orders",
+            settings.BASE_DIR / "routes",
+            settings.BASE_DIR / "product",
+            settings.BASE_DIR / "invoice",
+            settings.BASE_DIR / "payment",
+        ]
+        files: list[Path] = []
+        for root in roots:
+            files.extend(root.rglob("*.py"))
+        return [
+            file_path
+            for file_path in files
+            if "migrations" not in file_path.parts
+            and "tests" not in file_path.parts
+            and "management" not in file_path.parts
+        ]
+
+    def _relative(self, path: Path) -> str:
+        return str(path.relative_to(settings.BASE_DIR))
+
+    def _bootstrap_class_tokens(self, content: str) -> list[str]:
+        offenders: list[str] = []
+        for class_attribute in self.class_attribute_pattern.findall(content):
+            for token in class_attribute.split():
+                if token.startswith("pg-") or token.startswith("fa"):
+                    continue
+                if token.startswith("{") or token.endswith("}") or "|" in token:
+                    continue
+                if self.bootstrap_class_token_pattern.match(token):
+                    offenders.append(token)
+        return offenders
+
+    def _legacy_tab_state_class(self, attrs: dict[str, str]) -> bool:
+        class_value = attrs.get("class", "")
+        return bool(re.search(r"%}\s*(?:show\s+)?active\s*{%", class_value))
+
+    def test_base_layouts_load_shared_design_system_assets(self) -> None:
+        base_templates = [
+            settings.BASE_DIR / "core/templates/base.html",
+            settings.BASE_DIR / "tenant_client/templates/tenant_client/base_tenant.html",
+        ]
+
+        for template_path in base_templates:
+            content = template_path.read_text()
+
+            self.assertIn("core/css/design-system.css", content, self._relative(template_path))
+            self.assertIn("core/js/design-system.js", content, self._relative(template_path))
+            self.assertNotRegex(content, self.bootstrap_asset_pattern, self._relative(template_path))
+
+    def test_project_ui_files_do_not_include_bootstrap_assets_or_inline_styles(self) -> None:
+        offenders: list[str] = []
+        for file_path in self._project_ui_files():
+            content = file_path.read_text()
+            inline_matches = [
+                match.group(0)
+                for match in self.inline_style_pattern.finditer(content)
+                if not any(fragment in match.group(0) for fragment in self.allowed_inline_style_fragments)
+            ]
+            if self.bootstrap_asset_pattern.search(content) or inline_matches:
+                offenders.append(self._relative(file_path))
+
+        self.assertEqual(offenders, [])
+
+    def test_templates_do_not_use_bootstrap_utility_or_component_classes(self) -> None:
+        offenders: list[str] = []
+        for file_path in self._project_ui_files():
+            if file_path.suffix != ".html":
+                continue
+            content = file_path.read_text()
+            if self._bootstrap_class_tokens(content):
+                offenders.append(self._relative(file_path))
+
+        self.assertEqual(offenders, [])
+
+    def test_pg_tab_triggers_target_design_system_tab_panes(self) -> None:
+        offenders: list[str] = []
+        for file_path in self._project_ui_files():
+            if file_path.suffix != ".html":
+                continue
+
+            parser = _HtmlTagParser()
+            parser.feed(file_path.read_text())
+            tab_triggers = [
+                attrs
+                for _, attrs in parser.tags
+                if attrs.get("data-pg-toggle") == "tab"
+            ]
+            target_ids = [
+                attrs["data-pg-target"].removeprefix("#")
+                for attrs in tab_triggers
+                if attrs.get("data-pg-target", "").startswith("#")
+            ]
+            panes_by_id = {
+                attrs["id"]: attrs
+                for _, attrs in parser.tags
+                if attrs.get("id") in target_ids
+            }
+
+            for trigger in tab_triggers:
+                if self._legacy_tab_state_class(trigger):
+                    offenders.append(f"{self._relative(file_path)}: legacy active tab trigger")
+
+            for target_id in target_ids:
+                pane_attrs = panes_by_id.get(target_id)
+                if pane_attrs is None:
+                    offenders.append(f"{self._relative(file_path)}: missing #{target_id}")
+                    continue
+                if "pg-tab-pane" not in pane_attrs.get("class", "").split():
+                    offenders.append(f"{self._relative(file_path)}: #{target_id} missing pg-tab-pane")
+                if self._legacy_tab_state_class(pane_attrs):
+                    offenders.append(f"{self._relative(file_path)}: #{target_id} uses legacy active state")
+
+        self.assertEqual(offenders, [])
+
+    def test_python_ui_code_does_not_emit_bootstrap_or_inline_styles(self) -> None:
+        old_ui_fragments = (
+            "<style",
+            "style=",
+            "form-control",
+            "form-select",
+            "form-check-input",
+            'class="button"',
+        )
+        offenders: list[str] = []
+        for file_path in self._project_python_ui_files():
+            content = file_path.read_text()
+            if any(fragment in content for fragment in old_ui_fragments):
+                offenders.append(self._relative(file_path))
+
+        self.assertEqual(offenders, [])
+
+    def test_summary_tiles_use_dashboard_metric_card_pattern(self) -> None:
+        offenders: list[str] = []
+        for file_path in self._project_ui_files():
+            content = file_path.read_text()
+            if self.legacy_tile_pattern.search(content):
+                offenders.append(self._relative(file_path))
+
+        self.assertEqual(offenders, [])
 
 
 class HealthCheckViewTests(SimpleTestCase):

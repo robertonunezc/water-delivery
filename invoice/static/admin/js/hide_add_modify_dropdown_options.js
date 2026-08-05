@@ -4,19 +4,19 @@
   const modifyBillingRecordBtn = document.getElementById(
     "change_id_invoice"
   );
-  modifyBillingRecordBtn.style.display = "none";
+  if (modifyBillingRecordBtn) modifyBillingRecordBtn.hidden = true;
     const addBillingRecordBtn = document.getElementById("add_id_invoice");
-    addBillingRecordBtn.style.display = "none";
+    if (addBillingRecordBtn) addBillingRecordBtn.hidden = true;
     
     const modifyOrderBtn = document.getElementById("change_id_order");
-    modifyOrderBtn.style.display = "none";
+    if (modifyOrderBtn) modifyOrderBtn.hidden = true;
     const addOrderBtn = document.getElementById("add_id_order");
-    addOrderBtn.style.display = "none";
+    if (addOrderBtn) addOrderBtn.hidden = true;
     
     const viewBillingRecordBtn = document.getElementById("view_id_invoice");
-    viewBillingRecordBtn.style.display = "none";
+    if (viewBillingRecordBtn) viewBillingRecordBtn.hidden = true;
     const viewOrderBtn = document.getElementById("view_id_order");
-    viewOrderBtn.style.display = "none";
+    if (viewOrderBtn) viewOrderBtn.hidden = true;
   
 
       });

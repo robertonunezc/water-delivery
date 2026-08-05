@@ -9,7 +9,7 @@ Base template for all tenant management pages.
 
 **Features:**
 - Dark navigation bar with tenant-specific menu
-- Responsive Bootstrap 5 layout
+- Responsive layout using the shared `pg-*` design-system utilities
 - Message notification system
 - Custom styling for tenant cards and status badges
 - Font Awesome icons throughout
@@ -250,9 +250,9 @@ All templates are fully responsive:
 - **Tablet (768px - 992px):** 2 columns for tenant cards
 - **Desktop (> 992px):** 3 columns for tenant cards
 
-Bootstrap 5 breakpoints:
-- `col-md-6` - 2 columns on medium devices
-- `col-lg-4` - 3 columns on large devices
+Design-system breakpoints:
+- `pg-col-md-6` - 2 columns on medium devices
+- `pg-col-lg-4` - 3 columns on large devices
 
 ---
 
@@ -265,8 +265,9 @@ Tested and compatible with:
 - Edge 90+
 
 **Dependencies:**
-- Bootstrap 5.3.0 (CDN)
-- Font Awesome 6.0.0 (CDN)
+- Shared `core/css/design-system.css`
+- Shared `core/js/design-system.js`
+- Font Awesome 6.0.0
 - Modern JavaScript (ES6+)
 
 ---
@@ -274,7 +275,7 @@ Tested and compatible with:
 ## Customization
 
 ### Changing Colors
-Edit the `<style>` block in `base_tenant.html`:
+Edit the tenant component rules in `core/static/core/css/design-system.css`:
 
 ```css
 .stat-card {
@@ -291,7 +292,7 @@ Edit the `<style>` block in `base_tenant.html`:
 Edit the card structure in `tenant_list.html`:
 
 ```html
-<div class="card tenant-card">
+<div class="pg-card tenant-card">
     <!-- Add your custom content here -->
 </div>
 ```
@@ -348,7 +349,7 @@ Potential improvements for the tenant management interface:
 **Cause:** CDN blocked or no internet
 **Solution:**
 1. Check network tab in browser dev tools
-2. Consider hosting Bootstrap/Font Awesome locally
+2. Keep shared UI changes in `core/static/core/css/design-system.css`
 
 ---
 

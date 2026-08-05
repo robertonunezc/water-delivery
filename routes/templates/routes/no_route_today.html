@@ -3,40 +3,40 @@
 {% block title %}No Route Today{% endblock %}
 
 {% block content %}
-<div class="container-fluid">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header bg-info text-white">
-                    <h4 class="card-title mb-0">No Route Today</h4>
+<div class="pg-container-fluid">
+    <div class="pg-row pg-justify-center">
+        <div class="pg-col-md-8">
+            <div class="pg-card">
+                <div class="pg-card-header pg-bg-info pg-text-white">
+                    <h4 class="pg-card-title pg-mb-0">No Route Today</h4>
                 </div>
-                <div class="card-body text-center">
-                    <i class="fas fa-calendar-times fa-4x text-info mb-3"></i>
+                <div class="pg-card-body pg-text-center">
+                    <i class="fas fa-calendar-times fa-4x pg-text-info pg-mb-3"></i>
                     <h5>Hola {{ employee.user.get_full_name }},</h5>
                     <p>No tienes ruta asignada para <strong>{{ today|date:"l, F d, Y" }}</strong>.</p>
                     
-                    <div class="row mt-4">
-                        <div class="col-md-6">
+                    <div class="pg-row pg-mt-4">
+                        <div class="pg-col-md-6">
                             <h6>Su transporte:</h6>
-                            <div class="alert alert-light">
+                            <div class="pg-alert pg-alert-light">
                                 <strong>{{ transportation.license_plate }}</strong><br>
                                 {{ transportation.model }}<br>
                                 Capacidad: {{ transportation.capacity_liters }}L
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="pg-col-md-6">
                             <h6>Hoy:</h6>
-                            <div class="alert alert-light">
+                            <div class="pg-alert pg-alert-light">
                                 {{ today|date:"l" }}<br>
                                 {{ today|date:"F d, Y" }}
                             </div>
                         </div>
                     </div>
                     
-                    <p class="text-muted">Contacte al administrador para configurar rutas para este día, o verifique de nuevo mañana.</p>
-                    <div class="mt-3">
-                        <a href="{% url 'routes:list' %}" class="btn btn-secondary me-2">Ver Rutas</a>
-                        <a href="{% url 'core:home' %}" class="btn btn-primary">Ir a Inicio</a>
+                    <p class="pg-text-muted">Contacte al administrador para configurar rutas para este día, o verifique de nuevo mañana.</p>
+                    <div class="pg-mt-3">
+                        <a href="{% url 'routes:list' %}" class="pg-button pg-button-secondary pg-me-2">Ver Rutas</a>
+                        <a href="{% url 'core:home' %}" class="pg-button pg-button-primary">Ir a Inicio</a>
                     </div>
                 </div>
             </div>

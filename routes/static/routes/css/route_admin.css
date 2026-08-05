@@ -1,12 +1,12 @@
 /* Route Client Admin Styles */
 
 .duplicate-assignment-warning {
-    background-color: #fff3cd !important;
-    border: 1px solid #ffeaa7 !important;
+    background-color: var(--pg-warning-soft) !important;
+    border: 1px solid color-mix(in srgb, var(--pg-warning) 24%, white) !important;
     border-radius: 4px !important;
     padding: 6px 8px !important;
     margin: 3px 0 !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: var(--pg-shadow-sm);
     position: relative;
     width: calc(100% - 40px); /* Leave space for delete button */
 }
@@ -14,25 +14,25 @@
 .duplicate-assignment-warning .help {
     margin: 2px 0 !important;
     font-weight: normal !important;
-    color: #856404 !important;
+    color: var(--pg-warning-foreground) !important;
     line-height: 1.3;
 }
 
 .route-client-inline .client-select {
-    border: 2px solid #ddd;
+    border: 2px solid var(--pg-border);
     transition: border-color 0.3s ease;
     border-radius: 4px;
 }
 
 .route-client-inline .client-select:focus {
-    border-color: #007cba;
-    box-shadow: 0 0 5px rgba(0, 124, 186, 0.3);
+    border-color: var(--pg-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--pg-primary) 18%, transparent);
     outline: none;
 }
 
 .has-conflict .client-select {
-    border-color: #e74c3c !important;
-    background-color: #fdf2f2 !important;
+    border-color: var(--pg-destructive) !important;
+    background-color: #fff1f2 !important;
 }
 
 .confirm-duplicate-checkbox {
@@ -41,10 +41,10 @@
 }
 
 .field-confirm_duplicate_assignment {
-    background-color: #f8f9fa;
+    background-color: var(--pg-muted);
     padding: 8px;
     border-radius: 4px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--pg-border);
     margin: 5px 0;
     grid-column: 1 / -2; /* Take all columns except the last one (delete button) */
     clear: both;
@@ -52,7 +52,7 @@
 
 .field-confirm_duplicate_assignment label {
     font-weight: bold;
-    color: #495057;
+    color: var(--pg-foreground);
     margin-bottom: 3px;
     display: inline-block;
     font-size: 12px;
@@ -67,7 +67,7 @@
 .compact-warning {
     font-size: 10px;
     line-height: 1.2;
-    color: #856404;
+    color: var(--pg-warning-foreground);
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -99,7 +99,7 @@
 .tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment label {
     display: inline-block !important;
     font-size: 11px;
-    color: #856404;
+    color: var(--pg-warning-foreground);
     font-weight: bold;
 }
 
@@ -124,17 +124,17 @@
 
 /* Inline form styling improvements */
 .inline-related {
-    border: 1px solid #e1e5e9;
+    border: 1px solid var(--pg-border);
     border-radius: 6px;
     margin-bottom: 10px;
-    background-color: #f8f9fa;
+    background-color: var(--pg-muted);
 }
 
 .inline-related h3 {
-    background-color: #e9ecef;
+    background-color: var(--pg-muted);
     padding: 8px 12px;
     margin: 0;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--pg-border);
     border-radius: 6px 6px 0 0;
 }
 
@@ -170,8 +170,8 @@
 
 /* When there's a conflict, show the checkbox and make it more prominent */
 .tabular tr.has-duplicate-warning .field-confirm_duplicate_assignment {
-    background: #fff3cd;
-    border: 1px solid #ffeaa7;
+    background: var(--pg-warning-soft);
+    border: 1px solid color-mix(in srgb, var(--pg-warning) 24%, white);
     border-radius: 3px;
 }
 
@@ -210,7 +210,7 @@
 .tabular tr:has(td.field-client.errors) td.field-confirm_duplicate_assignment label {
     display: inline-block !important;
     font-size: 11px;
-    color: #856404;
+    color: var(--pg-warning-foreground);
     font-weight: bold;
 }
 
@@ -225,7 +225,7 @@
 .form-row.has-client-error .field-confirm_duplicate_assignment label {
     display: inline-block !important;
     font-size: 11px;
-    color: #856404;
+    color: var(--pg-warning-foreground);
     font-weight: bold;
 }
 
@@ -233,7 +233,7 @@
     display: block;
     font-size: 10px;
     font-weight: bold;
-    color: #856404;
+    color: var(--pg-warning-foreground);
     line-height: 1.2;
     margin: 0;
 }
@@ -255,7 +255,7 @@
 
 .route-form .form-row label {
     font-weight: 600;
-    color: #333;
+    color: var(--pg-foreground);
     margin-bottom: 5px;
     display: block;
 }
@@ -265,7 +265,7 @@
 .route-form textarea {
     width: 100%;
     padding: 8px 12px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--pg-input);
     border-radius: 4px;
     font-size: 14px;
 }
@@ -273,8 +273,8 @@
 .route-form input[type="text"]:focus,
 .route-form select:focus,
 .route-form textarea:focus {
-    border-color: #007cba;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    border-color: var(--pg-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--pg-primary) 18%, transparent);
     outline: none;
 }
 
@@ -285,21 +285,21 @@
 }
 
 .messagelist .success {
-    background-color: #d4edda;
-    border-color: #c3e6cb;
-    color: #155724;
+    background-color: var(--pg-success-soft);
+    border-color: color-mix(in srgb, var(--pg-success) 24%, white);
+    color: var(--pg-success);
 }
 
 .messagelist .warning {
-    background-color: #fff3cd;
-    border-color: #ffeaa7;
-    color: #856404;
+    background-color: var(--pg-warning-soft);
+    border-color: color-mix(in srgb, var(--pg-warning) 24%, white);
+    color: var(--pg-warning-foreground);
 }
 
 .messagelist .error {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+    background-color: #fff1f2;
+    border-color: #fecdd3;
+    color: var(--pg-destructive);
 }
 
 /* Responsive adjustments */
