@@ -534,6 +534,7 @@ def _payment_history_item(payment: Any) -> dict[str, Any]:
         'status_class': _payment_status_class(payment.status),
         'order_id': payment.order.id if payment.order else None,
         'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
+        'is_credit_debt': payment.method == 'pending_credit',
         'is_positive': True,
         'object': payment,
         'created_by': payment.created_by,

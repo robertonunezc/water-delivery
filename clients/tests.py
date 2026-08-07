@@ -754,6 +754,36 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
             [payments[10].id, payments[11].id],
         )
 
+    def test_credit_order_pending_payment_paid_column_shows_debt_not_amount(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+            type='credito',
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=order,
+            amount=Decimal('100.00'),
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            '<span class="pg-badge pg-bg-warning pg-text-dark">Deuda</span>',
+            html=True,
+        )
+        self.assertNotContains(
+            response,
+            '<span class="pg-text-success">$100.00</span>',
+            html=True,
+        )
+
     def test_detail_header_renders_addresses_in_right_column(self) -> None:
         Address.objects.create(
             client=self.customer,

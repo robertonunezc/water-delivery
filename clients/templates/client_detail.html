@@ -395,7 +395,11 @@
                       </td>
                       <td class="pg-fw-bold">
                         {% if payment_data.type == 'payment' %}
-                          <span class="pg-text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                          {% if payment_data.is_credit_debt %}
+                            <span class="pg-badge pg-bg-warning pg-text-dark">Deuda</span>
+                          {% else %}
+                            <span class="pg-text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                          {% endif %}
                         {% elif payment_data.is_positive %}
                           <span class="pg-text-success">+${{ payment_data.amount|floatformat:2 }}</span>
                         {% else %}
