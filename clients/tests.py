@@ -784,6 +784,42 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
             html=True,
         )
 
+    def test_payment_history_balance_transaction_with_notes_has_note_modal_trigger(self) -> None:
+        noted_transaction = BalanceTransaction.objects.create(
+            client=self.customer,
+            transaction_type='deposit',
+            amount=Decimal('75.00'),
+            balance_before=Decimal('0.00'),
+            balance_after=Decimal('75.00'),
+            notes='Transferencia recibida folio ABC123.',
+            created_by=self.user,
+        )
+        plain_transaction = BalanceTransaction.objects.create(
+            client=self.customer,
+            transaction_type='adjustment',
+            amount=Decimal('10.00'),
+            balance_before=Decimal('75.00'),
+            balance_after=Decimal('65.00'),
+            created_by=self.user,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            f'id="payment-note-modal-balance-transaction-{noted_transaction.pk}"',
+        )
+        self.assertContains(
+            response,
+            f'aria-label="Ver nota de saldo #{noted_transaction.pk}"',
+        )
+        self.assertContains(response, 'Transferencia recibida folio ABC123.')
+        self.assertNotContains(
+            response,
+            f'id="payment-note-modal-balance-transaction-{plain_transaction.pk}"',
+        )
+
     def test_detail_header_renders_addresses_in_right_column(self) -> None:
         Address.objects.create(
             client=self.customer,

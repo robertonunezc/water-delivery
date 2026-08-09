@@ -378,7 +378,23 @@
                           <span class="pg-badge pg-bg-warning pg-text-dark">Crédito</span>
                         {% endif %}
                       </td>
-                      <td><strong>#{{ payment_data.id }}</strong></td>
+                      <td>
+                        <span class="client-order-id-cell">
+                          <strong>#{{ payment_data.id }}</strong>
+                          {% if payment_data.notes %}
+                            <button
+                              type="button"
+                              class="pg-button pg-button-sm pg-button-outline-secondary client-order-note-trigger client-payment-note-trigger"
+                              data-pg-toggle="modal"
+                              data-pg-target="#{{ payment_data.note_modal_id }}"
+                              aria-label="{{ payment_data.note_aria_label }}"
+                              title="Ver nota">
+                              <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                              <span class="pg-visually-hidden">Ver nota</span>
+                            </button>
+                          {% endif %}
+                        </span>
+                      </td>
                       <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
                       <td>
                         {% if payment_data.order_id %}
@@ -412,6 +428,23 @@
                 </tbody>
               </table>
             </div>
+            {% for payment_data in all_payment_data %}
+              {% if payment_data.notes %}
+                <div class="pg-modal pg-fade" id="{{ payment_data.note_modal_id }}" tabindex="-1" aria-labelledby="{{ payment_data.note_modal_id }}-label" aria-hidden="true">
+                  <div class="pg-modal-dialog pg-modal-dialog-centered">
+                    <div class="pg-modal-content">
+                      <div class="pg-modal-header">
+                        <h3 class="pg-modal-title pg-h5" id="{{ payment_data.note_modal_id }}-label">{{ payment_data.note_title }}</h3>
+                        <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+                      </div>
+                      <div class="pg-modal-body">
+                        {{ payment_data.notes|linebreaksbr }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+            {% endfor %}
             {% if all_payment_data.has_other_pages %}
               <nav class="pg-mt-3" aria-label="Paginación de pagos del cliente">
                 <ul class="pg-pagination pg-justify-end pg-mb-0">
