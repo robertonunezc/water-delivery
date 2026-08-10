@@ -1246,6 +1246,21 @@ class ClientDetailSelectedPaymentUiTests(FastTenantTestCase):
             f'data-cancel-url="{reverse("orders:cancel_order", args=[order.pk])}"',
         )
 
+    def test_recent_sales_completed_order_has_split_action(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        split_url = reverse('orders:split_order', args=[order.pk])
+        self.assertContains(
+            response,
+            f'<a class="pg-dropdown-item" href="{split_url}">Dividir</a>',
+        )
+
     def test_recent_sales_paid_order_has_no_payment_checkbox_or_pay_action(self) -> None:
         order = Order.objects.create(
             client=self.customer,

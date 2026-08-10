@@ -19,7 +19,7 @@ from clients.services import balance_service
 
 User = get_user_model()
 from core.models import Employee, Transport
-from orders.models import Order, OrderProduct, OrderStatus
+from orders.models import Order, OrderProduct, OrderStatus, OrderSplit
 from orders import services
 from orders.admin import OrderAdmin
 from payment.models import Payment
@@ -491,6 +491,62 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         template_source = template_path.read_text()
 
         self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 2)
+
+
+class SplitOrderViewTestCase(FastTenantTestCase):
+    """Integration tests for splitting orders."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="split_user", password="testpass")
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(name="Cliente Split")
+        self.category = ProductCategory.objects.create(name="Water Split")
+        self.product_1 = Product.objects.create(
+            name="Garrafon Split",
+            presentation="20",
+            unit_of_measure=1,
+            category=self.category,
+            price=Decimal("20.00"),
+        )
+        self.product_2 = Product.objects.create(
+            name="Botella Split",
+            presentation="1",
+            unit_of_measure=1,
+            category=self.category,
+            price=Decimal("10.00"),
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            subtotal_amount=Decimal("50.00"),
+            total_amount=Decimal("50.00"),
+        )
+        self.item_1 = OrderProduct.objects.create(
+            order=self.order,
+            product=self.product_1,
+            quantity=2,
+            unit_price=Decimal("20.00"),
+        )
+        self.item_2 = OrderProduct.objects.create(
+            order=self.order,
+            product=self.product_2,
+            quantity=1,
+            unit_price=Decimal("10.00"),
+        )
+
+    def test_split_order_redirects_to_pedidos_list_after_success(self) -> None:
+        response = self.client.post(
+            reverse("orders:split_order", args=[self.order.pk]),
+            {
+                f"quantity_{self.item_1.pk}": "1",
+                f"quantity_{self.item_2.pk}": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse("admin_orders"))
+        self.assertTrue(OrderSplit.objects.filter(source_order=self.order).exists())
 
 
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):

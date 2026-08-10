@@ -684,7 +684,6 @@ def split_order(request, order_id):
                 split_by=request.user
             )
             
-            # Redirect back to admin with success message
             from django.contrib import messages
             messages.success(
                 request,
@@ -692,7 +691,7 @@ def split_order(request, order_id):
                 f'Orden original #{order.id} actualizada con total ${order.total_amount}.'
             )
             
-            return redirect('admin:orders_order_change', order.id)
+            return redirect('admin_orders')
     else:
         form = SplitOrderForm(order=order)
     
