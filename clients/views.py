@@ -764,8 +764,6 @@ def detail(request, pk):
     snapshot_context = build_client_detail_snapshot(
         client=client,
         billing_frequency=billing_frequency,
-        route_clients=route_clients,
-        upcoming_route_orders=upcoming_route_orders,
         client_invoices=client_invoices_list,
         pending_payment_data=pending_payment_data,
         debt_percentage=debt_percentage,

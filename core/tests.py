@@ -231,6 +231,16 @@ class DesignSystemMigrationTests(SimpleTestCase):
 
         self.assertEqual(offenders, [])
 
+    def test_dropdowns_support_viewport_positioning_from_clipped_containers(self) -> None:
+        css_content = (settings.BASE_DIR / "core/static/core/css/design-system.css").read_text()
+        js_content = (settings.BASE_DIR / "core/static/core/js/design-system.js").read_text()
+
+        self.assertIn(".pg-dropdown-menu.pg-dropdown-menu-fixed", css_content)
+        self.assertIn("function hasClippingAncestor", js_content)
+        self.assertIn("function positionDropdownMenu", js_content)
+        self.assertIn("Math.max(rect.left, rect.right - menuWidth)", js_content)
+        self.assertIn("pg-dropdown-menu-fixed", js_content)
+
 
 class HealthCheckViewTests(SimpleTestCase):
     def setUp(self) -> None:

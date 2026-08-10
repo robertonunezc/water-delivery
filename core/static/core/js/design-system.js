@@ -15,26 +15,155 @@
     trigger.setAttribute("aria-expanded", isExpanded ? "true" : "false");
   }
 
+  var dropdownState = new WeakMap();
+  var dropdownGap = 6;
+  var dropdownViewportPadding = 8;
+
+  function getDropdownMenu(trigger) {
+    var controlledId = trigger.getAttribute("aria-controls");
+    if (controlledId) {
+      var controlledMenu = document.getElementById(controlledId);
+      if (controlledMenu && controlledMenu.classList.contains("pg-dropdown-menu")) {
+        return controlledMenu;
+      }
+    }
+
+    var target = closestTarget(trigger);
+    if (target && target.classList.contains("pg-dropdown-menu")) {
+      return target;
+    }
+
+    return trigger.parentElement ? trigger.parentElement.querySelector(".pg-dropdown-menu") : null;
+  }
+
+  function getDropdownTrigger(menu) {
+    var state = dropdownState.get(menu);
+    if (state && state.trigger) return state.trigger;
+    if (!menu.id) return null;
+    return document.querySelector('[data-pg-toggle="dropdown"][aria-controls="' + menu.id + '"]');
+  }
+
+  function clearDropdownPosition(menu) {
+    menu.style.removeProperty("left");
+    menu.style.removeProperty("top");
+    menu.style.removeProperty("right");
+    menu.style.removeProperty("bottom");
+    menu.style.removeProperty("min-width");
+  }
+
+  function restoreDropdownMenu(menu) {
+    var state = dropdownState.get(menu);
+    menu.classList.remove("pg-dropdown-menu-fixed");
+    clearDropdownPosition(menu);
+
+    if (!state || !state.parent || menu.parentElement === state.parent) return;
+    var nextSibling = state.nextSibling && state.nextSibling.parentElement === state.parent ? state.nextSibling : null;
+    state.parent.insertBefore(menu, nextSibling);
+  }
+
+  function hasClippingAncestor(element) {
+    var node = element.parentElement;
+    while (node && node !== document.body) {
+      var styles = window.getComputedStyle ? window.getComputedStyle(node) : null;
+      if (styles) {
+        var overflow = [styles.overflow, styles.overflowX, styles.overflowY].join(" ");
+        if (/(auto|scroll|hidden|clip)/.test(overflow)) return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function portDropdownMenu(trigger, menu) {
+    var state = dropdownState.get(menu) || {};
+    if (menu.parentElement !== document.body) {
+      state.parent = menu.parentElement;
+      state.nextSibling = menu.nextSibling;
+    }
+    state.trigger = trigger;
+    dropdownState.set(menu, state);
+
+    menu.classList.add("pg-dropdown-menu-fixed");
+    document.body.appendChild(menu);
+  }
+
+  function positionDropdownMenu(trigger, menu) {
+    if (!menu.classList.contains("pg-dropdown-menu-fixed")) return;
+
+    var rect = trigger.getBoundingClientRect();
+    var viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    var viewportHeight = document.documentElement.clientHeight || window.innerHeight;
+    var menuWidth = menu.offsetWidth;
+    var menuHeight = menu.offsetHeight;
+    var maxLeft = Math.max(dropdownViewportPadding, viewportWidth - menuWidth - dropdownViewportPadding);
+    var left = menu.classList.contains("pg-dropdown-menu-end")
+      ? Math.max(rect.left, rect.right - menuWidth)
+      : rect.left;
+    left = clamp(left, dropdownViewportPadding, maxLeft);
+
+    var belowTop = rect.bottom + dropdownGap;
+    var aboveTop = rect.top - menuHeight - dropdownGap;
+    var maxTop = Math.max(dropdownViewportPadding, viewportHeight - menuHeight - dropdownViewportPadding);
+    var top = belowTop;
+    if (belowTop + menuHeight > viewportHeight - dropdownViewportPadding && aboveTop >= dropdownViewportPadding) {
+      top = aboveTop;
+    } else {
+      top = clamp(belowTop, dropdownViewportPadding, maxTop);
+    }
+
+    menu.style.setProperty("left", Math.round(left) + "px");
+    menu.style.setProperty("top", Math.round(top) + "px");
+    menu.style.setProperty("min-width", Math.ceil(rect.width) + "px");
+  }
+
+  function positionOpenDropdowns() {
+    document.querySelectorAll(".pg-dropdown-menu.pg-open.pg-dropdown-menu-fixed").forEach(function (menu) {
+      var trigger = getDropdownTrigger(menu);
+      if (trigger) positionDropdownMenu(trigger, menu);
+    });
+  }
+
+  function openDropdownMenu(trigger, menu) {
+    menu.classList.add("pg-open");
+    setExpanded(trigger, true);
+
+    if (hasClippingAncestor(trigger)) {
+      portDropdownMenu(trigger, menu);
+      positionDropdownMenu(trigger, menu);
+    } else {
+      restoreDropdownMenu(menu);
+    }
+  }
+
+  function closeDropdownMenu(menu) {
+    menu.classList.remove("pg-open");
+    var trigger = getDropdownTrigger(menu);
+    if (trigger) setExpanded(trigger, false);
+    restoreDropdownMenu(menu);
+  }
+
   function closeDropdowns(exceptMenu) {
     document.querySelectorAll(".pg-dropdown-menu.pg-open").forEach(function (menu) {
       if (menu === exceptMenu) return;
-      menu.classList.remove("pg-open");
-      var trigger = document.querySelector('[data-pg-toggle="dropdown"][aria-controls="' + menu.id + '"]');
-      if (trigger) setExpanded(trigger, false);
+      closeDropdownMenu(menu);
     });
   }
 
   function toggleDropdown(trigger) {
-    var menu = closestTarget(trigger);
-    if (!menu) {
-      menu = trigger.parentElement ? trigger.parentElement.querySelector(".pg-dropdown-menu") : null;
-    }
+    var menu = getDropdownMenu(trigger);
     if (!menu) return;
 
     var willOpen = !menu.classList.contains("pg-open");
     closeDropdowns(menu);
-    menu.classList.toggle("pg-open", willOpen);
-    setExpanded(trigger, willOpen);
+    if (willOpen) {
+      openDropdownMenu(trigger, menu);
+    } else {
+      closeDropdownMenu(menu);
+    }
   }
 
   function toggleCollapse(trigger) {
@@ -185,6 +314,8 @@
     initializeDismissButtons();
     document.addEventListener("click", handleClick);
     document.addEventListener("keydown", handleKeydown);
+    document.addEventListener("scroll", positionOpenDropdowns, true);
+    window.addEventListener("resize", positionOpenDropdowns);
   }
 
   if (document.readyState === "loading") {

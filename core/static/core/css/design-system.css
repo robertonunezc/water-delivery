@@ -318,6 +318,16 @@ textarea:disabled,
   right: 0;
 }
 
+.pg-dropdown-menu.pg-dropdown-menu-fixed {
+  margin: 0;
+  max-width: calc(100vw - 1rem);
+  position: fixed;
+  right: auto;
+  top: auto;
+  width: max-content;
+  z-index: 90;
+}
+
 .pg-dropdown-menu.pg-open {
   display: grid;
   gap: 0.1rem;

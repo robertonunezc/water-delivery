@@ -1485,8 +1485,6 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
         return build_client_detail_snapshot(
             client=self.client_obj,
             billing_frequency=billing_frequency,
-            route_clients=self.client_obj.client_routes.filter(is_active=True),
-            upcoming_route_orders=[],
             client_invoices=client_invoices or [],
             pending_payment_data=pending_payment_data or {
                 'total_overdue_amount': Decimal('0.00'),
@@ -1509,14 +1507,18 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
             'Ver reporte de crédito',
         )
 
-    def test_snapshot_keeps_route_card_stable_when_client_has_no_route(self) -> None:
+    def test_snapshot_does_not_include_next_visit_card(self) -> None:
         snapshot = self._build_snapshot()
-        route_card = next(
-            card for card in snapshot['snapshot_cards'] if card['label'] == 'Próxima visita'
-        )
+        card_labels = [
+            card['label']
+            for card in snapshot['snapshot_cards']
+        ]
 
-        self.assertEqual(route_card['value'], 'Sin ruta')
-        self.assertEqual(route_card['note'], 'Sin ruta asignada')
+        self.assertNotIn('Próxima visita', card_labels)
+        self.assertEqual(
+            card_labels,
+            ['Saldo prepago', 'Deuda actual', 'Crédito', 'Facturación'],
+        )
 
     def test_snapshot_summarizes_credit_usage_when_credit_is_enabled(self) -> None:
         self.client_obj.credit_limit = Decimal('100.00')
