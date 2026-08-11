@@ -127,7 +127,7 @@
             <th>ID</th>
             <th>Cliente</th>
             <th>Fecha</th>
-            <th>Subtotal</th>
+            {% comment %} <th>Subtotal</th> {% endcomment %}
             <th>Descuento</th>
             <th>Total</th>
             <th>Productos</th>
@@ -156,7 +156,7 @@
                 </a>
               </td>
               <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
-              <td>${{ order.subtotal|floatformat:2 }}</td>
+              {% comment %} <td>${{ order.subtotal|floatformat:2 }}</td> {% endcomment %}
               <td>${{ order.discount|floatformat:2 }}</td>
               <td>${{ order.total_amount|floatformat:2 }}</td>
               <td>
@@ -215,7 +215,7 @@
                     {% if order.cancellation_review_required %}
                       <li><a class="pg-dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
                     {% endif %}
-                    {% if not order.is_paid %}
+                    {% if not order.is_paid and order.status == 'COMPLETED' %}
                       <li><a class="pg-dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
                     {% endif %}
                   </ul>

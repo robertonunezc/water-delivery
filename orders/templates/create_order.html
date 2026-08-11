@@ -72,14 +72,22 @@
                 <div class="pg-col-12 pg-col-md-6">
                   <div class="pg-h-100 pg-bg-light pg-rounded pg-border financial-summary-card">
                     <div class="pg-flex pg-justify-between pg-align-start">
-                      <div>
-                        <div class="pg-text-muted pg-mb-1 financial-summary-label">Crédito disponible</div>
-                        <div class="pg-fw-bold financial-summary-amount {% if client.can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% else %}pg-text-secondary{% endif %}">
-                          {% if client.can_pay_with_credit %}
-                            ${{ client.get_available_credit|floatformat:2 }}
-                          {% else %}
-                            No disponible
-                          {% endif %}
+                      <div class="pg-row pg-gap-3 pg-flex-grow financial-credit-debt-grid">
+                        <div class="pg-col-6 financial-credit-column">
+                          <div class="pg-text-muted pg-mb-1 financial-summary-label">Crédito disponible</div>
+                          <div class="pg-fw-bold financial-summary-amount {% if client.can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% else %}pg-text-secondary{% endif %}">
+                            {% if client.can_pay_with_credit %}
+                              ${{ client.get_available_credit|floatformat:2 }}
+                            {% else %}
+                              No disponible
+                            {% endif %}
+                          </div>
+                        </div>
+                        <div class="pg-col-6 financial-debt-column">
+                          <div class="pg-text-muted pg-mb-1 financial-summary-label">Deuda Actual</div>
+                          <div class="pg-fw-bold financial-summary-amount {% if client.current_debt > 0 %}pg-text-warning{% else %}pg-text-success{% endif %}">
+                            ${{ client.current_debt|floatformat:2 }}
+                          </div>
                         </div>
                       </div>
                       <div id="affordability-status" class="pg-ms-3 pg-text-end"></div>
@@ -95,34 +103,7 @@
                 </div>
               </div>
             </div>
-            <div id="client-financial-status-collapse" class="pg-collapse">
-              <div class="pg-card-body">
-                <div class="pg-row pg-gap-3">
-                  <div class="pg-col-md-4">
-                    <div class="pg-p-3 pg-bg-light pg-rounded pg-border pg-h-100">
-                      <div class="pg-small pg-text-muted">Deuda actual</div>
-                      <div class="pg-fs-5 pg-fw-bold {% if client.current_debt > 0 %}pg-text-warning{% else %}pg-text-success{% endif %}">
-                        ${{ client.current_debt|floatformat:2 }}
-                      </div>
-                    </div>
-                  </div>
-                  <div class="pg-col-md-4">
-                    <div class="pg-p-3 pg-bg-light pg-rounded pg-border pg-h-100">
-                      <div class="pg-small pg-text-muted">Límite de crédito</div>
-                      <div class="pg-fs-5 pg-fw-bold pg-text-secondary">${{ client.credit_limit|floatformat:2 }}</div>
-                    </div>
-                  </div>
-                  <div class="pg-col-md-4">
-                    <div class="pg-p-3 pg-bg-light pg-rounded pg-border pg-h-100">
-                      <div class="pg-small pg-text-muted">Tipo de compra</div>
-                      <div class="pg-fs-6 pg-fw-semibold">
-                        {% if client.can_pay_with_credit %}Saldo y crédito{% else %}Solo saldo / pago directo{% endif %}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+
           </div>
         </div>
       </div>

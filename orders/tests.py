@@ -492,6 +492,35 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
         self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 2)
 
+    def test_order_page_shows_credit_then_debt_in_two_summary_columns(self) -> None:
+        self.customer.balance = Decimal("0.00")
+        self.customer.credit_limit = Decimal("1000.00")
+        self.customer.current_debt = Decimal("125.00")
+        self.customer.can_pay_with_credit = True
+        self.customer.save(
+            update_fields=[
+                "balance",
+                "credit_limit",
+                "current_debt",
+                "can_pay_with_credit",
+            ]
+        )
+        user = self._create_user_with_employee(username="finanzas", position="manager")
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode()
+        self.assertIn("financial-credit-debt-grid", html)
+        credit_column_start = html.index("financial-credit-column")
+        debt_column_start = html.index("financial-debt-column")
+        self.assertLess(credit_column_start, debt_column_start)
+        self.assertIn("Crédito disponible", html[credit_column_start:debt_column_start])
+        self.assertIn("Deuda Actual", html[debt_column_start:])
+
 
 class SplitOrderViewTestCase(FastTenantTestCase):
     """Integration tests for splitting orders."""
