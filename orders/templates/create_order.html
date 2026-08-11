@@ -45,7 +45,7 @@
       <div class="pg-row pg-mb-4">
         <div class="pg-col-12">
           <div class="pg-card pg-border-info pg-shadow-sm">
-            <div class="pg-card-header pg-bg-info pg-text-white pg-flex pg-justify-between pg-align-center">
+            <div class="pg-card-header pg-bg-info pg-text-white pg-flex pg-justify-between pg-align-center order-workflow-header">
               <h5 class="pg-mb-0">
                 <i class="fas fa-wallet pg-me-2"></i>Estado Financiero del Cliente
               </h5>
@@ -218,8 +218,8 @@
         <div class="pg-col-12 pg-col-lg-5 pg-col-xl-4 pg-hidden pg-d-lg-block">
           <div class="order-summary-fixed">
             <!-- Order Summary Card -->
-            <div class="pg-card pg-shadow-sm pg-mb-4">
-              <div class="pg-card-header pg-bg-info pg-text-white">
+            <div class="pg-card pg-shadow-sm pg-mb-3 order-summary-card">
+              <div class="pg-card-header pg-bg-info pg-text-white order-workflow-header">
                 <h4 class="pg-mb-0">
                   <i class="fas fa-receipt pg-me-2"></i>Resumen del Pedido
                 </h4>
@@ -227,15 +227,15 @@
               <div class="pg-card-body">
                 <ul class="pg-list" id="order-summary-products">
                   {% for item in order.items.all %}
-                    <li class="pg-list-item pg-flex pg-justify-between pg-align-center pg-border-0 pg-px-0" 
-                        data-product-id="{{ item.product.id }}" 
+                    <li class="pg-list-item pg-border-0 order-summary-item"
+                        data-product-id="{{ item.product.id }}"
                         data-order-id="{{ order.pk }}">
-                      <div class="pg-flex-grow">
-                        <div class="pg-fw-bold">{{ item.product.get_full_name }}</div>
-                        <small class="pg-text-muted">Cantidad: {{ item.quantity }}</small>
+                      <div class="order-summary-details">
+                        <div class="pg-fw-bold order-summary-product">{{ item.product.get_full_name }}</div>
+                        <small class="pg-text-muted order-summary-quantity">Cantidad: {{ item.quantity }}</small>
                       </div>
-                      <div class="pg-flex pg-align-center">
-                        <span class="pg-badge pg-bg-primary pg-rounded-pill pg-me-2">${{ item.get_total_price|default:"0.00" }}</span>
+                      <div class="order-summary-actions">
+                        <span class="pg-badge pg-bg-primary pg-rounded-pill order-summary-price">${{ item.get_total_price|default:"0.00" }}</span>
                         <button type="button" 
                                 class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn pg-touch" 
                                 data-product-id="{{ item.product.id }}" 

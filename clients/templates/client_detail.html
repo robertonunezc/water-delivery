@@ -211,7 +211,8 @@
                     <th>Estado</th>
                     <th>Total</th>
                     <th>Productos</th>
-                    <th>Pago</th>
+                    <th>Transacciones</th>
+                    <th>Estado de Pagos</th>
                     <th>Acciones</th>
                   </tr>
                 </thead>
@@ -262,6 +263,19 @@
                         {% empty %}
                           <span class="pg-text-muted">Sin pago</span>
                         {% endfor %}
+                      </td>
+                      <td>
+                        {% if order.status == 'CANCELLED' %}
+                          <span class="pg-badge pg-bg-danger">Revertido</span>
+                        {% else %}
+                          <span class="pg-badge pg-bg-{% if order.is_paid %}success{% else %}warning pg-text-dark{% endif %}">
+                            {% if order.is_paid %}
+                              Pagado
+                            {% else %}
+                              Pendiente
+                            {% endif %}
+                          </span>
+                        {% endif %}
                       </td>
                       <td>
                         <div class="pg-dropdown">

@@ -2487,6 +2487,88 @@ body.pg-modal-open {
       line-height: 1.2;
     }
 
+    .order-workflow-header {
+      background: var(--pg-info);
+      border-color: var(--pg-info);
+      color: var(--pg-info-foreground);
+      padding: 0.65rem 0.85rem;
+    }
+
+    .order-workflow-header h4,
+    .order-workflow-header h5 {
+      color: inherit;
+      font-size: 0.98rem;
+      font-weight: 750;
+      line-height: 1.2;
+      margin: 0;
+    }
+
+    .order-summary-card .pg-card-body {
+      padding: 0.65rem 0.75rem;
+    }
+
+    .order-summary-card .pg-list {
+      gap: 0.25rem;
+    }
+
+    .order-summary-card .pg-list-item {
+      padding: 0.5rem 0.6rem;
+    }
+
+    .order-summary-card .order-summary-item {
+      align-items: center;
+      display: grid;
+      gap: 0.5rem;
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .order-summary-card .order-summary-details {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.6rem;
+      min-width: 0;
+    }
+
+    .order-summary-card .order-summary-actions {
+      align-items: center;
+      display: flex;
+      flex-shrink: 0;
+      gap: 0.35rem;
+    }
+
+    .order-summary-card .pg-fw-bold {
+      font-size: 0.92rem;
+      line-height: 1.2;
+      min-width: 0;
+    }
+
+    .order-summary-card small {
+      font-size: 0.78rem;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .order-summary-card .order-summary-price {
+      margin: 0;
+    }
+
+    .order-summary-card .remove-item-btn {
+      min-height: 2rem;
+      min-width: 2rem;
+      padding: 0.35rem 0.5rem;
+    }
+
+    @media (max-width: 1180px) {
+      .order-summary-card .order-summary-item {
+        grid-template-columns: 1fr;
+      }
+
+      .order-summary-card .order-summary-actions {
+        justify-content: flex-start;
+      }
+    }
+
 /* Source: orders/templates/orders/list_order.html */
 .filter-section {
       background: var(--pg-muted);

@@ -417,8 +417,8 @@ class OrderSummaryManager {
       const orderId = document.querySelector('[data-order]')?.getAttribute('data-order');
 
       if (existingItem) {
-        const productNameDiv = existingItem.querySelector('.pg-fw-bold, .pg-flex-grow > div:first-child');
-        const quantitySmall = existingItem.querySelector('small');
+        const productNameDiv = existingItem.querySelector('.order-summary-product, .pg-fw-bold, .pg-flex-grow > div:first-child');
+        const quantitySmall = existingItem.querySelector('.order-summary-quantity, small');
         const badge = existingItem.querySelector('.pg-badge');
         if (productNameDiv) productNameDiv.textContent = fullProductName;
         if (quantitySmall) quantitySmall.textContent = `Cantidad: ${quantity}`;
@@ -443,14 +443,14 @@ class OrderSummaryManager {
             </div>
           `;
         } else {
-          newItem.className = 'pg-list-item pg-flex pg-justify-between pg-align-center pg-border-0 pg-px-0';
+          newItem.className = 'pg-list-item pg-border-0 order-summary-item';
           newItem.innerHTML = `
-            <div class="pg-flex-grow">
-              <div class="pg-fw-bold">${fullProductName}</div>
-              <small class="pg-text-muted">Cantidad: ${quantity}</small>
+            <div class="order-summary-details">
+              <div class="pg-fw-bold order-summary-product">${fullProductName}</div>
+              <small class="pg-text-muted order-summary-quantity">Cantidad: ${quantity}</small>
             </div>
-            <div class="pg-flex pg-align-center">
-              <span class="pg-badge pg-bg-primary pg-rounded-pill pg-me-2">$${itemTotal}</span>
+            <div class="order-summary-actions">
+              <span class="pg-badge pg-bg-primary pg-rounded-pill order-summary-price">$${itemTotal}</span>
               <button type="button" class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn pg-touch" data-product-id="${productId}" data-order-id="${orderId}" title="Remover producto">
                 <i class="fas fa-times"></i>
               </button>
