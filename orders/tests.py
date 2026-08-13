@@ -842,6 +842,64 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
             ).exists()
         )
 
+    def test_cancel_branch_credit_order_without_override_reduces_corporate_debt(self) -> None:
+        corporate = Client.objects.create(
+            name="Corporativo reversa crédito",
+            type="corporate",
+            credit_limit=Decimal("1000.00"),
+            current_debt=Decimal("0.00"),
+            can_pay_with_credit=True,
+        )
+        branch = Client.objects.create(
+            name="Sucursal reversa crédito",
+            type="branch",
+            corporate=corporate,
+            credit_override_enabled=False,
+        )
+        order = Order.objects.create(
+            client=branch,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("500.00"),
+            type="credito",
+        )
+        pending_credit = Payment(
+            amount=Decimal("500.00"),
+            method="pending_credit",
+            client=branch,
+            order=order,
+            status="pending",
+            created_by=self.user,
+        )
+        pending_credit.save(apply_accounting=False)
+        balance_service.add_debt(
+            client=branch,
+            amount=Decimal("500.00"),
+            transaction_type="purchase",
+            user=self.user,
+            reference_order=order,
+            reference_payment=pending_credit,
+        )
+        corporate.refresh_from_db()
+        self.assertEqual(corporate.current_debt, Decimal("500.00"))
+
+        result = services.cancel_order(order=order, user=self.user)
+
+        self.assertTrue(result["success"])
+        corporate.refresh_from_db()
+        branch.refresh_from_db()
+        pending_credit.refresh_from_db()
+        self.assertEqual(corporate.current_debt, Decimal("0.00"))
+        self.assertEqual(branch.current_debt, Decimal("0.00"))
+        self.assertEqual(pending_credit.status, "reversed")
+        self.assertTrue(
+            CreditTransaction.objects.filter(
+                client=corporate,
+                reference_order=order,
+                reference_payment=pending_credit,
+                transaction_type="purchase_reversal",
+            ).exists()
+        )
+
     def test_cancel_settled_credit_order_reverses_payment_and_purchase(self) -> None:
         self.order.status = OrderStatus.COMPLETED.value
         self.order.type = "credito"
@@ -1590,6 +1648,44 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         self.assertEqual(result["credit_used"], Decimal("50.00"))
         self.assertEqual(result["balance_used"], Decimal("0"))
         mock_add_debt.assert_called_once()
+
+    def test_process_order_payment_branch_without_override_uses_corporate_credit(self) -> None:
+        """Test inherited branch credit payments use corporate credit ledger."""
+        corporate = Client.objects.create(
+            name="Corporativo helper crédito",
+            type="corporate",
+            credit_limit=Decimal("1000.00"),
+            current_debt=Decimal("0.00"),
+            can_pay_with_credit=True,
+        )
+        branch = Client.objects.create(
+            name="Sucursal helper crédito",
+            type="branch",
+            corporate=corporate,
+            balance=Decimal("0.00"),
+            credit_limit=Decimal("0.00"),
+            current_debt=Decimal("0.00"),
+            can_pay_with_credit=False,
+            credit_override_enabled=False,
+        )
+        order = Order.objects.create(
+            client=branch,
+            total_amount=Decimal("500.00"),
+        )
+
+        result = services.process_order_payment(
+            client=branch,
+            order_amount=Decimal("500.00"),
+            payment_method="credit",
+            order=order,
+        )
+
+        self.assertTrue(result["success"])
+        corporate.refresh_from_db()
+        branch.refresh_from_db()
+        self.assertEqual(corporate.current_debt, Decimal("500.00"))
+        self.assertEqual(branch.current_debt, Decimal("0.00"))
+        self.assertEqual(result["current_debt"], Decimal("500.00"))
 
     def test_process_order_payment_credit_only_insufficient(self) -> None:
         """Test payment fails when credit is insufficient and method is credit."""

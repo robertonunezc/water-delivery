@@ -284,7 +284,8 @@ def _reverse_credit_payment_transactions(
 ) -> None:
     from clients.services import balance_service
 
-    credit_payments = order.client.credit_transactions.filter(
+    credit_account = order.client.get_credit_account()
+    credit_payments = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type__in=['payment', 'payment_from_balance'],
     ).order_by('created_at', 'id')
@@ -305,7 +306,8 @@ def _reverse_credit_purchase_transactions(
 ) -> None:
     from clients.services import balance_service
 
-    credit_purchases = order.client.credit_transactions.filter(
+    credit_account = order.client.get_credit_account()
+    credit_purchases = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type='purchase',
     ).order_by('created_at', 'id')
@@ -449,6 +451,7 @@ def process_order_payment(
     """
     from clients.services import balance_service
 
+    credit_account = client.get_credit_account()
     remaining_amount = order_amount
     balance_used = Decimal("0")
     credit_used = Decimal("0")
@@ -468,7 +471,7 @@ def process_order_payment(
 
     elif payment_method == "credit":
         # Try to pay entirely with credit
-        if not client.can_pay_with_credit:
+        if not credit_account.can_pay_with_credit:
             return {
                 "success": False,
                 "error": "Cliente no puede pagar con credito",
@@ -476,10 +479,7 @@ def process_order_payment(
                 "credit_used": Decimal("0"),
             }
 
-        available_credit = max(
-            client.credit_limit - client.current_debt,
-            Decimal("0.00"),
-        )
+        available_credit = max(credit_account.get_available_credit(), Decimal("0.00"))
         if available_credit >= order_amount:
             credit_used = order_amount
             remaining_amount = Decimal("0")
@@ -499,7 +499,7 @@ def process_order_payment(
 
         # Then, use credit if needed and available
         if remaining_amount > 0:
-            if not client.can_pay_with_credit:
+            if not credit_account.can_pay_with_credit:
                 return {
                     "success": False,
                     "error": "Cliente no puede pagar con credito",
@@ -509,10 +509,7 @@ def process_order_payment(
                     "credit_available": Decimal("0"),
                 }
 
-            available_credit = max(
-                client.credit_limit - client.current_debt,
-                Decimal("0.00"),
-            )
+            available_credit = max(credit_account.get_available_credit(), Decimal("0.00"))
             credit_used = min(available_credit, remaining_amount)
             remaining_amount -= credit_used
 
@@ -524,7 +521,7 @@ def process_order_payment(
             "balance_used": Decimal("0"),
             "credit_used": Decimal("0"),
             "balance_available": client.balance,
-            "credit_available": client.get_available_credit(),
+            "credit_available": credit_account.get_available_credit(),
         }
 
     # Actually process the payment using balance_service
@@ -556,8 +553,8 @@ def process_order_payment(
         "balance_used": balance_used,
         "credit_used": credit_used,
         "remaining_balance": client.balance,
-        "current_debt": client.current_debt,
-        "available_credit": client.get_available_credit(),
+        "current_debt": credit_account.current_debt,
+        "available_credit": credit_account.get_available_credit(),
     }
 
 

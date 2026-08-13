@@ -293,7 +293,8 @@ def _reconcile_unapplied_credit_payment(
     request_user: User,
 ) -> Optional[Payment]:
     """Apply a previously recorded payment that did not reduce credit debt."""
-    accounted_payment_ids = order.client.credit_transactions.filter(
+    credit_account = order.client.get_credit_account()
+    accounted_payment_ids = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type='payment',
         reference_payment__isnull=False,
@@ -558,7 +559,8 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
             'order_status': order.status,
         }, 200
 
-    existing_purchase = order.client.credit_transactions.filter(
+    credit_account = order.client.get_credit_account()
+    existing_purchase = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type='purchase',
     ).first()

@@ -13,7 +13,7 @@ from tenant_client.test_utils import FastTenantTestCase
 
 User = get_user_model()
 
-from clients.models import Client, ClientCreditConfig
+from clients.models import Client, ClientCreditConfig, CreditTransaction
 from clients.services import balance_service
 from clients.services.pending_payment_service import client_has_overdue_credit
 from orders.models import Order
@@ -306,12 +306,223 @@ class CreditOrderSettlementTests(FastTenantTestCase):
 		self.assertEqual(self.customer.current_debt, Decimal('0.00'))
 		self.assertEqual(self.customer.get_available_credit(), 1000.0)
 
+	def test_branch_without_override_settlement_reduces_corporate_debt(self):
+		corporate = Client.objects.create(
+			name='Corporativo crédito por liquidar',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('500.00'),
+			can_pay_with_credit=True,
+		)
+		branch = Client.objects.create(
+			name='Sucursal crédito por liquidar',
+			type='branch',
+			corporate=corporate,
+			credit_override_enabled=False,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('500.00'),
+			type='credito',
+		)
+		pending_credit = Payment(
+			amount=Decimal('500.00'),
+			method='pending_credit',
+			status='pending',
+			client=branch,
+			order=order,
+			created_by=self.user,
+		)
+		pending_credit.save(apply_accounting=False)
+		CreditTransaction.objects.create(
+			client=corporate,
+			transaction_type='purchase',
+			amount=Decimal('500.00'),
+			debt_before=Decimal('0.00'),
+			debt_after=Decimal('500.00'),
+			credit_limit_before=Decimal('1000.00'),
+			credit_limit_after=Decimal('1000.00'),
+			reference_order=order,
+			reference_payment=pending_credit,
+		)
+
+		payment, error = services.settle_credit_order_payment(
+			order=order,
+			payment_method='cash',
+			amount=Decimal('500.00'),
+			request_user=self.user,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment.client, branch)
+		corporate.refresh_from_db()
+		branch.refresh_from_db()
+		pending_credit.refresh_from_db()
+		self.assertEqual(corporate.current_debt, Decimal('0.00'))
+		self.assertEqual(branch.current_debt, Decimal('0.00'))
+		self.assertEqual(pending_credit.status, 'completed')
+		self.assertTrue(
+			CreditTransaction.objects.filter(
+				client=corporate,
+				reference_order=order,
+				reference_payment=payment,
+				transaction_type='payment',
+				amount=Decimal('500.00'),
+			).exists()
+		)
+
 class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(
 			username='credit-registration-user',
 			password='testpass123',
 		)
+
+	def test_branch_without_credit_override_resolves_corporate_credit_account(self):
+		corporate = Client.objects.create(
+			name='Corporativo cuenta crédito',
+			type='corporate',
+		)
+		branch = Client.objects.create(
+			name='Sucursal hereda cuenta crédito',
+			type='branch',
+			corporate=corporate,
+			credit_override_enabled=False,
+		)
+
+		self.assertEqual(branch.get_credit_account(), corporate)
+
+	def test_branch_with_credit_override_resolves_own_credit_account(self):
+		corporate = Client.objects.create(
+			name='Corporativo no usado',
+			type='corporate',
+		)
+		branch = Client.objects.create(
+			name='Sucursal crédito propio',
+			type='branch',
+			corporate=corporate,
+			credit_override_enabled=True,
+		)
+
+		self.assertEqual(branch.get_credit_account(), branch)
+
+	def test_branch_credit_order_without_override_charges_corporate_credit(self):
+		corporate = Client.objects.create(
+			name='Corporativo crédito compartido',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+		)
+		branch = Client.objects.create(
+			name='Sucursal crédito heredado',
+			type='branch',
+			corporate=corporate,
+			credit_limit=Decimal('0.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=False,
+			credit_override_enabled=False,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('500.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 200)
+		self.assertTrue(response['success'])
+		corporate.refresh_from_db()
+		branch.refresh_from_db()
+		self.assertEqual(corporate.current_debt, Decimal('500.00'))
+		self.assertEqual(branch.current_debt, Decimal('0.00'))
+		self.assertEqual(corporate.get_available_credit(), Decimal('500.00'))
+		self.assertTrue(
+			CreditTransaction.objects.filter(
+				client=corporate,
+				reference_order=order,
+				transaction_type='purchase',
+				amount=Decimal('500.00'),
+			).exists()
+		)
+
+	def test_branch_credit_order_without_override_uses_corporate_limit(self):
+		corporate = Client.objects.create(
+			name='Corporativo límite usado',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('800.00'),
+			can_pay_with_credit=True,
+		)
+		branch = Client.objects.create(
+			name='Sucursal límite heredado',
+			type='branch',
+			corporate=corporate,
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+			credit_override_enabled=False,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('250.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 400)
+		self.assertIn('excede el límite de crédito', response['error'])
+		corporate.refresh_from_db()
+		branch.refresh_from_db()
+		self.assertEqual(corporate.current_debt, Decimal('800.00'))
+		self.assertEqual(branch.current_debt, Decimal('0.00'))
+		self.assertFalse(order.payments.exists())
+
+	def test_branch_credit_order_with_override_charges_branch_credit(self):
+		corporate = Client.objects.create(
+			name='Corporativo crédito separado',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('200.00'),
+			can_pay_with_credit=True,
+		)
+		branch = Client.objects.create(
+			name='Sucursal crédito propio',
+			type='branch',
+			corporate=corporate,
+			credit_limit=Decimal('600.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+			credit_override_enabled=True,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('500.00'),
+			type='credito',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 200)
+		self.assertTrue(response['success'])
+		corporate.refresh_from_db()
+		branch.refresh_from_db()
+		self.assertEqual(corporate.current_debt, Decimal('200.00'))
+		self.assertEqual(branch.current_debt, Decimal('500.00'))
 
 	def test_credit_order_emergency_stop_blocks_even_when_limit_is_available(self):
 		customer = Client.objects.create(
@@ -392,6 +603,41 @@ class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 				amount=Decimal('50.00'),
 			).exists()
 		)
+
+	def test_branch_without_override_overdue_lookup_uses_corporate_credit_config(self):
+		corporate = Client.objects.create(
+			name='Corporativo vencimiento heredado',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			can_pay_with_credit=True,
+		)
+		ClientCreditConfig.objects.create(
+			client=corporate,
+			payment_term_type='monthly_cutoff',
+			cutoff_day='last_day',
+		)
+		branch = Client.objects.create(
+			name='Sucursal vencimiento heredado',
+			type='branch',
+			corporate=corporate,
+			credit_override_enabled=False,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('100.00'),
+			type='credito',
+		)
+		balance_service.add_debt(
+			client=branch,
+			amount=Decimal('100.00'),
+			transaction_type='purchase',
+			reference_order=order,
+		)
+		Order.objects.filter(pk=order.pk).update(
+			order_date=timezone.now() - timedelta(days=60),
+		)
+
+		self.assertTrue(client_has_overdue_credit(branch))
 
 	def test_credit_order_fails_when_remaining_amount_exceeds_available_limit(self):
 		customer = Client.objects.create(

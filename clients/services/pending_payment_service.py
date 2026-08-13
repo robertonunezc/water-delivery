@@ -61,16 +61,15 @@ def _overdue_order_data(
     orders: list[Order],
     current_date: date,
 ) -> tuple[list[Order], Decimal, int]:
-    try:
-        credit_config = client.credit_config
-    except ClientCreditConfig.DoesNotExist:
-        return [], Decimal('0.00'), 0
-
     overdue_orders = []
     total_overdue = Decimal('0.00')
     maximum_days_overdue = 0
 
     for order in orders:
+        credit_config = order.client.get_effective_credit_config()
+        if credit_config is None:
+            continue
+
         due_date = get_order_credit_due_date(order, credit_config)
         if due_date is None or current_date <= due_date:
             continue
@@ -93,15 +92,20 @@ def _overdue_order_data(
 
 def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
     """Return due-date and overdue information for outstanding credit orders."""
-    credit_order_ids = CreditTransaction.objects.filter(
-        client=client,
+    credit_account = client.get_credit_account()
+    credit_transactions = CreditTransaction.objects.filter(
+        client=credit_account,
         transaction_type='purchase',
         reference_order__isnull=False,
-    ).values('reference_order_id')
+    )
+    if credit_account.pk != client.pk:
+        credit_transactions = credit_transactions.filter(reference_order__client=client)
+
+    credit_order_ids = credit_transactions.values('reference_order_id')
     unpaid_orders = list(
         Order.objects.active().unpaid()
-        .filter(client=client, pk__in=credit_order_ids)
-        .select_related('client', 'client__credit_config')
+        .filter(pk__in=credit_order_ids)
+        .select_related('client', 'client__credit_config', 'client__corporate')
         .prefetch_related('invoice_links__invoice')
     )
     current_date = _current_date()
@@ -110,19 +114,22 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         unpaid_orders,
         current_date,
     )
-    try:
-        credit_config = client.credit_config
-    except ClientCreditConfig.DoesNotExist:
-        credit_config = None
-
     due_dates = [
         due_date
         for order in unpaid_orders
+        for credit_config in [order.client.get_effective_credit_config()]
         if credit_config
         for due_date in [get_order_credit_due_date(order, credit_config)]
         if due_date is not None
     ]
     nearest_due_date = min(due_dates, default=None)
+    awaiting_invoice = any(
+        credit_config
+        and credit_config.payment_term_type == 'invoice_due'
+        and get_order_credit_due_date(order, credit_config) is None
+        for order in unpaid_orders
+        for credit_config in [order.client.get_effective_credit_config()]
+    )
     return {
         'total_overdue_amount': total_overdue,
         'days_overdue': days_overdue,
@@ -131,12 +138,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         'nearest_due_is_overdue': bool(
             nearest_due_date and nearest_due_date < current_date
         ),
-        'awaiting_invoice': bool(
-            unpaid_orders
-            and credit_config
-            and credit_config.payment_term_type == 'invoice_due'
-            and nearest_due_date is None
-        ),
+        'awaiting_invoice': awaiting_invoice,
     }
 
 
@@ -148,20 +150,22 @@ def client_has_overdue_credit(client: Client) -> bool:
 def get_clients_with_pending_payments() -> list[dict[str, Any]]:
     """Return active clients that have overdue credit orders."""
     clients = list(
-        Client.objects.filter(active=True, credit_config__isnull=False).select_related(
+        Client.objects.filter(active=True).select_related(
             'credit_config',
+            'corporate',
+            'corporate__credit_config',
         )
     )
     clients_map = {client.id: client for client in clients}
     credit_order_ids = CreditTransaction.objects.filter(
-        client_id__in=clients_map,
         transaction_type='purchase',
         reference_order__isnull=False,
+        reference_order__client_id__in=clients_map,
     ).values('reference_order_id')
     unpaid_orders = (
         Order.objects.active().unpaid()
         .filter(client_id__in=clients_map, pk__in=credit_order_ids)
-        .select_related('client', 'client__credit_config')
+        .select_related('client', 'client__credit_config', 'client__corporate')
         .prefetch_related('invoice_links__invoice')
     )
     orders_by_client: dict[int, list[Order]] = {}
@@ -169,10 +173,13 @@ def get_clients_with_pending_payments() -> list[dict[str, Any]]:
         orders_by_client.setdefault(order.client_id, []).append(order)
 
     last_payments = CreditTransaction.objects.filter(
-        client_id__in=clients_map,
         transaction_type='payment',
-    ).values('client_id').annotate(last_date=Max('created_at'))
-    last_payment_map = {item['client_id']: item['last_date'] for item in last_payments}
+        reference_order__client_id__in=clients_map,
+    ).values('reference_order__client_id').annotate(last_date=Max('created_at'))
+    last_payment_map = {
+        item['reference_order__client_id']: item['last_date']
+        for item in last_payments
+    }
 
     clients_data = []
     current_date = _current_date()

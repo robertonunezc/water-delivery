@@ -97,6 +97,36 @@ def _get_credit_order_ids_for_clients(client_ids: list[int]) -> list[int]:
     )
 
 
+def _get_credit_client_ids_by_order_id(client_ids: list[int]) -> dict[int, int]:
+    rows = CreditTransaction.objects.filter(
+        client_id__in=client_ids,
+        transaction_type="purchase",
+        reference_order__isnull=False,
+    ).values_list("reference_order_id", "client_id")
+    return dict(rows)
+
+
+def _get_open_credit_orders_for_client(client: Client) -> list[Order]:
+    credit_account = client.get_credit_account()
+    credit_transactions = CreditTransaction.objects.filter(
+        client=credit_account,
+        transaction_type="purchase",
+        reference_order__isnull=False,
+    )
+    if credit_account.pk != client.pk:
+        credit_transactions = credit_transactions.filter(reference_order__client=client)
+
+    credit_order_ids = credit_transactions.values("reference_order_id")
+    return list(
+        Order.objects.active()
+        .unpaid()
+        .filter(pk__in=credit_order_ids)
+        .select_related("client", "client__credit_config", "client__corporate")
+        .prefetch_related("invoice_links__invoice", "payments")
+        .order_by("order_date", "id")
+    )
+
+
 def _get_open_credit_orders_for_clients(client_ids: list[int]) -> list[Order]:
     if not client_ids:
         return []
@@ -108,8 +138,8 @@ def _get_open_credit_orders_for_clients(client_ids: list[int]) -> list[Order]:
     return list(
         Order.objects.active()
         .unpaid()
-        .filter(client_id__in=client_ids, pk__in=credit_order_ids)
-        .select_related("client", "client__credit_config")
+        .filter(pk__in=credit_order_ids)
+        .select_related("client", "client__credit_config", "client__corporate")
         .prefetch_related("invoice_links__invoice", "payments")
         .order_by("order_date", "id")
     )
@@ -130,7 +160,7 @@ def _get_credit_config(client: Client) -> ClientCreditConfig | None:
 
 
 def _get_order_due_date(order: Order) -> date | None:
-    credit_config = _get_credit_config(order.client)
+    credit_config = order.client.get_effective_credit_config()
     if credit_config is None:
         return None
     return get_order_credit_due_date(order, credit_config)
@@ -222,8 +252,9 @@ def _build_client_report_from_orders(
         (item.remaining_amount for item in order_items if item.is_overdue),
         ZERO,
     )
-    current_credit = _money(client.current_debt)
-    authorized_credit_line = _money(client.credit_limit)
+    credit_account = client.get_credit_account()
+    current_credit = _money(credit_account.current_debt)
+    authorized_credit_line = _money(credit_account.credit_limit)
     reconciliation_difference = current_credit - open_credit_total
     return ClientCreditReport(
         client=client,
@@ -254,7 +285,7 @@ def get_client_credit_report(
 ) -> ClientCreditReport:
     """Build the detailed credit report for a single client."""
     report_date = as_of or _today()
-    orders = _get_open_credit_orders_for_clients([client.pk])
+    orders = _get_open_credit_orders_for_client(client)
     return _build_client_report_from_orders(client, orders, as_of=report_date)
 
 
@@ -267,10 +298,13 @@ def get_global_credit_report(*, as_of: date | None = None) -> GlobalCreditReport
         .select_related("credit_config")
         .order_by("name")
     )
-    orders = _get_open_credit_orders_for_clients([client.pk for client in clients])
+    client_ids = [client.pk for client in clients]
+    orders = _get_open_credit_orders_for_clients(client_ids)
+    credit_client_ids_by_order_id = _get_credit_client_ids_by_order_id(client_ids)
     orders_by_client: dict[int, list[Order]] = {}
     for order in orders:
-        orders_by_client.setdefault(order.client_id, []).append(order)
+        credit_client_id = credit_client_ids_by_order_id.get(order.pk, order.client_id)
+        orders_by_client.setdefault(credit_client_id, []).append(order)
 
     rows = []
     for client in clients:
