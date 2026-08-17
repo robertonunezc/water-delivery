@@ -322,7 +322,7 @@
 				<div class="pg-tab-pane pg-fade {% if active_tab == 'credit' %}pg-show pg-active{% endif %}" id="tab-credit" role="tabpanel">
 					{% if client %}
 						{% if credit_read_only %}
-							<div class="pg-alert pg-alert-warning">La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
+							<div class="pg-alert pg-alert-warning">Crédito administrado por {{ effective_credit_account.name }}. La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
 						{% endif %}
 						<form method="post">
 							{% csrf_token %}

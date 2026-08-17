@@ -18,7 +18,10 @@ from .forms import (
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
-from clients.services.client_service import initialize_branch_credit_from_corporate
+from clients.services.client_service import (
+	initialize_branch_credit_from_corporate,
+	sync_inherited_branch_credit_from_corporate,
+)
 from routes.models import RouteClient
 from core.admin_mixins import SoftDeleteAdminMixin
 
@@ -193,6 +196,14 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 				request,
 				"⚠️ Advertencia: El cliente requiere facturación pero no se encontró un domicilio de tipo FISCAL."
 			)
+
+		if client.type == 'corporate':
+			sync_count = sync_inherited_branch_credit_from_corporate(client)
+			if sync_count:
+				messages.info(
+					request,
+					f"Se actualizaron {sync_count} sucursales que heredan crédito.",
+				)
 
 		if request.POST.get('copy_address_for_all_inlines') != 'on':
 			return

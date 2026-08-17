@@ -1,5 +1,6 @@
 from calendar import monthrange
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Optional, List
 # pyrefly: ignore [missing-import]
 from django.conf import settings
@@ -192,21 +193,42 @@ class Client(TimeStampedModel):
             raise ValidationError(errors)
 
     # Balance and Credit State Methods (pure state queries, no side effects)
-    def get_available_credit(self):
-        """Get remaining credit available"""
-        return float(self.credit_limit) - float(self.current_debt)
+    def get_credit_account(self) -> "Client":
+        """Return the client whose credit ledger applies to this client."""
+        if self.type == 'branch' and self.corporate_id and not self.credit_override_enabled:
+            return self.corporate
+        return self
+
+    def get_effective_credit_config(self) -> Optional["ClientCreditConfig"]:
+        """Return the credit terms configured on the effective credit account."""
+        try:
+            return self.get_credit_account().credit_config
+        except ObjectDoesNotExist:
+            return None
+
+    def get_available_credit(self) -> Decimal:
+        """Get remaining credit available from the effective credit account."""
+        credit_account = self.get_credit_account()
+        return (
+            Decimal(str(credit_account.credit_limit))
+            - Decimal(str(credit_account.current_debt))
+        )
     
-    def can_use_credit_for_payment(self):
+    def can_use_credit_for_payment(self) -> bool:
         """
         Check if client can use credit for payments based on their settings and available credit
         
         Returns:
             bool: True if client can use credit, False otherwise
         """
-        # If credit payment is disabled for this client
-        return self.can_pay_with_credit and self.get_available_credit() > 0
+        credit_account = self.get_credit_account()
+        return credit_account.can_pay_with_credit and self.get_available_credit() > 0
     
-    def validate_credit_payment(self, amount, note=None):
+    def validate_credit_payment(
+        self,
+        amount: Decimal,
+        note: str | None = None,
+    ) -> dict[str, object]:
         """
         Validate if a credit payment can be processed
         
@@ -217,6 +239,8 @@ class Client(TimeStampedModel):
         Returns:
             dict: Validation result with success status and error message if applicable
         """
+        amount = Decimal(str(amount))
+
         # Check if client can use credit
         if not self.can_use_credit_for_payment():
             return {
@@ -239,10 +263,11 @@ class Client(TimeStampedModel):
         has_frequency = hasattr(self, 'invoice_schedule')
         return has_frequency
         
-    def can_afford_order(self, order_amount):
+    def can_afford_order(self, order_amount: Decimal) -> bool:
         """Check if client can afford an order using balance + available credit"""
-        available_balance = self.balance
-        available_credit = 0
+        order_amount = Decimal(str(order_amount))
+        available_balance = Decimal(str(self.balance))
+        available_credit = Decimal("0.00")
         
         # Only include available credit if client can use credit for payments
         if self.can_use_credit_for_payment():

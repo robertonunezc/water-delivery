@@ -216,7 +216,8 @@ def add_debt(
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
-    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    credit_account = client.get_credit_account()
+    locked_client = Client.objects.select_for_update().get(pk=credit_account.pk)
     if transaction_type == 'purchase' and not locked_client.can_pay_with_credit:
         raise ValueError('Cliente no puede pagar con credito')
 
@@ -241,12 +242,14 @@ def add_debt(
 
     # Save client
     locked_client.save(update_fields=["current_debt", "updated_at"])
-    client.current_debt = locked_client.current_debt
+    credit_account.current_debt = locked_client.current_debt
+    if client.pk == locked_client.pk:
+        client.current_debt = locked_client.current_debt
 
     # Create transaction record
     combined_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${amount:.2f}"
     return CreditTransaction.objects.create(
-        client=client,
+        client=locked_client,
         transaction_type=transaction_type,
         amount=amount,
         debt_before=debt_before,
@@ -293,7 +296,8 @@ def pay_debt(
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
-    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    credit_account = client.get_credit_account()
+    locked_client = Client.objects.select_for_update().get(pk=credit_account.pk)
     payment_amount = min(amount, locked_client.current_debt)
 
     if payment_amount == 0:
@@ -309,12 +313,14 @@ def pay_debt(
 
     # Save client
     locked_client.save(update_fields=["current_debt", "updated_at"])
-    client.current_debt = locked_client.current_debt
+    credit_account.current_debt = locked_client.current_debt
+    if client.pk == locked_client.pk:
+        client.current_debt = locked_client.current_debt
 
     # Create transaction record
     final_notes = notes or f"{transaction_type.replace('_', ' ').title()} de ${payment_amount:.2f}"
     CreditTransaction.objects.create(
-        client=client,
+        client=locked_client,
         transaction_type=transaction_type,
         amount=payment_amount,
         debt_before=debt_before,
@@ -388,7 +394,8 @@ def reverse_credit_purchase(
     if paid_amount != amount:
         raise ValueError("No se pudo revertir completo el crédito del pedido.")
 
-    transaction = client.credit_transactions.filter(
+    credit_account = client.get_credit_account()
+    transaction = credit_account.credit_transactions.filter(
         transaction_type="purchase_reversal",
         amount=amount,
         reference_order=reference_order,
@@ -469,6 +476,12 @@ def update_credit_limit(
 
     # Save client
     client.save(update_fields=["credit_limit", "updated_at"])
+    if client.type == "corporate":
+        from clients.services.client_service import (
+            sync_inherited_branch_credit_from_corporate,
+        )
+
+        sync_inherited_branch_credit_from_corporate(client)
 
     # Create transaction record
     final_notes = (

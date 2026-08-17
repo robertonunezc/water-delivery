@@ -24,8 +24,14 @@ from .forms import (
     AddressInlineForm,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
-from .services.client_detail_service import build_client_detail_snapshot
-from .services.client_service import initialize_branch_credit_from_corporate
+from .services.client_detail_service import (
+    build_client_detail_snapshot,
+    get_client_detail_current_debt,
+)
+from .services.client_service import (
+    initialize_branch_credit_from_corporate,
+    sync_inherited_branch_credit_from_corporate,
+)
 from .services.corporate_branch_service import build_corporate_branch_workspace
 from orders.models import Order
 from payment import services as payment_services
@@ -127,8 +133,18 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     forms_override = forms_override or {}
 
     core_form = forms_override.get('core_form') or ClientCoreForm(instance=client)
+    credit_read_only = bool(
+        client
+        and client.type == 'branch'
+        and not client.credit_override_enabled
+    )
+    effective_credit_account = (
+        client.get_credit_account()
+        if client and credit_read_only
+        else client
+    )
     credit_policy_form = forms_override.get('credit_policy_form') or ClientCreditPolicyForm(
-        instance=client,
+        instance=effective_credit_account,
         prefix='credit_policy',
     )
 
@@ -148,12 +164,18 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     invoice_schedule_instance = getattr(client, 'invoice_schedule', None) if client else None
     if client and invoice_schedule_instance is None:
         invoice_schedule_instance = InvoiceSchedule(client=client)
-    credit_config_instance = getattr(client, 'credit_config', None) if client else None
-    if client and credit_config_instance is None:
+    credit_config_instance = (
+        getattr(effective_credit_account, 'credit_config', None)
+        if effective_credit_account
+        else None
+    )
+    if effective_credit_account and credit_config_instance is None:
         credit_config_instance = ClientCreditConfig(
-            client=client,
+            client=effective_credit_account,
             payment_term_type=(
-                'invoice_due' if client.requires_billing else 'monthly_cutoff'
+                'invoice_due'
+                if effective_credit_account.requires_billing
+                else 'monthly_cutoff'
             ),
         )
 
@@ -169,11 +191,6 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     )
     billing_data_disabled = not billing_enabled or billing_read_only
     billing_frequency_disabled = billing_data_disabled or not bool(client and client.requires_billing)
-    credit_read_only = bool(
-        client
-        and client.type == 'branch'
-        and not client.credit_override_enabled
-    )
 
     if billing_data_disabled:
         for field in invoice_data_form.fields.values():
@@ -207,6 +224,7 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         'billing_data_disabled': billing_data_disabled,
         'billing_frequency_disabled': billing_frequency_disabled,
         'credit_read_only': credit_read_only,
+        'effective_credit_account': effective_credit_account,
         'effective_billing_data': client.billing_info.effective.data if client else None,
         'effective_billing_address': client.billing_info.effective.address if client else None,
         'effective_billing_frequency': client.billing_info.effective.frequency if client else None,
@@ -461,7 +479,13 @@ def edit_v2(request, pk):
                 credit_config = credit_config_form.save(commit=False)
                 credit_config.client = client
                 credit_config.save()
+                sync_count = sync_inherited_branch_credit_from_corporate(client)
                 messages.success(request, 'Configuración de crédito actualizada correctamente.')
+                if sync_count:
+                    messages.info(
+                        request,
+                        f'Se actualizaron {sync_count} sucursales que heredan crédito.',
+                    )
                 if request.path.startswith('/administrador/'):
                     return redirect(f"{reverse('admin_edit_client', kwargs={'pk': client.pk})}?tab=credit")
                 return redirect(f"{reverse('clients:edit_v2', kwargs={'pk': client.pk})}?tab=credit")
@@ -759,7 +783,14 @@ def detail(request, pk):
     # Get pending payment data
     from clients.services.pending_payment_service import get_overdue_orders_for_client
     pending_payment_data = get_overdue_orders_for_client(client)
-    debt_percentage = int(client.current_debt / client.credit_limit * 100) if client.credit_limit > 0 else 0
+    detail_current_debt = get_client_detail_current_debt(client)
+    credit_account = client.get_credit_account()
+    effective_credit_config = client.get_effective_credit_config()
+    debt_percentage = (
+        int(detail_current_debt / credit_account.credit_limit * 100)
+        if credit_account.credit_limit > 0
+        else 0
+    )
     client_invoices_list = tuple(client_invoices)
     snapshot_context = build_client_detail_snapshot(
         client=client,
@@ -784,6 +815,9 @@ def detail(request, pk):
         'recent_completed_routes': recent_completed_routes,
         'client_invoices': client_invoices_list,
         'debt_percentage': debt_percentage,
+        'credit_account': credit_account,
+        'effective_credit_config': effective_credit_config,
+        'credit_is_inherited': credit_account.pk != client.pk,
         'stats': {
             'total_orders': total_orders,
             'total_spent': total_spent,

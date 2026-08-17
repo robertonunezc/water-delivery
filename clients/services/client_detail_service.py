@@ -1,13 +1,37 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 from clients.models import Client
 
+ZERO = Decimal("0.00")
+
 
 def _money(value: Any) -> str:
     return f"${float(value):.2f}"
+
+
+def _decimal(value: Any) -> Decimal:
+    return Decimal(str(value or ZERO))
+
+
+def _get_inherited_branch_debt(client: Client, credit_account: Client) -> Decimal:
+    summary = (
+        credit_account.credit_transactions.filter(reference_order__client=client)
+        .aggregate_summary()
+    )
+    debt = summary["total_purchases"] - summary["total_payments"]
+    return max(debt, ZERO)
+
+
+def get_client_detail_current_debt(client: Client) -> Decimal:
+    """Return the debt amount shown on the client detail page."""
+    credit_account = client.get_credit_account()
+    if credit_account.pk == client.pk:
+        return _decimal(client.current_debt)
+    return _get_inherited_branch_debt(client, credit_account)
 
 
 def _pending_invoice_count(client_invoices: Sequence[Any]) -> int:
@@ -57,15 +81,17 @@ def build_client_detail_snapshot(
     debt_percentage: int,
 ) -> dict[str, Any]:
     has_financial_risk = pending_payment_data.get("total_overdue_amount", 0) > 0
+    current_debt = get_client_detail_current_debt(client)
+    credit_account = client.get_credit_account()
     billing_value, billing_note, billing_tone = _next_billing_summary(
         client=client,
         billing_frequency=billing_frequency,
         client_invoices=client_invoices,
     )
-    credit_enabled = client.credit_limit > 0
+    credit_enabled = credit_account.credit_limit > 0
     credit_value = f"{debt_percentage}%" if credit_enabled else "Sin crédito"
     credit_note = (
-        f"Disponible: {_money(client.get_available_credit())} de {_money(client.credit_limit)}"
+        f"Disponible: {_money(client.get_available_credit())} de {_money(credit_account.credit_limit)}"
         if credit_enabled
         else "Sin crédito habilitado"
     )
@@ -85,15 +111,15 @@ def build_client_detail_snapshot(
             },
             {
                 "label": "Deuda actual",
-                "value": _money(client.current_debt),
+                "value": _money(current_debt),
                 "note": (
                     "Vencida"
                     if has_financial_risk
-                    else ("Pendiente" if client.current_debt > 0 else "Sin deuda")
+                    else ("Pendiente" if current_debt > 0 else "Sin deuda")
                 ),
                 "tone": (
                     "danger"
-                    if has_financial_risk or client.current_debt > 0
+                    if has_financial_risk or current_debt > 0
                     else "success"
                 ),
             },

@@ -277,6 +277,82 @@ class BranchCreditInitializationTests(FastTenantTestCase):
         self.assertEqual(branch.credit_config.max_payment_days, 35)
 
 
+class CorporateCreditPropagationTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='corporate-credit-propagation-admin',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+
+    def test_corporate_credit_edit_updates_inheriting_branches_only(self) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo sincroniza crédito',
+            type='corporate',
+            credit_limit=Decimal('100.00'),
+            can_pay_with_credit=True,
+        )
+        ClientCreditConfig.objects.create(
+            client=corporate,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='10',
+            max_payment_days=20,
+        )
+        inherited_branch = Client.objects.create(
+            name='Sucursal hereda crédito sincronizado',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+            credit_limit=Decimal('100.00'),
+            can_pay_with_credit=True,
+        )
+        ClientCreditConfig.objects.create(
+            client=inherited_branch,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='10',
+            max_payment_days=20,
+        )
+        override_branch = Client.objects.create(
+            name='Sucursal crédito propio sin sincronizar',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=True,
+            credit_limit=Decimal('55.00'),
+            can_pay_with_credit=True,
+        )
+        ClientCreditConfig.objects.create(
+            client=override_branch,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='5',
+            max_payment_days=9,
+        )
+
+        response = self.client.post(
+            reverse('clients:edit_v2', args=[corporate.pk]),
+            data={
+                'section': 'credit',
+                'credit_policy-can_pay_with_credit': 'on',
+                'credit_policy-credit_limit': '500.00',
+                'credit_config-payment_term_type': 'monthly_cutoff',
+                'credit_config-cutoff_day': '20',
+                'credit_config-max_payment_days': '45',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        inherited_branch.refresh_from_db()
+        override_branch.refresh_from_db()
+        self.assertEqual(inherited_branch.credit_limit, Decimal('500.00'))
+        self.assertFalse(inherited_branch.can_pay_with_credit)
+        self.assertEqual(inherited_branch.credit_config.cutoff_day, '20')
+        self.assertEqual(inherited_branch.credit_config.max_payment_days, 45)
+        self.assertEqual(override_branch.credit_limit, Decimal('55.00'))
+        self.assertTrue(override_branch.can_pay_with_credit)
+        self.assertEqual(override_branch.credit_config.cutoff_day, '5')
+        self.assertEqual(override_branch.credit_config.max_payment_days, 9)
+
+
 class BranchCreditTabTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
@@ -310,6 +386,39 @@ class BranchCreditTabTests(FastTenantTestCase):
             response,
             'La configuración de crédito se administra desde el corporativo',
         )
+
+    def test_branch_without_credit_override_shows_effective_corporate_credit(self) -> None:
+        self.corporate.credit_limit = Decimal('250.00')
+        self.corporate.can_pay_with_credit = False
+        self.corporate.save(
+            update_fields=['credit_limit', 'can_pay_with_credit', 'updated_at'],
+        )
+        ClientCreditConfig.objects.create(
+            client=self.corporate,
+            payment_term_type='monthly_cutoff',
+            cutoff_day='15',
+            max_payment_days=40,
+        )
+        self.branch.credit_limit = Decimal('10.00')
+        self.branch.can_pay_with_credit = True
+        self.branch.save(
+            update_fields=['credit_limit', 'can_pay_with_credit', 'updated_at'],
+        )
+        self.branch.credit_config.cutoff_day = '5'
+        self.branch.credit_config.max_payment_days = 12
+        self.branch.credit_config.save(update_fields=['cutoff_day', 'max_payment_days'])
+
+        response = self.client.get(
+            f"{reverse('clients:edit_v2', args=[self.branch.pk])}?tab=credit",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'Crédito administrado por Corporativo con facturación',
+        )
+        self.assertContains(response, 'value="250.00"')
+        self.assertContains(response, 'value="40"')
 
     def test_branch_without_credit_override_cannot_modify_its_credit(self) -> None:
         response = self.client.post(

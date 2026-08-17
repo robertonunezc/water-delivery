@@ -7,6 +7,7 @@ from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.db.models import Sum
 from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase, override_settings
 from django.urls import reverse
@@ -1477,19 +1478,44 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
     def _build_snapshot(
         self,
         *,
+        client: Client | None = None,
         billing_frequency: object | None = None,
         client_invoices: list[object] | None = None,
         pending_payment_data: dict[str, object] | None = None,
         debt_percentage: int = 0,
     ) -> dict[str, object]:
         return build_client_detail_snapshot(
-            client=self.client_obj,
+            client=client or self.client_obj,
             billing_frequency=billing_frequency,
             client_invoices=client_invoices or [],
             pending_payment_data=pending_payment_data or {
                 'total_overdue_amount': Decimal('0.00'),
             },
             debt_percentage=debt_percentage,
+        )
+
+    def _snapshot_card(
+        self,
+        snapshot: dict[str, object],
+        label: str,
+    ) -> dict[str, object]:
+        return next(
+            card
+            for card in snapshot['snapshot_cards']
+            if card['label'] == label
+        )
+
+    def _create_credit_order(
+        self,
+        *,
+        client: Client,
+        amount: Decimal,
+    ) -> Order:
+        return Order.objects.create(
+            client=client,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=amount,
+            type='credito',
         )
 
     def test_snapshot_promotes_financial_risk_only_when_overdue_amount_exists(self) -> None:
@@ -1526,12 +1552,140 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
         self.client_obj.save(update_fields=['credit_limit', 'current_debt', 'updated_at'])
 
         snapshot = self._build_snapshot(debt_percentage=20)
-        credit_card = next(
-            card for card in snapshot['snapshot_cards'] if card['label'] == 'Crédito'
-        )
+        credit_card = self._snapshot_card(snapshot, 'Crédito')
 
         self.assertEqual(credit_card['value'], '20%')
         self.assertEqual(credit_card['note'], 'Disponible: $80.00 de $100.00')
+
+    def test_snapshot_shows_inherited_branch_debt_from_corporate_credit_order(
+        self,
+    ) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo snapshot',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            current_debt=Decimal('100.00'),
+            can_pay_with_credit=True,
+        )
+        branch = Client.objects.create(
+            name='Sucursal snapshot',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal('0.00'),
+        )
+        order = self._create_credit_order(client=branch, amount=Decimal('100.00'))
+        CreditTransaction.objects.create(
+            client=corporate,
+            amount=Decimal('100.00'),
+            transaction_type='purchase',
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('100.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+        )
+
+        snapshot = self._build_snapshot(client=branch, debt_percentage=10)
+        debt_card = self._snapshot_card(snapshot, 'Deuda actual')
+
+        self.assertEqual(debt_card['value'], '$100.00')
+        self.assertEqual(debt_card['note'], 'Pendiente')
+
+    def test_snapshot_subtracts_inherited_branch_credit_payments(self) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo con pagos',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            current_debt=Decimal('60.00'),
+            can_pay_with_credit=True,
+        )
+        branch = Client.objects.create(
+            name='Sucursal con pagos',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal('0.00'),
+        )
+        order = self._create_credit_order(client=branch, amount=Decimal('100.00'))
+        CreditTransaction.objects.create(
+            client=corporate,
+            amount=Decimal('100.00'),
+            transaction_type='purchase',
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('100.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+        )
+        CreditTransaction.objects.create(
+            client=corporate,
+            amount=Decimal('40.00'),
+            transaction_type='payment',
+            debt_before=Decimal('100.00'),
+            debt_after=Decimal('60.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+        )
+
+        snapshot = self._build_snapshot(client=branch, debt_percentage=6)
+        debt_card = self._snapshot_card(snapshot, 'Deuda actual')
+
+        self.assertEqual(debt_card['value'], '$60.00')
+
+    def test_snapshot_shows_corporate_ledger_total_for_inherited_branch_debts(
+        self,
+    ) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo suma',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            current_debt=Decimal('300.00'),
+            can_pay_with_credit=True,
+        )
+        first_branch = Client.objects.create(
+            name='Sucursal uno',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+        )
+        second_branch = Client.objects.create(
+            name='Sucursal dos',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+        )
+        first_order = self._create_credit_order(
+            client=first_branch,
+            amount=Decimal('100.00'),
+        )
+        second_order = self._create_credit_order(
+            client=second_branch,
+            amount=Decimal('200.00'),
+        )
+        for order in (first_order, second_order):
+            CreditTransaction.objects.create(
+                client=corporate,
+                amount=order.total_amount,
+                transaction_type='purchase',
+                debt_before=Decimal('0.00'),
+                debt_after=order.total_amount,
+                credit_limit_before=Decimal('1000.00'),
+                credit_limit_after=Decimal('1000.00'),
+                reference_order=order,
+            )
+
+        snapshot = self._build_snapshot(client=corporate, debt_percentage=30)
+        debt_card = self._snapshot_card(snapshot, 'Deuda actual')
+        branch_purchase_total = CreditTransaction.objects.filter(
+            client=corporate,
+            reference_order__client__in=[first_branch, second_branch],
+            transaction_type='purchase',
+        ).aggregate(total=Sum('amount'))['total']
+
+        self.assertEqual(branch_purchase_total, Decimal('300.00'))
+        self.assertEqual(debt_card['value'], '$300.00')
 
     def test_snapshot_summarizes_next_billing_and_pending_invoices(self) -> None:
         self.client_obj.requires_billing = True
