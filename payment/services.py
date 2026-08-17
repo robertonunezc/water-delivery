@@ -46,7 +46,12 @@ def get_unpaid_amount(order: Order) -> Decimal:
     )
 
 
-def get_selected_unpaid_orders(client: "Client", order_ids: list[int]) -> list[Order]:
+def get_selected_unpaid_orders(
+    client: "Client",
+    order_ids: list[int],
+    *,
+    allowed_order_ids: list[int] | None = None,
+) -> list[Order]:
     """Return selected unpaid orders for a client, preserving submitted order."""
     if not order_ids:
         raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
@@ -65,16 +70,30 @@ def get_selected_unpaid_orders(client: "Client", order_ids: list[int]) -> list[O
             raise ClientOrderPaymentError(f'Pedido #{order_id} no encontrado.')
         selected_orders.append(order)
 
-    _validate_selected_orders(client=client, orders=selected_orders)
+    _validate_selected_orders(
+        client=client,
+        orders=selected_orders,
+        allowed_order_ids=allowed_order_ids,
+    )
     return selected_orders
 
 
-def _validate_selected_orders(client: "Client", orders: list[Order]) -> None:
+def _validate_selected_orders(
+    client: "Client",
+    orders: list[Order],
+    *,
+    allowed_order_ids: list[int] | None = None,
+) -> None:
     if not orders:
         raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
 
+    allowed_ids = set(allowed_order_ids or [])
     for order in orders:
-        if order.client_id != client.id:
+        if allowed_order_ids is not None and order.pk not in allowed_ids:
+            raise ClientOrderPaymentError(
+                f'El pedido #{order.id} no pertenece al alcance seleccionado.'
+            )
+        if allowed_order_ids is None and order.client_id != client.id:
             raise ClientOrderPaymentError(f'El pedido #{order.id} no pertenece al cliente.')
         if order.status == OrderStatus.CANCELLED.value:
             raise ClientOrderPaymentError(f'El pedido #{order.id} está cancelado.')
@@ -89,11 +108,14 @@ def pay_client_orders(
     payment_method: str,
     amount: Decimal,
     request_user: User,
+    allowed_order_ids: list[int] | None = None,
+    payment_client: "Client | None" = None,
 ) -> dict[str, object]:
     """Pay selected unpaid client orders and add overpayment to balance."""
     selected_orders = get_selected_unpaid_orders(
         client=client,
         order_ids=[order.id for order in orders],
+        allowed_order_ids=allowed_order_ids,
     )
     amount = Decimal(str(amount))
     selected_total = sum(
@@ -121,6 +143,7 @@ def pay_client_orders(
                 payment_method=payment_method,
                 amount=order_amount,
                 request_user=request_user,
+                payment_client=payment_client,
             )
         else:
             payment, error = process_single_payment(
@@ -128,6 +151,7 @@ def pay_client_orders(
                 payment_method=payment_method,
                 amount=order_amount,
                 request_user=request_user,
+                payment_client=payment_client,
             )
         if error:
             raise ClientOrderPaymentError(error['error'])
@@ -198,6 +222,7 @@ def process_single_payment(
     amount: Decimal,
     request_user: User,
     credit_note: Optional[str] = None,
+    payment_client: "Client | None" = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Process and persist one payment for an order."""
     if payment_method not in VALID_SETTLEMENT_METHODS:
@@ -205,7 +230,7 @@ def process_single_payment(
             'error': 'Método de pago inválido para este flujo.'
         }
 
-    client = order.client
+    client = payment_client or order.client
 
     if payment_method == 'balance' and client.balance < amount:
         return None, {
@@ -237,6 +262,7 @@ def settle_credit_order_payment(
     payment_method: str,
     amount: Decimal,
     request_user: User,
+    payment_client: "Client | None" = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Record a credit-order payment and reduce the client's debt atomically."""
     pending_credit = order.payments.select_for_update().filter(
@@ -267,6 +293,7 @@ def settle_credit_order_payment(
         payment_method=payment_method,
         amount=amount,
         request_user=request_user,
+        payment_client=payment_client,
     )
     if error:
         return None, error

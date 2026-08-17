@@ -1121,6 +1121,69 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
 
         self.assertEqual([order.pk for order in orders], [selectable.pk])
 
+    def test_pay_client_orders_allows_corporate_scope_for_branch_credit_orders(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+        from payment import services as payment_services
+
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        allowed_orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        result = payment_services.pay_client_orders(
+            client=self.corporate,
+            orders=[order],
+            payment_method='cash',
+            amount=Decimal('100.00'),
+            request_user=self.user,
+            allowed_order_ids=[allowed_order.pk for allowed_order in allowed_orders],
+        )
+
+        self.assertEqual(result['selected_total'], Decimal('100.00'))
+        self.corporate.refresh_from_db()
+        self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
+        self.assertTrue(order.payments.filter(method='cash', client=self.branch).exists())
+
+    def test_corporate_balance_payment_spends_corporate_balance_for_branch_order(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+        from payment import services as payment_services
+
+        self.corporate.balance = Decimal('120.00')
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['balance', 'current_debt', 'updated_at'])
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        allowed_orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        payment_services.pay_client_orders(
+            client=self.corporate,
+            orders=[order],
+            payment_method='balance',
+            amount=Decimal('100.00'),
+            request_user=self.user,
+            allowed_order_ids=[allowed_order.pk for allowed_order in allowed_orders],
+            payment_client=self.corporate,
+        )
+
+        self.corporate.refresh_from_db()
+        self.branch.refresh_from_db()
+        self.assertEqual(self.corporate.balance, Decimal('20.00'))
+        self.assertEqual(self.branch.balance, Decimal('0.00'))
+        self.assertTrue(order.payments.filter(method='balance', client=self.corporate).exists())
+
 
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
     def setUp(self) -> None:

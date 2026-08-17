@@ -464,7 +464,7 @@ Pass `allowed_order_ids` into `get_selected_unpaid_orders(...)`, and pass `payme
 
 - [ ] **Step 4: Run tests to verify they pass**
 
-Run: `.venv/bin/python manage.py test clients.tests.ClientCreditManagementOrderScopeTests clients.tests.ClientOrderPaymentServiceTests payment.tests.CreditOrderSettlementTests --verbosity 1 --noinput`
+Run: `.venv/bin/python manage.py test clients.tests.ClientCreditManagementOrderScopeTests clients.tests.ClientSelectedOrderPaymentServiceTests payment.tests.CreditOrderSettlementTests --verbosity 1 --noinput`
 
 Expected: PASS.
 
@@ -817,7 +817,7 @@ Expected: PASS.
 
 - [ ] **Step 5: Run broader related tests**
 
-Run: `.venv/bin/python manage.py test clients.tests.ClientOrderPaymentServiceTests clients.tests.ClientSelectedOrderPaymentViewTests payment.tests.CreditOrderSettlementTests payment.tests.CreditOrderRegistrationRuleTests orders.tests.ProcessOrderPaymentTestCase --verbosity 1 --noinput`
+Run: `.venv/bin/python manage.py test clients.tests.ClientSelectedOrderPaymentServiceTests clients.tests.ClientSelectedOrderPaymentViewTests payment.tests.CreditOrderSettlementTests payment.tests.CreditOrderRegistrationRuleTests orders.tests.ProcessOrderPaymentTestCase --verbosity 1 --noinput`
 
 Expected: PASS.
 
