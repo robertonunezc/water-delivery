@@ -1362,7 +1362,7 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'name="orders" value="{order.pk}"')
         self.assertContains(response, 'Total pedidos seleccionados')
-        self.assertContains(response, 'Monto agregado - total pedidos seleccionados')
+        self.assertContains(response, 'Monto disponible')
         self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
 
     def test_pay_credit_page_does_not_show_forgiveness_option(self) -> None:
