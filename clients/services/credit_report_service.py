@@ -295,7 +295,12 @@ def get_global_credit_report(*, as_of: date | None = None) -> GlobalCreditReport
     clients = list(
         Client.objects.filter(active=True)
         .filter(Q(credit_limit__gt=0) | Q(current_debt__gt=0))
-        .select_related("credit_config")
+        .exclude(
+            type="branch",
+            corporate_id__isnull=False,
+            credit_override_enabled=False,
+        )
+        .select_related("credit_config", "corporate")
         .order_by("name")
     )
     client_ids = [client.pk for client in clients]

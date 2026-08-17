@@ -50,7 +50,7 @@ from dataclasses import dataclass
 from typing import Optional
 from decimal import Decimal
 from django.contrib.auth.models import User
-from clients.models import Client
+from clients.models import Client, ClientCreditConfig
 
 
 @dataclass
@@ -70,26 +70,29 @@ class ClientUpdateData:
     credit_override_enabled: Optional[bool] = None
 
 
-def initialize_branch_credit_from_corporate(client: Client) -> bool:
-    """
-    Copy corporate credit policy to a new branch while keeping branch ledger state.
+def _get_credit_config_defaults(
+    credit_config: ClientCreditConfig,
+) -> dict[str, object]:
+    return {
+        'payment_term_type': credit_config.payment_term_type,
+        'cutoff_day': credit_config.cutoff_day,
+        'max_payment_days': credit_config.max_payment_days,
+        'first_notification_days': credit_config.first_notification_days,
+        'second_notification_days': credit_config.second_notification_days,
+        'overdue_notification_days': credit_config.overdue_notification_days,
+    }
 
-    Returns True when any credit policy/configuration data was copied.
-    """
-    if client.type != 'branch' or client.corporate_id is None:
-        return False
 
-    from clients.models import ClientCreditConfig
-
-    corporate = client.corporate
+def _copy_corporate_credit_to_branch(branch: Client, corporate: Client) -> bool:
+    """Copy corporate-owned credit policy/configuration to one branch row."""
     changed_fields = []
 
-    if client.credit_limit != corporate.credit_limit:
-        client.credit_limit = corporate.credit_limit
+    if branch.credit_limit != corporate.credit_limit:
+        branch.credit_limit = corporate.credit_limit
         changed_fields.append('credit_limit')
 
-    if client.can_pay_with_credit != corporate.can_pay_with_credit:
-        client.can_pay_with_credit = corporate.can_pay_with_credit
+    if branch.can_pay_with_credit != corporate.can_pay_with_credit:
+        branch.can_pay_with_credit = corporate.can_pay_with_credit
         changed_fields.append('can_pay_with_credit')
 
     try:
@@ -100,29 +103,68 @@ def initialize_branch_credit_from_corporate(client: Client) -> bool:
     if (
         corporate_config
         and corporate_config.payment_term_type == 'invoice_due'
-        and not client.requires_billing
+        and not branch.requires_billing
     ):
-        client.requires_billing = True
+        branch.requires_billing = True
         changed_fields.append('requires_billing')
 
     if changed_fields:
-        client.save(update_fields=[*changed_fields, 'updated_at'])
+        branch.save(update_fields=[*changed_fields, 'updated_at'])
 
     if not corporate_config:
         return bool(changed_fields)
 
-    ClientCreditConfig.objects.update_or_create(
-        client=client,
-        defaults={
-            'payment_term_type': corporate_config.payment_term_type,
-            'cutoff_day': corporate_config.cutoff_day,
-            'max_payment_days': corporate_config.max_payment_days,
-            'first_notification_days': corporate_config.first_notification_days,
-            'second_notification_days': corporate_config.second_notification_days,
-            'overdue_notification_days': corporate_config.overdue_notification_days,
-        },
+    defaults = _get_credit_config_defaults(corporate_config)
+    branch_config, created = ClientCreditConfig.objects.get_or_create(
+        client=branch,
+        defaults=defaults,
     )
-    return True
+    if created:
+        return True
+
+    config_changed_fields = []
+    for field_name, value in defaults.items():
+        if getattr(branch_config, field_name) != value:
+            setattr(branch_config, field_name, value)
+            config_changed_fields.append(field_name)
+
+    if config_changed_fields:
+        branch_config.save(update_fields=[*config_changed_fields, 'updated_at'])
+
+    return bool(changed_fields or config_changed_fields)
+
+
+def initialize_branch_credit_from_corporate(client: Client) -> bool:
+    """
+    Copy corporate credit policy to a new branch while keeping branch ledger state.
+
+    Returns True when any credit policy/configuration data was copied.
+    """
+    if client.type != 'branch' or client.corporate_id is None:
+        return False
+
+    return _copy_corporate_credit_to_branch(client, client.corporate)
+
+
+def sync_inherited_branch_credit_from_corporate(corporate: Client) -> int:
+    """
+    Push corporate-owned credit settings to branches that inherit credit.
+
+    Branches with credit_override_enabled=True keep their own credit settings.
+    Returns the number of branch rows that changed.
+    """
+    if corporate.type != 'corporate':
+        return 0
+
+    changed_count = 0
+    branches = corporate.branches.filter(
+        type='branch',
+        credit_override_enabled=False,
+    ).select_related('corporate')
+    for branch in branches:
+        if _copy_corporate_credit_to_branch(branch, corporate):
+            changed_count += 1
+    return changed_count
 
 
 def _has_credit_policy_update(update_data: ClientUpdateData) -> bool:
@@ -222,10 +264,15 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     # Note: balance and current_debt should be updated through transaction services
     # not directly, so we skip them here for safety
     
+    credit_policy_changed = _has_credit_policy_update(update_data)
+
     if updated:
         # Run model validation
         client.full_clean()
         # Save the changes
         client.save()
+
+        if client.type == 'corporate' and credit_policy_changed:
+            sync_inherited_branch_credit_from_corporate(client)
     
     return client

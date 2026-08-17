@@ -124,7 +124,7 @@ def build_client_detail_snapshot(
                 ),
             },
             {
-                "label": "Crédito USADO",
+                "label": "Crédito",
                 "value": credit_value,
                 "note": credit_note,
                 "tone": "warning" if debt_percentage > 60 else "success",

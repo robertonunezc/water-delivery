@@ -744,16 +744,19 @@
 
             <section class="client-profile-section">
               <h3><i class="fas fa-credit-card pg-me-2"></i>Crédito</h3>
-              {% if client.credit_limit > 0 %}
-                <div><strong>Límite:</strong> ${{ client.credit_limit|floatformat:2 }}</div>
+              {% if credit_account.credit_limit > 0 %}
+                {% if credit_is_inherited %}
+                  <div class="pg-text-muted pg-mb-2">Crédito administrado por {{ credit_account.name }}</div>
+                {% endif %}
+                <div><strong>Límite:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
                 <div><strong>Disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
                 <div><strong>Uso:</strong> {{ debt_percentage }}%</div>
                 <div class="pg-mt-2">
                   <strong>Ciclo de vencimiento:</strong>
-                  {% if client.credit_config.payment_term_type == 'monthly_cutoff' %}
-                    {{ client.credit_config.get_cutoff_day_display }}
-                  {% elif client.credit_config.payment_term_type == 'invoice_due' %}
-                    {{ client.credit_config.max_payment_days }} días después de emitir la factura
+                  {% if effective_credit_config and effective_credit_config.payment_term_type == 'monthly_cutoff' %}
+                    {{ effective_credit_config.get_cutoff_day_display }}
+                  {% elif effective_credit_config and effective_credit_config.payment_term_type == 'invoice_due' %}
+                    {{ effective_credit_config.max_payment_days }} días después de emitir la factura
                   {% else %}
                     <span class="pg-text-muted">Sin configuración</span>
                   {% endif %}

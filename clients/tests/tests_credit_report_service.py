@@ -200,6 +200,51 @@ class CreditReportServiceTests(FastTenantTestCase):
             [order],
         )
 
+    def test_global_report_excludes_inherited_branch_rows_to_avoid_double_counting(
+        self,
+    ) -> None:
+        corporate = self._create_credit_client(
+            name="Corporativo crédito compartido",
+            current_debt=Decimal("100.00"),
+            credit_limit=Decimal("1000.00"),
+        )
+        inherited_branch = Client.objects.create(
+            name="Sucursal heredada no duplicada",
+            type="branch",
+            corporate=corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal("0.00"),
+            credit_limit=Decimal("1000.00"),
+        )
+        ClientCreditConfig.objects.create(client=inherited_branch)
+        override_branch = self._create_credit_client(
+            name="Sucursal crédito propio reportada",
+            current_debt=Decimal("50.00"),
+            credit_limit=Decimal("300.00"),
+        )
+        override_branch.type = "branch"
+        override_branch.corporate = corporate
+        override_branch.credit_override_enabled = True
+        override_branch.save(
+            update_fields=["type", "corporate", "credit_override_enabled"],
+        )
+
+        report = get_global_credit_report(as_of=date(2026, 7, 8))
+
+        row_names = [row.client.name for row in report.rows]
+        self.assertEqual(
+            row_names,
+            [
+                "Corporativo crédito compartido",
+                "Sucursal crédito propio reportada",
+            ],
+        )
+        self.assertNotIn("Sucursal heredada no duplicada", row_names)
+        self.assertEqual(
+            report.total_authorized_credit_line,
+            Decimal("1300.00"),
+        )
+
     def test_invoice_due_uninvoiced_orders_are_not_overdue_until_invoice_emission(
         self,
     ) -> None:

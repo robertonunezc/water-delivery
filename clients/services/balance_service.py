@@ -476,6 +476,12 @@ def update_credit_limit(
 
     # Save client
     client.save(update_fields=["credit_limit", "updated_at"])
+    if client.type == "corporate":
+        from clients.services.client_service import (
+            sync_inherited_branch_credit_from_corporate,
+        )
+
+        sync_inherited_branch_credit_from_corporate(client)
 
     # Create transaction record
     final_notes = (
