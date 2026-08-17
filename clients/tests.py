@@ -1287,6 +1287,39 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(self.branch.balance, Decimal('0.00'))
         self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
 
+    def test_pay_credit_page_shows_credit_order_selection_and_totals(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, 'Total pedidos seleccionados')
+        self.assertContains(response, 'Monto agregado - total pedidos seleccionados')
+        self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
+
+    def test_pay_credit_page_does_not_show_forgiveness_option(self) -> None:
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Condonación de deuda')
+
 
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
     def setUp(self) -> None:
