@@ -11,7 +11,12 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.admin import ClientAdmin, ClientCreditConfigInline
-from clients.forms import ClientCoreForm, ClientCreditConfigForm, ClientCreditPolicyForm
+from clients.forms import (
+    ClientCoreForm,
+    ClientCreditConfigForm,
+    ClientCreditPolicyForm,
+    ManualCreditTransactionForm,
+)
 from clients.models import Client, ClientCreditConfig
 from clients.services import balance_service
 from clients.services.pending_payment_service import client_has_overdue_credit
@@ -49,6 +54,11 @@ class CreditFormFieldTests(SimpleTestCase):
             form.fields['credit_limit'].help_text,
             'Monto máximo de deuda activa autorizado.',
         )
+
+    def test_manual_credit_transaction_form_removes_forgiveness(self) -> None:
+        form = ManualCreditTransactionForm()
+
+        self.assertNotIn('forgiveness', dict(form.fields['transaction_type'].choices))
 
 
 class ClientCreditAvailabilityTests(SimpleTestCase):

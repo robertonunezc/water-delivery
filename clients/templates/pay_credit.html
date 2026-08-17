@@ -19,14 +19,18 @@
             <div class="pg-row pg-gap-3">
                 <div class="pg-col-md-6"><strong>Cliente:</strong> {{ client.name }}</div>
                 <div class="pg-col-md-6"><strong>Saldo actual:</strong> ${{ client.balance|floatformat:2 }}</div>
-                <div class="pg-col-md-6"><strong>Deuda actual:</strong> ${{ client.current_debt|floatformat:2 }}</div>
-                <div class="pg-col-md-6"><strong>Límite de crédito:</strong> ${{ client.credit_limit|floatformat:2 }}</div>
+                <div class="pg-col-md-6"><strong>Deuda actual:</strong> ${{ credit_account.current_debt|floatformat:2 }}</div>
+                <div class="pg-col-md-6"><strong>Límite de crédito:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
                 <div class="pg-col-md-6"><strong>Crédito disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
             </div>
         </div>
     </div>
 
-    {% if client.current_debt > 0 %}
+    {% if error_message %}
+        <div class="pg-alert pg-alert-danger">{{ error_message }}</div>
+    {% endif %}
+
+    {% if credit_account.current_debt > 0 or credit_orders %}
         <div class="pg-card dashboard-card pg-mb-4">
             <div class="pg-card-body pg-p-4">
                 <form method="post" action="">

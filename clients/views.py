@@ -33,6 +33,12 @@ from .services.client_service import (
     sync_inherited_branch_credit_from_corporate,
 )
 from .services.corporate_branch_service import build_corporate_branch_workspace
+from .services.credit_payment_service import (
+    CreditManagementOrderError,
+    get_open_credit_orders_for_credit_management,
+    get_selected_credit_orders_for_credit_management,
+    get_selected_credit_orders_total,
+)
 from orders.models import Order
 from payment import services as payment_services
 from payment.models import PAYMENT_METHOD_CHOICES
@@ -1016,6 +1022,97 @@ def get_clients(request):
         'client_list_clear_url': clear_url,
     }
     return context
+
+
+def _credit_payment_context(
+    client: Client,
+    form: ManualCreditTransactionForm,
+    *,
+    selected_order_ids: List[int] | None = None,
+    error_message: str | None = None,
+) -> dict[str, Any]:
+    credit_orders = get_open_credit_orders_for_credit_management(client)
+    for order in credit_orders:
+        order.remaining_payment_amount = payment_services.get_unpaid_amount(order)
+
+    selected_ids = set(selected_order_ids or [])
+    selected_total = sum(
+        (
+            order.remaining_payment_amount
+            for order in credit_orders
+            if order.pk in selected_ids
+        ),
+        Decimal('0.00'),
+    )
+    settlement_payment_types = [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value not in {'pending_credit', 'balance'}
+    ]
+    return {
+        'form': form,
+        'client': client,
+        'credit_account': client.get_credit_account(),
+        'credit_orders': credit_orders,
+        'selected_order_ids': selected_ids,
+        'selected_total': selected_total,
+        'settlement_payment_types': settlement_payment_types,
+        'error_message': error_message,
+    }
+
+
+def _credit_order_allowed_ids(client: Client) -> List[int]:
+    return [
+        order.pk
+        for order in get_open_credit_orders_for_credit_management(client)
+    ]
+
+
+def _with_split_order_guidance(error_message: str) -> str:
+    guidance = 'Puede dividir un pedido antes de continuar.'
+    if guidance in error_message:
+        return error_message
+    if 'menor al total seleccionado' in error_message:
+        return f'El monto no cubre los pedidos seleccionados. {guidance}'
+    return error_message
+
+
+def _pay_credit_orders_from_received_amount(
+    *,
+    client: Client,
+    selected_orders: List[Order],
+    amount: Decimal,
+    payment_method: str,
+    request_user: Any,
+) -> dict[str, object]:
+    return payment_services.pay_client_orders(
+        client=client,
+        orders=selected_orders,
+        payment_method=payment_method,
+        amount=amount,
+        request_user=request_user,
+        allowed_order_ids=_credit_order_allowed_ids(client),
+    )
+
+
+def _pay_credit_orders_from_balance(
+    *,
+    client: Client,
+    selected_orders: List[Order],
+    request_user: Any,
+) -> dict[str, object]:
+    selected_total = get_selected_credit_orders_total(selected_orders)
+    return payment_services.pay_client_orders(
+        client=client,
+        orders=selected_orders,
+        payment_method='balance',
+        amount=selected_total,
+        request_user=request_user,
+        allowed_order_ids=_credit_order_allowed_ids(client),
+        payment_client=client,
+    )
+
+
 @login_required
 def pay_credit(request, pk):
     """View for paying credit (reducing debt) for a client"""
@@ -1024,7 +1121,7 @@ def pay_credit(request, pk):
     if request.method == 'POST':
         form = ManualCreditTransactionForm(request.POST)
         if form.is_valid():
-            amount = form.cleaned_data['amount']
+            amount = form.cleaned_data.get('amount')
             transaction_type = form.cleaned_data['transaction_type']
             description = form.cleaned_data['description']
             notes = form.cleaned_data['notes']
@@ -1046,7 +1143,52 @@ def pay_credit(request, pk):
                         f"Límite de crédito actualizado exitosamente. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
                     )
 
-                elif transaction_type in ['payment', 'forgiveness', 'adjustment', 'correction']:
+                elif transaction_type == 'payment':
+                    selected_order_ids = _parse_order_ids(request)
+                    selected_orders = get_selected_credit_orders_for_credit_management(
+                        client,
+                        selected_order_ids,
+                    )
+                    result = _pay_credit_orders_from_received_amount(
+                        client=client,
+                        selected_orders=selected_orders,
+                        amount=amount,
+                        payment_method=request.POST.get('payment_method', 'cash'),
+                        request_user=request.user,
+                    )
+                    messages.success(
+                        request,
+                        (
+                            f'Se registró el pago de {len(result["orders"])} pedido(s) '
+                            f'a crédito por ${result["selected_total"]:.2f}.'
+                        ),
+                    )
+                    if result['balance_added'] > 0:
+                        messages.info(
+                            request,
+                            f'Se agregó ${result["balance_added"]:.2f} al saldo del cliente.',
+                        )
+
+                elif transaction_type == 'payment_from_balance':
+                    selected_order_ids = _parse_order_ids(request)
+                    selected_orders = get_selected_credit_orders_for_credit_management(
+                        client,
+                        selected_order_ids,
+                    )
+                    result = _pay_credit_orders_from_balance(
+                        client=client,
+                        selected_orders=selected_orders,
+                        request_user=request.user,
+                    )
+                    messages.success(
+                        request,
+                        (
+                            f'Se pagaron {len(result["orders"])} pedido(s) a crédito '
+                            f'con saldo por ${result["selected_total"]:.2f}.'
+                        ),
+                    )
+
+                elif transaction_type in ['adjustment', 'correction']:
                     # Pay down debt
                     paid_amount = balance_service.pay_debt(
                         client=client,
@@ -1060,30 +1202,20 @@ def pay_credit(request, pk):
                         f"Pago aplicado exitosamente. Deuda reducida en ${paid_amount:.2f}. {client.name} ahora debe ${client.current_debt:.2f}."
                     )
 
-                elif transaction_type == 'payment_from_balance':
-                    # Pay debt using client's balance
-                    result = balance_service.pay_debt_from_balance(
-                        client=client,
-                        amount=amount,
-                        user=request.user,
-                        notes=f"{description}. {notes}"
-                    )
-                    if result['success']:
-                        messages.success(
-                            request,
-                            f"Pago con saldo exitoso. ${result['amount_paid']:.2f} descontados del saldo. "
-                            f"Saldo restante: ${result['remaining_balance']:.2f}. "
-                            f"Deuda restante: ${result['remaining_debt']:.2f}."
-                        )
-                    else:
-                        messages.error(request, f"Error en pago con saldo: {result['error']}")
-                        return render(request, 'pay_credit.html', {
-                            'form': form,
-                            'client': client,
-                        })
-                
                 return redirect('clients:detail', pk=client.pk)
                 
+            except (CreditManagementOrderError, payment_services.ClientOrderPaymentError, ValueError) as exc:
+                selected_order_ids = _parse_order_ids(request)
+                return render(
+                    request,
+                    'pay_credit.html',
+                    _credit_payment_context(
+                        client,
+                        form,
+                        selected_order_ids=selected_order_ids,
+                        error_message=_with_split_order_guidance(str(exc)),
+                    ),
+                )
             except Exception as e:
                 messages.error(request, f"Error al procesar la transacción: {str(e)}")
     else:
@@ -1093,12 +1225,7 @@ def pay_credit(request, pk):
         form.fields['client'].widget.attrs['disabled'] = True
         form.fields['client'].required = False
     
-    context = {
-        'form': form,
-        'client': client,
-    }
-    
-    return render(request, 'pay_credit.html', context)
+    return render(request, 'pay_credit.html', _credit_payment_context(client, form))
 
 @login_required
 def create_admin(request):
