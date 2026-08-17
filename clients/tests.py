@@ -956,6 +956,172 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         self.assertContains(response, '<span class="pg-text-muted">-</span>')
 
 
+class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='credit-management-scope-user',
+            password='testpass123',
+        )
+        self.corporate = Client.objects.create(
+            name='Corporativo alcance credito',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.branch = Client.objects.create(
+            name='Sucursal alcance credito',
+            type='branch',
+            corporate=self.corporate,
+            credit_override_enabled=False,
+        )
+        self.other_corporate = Client.objects.create(
+            name='Corporativo fuera alcance credito',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.other_branch = Client.objects.create(
+            name='Sucursal fuera alcance credito',
+            type='branch',
+            corporate=self.other_corporate,
+            credit_override_enabled=False,
+        )
+
+    def _credit_order(
+        self,
+        client: Client,
+        amount: Decimal,
+        *,
+        order_date: datetime,
+        credit_account: Client | None = None,
+        status: str = OrderStatus.COMPLETED.value,
+    ) -> Order:
+        order = Order.objects.create(
+            client=client,
+            status=status,
+            total_amount=amount,
+            type='credito',
+        )
+        Order.objects.filter(pk=order.pk).update(order_date=order_date)
+        order.refresh_from_db()
+        pending_credit = Payment.objects.create(
+            client=client,
+            order=order,
+            amount=amount,
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=credit_account or client.get_credit_account(),
+            transaction_type='purchase',
+            amount=amount,
+            debt_before=Decimal('0.00'),
+            debt_after=amount,
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            reference_payment=pending_credit,
+            created_by=self.user,
+        )
+        return order
+
+    def test_branch_scope_lists_own_pending_credit_orders_newest_first(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        older = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=2),
+            credit_account=self.corporate,
+        )
+        newer = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=self.corporate,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.branch)
+
+        self.assertEqual([order.pk for order in orders], [newer.pk, older.pk])
+
+    def test_corporate_scope_lists_all_branch_credit_orders_newest_first(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        override_branch = Client.objects.create(
+            name='Sucursal credito propio',
+            type='branch',
+            corporate=self.corporate,
+            credit_override_enabled=True,
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        inherited_order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=2),
+            credit_account=self.corporate,
+        )
+        override_order = self._credit_order(
+            override_branch,
+            Decimal('180.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=override_branch,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        self.assertEqual([order.pk for order in orders], [override_order.pk, inherited_order.pk])
+
+    def test_scope_excludes_paid_cancelled_and_out_of_scope_orders(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        selectable = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=self.corporate,
+        )
+        paid = self._credit_order(
+            self.branch,
+            Decimal('80.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        Payment.objects.create(
+            client=self.branch,
+            order=paid,
+            amount=Decimal('80.00'),
+            method='cash',
+            status='completed',
+            created_by=self.user,
+        )
+        self._credit_order(
+            self.other_branch,
+            Decimal('90.00'),
+            order_date=timezone.now(),
+            credit_account=self.other_corporate,
+        )
+        self._credit_order(
+            self.branch,
+            Decimal('70.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+            status=OrderStatus.CANCELLED.value,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        self.assertEqual([order.pk for order in orders], [selectable.pk])
+
+
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
