@@ -51,17 +51,21 @@ def get_selected_unpaid_orders(
     order_ids: list[int],
     *,
     allowed_order_ids: list[int] | None = None,
+    lock: bool = False,
 ) -> list[Order]:
     """Return selected unpaid orders for a client, preserving submitted order."""
     if not order_ids:
         raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
 
     deduped_ids = list(dict.fromkeys(order_ids))
+    orders_queryset = Order.objects.filter(pk__in=deduped_ids).select_related('client')
+    if lock:
+        orders_queryset = orders_queryset.select_for_update()
+    orders_queryset = orders_queryset.prefetch_related('payments')
+
     orders_by_id = {
         order.id: order
-        for order in Order.objects.filter(pk__in=deduped_ids)
-        .select_related('client')
-        .prefetch_related('payments')
+        for order in orders_queryset
     }
     selected_orders = []
     for order_id in deduped_ids:
@@ -116,6 +120,7 @@ def pay_client_orders(
         client=client,
         order_ids=[order.id for order in orders],
         allowed_order_ids=allowed_order_ids,
+        lock=True,
     )
     amount = Decimal(str(amount))
     selected_total = sum(
@@ -125,6 +130,10 @@ def pay_client_orders(
     if amount < selected_total:
         raise ClientOrderPaymentError(
             f'El monto ${amount:.2f} es menor al total seleccionado ${selected_total:.2f}.'
+        )
+    if payment_method == 'balance' and amount != selected_total:
+        raise ClientOrderPaymentError(
+            f'Pago con saldo debe coincidir con el total seleccionado ${selected_total:.2f}.'
         )
 
     created_payments = []
@@ -144,6 +153,10 @@ def pay_client_orders(
                 amount=order_amount,
                 request_user=request_user,
                 payment_client=payment_client,
+            )
+        elif order.type == 'credito':
+            raise ClientOrderPaymentError(
+                f'El pedido #{order.id} ya no tiene crédito pendiente por liquidar.'
             )
         else:
             payment, error = process_single_payment(
@@ -301,7 +314,7 @@ def settle_credit_order_payment(
     paid_amount = balance_service.pay_debt(
         client=order.client,
         amount=amount,
-        transaction_type='payment',
+        transaction_type=_credit_payment_transaction_type(payment_method),
         user=request_user,
         reference_order=order,
         reference_payment=payment,
@@ -323,7 +336,7 @@ def _reconcile_unapplied_credit_payment(
     credit_account = order.client.get_credit_account()
     accounted_payment_ids = credit_account.credit_transactions.filter(
         reference_order=order,
-        transaction_type='payment',
+        transaction_type__in=['payment', 'payment_from_balance'],
         reference_payment__isnull=False,
     ).values('reference_payment_id')
     payment = order.payments.filter(
@@ -347,7 +360,7 @@ def _reconcile_unapplied_credit_payment(
     paid_amount = balance_service.pay_debt(
         client=order.client,
         amount=payment.amount,
-        transaction_type='payment',
+        transaction_type=_credit_payment_transaction_type(payment.method),
         user=request_user,
         reference_order=order,
         reference_payment=payment,
@@ -358,6 +371,12 @@ def _reconcile_unapplied_credit_payment(
 
     _complete_pending_credit(pending_credit)
     return payment
+
+
+def _credit_payment_transaction_type(payment_method: str) -> str:
+    if payment_method == 'balance':
+        return 'payment_from_balance'
+    return 'payment'
 
 
 def _complete_pending_credit(pending_credit: Payment) -> None:

@@ -60,6 +60,10 @@ class CreditFormFieldTests(SimpleTestCase):
 
         self.assertNotIn('forgiveness', dict(form.fields['transaction_type'].choices))
 
+    def test_add_credit_admin_template_removes_forgiveness(self) -> None:
+        with open('clients/templates/admin/clients/add_credit.html', encoding='utf-8') as template:
+            self.assertNotIn('Condonación de deuda', template.read())
+
 
 class ClientCreditAvailabilityTests(SimpleTestCase):
     def test_disabled_credit_cannot_be_used_with_available_limit(self) -> None:
@@ -572,6 +576,29 @@ class BranchCreditAdminTests(FastTenantTestCase):
         inline_types = self._inline_types_for(self.branch)
 
         self.assertIn(ClientCreditConfigInline, inline_types)
+
+    def test_add_credit_admin_balance_payment_requires_amount(self) -> None:
+        self.client.force_login(self.user)
+        self.corporate.balance = Decimal('100.00')
+        self.corporate.current_debt = Decimal('50.00')
+        self.corporate.save(update_fields=['balance', 'current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('admin:clients_client_add_credit'),
+            {
+                'client': self.corporate.pk,
+                'transaction_type': 'payment_from_balance',
+                'amount': '',
+                'description': 'Pago con saldo',
+                'notes': 'Pago con saldo desde admin.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'El monto es obligatorio')
+        self.corporate.refresh_from_db()
+        self.assertEqual(self.corporate.balance, Decimal('100.00'))
+        self.assertEqual(self.corporate.current_debt, Decimal('50.00'))
 
 
 class CreditSaleEnforcementTests(FastTenantTestCase):

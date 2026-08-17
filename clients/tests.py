@@ -1227,6 +1227,66 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
 
+    def test_pay_credit_rejects_balance_method_for_received_payment(self) -> None:
+        self.branch.balance = Decimal('150.00')
+        self.branch.save(update_fields=['balance', 'updated_at'])
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '150.00',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'balance',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Método de pago inválido')
+        self.branch.refresh_from_db()
+        self.corporate.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(self.branch.balance, Decimal('150.00'))
+        self.assertEqual(self.corporate.current_debt, Decimal('100.00'))
+        self.assertFalse(order.is_paid)
+
+    def test_pay_credit_invalid_form_preserves_selected_orders(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'description': 'Pago recibido',
+                'notes': 'corto',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(order.pk, response.context['selected_order_ids'])
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, 'checked')
+
     def test_pay_credit_payment_settles_orders_and_adds_overpayment_to_balance(self) -> None:
         order = self._credit_order(
             self.branch,

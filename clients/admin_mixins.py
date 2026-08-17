@@ -333,7 +333,7 @@ class AdminActionsMixin:
 							f"Límite de crédito actualizado. {client.name} ahora tiene ${client.credit_limit:.2f} de límite."
 						)
 
-					elif transaction_type in ['payment', 'forgiveness']:
+					elif transaction_type == 'payment':
 						# Pay down debt
 						paid_amount = balance_service.pay_debt(
 							client=client,
@@ -348,6 +348,15 @@ class AdminActionsMixin:
 						)
 
 					elif transaction_type == 'payment_from_balance':
+						if amount is None:
+							form.add_error('amount', 'El monto es obligatorio para pago con saldo.')
+							return render(request, 'admin/clients/add_credit.html', {
+								'form': form,
+								'title': 'Gestionar Crédito Manualmente',
+								'opts': self.model._meta,
+								'has_view_permission': True,
+								'client': client,
+							})
 						# Pay debt using client's balance
 						result = balance_service.pay_debt_from_balance(
 							client=client,

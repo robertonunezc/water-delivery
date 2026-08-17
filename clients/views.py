@@ -1044,11 +1044,6 @@ def _credit_payment_context(
         ),
         Decimal('0.00'),
     )
-    settlement_payment_types = [
-        (value, label)
-        for value, label in PAYMENT_METHOD_CHOICES
-        if value not in {'pending_credit', 'balance'}
-    ]
     return {
         'form': form,
         'client': client,
@@ -1056,9 +1051,24 @@ def _credit_payment_context(
         'credit_orders': credit_orders,
         'selected_order_ids': selected_ids,
         'selected_total': selected_total,
-        'settlement_payment_types': settlement_payment_types,
+        'settlement_payment_types': _received_credit_payment_types(),
         'error_message': error_message,
     }
+
+
+def _received_credit_payment_types() -> List[tuple[str, str]]:
+    return [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value not in {'pending_credit', 'balance'}
+    ]
+
+
+def _validate_received_credit_payment_method(payment_method: str) -> str:
+    allowed_methods = {value for value, _label in _received_credit_payment_types()}
+    if payment_method not in allowed_methods:
+        raise CreditManagementOrderError('Método de pago inválido para pago de deuda.')
+    return payment_method
 
 
 def _credit_order_allowed_ids(client: Client) -> List[int]:
@@ -1088,7 +1098,7 @@ def _pay_credit_orders_from_received_amount(
     return payment_services.pay_client_orders(
         client=client,
         orders=selected_orders,
-        payment_method=payment_method,
+        payment_method=_validate_received_credit_payment_method(payment_method),
         amount=amount,
         request_user=request_user,
         allowed_order_ids=_credit_order_allowed_ids(client),
@@ -1225,7 +1235,16 @@ def pay_credit(request, pk):
         form.fields['client'].widget.attrs['disabled'] = True
         form.fields['client'].required = False
     
-    return render(request, 'pay_credit.html', _credit_payment_context(client, form))
+    selected_order_ids = _parse_order_ids(request) if request.method == 'POST' else None
+    return render(
+        request,
+        'pay_credit.html',
+        _credit_payment_context(
+            client,
+            form,
+            selected_order_ids=selected_order_ids,
+        ),
+    )
 
 @login_required
 def create_admin(request):
