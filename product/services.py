@@ -2,7 +2,7 @@ import logging
 from typing import Dict, List, Optional
 from django.db import transaction
 from clients.models import Client
-from .models import Product, ProductClientPrice
+from .models import Product, ProductCategory, ProductClientPrice
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +80,28 @@ def ensure_product_for_all_clients(product: Product, user=None) -> Dict[str, obj
     )
 
     return summary
+
+
+def delete_product_category(category: ProductCategory) -> Dict[str, object]:
+    """Soft-delete a product category when it has no current product links."""
+    product_count = Product.all_objects.filter(
+        category=category,
+        deleted_at__isnull=True,
+    ).count()
+
+    if product_count > 0:
+        return {'deleted': False, 'product_count': product_count}
+
+    category.delete()
+    logger.info(
+        'Deleted product category',
+        extra={
+            'category_id': category.id,
+            'category_name': category.name,
+        },
+    )
+
+    return {'deleted': True, 'product_count': 0}
 
 
 def bulk_increase_product_client_prices(

@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+
+{% block extra_css %}
+{% endblock %}
+
+{% block content %}
+<div class="pg-container-fluid pg-mt-3 pg-mb-4">
+	<div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
+		<div>
+			<h1 class="pg-h3 pg-mb-1">{% if category %}Editar Categoría{% else %}Crear Categoría{% endif %}</h1>
+		</div>
+		<div class="pg-flex pg-align-center pg-gap-2">
+			<a href="{% url 'admin_products' %}" class="pg-button pg-button-outline-secondary">Productos</a>
+			<a href="{% url 'admin_categories' %}" class="pg-button pg-button-outline-secondary">Volver a lista</a>
+		</div>
+	</div>
+
+	<div class="pg-card dashboard-card">
+		<div class="pg-card-body">
+			<form method="post">
+				{% csrf_token %}
+				<div class="pg-row pg-gap-3">
+					<div class="pg-col-md-8">
+						<label class="pg-label">{{ form.name.label }}</label>
+						{{ form.name }}
+						{{ form.name.errors }}
+					</div>
+					{% if category %}
+						<div class="pg-col-md-4">
+							<label class="pg-label">Productos asociados</label>
+							<div class="pg-input">{{ product_count }}</div>
+						</div>
+					{% endif %}
+				</div>
+				{% if form.non_field_errors %}
+					<div class="pg-alert pg-alert-danger pg-mt-3 pg-mb-0">{{ form.non_field_errors }}</div>
+				{% endif %}
+				<div class="pg-mt-3 pg-flex pg-justify-end">
+					<button type="submit" class="pg-button pg-button-primary">{% if category %}Guardar Categoría{% else %}Guardar y Continuar{% endif %}</button>
+				</div>
+			</form>
+		</div>
+	</div>
+
+	{% if category %}
+		<div class="pg-card dashboard-card pg-mt-3">
+			<div class="pg-card-body">
+				<div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2">
+					<div>
+						<h2 class="pg-h5 pg-mb-1">Eliminar categoría</h2>
+						<p class="pg-text-muted pg-mb-0">Solo se puede eliminar cuando no tiene productos asociados.</p>
+					</div>
+					<form method="post" action="{% url 'admin_delete_category' category.pk %}" onsubmit="return confirm('¿Eliminar esta categoría?');">
+						{% csrf_token %}
+						<button type="submit" class="pg-button pg-button-outline-danger">Eliminar</button>
+					</form>
+				</div>
+			</div>
+		</div>
+	{% endif %}
+</div>
+{% endblock %}

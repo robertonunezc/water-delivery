@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Product, ProductClientPrice
+from .models import Product, ProductCategory, ProductClientPrice
 
 
 class ProductForm(forms.ModelForm):
@@ -45,6 +45,31 @@ class ProductClientPriceForm(forms.ModelForm):
             'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
             'note': forms.TextInput(attrs={'class': 'pg-input'}),
         }
+
+
+class ProductCategoryForm(forms.ModelForm):
+    class Meta:
+        model = ProductCategory
+        fields = ['name']
+        labels = {
+            'name': 'Nombre',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'Nombre de la categoría'}),
+        }
+
+    def clean_name(self) -> str:
+        name = self.cleaned_data['name'].strip()
+        queryset = ProductCategory.objects.filter(name__iexact=name)
+
+        if self.instance.pk:
+            queryset = queryset.exclude(pk=self.instance.pk)
+
+        if queryset.exists():
+            raise forms.ValidationError('Ya existe una categoría con este nombre.')
+
+        return name
+
 
 ProductClientPriceFormSet = inlineformset_factory(
     Product,

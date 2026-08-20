@@ -10,7 +10,10 @@
 			<h1 class="pg-h3 pg-mb-1">Productos</h1>
 			<p class="pg-text-muted pg-mb-0">Vista administrativa con búsqueda y paginador.</p>
 		</div>
-		<a href="{% url 'admin_create_product' %}" class="pg-button pg-button-primary">Nuevo Producto</a>
+		<div class="pg-flex pg-align-center pg-gap-2">
+			<a href="{% url 'admin_categories' %}" class="pg-button pg-button-outline-secondary">Categorías</a>
+			<a href="{% url 'admin_create_product' %}" class="pg-button pg-button-primary">Nuevo Producto</a>
+		</div>
 	</div>
 
 	<div class="metric-grid">
@@ -123,7 +126,7 @@
 								</div>
 							</td>
 						</tr>
-					{% empty %}	
+					{% empty %}
 						<tr>
 							<td colspan="7" class="pg-text-center pg-py-4 pg-text-muted">No hay productos para mostrar.</td>
 						</tr>

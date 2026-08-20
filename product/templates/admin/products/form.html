@@ -15,6 +15,7 @@
 					{% if product.active %}Activo{% else %}Inactivo{% endif %}
 				</span>
 			{% endif %}
+			<a href="{% url 'admin_categories' %}" class="pg-button pg-button-outline-secondary">Categorías</a>
 			<a href="{% url 'admin_products' %}" class="pg-button pg-button-outline-secondary">Volver a lista</a>
 		</div>
 	</div>

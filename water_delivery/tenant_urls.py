@@ -27,6 +27,10 @@ urlpatterns = [
     path('administrador/productos/', product_views.list_products_admin, name='admin_products'),
     path('administrador/productos/crear/', product_views.create_product_admin, name='admin_create_product'),
     path('administrador/productos/<int:pk>/editar/', product_views.edit_product_admin, name='admin_edit_product'),
+    path('administrador/categorias/', product_views.list_categories_admin, name='admin_categories'),
+    path('administrador/categorias/crear/', product_views.create_category_admin, name='admin_create_category'),
+    path('administrador/categorias/<int:pk>/editar/', product_views.edit_category_admin, name='admin_edit_category'),
+    path('administrador/categorias/<int:pk>/eliminar/', product_views.delete_category_admin, name='admin_delete_category'),
 
     path('administrador/rutas/', route_views.list_admin, name='admin_routes'),
     path('administrador/rutas/crear/', route_views.create_admin, name='admin_create_route'),
