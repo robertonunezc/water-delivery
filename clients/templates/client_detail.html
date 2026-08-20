@@ -160,7 +160,7 @@
         </li>
         <li class="pg-tab-item" role="presentation">
           <button class="pg-tab" id="payments-tab" data-pg-toggle="tab" data-pg-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="false">
-            Pagos
+            Historial de transacciones
           </button>
         </li>
         {% if client.requires_billing %}
@@ -390,11 +390,11 @@
                     <tr>
                       <td>
                         {% if payment_data.type == 'payment' %}
-                          <span class="pg-badge pg-bg-primary">Pago</span>
+                          <span class="pg-badge pg-bg-primary">Transaccion de venta </span>
                         {% elif payment_data.type == 'balance_transaction' %}
-                          <span class="pg-badge pg-bg-info pg-text-dark">Saldo</span>
+                          <span class="pg-badge pg-bg-info pg-text-dark">Gestion de Saldo</span>
                         {% elif payment_data.type == 'credit_transaction' %}
-                          <span class="pg-badge pg-bg-warning pg-text-dark">Crédito</span>
+                          <span class="pg-badge pg-bg-warning pg-text-dark">Gestión de Crédito</span>
                         {% endif %}
                       </td>
                       <td>

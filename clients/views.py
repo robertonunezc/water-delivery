@@ -629,7 +629,7 @@ def _build_payment_history(client: Client) -> List[dict[str, Any]]:
         'reference_payment',
         'created_by',
     ).order_by('-created_at')
-
+    print(f"Payments: {payments.count()}, Balance Transactions: {balance_transactions.count()}, Credit Transactions: {credit_transactions.count()}")
     payment_history = []
     for payment in payments:
         payment_history.append(_payment_history_item(payment))
@@ -640,10 +640,12 @@ def _build_payment_history(client: Client) -> List[dict[str, Any]]:
         payment_history.append(_balance_history_item(balance_tx))
 
     for credit_tx in credit_transactions:
+        print(f"Credit Transaction: {credit_tx.id}, Reference Payment: {credit_tx.reference_payment}")
         if credit_tx.reference_payment:
             continue
+        print(f"Adding Credit Transaction: {_credit_history_item(credit_tx)} to payment history")
         payment_history.append(_credit_history_item(credit_tx))
-
+    
     payment_history.sort(key=lambda item: item['date'], reverse=True)
     return payment_history
 
