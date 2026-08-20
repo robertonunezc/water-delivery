@@ -1,10 +1,62 @@
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from django.db import transaction
 from clients.models import Client
 from .models import Product, ProductCategory, ProductClientPrice
 
 logger = logging.getLogger(__name__)
+
+
+def create_or_restore_product_client_price(
+    *,
+    product: Product,
+    client: Client,
+    price: float,
+    active: bool = True,
+    note: Optional[str] = None,
+    update_existing: bool = False,
+    validate: bool = False,
+) -> Tuple[ProductClientPrice, bool]:
+    """Create a client price or restore the existing soft-deleted row.
+
+    Returns True when the active client price did not previously exist.
+    """
+    price_row = ProductClientPrice.all_objects.filter(
+        product=product,
+        client=client,
+    ).first()
+
+    if price_row is None:
+        price_row = ProductClientPrice(
+            product=product,
+            client=client,
+            price=price,
+            active=active,
+        )
+        if note is not None:
+            price_row.note = note
+        if validate:
+            price_row.full_clean()
+        price_row.save()
+        return price_row, True
+
+    if price_row.deleted_at is None and not update_existing:
+        return price_row, False
+
+    was_deleted = price_row.deleted_at is not None
+    price_row.price = price
+    price_row.active = active
+    price_row.deleted_at = None
+    update_fields = ['price', 'active', 'deleted_at', 'updated_at']
+
+    if note is not None:
+        price_row.note = note
+        update_fields.append('note')
+
+    if validate:
+        price_row.full_clean()
+    price_row.save(update_fields=update_fields)
+    return price_row, was_deleted
 
 
 def ensure_client_product_prices(client: Client) -> Dict[str, object]:
@@ -14,10 +66,10 @@ def ensure_client_product_prices(client: Client) -> Dict[str, object]:
 
     with transaction.atomic():
         for product in Product.objects.all().only("id", "price", "name"):
-            _, created = ProductClientPrice.objects.get_or_create(
+            _, created = create_or_restore_product_client_price(
                 product=product,
                 client=client,
-                defaults={"price": product.price},
+                price=product.price,
             )
             if created:
                 created_products.append(product.name)
@@ -52,10 +104,10 @@ def ensure_product_for_all_clients(product: Product, user=None) -> Dict[str, obj
 
     with transaction.atomic():
         for client in client_service.get_all_clients().only("id", "name"):
-            _, created = ProductClientPrice.objects.get_or_create(
+            _, created = create_or_restore_product_client_price(
                 product=product,
                 client=client,
-                defaults={"price": product.price},
+                price=product.price,
             )
             if created:
                 created_clients.append(client.name)

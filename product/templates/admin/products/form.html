@@ -108,16 +108,31 @@
 							{% if formset.non_form_errors %}
 								<div class="pg-alert pg-alert-danger">{{ formset.non_form_errors }}</div>
 							{% endif %}
+							<div class="pg-row pg-gap-2 pg-align-end pg-mb-3">
+								<div class="pg-col-md-10">
+									<label class="pg-label" for="product-client-price-search">Buscar cliente</label>
+									<input
+										id="product-client-price-search"
+										type="search"
+										class="pg-input"
+										placeholder="Nombre, precio o nota..."
+										autocomplete="off"
+									>
+								</div>
+								<div class="pg-col-md-2 pg-grid">
+									<button type="button" class="pg-button pg-button-outline-secondary" data-price-search-clear>Limpiar</button>
+								</div>
+							</div>
 							<div class="pg-row pg-gap-3">
 								{% for inline_form in formset.forms %}
-									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
+									<div class="pg-col-12 pg-border pg-rounded pg-p-3" data-price-search-row>
 										<div class="pg-row pg-gap-2">
 											{{ inline_form.errors }}
 											<div class="pg-col-md-4">{{ inline_form.client.label_tag }}{{ inline_form.client }}</div>
 											<div class="pg-col-md-2">{{ inline_form.price.label_tag }}{{ inline_form.price }}</div>
 											<div class="pg-col-md-4">{{ inline_form.note.label_tag }}{{ inline_form.note }}</div>
-											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.active }} <label class="pg-checkbox-label">Activo</label></div></div>
-											{% if inline_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
+											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.active }} <label class="pg-checkbox-label" for="{{ inline_form.active.id_for_label }}">Activo</label></div></div>
+											{% if inline_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.DELETE }} <label class="pg-checkbox-label" for="{{ inline_form.DELETE.id_for_label }}">Eliminar</label></div></div>{% endif %}
 											{{ inline_form.id }}
 										</div>
 										{{ inline_form.non_field_errors }}
@@ -134,4 +149,47 @@
 		</div>
 	</div>
 </div>
+<script>
+	(function () {
+		const searchInput = document.getElementById('product-client-price-search');
+		if (!searchInput) return;
+
+		const rows = Array.from(document.querySelectorAll('[data-price-search-row]'));
+		const clearButton = document.querySelector('[data-price-search-clear]');
+
+		function selectedOptionText(select) {
+			return select.selectedOptions.length ? select.selectedOptions[0].textContent : '';
+		}
+
+		function rowSearchText(row) {
+			const fields = Array.from(row.querySelectorAll('input:not([type="hidden"]), textarea'));
+			const selects = Array.from(row.querySelectorAll('select'));
+			return [
+				...fields.map((field) => field.value),
+				...selects.map(selectedOptionText),
+			].join(' ').toLowerCase();
+		}
+
+		function filterRows() {
+			const query = searchInput.value.trim().toLowerCase();
+			rows.forEach((row) => {
+				row.hidden = query !== '' && !rowSearchText(row).includes(query);
+			});
+		}
+
+		searchInput.addEventListener('input', filterRows);
+		rows.forEach((row) => {
+			row.addEventListener('input', filterRows);
+			row.addEventListener('change', filterRows);
+		});
+
+		if (clearButton) {
+			clearButton.addEventListener('click', () => {
+				searchInput.value = '';
+				filterRows();
+				searchInput.focus();
+			});
+		}
+	})();
+</script>
 {% endblock %}

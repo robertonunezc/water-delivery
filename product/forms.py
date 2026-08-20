@@ -1,6 +1,8 @@
 from decimal import Decimal
+
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import BaseInlineFormSet, inlineformset_factory
+
 from .models import Product, ProductCategory, ProductClientPrice
 
 
@@ -47,6 +49,49 @@ class ProductClientPriceForm(forms.ModelForm):
         }
 
 
+class ProductClientPriceBaseFormSet(BaseInlineFormSet):
+    def clean(self) -> None:
+        super().clean()
+        seen_client_ids: set[int] = set()
+
+        for form in self.forms:
+            if not hasattr(form, 'cleaned_data') or not form.cleaned_data:
+                continue
+            if form.cleaned_data.get('DELETE'):
+                continue
+
+            client = form.cleaned_data.get('client')
+            if client is None:
+                continue
+
+            if client.pk in seen_client_ids:
+                raise forms.ValidationError(
+                    'No se puede asignar el mismo cliente más de una vez para este producto.'
+                )
+            seen_client_ids.add(client.pk)
+
+    def save_new(self, form: forms.ModelForm, commit: bool = True) -> ProductClientPrice:
+        new_price = form.save(commit=False)
+        restored_price = ProductClientPrice.all_objects.filter(
+            product=self.instance,
+            client=new_price.client,
+            deleted_at__isnull=False,
+        ).first()
+
+        if restored_price is None:
+            return super().save_new(form, commit=commit)
+
+        restored_price.price = new_price.price
+        restored_price.note = new_price.note
+        restored_price.active = new_price.active
+        restored_price.deleted_at = None
+
+        if commit:
+            restored_price.save(update_fields=['price', 'note', 'active', 'deleted_at', 'updated_at'])
+
+        return restored_price
+
+
 class ProductCategoryForm(forms.ModelForm):
     class Meta:
         model = ProductCategory
@@ -75,6 +120,7 @@ ProductClientPriceFormSet = inlineformset_factory(
     Product,
     ProductClientPrice,
     form=ProductClientPriceForm,
+    formset=ProductClientPriceBaseFormSet,
     extra=1,
     can_delete=True
 )

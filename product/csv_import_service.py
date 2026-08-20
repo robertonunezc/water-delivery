@@ -7,7 +7,8 @@ from typing import Dict, List, Optional, Tuple
 from django.db import transaction
 
 from clients.models import Client
-from product.models import Product, ProductCategory, ProductClientPrice, UNIT_CHOICES
+from product.models import Product, ProductCategory, UNIT_CHOICES
+from product.services import create_or_restore_product_client_price
 
 
 @dataclass
@@ -141,11 +142,14 @@ def _upsert_client_price(product: Product, row: Dict[str, str]) -> str:
 
     client_price = _parse_decimal(client_price_raw, field_name="client_price")
 
-    price_row, created = ProductClientPrice.objects.get_or_create(product=product, client=client)
-    price_row.price = float(client_price)
-    price_row.active = True
-    price_row.full_clean()
-    price_row.save()
+    _, created = create_or_restore_product_client_price(
+        product=product,
+        client=client,
+        price=float(client_price),
+        active=True,
+        update_existing=True,
+        validate=True,
+    )
     return "created" if created else "updated"
 
 
