@@ -7,6 +7,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
+from django.views.decorators.http import require_POST
 from decimal import Decimal, InvalidOperation
 from typing import Any, List
 from urllib.parse import urlencode
@@ -22,6 +23,7 @@ from .forms import (
     InvoiceScheduleForm,
     ClientCreditConfigForm,
     AddressInlineForm,
+    ClientProductPriceFormSet,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from .services.client_detail_service import (
@@ -38,6 +40,10 @@ from .services.credit_payment_service import (
     get_open_credit_orders_for_credit_management,
     get_selected_credit_orders_for_credit_management,
     get_selected_credit_orders_total,
+)
+from .services.product_price_service import (
+    build_client_product_price_initial,
+    update_client_product_prices,
 )
 from orders.models import Order
 from payment import services as payment_services
@@ -82,6 +88,25 @@ def _get_route_assignment_formset(*, data: Any = None, instance: Client | None =
         can_delete=True,
     )
     return formset_cls(data=data, instance=instance, prefix='routes')
+
+
+def _get_active_client_detail_tab(request: HttpRequest) -> str:
+    active_tab = request.GET.get('tab', 'sales')
+    available_tabs = {'sales', 'payments', 'invoices', 'routes', 'profile'}
+    if request.user.is_staff:
+        available_tabs.add('prices')
+    if active_tab not in available_tabs:
+        return 'sales'
+    return active_tab
+
+
+def _get_client_product_price_formset(*, data: Any = None, client: Client) -> Any:
+    if data is not None:
+        return ClientProductPriceFormSet(data, prefix='client_prices')
+    return ClientProductPriceFormSet(
+        initial=build_client_product_price_initial(client),
+        prefix='client_prices',
+    )
 
 
 def _copy_delivery_to_billing_if_missing(client: Client) -> bool:
@@ -750,6 +775,7 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
 @login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
+    active_detail_tab = _get_active_client_detail_tab(request)
     orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-created_at')
     payments = client.payments.all()
     all_payment_data = _build_payment_history(client)
@@ -810,9 +836,15 @@ def detail(request, pk):
 
     context = {
         'client': client,
+        'active_detail_tab': active_detail_tab,
         'orders': orders_page,
         'payments': payments_page,
         'all_payment_data': payments_page,
+        'client_product_price_formset': (
+            _get_client_product_price_formset(client=client)
+            if request.user.is_staff
+            else None
+        ),
         'contacts': contacts,
         'addresses': addresses,
         'branches': branches,
@@ -837,6 +869,31 @@ def detail(request, pk):
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@user_passes_test(_is_admin_user)
+@require_POST
+def update_product_prices(request: HttpRequest, pk: int) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk)
+    formset = _get_client_product_price_formset(data=request.POST, client=client)
+
+    if formset.is_valid():
+        summary = update_client_product_prices(
+            client=client,
+            forms=formset.forms,
+            user=request.user,
+        )
+        messages.success(
+            request,
+            (
+                f"Precios actualizados: {summary['updated_count']}. "
+                f"Nuevos o restaurados: {summary['created_count']}."
+            ),
+        )
+    else:
+        messages.error(request, 'No se pudieron actualizar los precios por producto.')
+
+    return redirect(f"{reverse('clients:detail', args=[client.pk])}?tab=prices")
 
 
 @login_required

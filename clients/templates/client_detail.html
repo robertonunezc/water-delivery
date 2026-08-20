@@ -154,35 +154,42 @@
     <div class="pg-card-body">
       <ul class="pg-nav pg-tabs" id="client-detail-tabs" role="tablist">
         <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab pg-active" id="sales-tab" data-pg-toggle="tab" data-pg-target="#sales-tab-pane" type="button" role="tab" aria-controls="sales-tab-pane" aria-selected="true">
+          <button class="pg-tab {% if active_detail_tab == 'sales' %}pg-active{% endif %}" id="sales-tab" data-pg-toggle="tab" data-pg-target="#sales-tab-pane" type="button" role="tab" aria-controls="sales-tab-pane" aria-selected="{% if active_detail_tab == 'sales' %}true{% else %}false{% endif %}">
             Ventas
           </button>
         </li>
         <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab" id="payments-tab" data-pg-toggle="tab" data-pg-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="false">
+          <button class="pg-tab {% if active_detail_tab == 'payments' %}pg-active{% endif %}" id="payments-tab" data-pg-toggle="tab" data-pg-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="{% if active_detail_tab == 'payments' %}true{% else %}false{% endif %}">
             Historial de transacciones
           </button>
         </li>
+        {% if request.user.is_staff %}
+          <li class="pg-tab-item" role="presentation">
+            <button class="pg-tab {% if active_detail_tab == 'prices' %}pg-active{% endif %}" id="client-prices-tab" data-pg-toggle="tab" data-pg-target="#client-prices-tab-pane" type="button" role="tab" aria-controls="client-prices-tab-pane" aria-selected="{% if active_detail_tab == 'prices' %}true{% else %}false{% endif %}">
+              Precios por producto
+            </button>
+          </li>
+        {% endif %}
         {% if client.requires_billing %}
           <li class="pg-tab-item" role="presentation">
-            <button class="pg-tab" id="invoices-tab" data-pg-toggle="tab" data-pg-target="#invoices-tab-pane" type="button" role="tab" aria-controls="invoices-tab-pane" aria-selected="false">
+            <button class="pg-tab {% if active_detail_tab == 'invoices' %}pg-active{% endif %}" id="invoices-tab" data-pg-toggle="tab" data-pg-target="#invoices-tab-pane" type="button" role="tab" aria-controls="invoices-tab-pane" aria-selected="{% if active_detail_tab == 'invoices' %}true{% else %}false{% endif %}">
               Facturas
             </button>
           </li>
         {% endif %}
         <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab" id="routes-tab" data-pg-toggle="tab" data-pg-target="#routes-tab-pane" type="button" role="tab" aria-controls="routes-tab-pane" aria-selected="false">
+          <button class="pg-tab {% if active_detail_tab == 'routes' %}pg-active{% endif %}" id="routes-tab" data-pg-toggle="tab" data-pg-target="#routes-tab-pane" type="button" role="tab" aria-controls="routes-tab-pane" aria-selected="{% if active_detail_tab == 'routes' %}true{% else %}false{% endif %}">
             Rutas
           </button>
         </li>
         <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab" id="profile-tab" data-pg-toggle="tab" data-pg-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="false">
+          <button class="pg-tab {% if active_detail_tab == 'profile' %}pg-active{% endif %}" id="profile-tab" data-pg-toggle="tab" data-pg-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="{% if active_detail_tab == 'profile' %}true{% else %}false{% endif %}">
             Perfil
           </button>
         </li>
       </ul>
       <div class="tab-content">
-        <div class="pg-tab-pane pg-fade pg-show pg-active" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'sales' %}pg-show pg-active{% endif %}" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
           <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
             <h2 class="pg-h5 pg-mb-0">Ventas Recientes</h2>
             <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-center pg-justify-end">
@@ -359,7 +366,7 @@
           {% endif %}
         </div>
 
-        <div class="pg-tab-pane pg-fade" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'payments' %}pg-show pg-active{% endif %}" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
           <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
             <h2 class="pg-h5 pg-mb-0">Pagos Recientes</h2>
             <small class="pg-text-muted">
@@ -492,8 +499,89 @@
           {% endif %}
         </div>
 
+        {% if request.user.is_staff %}
+          <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'prices' %}pg-show pg-active{% endif %}" id="client-prices-tab-pane" role="tabpanel" aria-labelledby="client-prices-tab" tabindex="0">
+            <form method="post" action="{% url 'clients:update_product_prices' client.pk %}" id="client-product-prices-form">
+              {% csrf_token %}
+              {{ client_product_price_formset.management_form }}
+              <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-align-lg-center pg-gap-2 pg-mb-3">
+                <h2 class="pg-h5 pg-mb-0">Precios por producto</h2>
+                <button type="submit" class="pg-button pg-button-primary pg-button-sm">
+                  Guardar precios
+                </button>
+              </div>
+              {% if client_product_price_formset.non_form_errors %}
+                <div class="pg-alert pg-alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
+              {% endif %}
+              {% if client_product_price_formset.forms %}
+                <div class="pg-table-responsive">
+                  <table class="pg-table pg-table-hover pg-align-middle">
+                    <thead class="pg-table-light">
+                      <tr>
+                        <th>Producto</th>
+                        <th>Presentación</th>
+                        <th>Precio base</th>
+                        <th>Precio cliente</th>
+                        <th>Activo</th>
+                        <th>Nota</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for price_form in client_product_price_formset.forms %}
+                        <tr>
+                          <td>
+                            {{ price_form.product_id }}
+                            {% if price_form.product %}
+                              <strong>{{ price_form.product.name }}</strong>
+                            {% else %}
+                              <span class="pg-text-danger">Producto no válido</span>
+                            {% endif %}
+                            {{ price_form.product_id.errors }}
+                            {{ price_form.non_field_errors }}
+                          </td>
+                          <td>
+                            {% if price_form.product %}
+                              {{ price_form.product.get_presentation_display }}
+                            {% else %}
+                              <span class="pg-text-muted">-</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {% if price_form.product %}
+                              ${{ price_form.product.price|floatformat:2 }}
+                            {% else %}
+                              <span class="pg-text-muted">-</span>
+                            {% endif %}
+                          </td>
+                          <td>
+                            {{ price_form.price }}
+                            {{ price_form.price.errors }}
+                          </td>
+                          <td>
+                            <div class="pg-checkbox">
+                              {{ price_form.active }}
+                              <label class="pg-checkbox-label" for="{{ price_form.active.id_for_label }}">Activo</label>
+                            </div>
+                            {{ price_form.active.errors }}
+                          </td>
+                          <td>
+                            {{ price_form.note }}
+                            {{ price_form.note.errors }}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% else %}
+                <p class="pg-text-muted pg-mb-0">No hay productos activos.</p>
+              {% endif %}
+            </form>
+          </div>
+        {% endif %}
+
         {% if client.requires_billing %}
-          <div class="pg-tab-pane pg-fade" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
+          <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'invoices' %}pg-show pg-active{% endif %}" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
             <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
               <h2 class="pg-h5 pg-mb-0">Facturas</h2>
               <small class="pg-text-muted">
@@ -549,7 +637,7 @@
           </div>
         {% endif %}
 
-        <div class="pg-tab-pane pg-fade" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'routes' %}pg-show pg-active{% endif %}" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
           <h2 class="pg-h5 pg-mb-3">Rutas</h2>
           {% if route_clients or upcoming_route_orders or recent_completed_routes %}
             {% if route_clients %}
@@ -656,7 +744,7 @@
           {% endif %}
         </div>
 
-        <div class="pg-tab-pane pg-fade" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'profile' %}pg-show pg-active{% endif %}" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
           <div class="client-profile-grid">
             <section class="client-profile-section">
               <h3><i class="fas fa-user pg-me-2"></i>Contactos</h3>

@@ -30,6 +30,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='address',
             name='type',
-            field=models.CharField(choices=[('billing', 'Fiscal'), ('shipping', 'Ubicacion fisica'), ('other', 'Otro')], default='other', max_length=50, verbose_name='Tipo'),
+            field=models.CharField(choices=[('billing', 'Fiscal'), ('shipping', 'Entrega'), ('other', 'Otro')], default='other', max_length=50, verbose_name='Tipo'),
         ),
     ]

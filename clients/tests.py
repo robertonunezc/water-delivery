@@ -38,6 +38,7 @@ from core.models import Transport
 from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderStatus
 from payment.models import Payment
+from product.models import Product, ProductClientPrice
 from routes.models import Route, RouteClient
 
 User = get_user_model()
@@ -954,6 +955,143 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         self.assertContains(response, '¡Atención! Pagos Vencidos')
         self.assertContains(response, '<th>Factura</th>')
         self.assertContains(response, '<span class="pg-text-muted">-</span>')
+
+
+class ClientDetailProductPriceTabTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-product-prices-user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(
+            name='Cliente precios por producto',
+            active=True,
+        )
+        self.product = Product.objects.create(
+            name='Garrafón',
+            presentation='20',
+            unit_of_measure=1,
+            price=25.0,
+        )
+        self.second_product = Product.objects.create(
+            name='Botella',
+            presentation='600',
+            unit_of_measure=2,
+            price=12.0,
+        )
+        self.client_price = ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.customer,
+            price=21.5,
+            note='Precio anterior',
+        )
+
+    def _price_post_data(
+        self,
+        *,
+        product: Product,
+        price: str,
+        active: bool = True,
+        note: str = '',
+    ) -> dict[str, str]:
+        data = {
+            'client_prices-TOTAL_FORMS': '1',
+            'client_prices-INITIAL_FORMS': '0',
+            'client_prices-MIN_NUM_FORMS': '0',
+            'client_prices-MAX_NUM_FORMS': '1000',
+            'client_prices-0-product_id': str(product.pk),
+            'client_prices-0-price': price,
+            'client_prices-0-note': note,
+        }
+        if active:
+            data['client_prices-0-active'] = 'on'
+        return data
+
+    def test_detail_renders_product_price_tab(self) -> None:
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="client-prices-tab"')
+        self.assertContains(response, 'Precios por producto')
+        self.assertContains(response, self.product.name)
+        self.assertContains(response, self.second_product.name)
+        formset = response.context['client_product_price_formset']
+        prices_by_product = {
+            form.product.pk: form.initial['price']
+            for form in formset.forms
+        }
+        self.assertEqual(prices_by_product[self.product.pk], self.client_price.price)
+        self.assertEqual(prices_by_product[self.second_product.pk], self.second_product.price)
+
+    def test_update_product_prices_changes_existing_client_price(self) -> None:
+        response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='24.75',
+                note='Contrato actualizado',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            response.url,
+            f"{reverse('clients:detail', args=[self.customer.pk])}?tab=prices",
+        )
+        self.client_price.refresh_from_db()
+        self.assertEqual(self.client_price.price, 24.75)
+        self.assertTrue(self.client_price.active)
+        self.assertEqual(self.client_price.note, 'Contrato actualizado')
+
+    def test_update_product_prices_restores_soft_deleted_client_price(self) -> None:
+        self.client_price.delete()
+
+        response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='26.00',
+                note='Restaurado desde cliente',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.client_price.refresh_from_db()
+        self.assertIsNone(self.client_price.deleted_at)
+        self.assertEqual(self.client_price.price, 26.0)
+        self.assertEqual(self.client_price.note, 'Restaurado desde cliente')
+        self.assertEqual(
+            ProductClientPrice.all_objects.filter(
+                product=self.product,
+                client=self.customer,
+            ).count(),
+            1,
+        )
+
+    def test_product_price_updates_require_staff_user(self) -> None:
+        regular_user = User.objects.create_user(
+            username='client-product-prices-regular',
+            password='testpass123',
+        )
+        self.client.force_login(regular_user)
+
+        detail_response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+        post_response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='29.00',
+                note='No autorizado',
+            ),
+        )
+
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertNotContains(detail_response, 'id="client-prices-tab"')
+        self.assertEqual(post_response.status_code, 302)
+        self.client_price.refresh_from_db()
+        self.assertEqual(self.client_price.price, 21.5)
 
 
 class ClientCreditManagementOrderScopeTests(FastTenantTestCase):

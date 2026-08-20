@@ -156,7 +156,7 @@ class RouteClientOrder(TimeStampedModel):
         # Validate the client has an address of type delivery
         if not self.client.has_delivery_address():
             raise ValidationError({
-                'client': f"El cliente '{self.client.name}' no tiene una dirección de envío válida. Por favor, agregue una dirección de tipo 'Ubicacion Fisica' para este cliente."
+                'client': f"El cliente '{self.client.name}' no tiene una dirección de envío válida. Por favor, agregue una dirección de tipo 'Entrega' para este cliente."
             })
         
 
@@ -231,7 +231,7 @@ class RouteClient(TimeStampedModel):
 
         if not self.client.has_delivery_address():
             raise ValidationError({
-                'client': f"El cliente '{self.client.name}' no tiene una dirección de envío válida. Por favor, agregue una dirección de tipo 'Ubicacion Fisica' para este cliente."
+                'client': f"El cliente '{self.client.name}' no tiene una dirección de envío válida. Por favor, agregue una dirección de 'Entrega' para este cliente."
             })
     
     def clean(self):

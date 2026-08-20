@@ -1,6 +1,10 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.forms import formset_factory
 from decimal import Decimal
+
+from product.models import Product
+
 from .models import (
     Client,
     Address,
@@ -332,7 +336,6 @@ class AddressInlineForm(forms.ModelForm):
     TYPE_CHOICES_WITH_SHIPPING = [
         ('billing', 'Fiscal'),
         ('shipping', 'Entrega'),
-        ('delivery', 'Ubicacion fisica'),
         ('other', 'Otro'),
     ]
 
@@ -383,6 +386,61 @@ class ClientsCSVImportForm(forms.Form):
         if not csv_file.name.lower().endswith(".csv"):
             raise ValidationError("El archivo debe tener extensión .csv")
         return csv_file
+
+
+class ClientProductPriceForm(forms.Form):
+    product_id = forms.IntegerField(widget=forms.HiddenInput())
+    price = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.00'),
+        label='Precio',
+        widget=forms.NumberInput(attrs={
+            'class': 'pg-input',
+            'step': '0.01',
+            'min': '0',
+        }),
+    )
+    active = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Activo',
+        widget=forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+    )
+    note = forms.CharField(
+        required=False,
+        label='Nota',
+        widget=forms.TextInput(attrs={'class': 'pg-input'}),
+    )
+
+    product: Product | None = None
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.product = self._get_product_from_payload()
+
+    def _get_product_from_payload(self) -> Product | None:
+        product_id = self.initial.get('product_id')
+        if self.is_bound:
+            product_id = self.data.get(self.add_prefix('product_id'))
+
+        try:
+            parsed_product_id = int(product_id)
+        except (TypeError, ValueError):
+            return None
+
+        return Product.all_objects.filter(pk=parsed_product_id).first()
+
+    def clean_product_id(self) -> int:
+        product_id = self.cleaned_data['product_id']
+        product = Product.objects.filter(pk=product_id).first()
+        if product is None:
+            raise ValidationError('Seleccione un producto activo válido.')
+        self.product = product
+        return product_id
+
+
+ClientProductPriceFormSet = formset_factory(ClientProductPriceForm, extra=0)
 
 
 class ClientCoreForm(forms.ModelForm):
