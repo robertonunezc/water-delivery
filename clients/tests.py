@@ -956,6 +956,431 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         self.assertContains(response, '<span class="pg-text-muted">-</span>')
 
 
+class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='credit-management-scope-user',
+            password='testpass123',
+        )
+        self.client.force_login(self.user)
+        self.corporate = Client.objects.create(
+            name='Corporativo alcance credito',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.branch = Client.objects.create(
+            name='Sucursal alcance credito',
+            type='branch',
+            corporate=self.corporate,
+            credit_override_enabled=False,
+        )
+        self.other_corporate = Client.objects.create(
+            name='Corporativo fuera alcance credito',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        self.other_branch = Client.objects.create(
+            name='Sucursal fuera alcance credito',
+            type='branch',
+            corporate=self.other_corporate,
+            credit_override_enabled=False,
+        )
+
+    def _credit_order(
+        self,
+        client: Client,
+        amount: Decimal,
+        *,
+        order_date: datetime,
+        credit_account: Client | None = None,
+        status: str = OrderStatus.COMPLETED.value,
+    ) -> Order:
+        order = Order.objects.create(
+            client=client,
+            status=status,
+            total_amount=amount,
+            type='credito',
+        )
+        Order.objects.filter(pk=order.pk).update(order_date=order_date)
+        order.refresh_from_db()
+        pending_credit = Payment.objects.create(
+            client=client,
+            order=order,
+            amount=amount,
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=credit_account or client.get_credit_account(),
+            transaction_type='purchase',
+            amount=amount,
+            debt_before=Decimal('0.00'),
+            debt_after=amount,
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            reference_payment=pending_credit,
+            created_by=self.user,
+        )
+        return order
+
+    def test_branch_scope_lists_own_pending_credit_orders_newest_first(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        older = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=2),
+            credit_account=self.corporate,
+        )
+        newer = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=self.corporate,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.branch)
+
+        self.assertEqual([order.pk for order in orders], [newer.pk, older.pk])
+
+    def test_corporate_scope_lists_all_branch_credit_orders_newest_first(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        override_branch = Client.objects.create(
+            name='Sucursal credito propio',
+            type='branch',
+            corporate=self.corporate,
+            credit_override_enabled=True,
+            credit_limit=Decimal('1000.00'),
+            can_pay_with_credit=True,
+        )
+        inherited_order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=2),
+            credit_account=self.corporate,
+        )
+        override_order = self._credit_order(
+            override_branch,
+            Decimal('180.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=override_branch,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        self.assertEqual([order.pk for order in orders], [override_order.pk, inherited_order.pk])
+
+    def test_scope_excludes_paid_cancelled_and_out_of_scope_orders(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        selectable = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=self.corporate,
+        )
+        paid = self._credit_order(
+            self.branch,
+            Decimal('80.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        Payment.objects.create(
+            client=self.branch,
+            order=paid,
+            amount=Decimal('80.00'),
+            method='cash',
+            status='completed',
+            created_by=self.user,
+        )
+        self._credit_order(
+            self.other_branch,
+            Decimal('90.00'),
+            order_date=timezone.now(),
+            credit_account=self.other_corporate,
+        )
+        self._credit_order(
+            self.branch,
+            Decimal('70.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+            status=OrderStatus.CANCELLED.value,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        self.assertEqual([order.pk for order in orders], [selectable.pk])
+
+    def test_pay_client_orders_allows_corporate_scope_for_branch_credit_orders(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+        from payment import services as payment_services
+
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        allowed_orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        result = payment_services.pay_client_orders(
+            client=self.corporate,
+            orders=[order],
+            payment_method='cash',
+            amount=Decimal('100.00'),
+            request_user=self.user,
+            allowed_order_ids=[allowed_order.pk for allowed_order in allowed_orders],
+        )
+
+        self.assertEqual(result['selected_total'], Decimal('100.00'))
+        self.corporate.refresh_from_db()
+        self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
+        self.assertTrue(order.payments.filter(method='cash', client=self.branch).exists())
+
+    def test_corporate_balance_payment_spends_corporate_balance_for_branch_order(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+        from payment import services as payment_services
+
+        self.corporate.balance = Decimal('120.00')
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['balance', 'current_debt', 'updated_at'])
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        allowed_orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        payment_services.pay_client_orders(
+            client=self.corporate,
+            orders=[order],
+            payment_method='balance',
+            amount=Decimal('100.00'),
+            request_user=self.user,
+            allowed_order_ids=[allowed_order.pk for allowed_order in allowed_orders],
+            payment_client=self.corporate,
+        )
+
+        self.corporate.refresh_from_db()
+        self.branch.refresh_from_db()
+        self.assertEqual(self.corporate.balance, Decimal('20.00'))
+        self.assertEqual(self.branch.balance, Decimal('0.00'))
+        self.assertTrue(order.payments.filter(method='balance', client=self.corporate).exists())
+
+    def test_pay_credit_requires_selected_orders_for_payment(self) -> None:
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'amount': '100.00',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Selecciona al menos un pedido a crédito para pagar.')
+
+    def test_pay_credit_blocks_underpayment_with_split_guidance(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
+
+    def test_pay_credit_rejects_balance_method_for_received_payment(self) -> None:
+        self.branch.balance = Decimal('150.00')
+        self.branch.save(update_fields=['balance', 'updated_at'])
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '150.00',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'balance',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Método de pago inválido')
+        self.branch.refresh_from_db()
+        self.corporate.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(self.branch.balance, Decimal('150.00'))
+        self.assertEqual(self.corporate.current_debt, Decimal('100.00'))
+        self.assertFalse(order.is_paid)
+
+    def test_pay_credit_invalid_form_preserves_selected_orders(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'description': 'Pago recibido',
+                'notes': 'corto',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(order.pk, response.context['selected_order_ids'])
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, 'checked')
+
+    def test_pay_credit_payment_settles_orders_and_adds_overpayment_to_balance(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '200.00',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.corporate.refresh_from_db()
+        self.branch.refresh_from_db()
+        order.refresh_from_db()
+        self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
+        self.assertEqual(self.branch.balance, Decimal('50.00'))
+        self.assertTrue(order.is_paid)
+
+    def test_pay_credit_balance_payment_uses_screen_client_balance(self) -> None:
+        self.corporate.balance = Decimal('160.00')
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['balance', 'current_debt', 'updated_at'])
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.corporate.pk]),
+            {
+                'client': self.corporate.pk,
+                'transaction_type': 'payment_from_balance',
+                'orders': [str(order.pk)],
+                'description': 'Pago con saldo',
+                'notes': 'Pago aplicado usando saldo corporativo.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.corporate.refresh_from_db()
+        self.branch.refresh_from_db()
+        self.assertEqual(self.corporate.balance, Decimal('10.00'))
+        self.assertEqual(self.branch.balance, Decimal('0.00'))
+        self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
+
+    def test_pay_credit_page_shows_credit_order_selection_and_totals(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'name="orders" value="{order.pk}"')
+        self.assertContains(response, 'Total pedidos seleccionados')
+        self.assertContains(response, 'Monto disponible')
+        self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
+
+    def test_pay_credit_page_does_not_show_forgiveness_option(self) -> None:
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+        self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Condonación de deuda')
+
+
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(

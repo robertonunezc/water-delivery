@@ -291,6 +291,77 @@ class CreditOrderSettlementTests(FastTenantTestCase):
 		self.assertEqual(self.order.total_paid, Decimal('0.00'))
 		self.assertTrue(Order.objects.unpaid().filter(pk=self.order.pk).exists())
 
+	def test_balance_settlement_records_payment_from_balance_credit_transaction(self):
+		self.customer.balance = Decimal('1000.00')
+		self.customer.save(update_fields=['balance', 'updated_at'])
+
+		payment, error = services.settle_credit_order_payment(
+			order=self.order,
+			payment_method='balance',
+			amount=Decimal('1000.00'),
+			request_user=self.user,
+			payment_client=self.customer,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment.method, 'balance')
+		self.assertTrue(
+			CreditTransaction.objects.filter(
+				client=self.customer,
+				reference_order=self.order,
+				reference_payment=payment,
+				transaction_type='payment_from_balance',
+				amount=Decimal('1000.00'),
+			).exists()
+		)
+
+	def test_pay_client_orders_rejects_balance_overpayment(self):
+		self.customer.balance = Decimal('1200.00')
+		self.customer.save(update_fields=['balance', 'updated_at'])
+
+		with self.assertRaisesRegex(
+			services.ClientOrderPaymentError,
+			'Pago con saldo debe coincidir',
+		):
+			services.pay_client_orders(
+				client=self.customer,
+				orders=[self.order],
+				payment_method='balance',
+				amount=Decimal('1100.00'),
+				request_user=self.user,
+				payment_client=self.customer,
+			)
+
+		self.customer.refresh_from_db()
+		self.pending_credit.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('1000.00'))
+		self.assertEqual(self.customer.balance, Decimal('1200.00'))
+		self.assertEqual(self.pending_credit.status, 'pending')
+		self.assertFalse(self.order.payments.filter(method='balance').exists())
+
+	def test_pay_client_orders_rejects_credit_order_without_pending_marker(self):
+		self.pending_credit.status = 'completed'
+		self.pending_credit.save(
+			update_fields=['status', 'updated_at'],
+			apply_accounting=False,
+		)
+
+		with self.assertRaisesRegex(
+			services.ClientOrderPaymentError,
+			'ya no tiene crédito pendiente',
+		):
+			services.pay_client_orders(
+				client=self.customer,
+				orders=[self.order],
+				payment_method='cash',
+				amount=Decimal('1000.00'),
+				request_user=self.user,
+			)
+
+		self.customer.refresh_from_db()
+		self.assertEqual(self.customer.current_debt, Decimal('1000.00'))
+		self.assertFalse(self.order.payments.filter(method='cash').exists())
+
 	def test_order_payment_endpoint_reduces_credit_debt(self):
 		response = self.client.post(
 			reverse('orders:create_payment_for_order', args=[self.order.pk]),

@@ -90,7 +90,6 @@ class ManualCreditTransactionForm(forms.Form):
         ('adjustment', 'Ajuste manual de deuda'),
         ('payment', 'Pago de deuda'),
         ('payment_from_balance', 'Pago con Saldo'),
-        ('forgiveness', 'Condonación de deuda'),
         ('correction', 'Corrección'),
         ('limit_change', 'Cambio de límite de crédito'),
     ]
@@ -113,8 +112,9 @@ class ManualCreditTransactionForm(forms.Form):
         max_digits=10,
         decimal_places=2,
         min_value=Decimal('0.01'),
+        required=False,
         label="Monto",
-        help_text="Para pagos/condonaciones: reduce la deuda. Para ajustes: puede aumentar o reducir según el tipo.",
+        help_text="Para pago de deuda: monto recibido. Para ajustes/correcciones: monto del movimiento.",
         widget=forms.NumberInput(attrs={
             'class': 'pg-input',
             'step': '0.01',
@@ -164,6 +164,12 @@ class ManualCreditTransactionForm(forms.Form):
         new_credit_limit = cleaned_data.get('new_credit_limit')
         client = cleaned_data.get('client')
         amount = cleaned_data.get('amount')
+        amount_required_types = {'payment', 'adjustment', 'correction'}
+
+        if transaction_type in amount_required_types and amount is None:
+            raise ValidationError({
+                'amount': 'El monto es obligatorio para este tipo de transacción.'
+            })
         
         # Validate credit limit change
         if transaction_type == 'limit_change':
@@ -174,20 +180,6 @@ class ManualCreditTransactionForm(forms.Form):
             if client and new_credit_limit < client.current_debt:
                 raise ValidationError({
                     'new_credit_limit': f'El nuevo límite (${new_credit_limit:.2f}) no puede ser menor que la deuda actual (${client.current_debt:.2f}).'
-                })
-        
-        # Validate debt payment doesn't exceed current debt
-        if transaction_type in ['payment', 'forgiveness', 'payment_from_balance'] and client and amount:
-            if amount > client.current_debt:
-                raise ValidationError({
-                    'amount': f'El monto (${amount:.2f}) no puede ser mayor que la deuda actual (${client.current_debt:.2f}).'
-                })
-        
-        # Validate balance availability for payment_from_balance
-        if transaction_type == 'payment_from_balance' and client and amount:
-            if amount > client.balance:
-                raise ValidationError({
-                    'amount': f'Saldo insuficiente. Disponible: ${client.balance:.2f}, Requerido: ${amount:.2f}'
                 })
         
         return cleaned_data

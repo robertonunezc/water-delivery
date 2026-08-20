@@ -128,7 +128,7 @@ def build_client_detail_snapshot(
                 "value": credit_value,
                 "note": credit_note,
                 "tone": "warning" if debt_percentage > 60 else "success",
-                "action_label": "Gestionar crédito",
+                "action_label": "Pago de deuda",
                 "action_url_name": "clients:pay_credit",
                 "action_icon": "fas fa-credit-card",
             },
