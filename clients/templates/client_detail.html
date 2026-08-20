@@ -211,7 +211,7 @@
                     <th>Estado</th>
                     <th>Total</th>
                     <th>Productos</th>
-                    <th>Transacciones</th>
+                    <th>Historial de Transacciones</th>
                     <th>Estado de Pagos</th>
                     <th>Acciones</th>
                   </tr>
@@ -258,11 +258,13 @@
                         </small>
                       </td>
                       <td>
-                        {% for payment in order.payments.all %}
-                          <span class="pg-badge pg-bg-secondary">#{{ payment.id }} {{ payment.get_method_display }}</span><br>
-                        {% empty %}
-                          <span class="pg-text-muted">Sin pago</span>
-                        {% endfor %}
+                        <small>
+                          {% for payment in order.payments.all %}
+                            <span class="pg-badge pg-bg-secondary">#{{ payment.id }} {{ payment.get_method_display }}</span><br>
+                          {% empty %}
+                            <span class="pg-text-muted">Sin pago</span>
+                          {% endfor %}
+                        </small>
                       </td>
                       <td>
                         {% if order.status == 'CANCELLED' %}
