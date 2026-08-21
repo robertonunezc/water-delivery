@@ -93,10 +93,9 @@
                       <div id="affordability-status" class="pg-ms-3 pg-text-end"></div>
                     </div>
                     <div class="pg-text-muted financial-summary-help">
-                      {% if client.can_pay_with_credit %}
-                        {% if client.get_available_credit > 0 %}Puede apoyar ventas cuando el saldo no alcance.{% else %}Sin crédito utilizable en este momento.{% endif %}
-                      {% else %}
+                      {% if not client.can_pay_with_credit %}
                         Cliente no puede pagar con credito
+
                       {% endif %}
                     </div>
                   </div>
