@@ -512,6 +512,11 @@ class CreditTransaction(TimeStampedModel):
 from invoice.models import InvoiceSchedule
 ClientBillingFrecuency = InvoiceSchedule  # backward compat alias
 
+ADDRESS_TYPE_CHOICES = [
+    ('billing', 'Fiscal'),
+    ('delivery', 'Entrega'),
+    ('other', 'Otro'),
+]
 class Contact(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='contacts', on_delete=models.CASCADE)
     name = models.CharField(max_length=100, verbose_name="Nombre")
@@ -533,7 +538,7 @@ class Contact(TimeStampedModel):
 
 class Address(TimeStampedModel):
     client = models.ForeignKey('Client', related_name='addresses', on_delete=models.PROTECT, verbose_name="Cliente")
-    type = models.CharField(max_length=50, choices=[('billing', 'Fiscal'), ('delivery', 'Entrega'), ('other', 'Otro')], default='delivery', verbose_name="Tipo")
+    type = models.CharField(max_length=50, choices=ADDRESS_TYPE_CHOICES, default='delivery', verbose_name="Tipo")
     street = models.CharField(max_length=255, verbose_name="Calle")
     exterior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Exterior")
     interior_number = models.CharField(max_length=20, blank=True, null=True, verbose_name="No. Interior")

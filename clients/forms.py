@@ -6,6 +6,7 @@ from decimal import Decimal
 from product.models import Product
 
 from .models import (
+    ADDRESS_TYPE_CHOICES,
     Client,
     Address,
     BalanceTransaction,
@@ -332,19 +333,12 @@ class ClientBillingFrequencyForm(forms.ModelForm):
 
 class AddressInlineForm(forms.ModelForm):
     """Inline form for Address entries."""
-
-    TYPE_CHOICES_WITH_SHIPPING = [
-        ('billing', 'Fiscal'),
-        ('shipping', 'Entrega'),
-        ('other', 'Otro'),
-    ]
-
     same_as_previous = forms.BooleanField(
         required=False,
         label='Misma dirección que la anterior',
     )
 
-    type = forms.ChoiceField(choices=TYPE_CHOICES_WITH_SHIPPING, widget=forms.Select(attrs={'class': 'pg-select'}))
+    type = forms.ChoiceField(choices=ADDRESS_TYPE_CHOICES, widget=forms.Select(attrs={'class': 'pg-select'}))
 
     class Meta:
         model = Address
