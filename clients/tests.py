@@ -573,7 +573,7 @@ class AddressInlineFormTests(FastTenantTestCase):
         """Submitting without the helper field must not cause validation errors."""
         data = {
             'client': self.client_obj.pk,
-            'type': 'shipping',
+            'type': 'delivery',
             'street': 'Av. Test 1',
             'locality': 'Querétaro',
             'municipality': 'Querétaro',
