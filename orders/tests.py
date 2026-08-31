@@ -216,6 +216,31 @@ class UpdateOrderTestCase(FastTenantTestCase):
 
         self.assertEqual(result.total_amount, Decimal("90.00"))
 
+    def test_get_or_create_order_refreshes_reused_pending_item_prices(self) -> None:
+        """Reused pending orders should reflect current client-specific pricing."""
+        client_price = ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=20.00,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("20.00"),
+        )
+        self.order.total_amount = services.calculate_order_total(self.order)
+        self.order.save(update_fields=['subtotal_amount', 'total_amount'])
+
+        client_price.price = 25.00
+        client_price.save(update_fields=['price'])
+
+        order_data = services.get_or_create_order(client=self.client)
+
+        self.assertEqual(order_data.total_amount, Decimal("50.00"))
+        order_product = OrderProduct.objects.get(order=self.order, product=self.product)
+        self.assertEqual(order_product.unit_price, Decimal("25.00"))
+
 
 class UpdateOrderViewTestCase(FastTenantTestCase):
     """Integration tests for update_order endpoint behavior."""

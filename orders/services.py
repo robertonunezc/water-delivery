@@ -72,28 +72,8 @@ class OrderData:
     items: List = None
 
 
-def get_or_create_order(client=None, order_id=None, owner=None) -> OrderData:
-    if not client and not order_id:
-        raise ValueError("Se requiere un cliente o un ID de orden para obtener o crear una orden.")
-    if order_id:
-        try:
-            order = Order.objects.get(pk=order_id)
-            return OrderData(
-                id=order.id,
-                client_id=order.client_id,
-                total_amount=order.total_amount,
-                status=order.status,
-                created_at=order.created_at,
-                items=list(order.items.all())
-            )
-        except Order.DoesNotExist:
-            pass
-
-    existing_orders = get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client)
-    if existing_orders:
-        return existing_orders[0]
-
-    order = Order.objects.create(client=client, total_amount=Decimal('0.00'), owner=owner)
+def _order_data_from_order(order: Order) -> OrderData:
+    refresh_pending_order_prices(order)
     return OrderData(
         id=order.id,
         client_id=order.client_id,
@@ -104,19 +84,27 @@ def get_or_create_order(client=None, order_id=None, owner=None) -> OrderData:
     )
 
 
+def get_or_create_order(client=None, order_id=None, owner=None) -> OrderData:
+    if not client and not order_id:
+        raise ValueError("Se requiere un cliente o un ID de orden para obtener o crear una orden.")
+    if order_id:
+        try:
+            order = Order.objects.get(pk=order_id)
+            return _order_data_from_order(order)
+        except Order.DoesNotExist:
+            pass
+
+    existing_orders = get_client_orders(date=date.today(), status=OrderStatus.PENDING, client=client)
+    if existing_orders:
+        return existing_orders[0]
+
+    order = Order.objects.create(client=client, total_amount=Decimal('0.00'), owner=owner)
+    return _order_data_from_order(order)
+
+
 def get_client_orders(date: date, status: OrderStatus, client: Client) -> List[OrderData]:
     orders = Order.objects.filter(client=client, created_at__date=date, status=status.value)
-    return [
-        OrderData(
-            id=order.id,
-            client_id=order.client_id,
-            total_amount=order.total_amount,
-            status=order.status,
-            created_at=order.created_at,
-            items=list(order.items.all())
-        )
-        for order in orders
-    ]
+    return [_order_data_from_order(order) for order in orders]
 
 
 def get_product_price_for_client(product, client):
@@ -128,6 +116,26 @@ def get_product_price_for_client(product, client):
         if base_price is not None:
             return Decimal(str(base_price))
         return Decimal(str(getattr(product, 'price', 0.0)))
+
+
+def refresh_pending_order_prices(order: Order) -> bool:
+    if order.status != OrderStatus.PENDING.value:
+        return False
+
+    changed = False
+    for item in order.items.select_related('product').all():
+        unit_price = get_product_price_for_client(item.product, order.client)
+        if item.unit_price == unit_price:
+            continue
+        item.unit_price = unit_price
+        item.save(update_fields=['unit_price', 'updated_at'])
+        changed = True
+
+    if changed:
+        order.total_amount = calculate_order_total(order)
+        order.save(update_fields=['subtotal_amount', 'total_amount', 'updated_at'])
+
+    return changed
     
 def update_order(order: Order, quantity: int, product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
     unit_price = get_product_price_for_client(product, client)
