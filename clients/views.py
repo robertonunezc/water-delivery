@@ -62,7 +62,7 @@ def _get_address_formset(*, data=None, instance=None):
         Client,
         Address,
         form=AddressInlineForm,
-        extra=1,
+        extra=0,
         can_delete=True,
     )
     return formset_cls(data=data, instance=instance, prefix='addresses')
@@ -187,6 +187,10 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
     if contact_formset is None and client is not None:
         contact_formset = _get_contact_formset(instance=client)
 
+    client_product_price_formset = forms_override.get('client_product_price_formset')
+    if client_product_price_formset is None and client is not None:
+        client_product_price_formset = _get_client_product_price_formset(client=client)
+
     route_assignment_formset = forms_override.get('route_assignment_formset')
     if route_assignment_formset is None and client is not None:
         route_assignment_formset = _get_route_assignment_formset(instance=client)
@@ -244,6 +248,7 @@ def _build_client_v2_context(request, *, client=None, active_tab='basic', forms_
         'credit_policy_form': credit_policy_form,
         'address_formset': address_formset,
         'contact_formset': contact_formset,
+        'client_product_price_formset': client_product_price_formset,
         'route_assignment_formset': route_assignment_formset,
         'has_delivery_address': client.has_delivery_address() if client else False,
         'invoice_data_form': invoice_data_form,
@@ -405,6 +410,39 @@ def edit_v2(request, pk):
                 client=client,
                 active_tab=active_tab,
                 forms_override={'contact_formset': contact_formset},
+            )
+            return render(request, 'clients/client_form_v2.html', context)
+
+        if section == 'prices':
+            client_product_price_formset = _get_client_product_price_formset(
+                data=request.POST,
+                client=client,
+            )
+            if client_product_price_formset.is_valid():
+                summary = update_client_product_prices(
+                    client=client,
+                    forms=client_product_price_formset.forms,
+                    user=request.user,
+                )
+                messages.success(
+                    request,
+                    (
+                        f"Precios actualizados: {summary['updated_count']}. "
+                        f"Nuevos o restaurados: {summary['created_count']}."
+                    ),
+                )
+                if request.path.startswith('/administrador/'):
+                    edit_url = reverse('admin_edit_client', kwargs={'pk': client.pk})
+                else:
+                    edit_url = reverse('clients:edit_v2', kwargs={'pk': client.pk})
+                return redirect(f'{edit_url}?tab=prices')
+            context = _build_client_v2_context(
+                request,
+                client=client,
+                active_tab='prices',
+                forms_override={
+                    'client_product_price_formset': client_product_price_formset,
+                },
             )
             return render(request, 'clients/client_form_v2.html', context)
 

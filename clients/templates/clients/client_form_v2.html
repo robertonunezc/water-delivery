@@ -38,6 +38,11 @@
 				<li class="pg-tab-item" role="presentation">
 					<button class="pg-tab {% if active_tab == 'contacts' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab" {% if not client %}disabled{% endif %}>Contactos</button>
 				</li>
+				{% if client %}
+					<li class="pg-tab-item" role="presentation">
+						<button class="pg-tab {% if active_tab == 'prices' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab">Precio Productos</button>
+					</li>
+				{% endif %}
 				<li class="pg-tab-item" role="presentation">
 					<button class="pg-tab {% if active_tab == 'routes' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab" {% if not client %}disabled{% endif %}>Rutas</button>
 				</li>
@@ -120,7 +125,12 @@
 							{% if address_formset.non_form_errors %}
 								<div class="pg-alert pg-alert-danger">{{ address_formset.non_form_errors }}</div>
 							{% endif %}
-							<div class="pg-row pg-gap-3">
+							<div class="pg-flex pg-justify-end pg-mb-3">
+								<button type="button" class="pg-button pg-button-sm pg-button-outline-primary" id="add-address-row">
+									<i class="fas fa-plus"></i> Agregar dirección
+								</button>
+							</div>
+							<div class="pg-row pg-gap-3" id="address-formset-container">
 								{% for form in address_formset.forms %}
 									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
 										<div class="pg-row pg-gap-2">
@@ -143,6 +153,25 @@
 									</div>
 								{% endfor %}
 							</div>
+							<template id="address-empty-form-template">
+								<div class="pg-col-12 pg-border pg-rounded pg-p-3">
+									<div class="pg-row pg-gap-2">
+										<div class="pg-col-md-2">{{ address_formset.empty_form.type.label_tag }}{{ address_formset.empty_form.type }}</div>
+										<div class="pg-col-md-4">{{ address_formset.empty_form.street.label_tag }}{{ address_formset.empty_form.street }}</div>
+										<div class="pg-col-md-2">{{ address_formset.empty_form.exterior_number.label_tag }}{{ address_formset.empty_form.exterior_number }}</div>
+										<div class="pg-col-md-2">{{ address_formset.empty_form.interior_number.label_tag }}{{ address_formset.empty_form.interior_number }}</div>
+										<div class="pg-col-md-2">{{ address_formset.empty_form.zip_code.label_tag }}{{ address_formset.empty_form.zip_code }}</div>
+										<div class="pg-col-md-3">{{ address_formset.empty_form.locality.label_tag }}{{ address_formset.empty_form.locality }}</div>
+										<div class="pg-col-md-3">{{ address_formset.empty_form.municipality.label_tag }}{{ address_formset.empty_form.municipality }}</div>
+										<div class="pg-col-md-3">{{ address_formset.empty_form.state.label_tag }}{{ address_formset.empty_form.state }}</div>
+										<div class="pg-col-md-3">{{ address_formset.empty_form.country.label_tag }}{{ address_formset.empty_form.country }}</div>
+										<div class="pg-col-md-10">{{ address_formset.empty_form.reference.label_tag }}{{ address_formset.empty_form.reference }}</div>
+										<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ address_formset.empty_form.active }} <label class="pg-checkbox-label">Activo</label></div></div>
+										{% if address_formset.empty_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ address_formset.empty_form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
+										{{ address_formset.empty_form.id }}
+									</div>
+								</div>
+							</template>
 							<div class="pg-checkbox pg-mt-3">
 								<input class="pg-checkbox-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
 								<label class="pg-checkbox-label" for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
@@ -181,6 +210,86 @@
 						</form>
 					{% endif %}
 				</div>
+
+				{% if client %}
+					<div class="pg-tab-pane pg-fade {% if active_tab == 'prices' %}pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
+						<form method="post">
+							{% csrf_token %}
+							<input type="hidden" name="section" value="prices">
+							{{ client_product_price_formset.management_form }}
+							<div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-align-lg-center pg-gap-2 pg-mb-3">
+								<div class="form-section-title pg-mb-0">Precio Productos</div>
+								<button type="submit" class="pg-button pg-button-primary">Guardar Precios</button>
+							</div>
+							{% if client_product_price_formset.non_form_errors %}
+								<div class="pg-alert pg-alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
+							{% endif %}
+							{% if client_product_price_formset.forms %}
+								<div class="pg-table-responsive">
+									<table class="pg-table pg-table-hover pg-align-middle">
+										<thead class="pg-table-light">
+											<tr>
+												<th>Producto</th>
+												<th>Presentación</th>
+												<th>Precio base</th>
+												<th>Precio cliente</th>
+												<th>Activo</th>
+												<th>Nota</th>
+											</tr>
+										</thead>
+										<tbody>
+											{% for price_form in client_product_price_formset.forms %}
+												<tr>
+													<td>
+														{{ price_form.product_id }}
+														{% if price_form.product %}
+															<strong>{{ price_form.product.name }}</strong>
+														{% else %}
+															<span class="pg-text-danger">Producto no válido</span>
+														{% endif %}
+														{{ price_form.product_id.errors }}
+														{{ price_form.non_field_errors }}
+													</td>
+													<td>
+														{% if price_form.product %}
+															{{ price_form.product.get_presentation_display }}
+														{% else %}
+															<span class="pg-text-muted">-</span>
+														{% endif %}
+													</td>
+													<td>
+														{% if price_form.product %}
+															${{ price_form.product.price|floatformat:2 }}
+														{% else %}
+															<span class="pg-text-muted">-</span>
+														{% endif %}
+													</td>
+													<td>
+														{{ price_form.price }}
+														{{ price_form.price.errors }}
+													</td>
+													<td>
+														<div class="pg-checkbox">
+															{{ price_form.active }}
+															<label class="pg-checkbox-label" for="{{ price_form.active.id_for_label }}">Activo</label>
+														</div>
+														{{ price_form.active.errors }}
+													</td>
+													<td>
+														{{ price_form.note }}
+														{{ price_form.note.errors }}
+													</td>
+												</tr>
+											{% endfor %}
+										</tbody>
+									</table>
+								</div>
+							{% else %}
+								<p class="pg-text-muted pg-mb-0">No hay productos activos.</p>
+							{% endif %}
+						</form>
+					</div>
+				{% endif %}
 
 				<div class="pg-tab-pane pg-fade {% if active_tab == 'routes' %}pg-show pg-active{% endif %}" id="tab-routes" role="tabpanel">
 					{% if client %}
@@ -365,6 +474,32 @@
 
 {% block extra_js %}
 <script>
+	class AddressFormsetManager {
+		constructor() {
+			this.addButton = document.getElementById('add-address-row');
+			this.container = document.getElementById('address-formset-container');
+			this.template = document.getElementById('address-empty-form-template');
+			this.totalFormsInput = document.getElementById('id_addresses-TOTAL_FORMS');
+
+			if (!this.addButton || !this.container || !this.template || !this.totalFormsInput) {
+				return;
+			}
+
+			this.addButton.addEventListener('click', () => this.addRow());
+		}
+
+		addRow() {
+			const nextIndex = Number.parseInt(this.totalFormsInput.value, 10);
+			if (Number.isNaN(nextIndex)) {
+				return;
+			}
+
+			const rowHtml = this.template.innerHTML.replace(/__prefix__/g, String(nextIndex));
+			this.container.insertAdjacentHTML('beforeend', rowHtml);
+			this.totalFormsInput.value = String(nextIndex + 1);
+		}
+	}
+
 	class InvoiceFrequencyFieldController {
 		constructor() {
 			this.frequencySelect = document.getElementById('id_invoice_schedule-frequency');
@@ -415,6 +550,7 @@
 	}
 
 	document.addEventListener('DOMContentLoaded', () => {
+		new AddressFormsetManager();
 		new InvoiceFrequencyFieldController();
 
 		class RecurringBillingToggleController {

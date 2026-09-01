@@ -610,6 +610,50 @@ class AddressInlineFormTests(FastTenantTestCase):
             duplicate.full_clean()
 
 
+class ClientEditAddressTabTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-edit-addresses-user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(
+            name='Cliente editar direcciones',
+            active=True,
+        )
+        self.address = Address.objects.create(
+            client=self.customer,
+            type='delivery',
+            street='Av. Existente 123',
+            locality='Querétaro',
+            municipality='Querétaro',
+            state='Querétaro',
+            zip_code='76000',
+            country='Mexico',
+        )
+
+    def _edit_url(self) -> str:
+        return reverse('clients:edit_v2', kwargs={'pk': self.customer.pk})
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_edit_form_renders_only_existing_address_forms(self) -> None:
+        response = self.client.get(f'{self._edit_url()}?tab=addresses')
+
+        self.assertEqual(response.status_code, 200)
+        address_formset = response.context['address_formset']
+        self.assertEqual(len(address_formset.forms), 1)
+        self.assertEqual(address_formset.forms[0].instance, self.address)
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_edit_form_exposes_add_address_controls(self) -> None:
+        response = self.client.get(f'{self._edit_url()}?tab=addresses')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="add-address-row"')
+        self.assertContains(response, 'id="address-empty-form-template"')
+
+
 class ClientDetailOrderActionsTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
@@ -1023,7 +1067,10 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
             for form in formset.forms
         }
         self.assertEqual(prices_by_product[self.product.pk], self.client_price.price)
-        self.assertEqual(prices_by_product[self.second_product.pk], self.second_product.price)
+        self.assertEqual(
+            prices_by_product[self.second_product.pk],
+            self.second_product.price,
+        )
 
     def test_update_product_prices_changes_existing_client_price(self) -> None:
         response = self.client.post(
@@ -1092,6 +1139,108 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
         self.assertEqual(post_response.status_code, 302)
         self.client_price.refresh_from_db()
         self.assertEqual(self.client_price.price, 21.5)
+
+
+class ClientEditProductPriceTabTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-edit-product-prices-user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(
+            name='Cliente editar precios por producto',
+            active=True,
+        )
+        self.product = Product.objects.create(
+            name='Garrafón',
+            presentation='20',
+            unit_of_measure=1,
+            price=25.0,
+        )
+        self.second_product = Product.objects.create(
+            name='Botella',
+            presentation='600',
+            unit_of_measure=2,
+            price=12.0,
+        )
+        self.client_price = ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.customer,
+            price=21.5,
+            note='Precio anterior',
+        )
+
+    def _edit_url(self) -> str:
+        return reverse('clients:edit_v2', kwargs={'pk': self.customer.pk})
+
+    def _price_post_data(
+        self,
+        *,
+        product: Product,
+        price: str,
+        active: bool = True,
+        note: str = '',
+    ) -> dict[str, str]:
+        data = {
+            'section': 'prices',
+            'client_prices-TOTAL_FORMS': '1',
+            'client_prices-INITIAL_FORMS': '0',
+            'client_prices-MIN_NUM_FORMS': '0',
+            'client_prices-MAX_NUM_FORMS': '1000',
+            'client_prices-0-product_id': str(product.pk),
+            'client_prices-0-price': price,
+            'client_prices-0-note': note,
+        }
+        if active:
+            data['client_prices-0-active'] = 'on'
+        return data
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_edit_form_renders_product_price_tab(self) -> None:
+        response = self.client.get(f'{self._edit_url()}?tab=prices')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Precio Productos')
+        self.assertContains(response, 'id="tab-prices"')
+        self.assertContains(response, self.product.name)
+        self.assertContains(response, self.second_product.name)
+        formset = response.context['client_product_price_formset']
+        prices_by_product = {
+            form.product.pk: form.initial['price']
+            for form in formset.forms
+        }
+        self.assertEqual(prices_by_product[self.product.pk], self.client_price.price)
+        self.assertEqual(prices_by_product[self.second_product.pk], self.second_product.price)
+
+    @override_settings(STORAGES=TEST_STATIC_STORAGES)
+    def test_create_form_does_not_render_product_price_tab(self) -> None:
+        response = self.client.get(reverse('clients:create_v2'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Precio Productos')
+        self.assertNotContains(response, 'id="tab-prices"')
+
+    def test_edit_form_price_post_updates_client_price(self) -> None:
+        response = self.client.post(
+            self._edit_url(),
+            data=self._price_post_data(
+                product=self.product,
+                price='24.75',
+                note='Contrato actualizado desde edicion',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, f'{self._edit_url()}?tab=prices')
+        self.client_price.refresh_from_db()
+        self.assertEqual(self.client_price.price, 24.75)
+        self.assertTrue(self.client_price.active)
+        self.assertEqual(
+            self.client_price.note,
+            'Contrato actualizado desde edicion',
+        )
 
 
 class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
