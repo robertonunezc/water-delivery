@@ -372,6 +372,17 @@ class UpdateOrderViewTestCase(FastTenantTestCase):
         self.assertEqual(self.order.subtotal_amount, Decimal("50.00"))
         self.assertEqual(self.order.total_amount, Decimal("50.00"))
 
+    def test_update_endpoint_persists_submitted_order_date(self) -> None:
+        original_time = timezone.localtime(self.order.order_date).time()
+
+        response = self._post_update({"order_date": "2026-07-14"})
+
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        saved_order_date = timezone.localtime(self.order.order_date)
+        self.assertEqual(saved_order_date.date(), date(2026, 7, 14))
+        self.assertEqual(saved_order_date.time().replace(microsecond=0), original_time.replace(microsecond=0))
+
     def test_update_endpoint_product_change_can_persist_notes(self) -> None:
         response = self._post_update(
             {

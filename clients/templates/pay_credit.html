@@ -53,6 +53,23 @@
                         {% endif %}
                     </div>
 
+                    <div class="pg-mb-3">
+                        <label for="{{ form.date.id_for_label }}" class="pg-label">
+                            {{ form.date.label }}
+                        </label>
+                        {{ form.date }}
+                        {% if form.date.help_text %}
+                            <small class="pg-field-help pg-text-muted pg-block">{{ form.date.help_text }}</small>
+                        {% endif %}
+                        {% if form.date.errors %}
+                            <div class="pg-text-danger pg-mt-1">
+                                {% for error in form.date.errors %}
+                                    <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+
                     <div class="pg-mb-3" id="amount_row">
                         <label for="{{ form.amount.id_for_label }}" class="pg-label">
                             {{ form.amount.label }}

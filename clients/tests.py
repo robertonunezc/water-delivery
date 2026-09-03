@@ -1605,6 +1605,40 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(self.branch.balance, Decimal('50.00'))
         self.assertTrue(order.is_paid)
 
+    def test_pay_credit_payment_uses_submitted_transaction_date(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('150.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('150.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_credit', args=[self.branch.pk]),
+            {
+                'client': self.branch.pk,
+                'transaction_type': 'payment',
+                'orders': [str(order.pk)],
+                'amount': '150.00',
+                'date': '2026-07-14',
+                'description': 'Pago recibido',
+                'notes': 'Pago recibido con referencia bancaria.',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        payment = order.payments.get(method='cash')
+        payment_date = timezone.localtime(payment.date)
+        credit_transaction = CreditTransaction.objects.get(
+            reference_order=order,
+            transaction_type='payment',
+        )
+        self.assertEqual(payment_date.date(), date(2026, 7, 14))
+        self.assertEqual(credit_transaction.date, date(2026, 7, 14))
+
     def test_pay_credit_balance_payment_uses_screen_client_balance(self) -> None:
         self.corporate.balance = Decimal('160.00')
         self.corporate.current_debt = Decimal('150.00')

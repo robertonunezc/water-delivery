@@ -80,7 +80,7 @@ class Payment(TimeStampedModel):
                         f"Monto requerido: ${self.amount:.2f}"
                     )
         
-    def apply_accounting_side_effects(self):
+    def apply_accounting_side_effects(self, transaction_date=None):
         """Apply financial mutations based on payment method."""
         from clients.services import balance_service
         from django.core.exceptions import ValidationError
@@ -93,6 +93,7 @@ class Payment(TimeStampedModel):
                 client=self.client,
                 amount=self.amount,
                 transaction_type='payment',
+                date=transaction_date,
                 user=self.created_by,
                 reference_order=self.order,
                 reference_payment=None,

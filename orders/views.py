@@ -17,6 +17,7 @@ import json
 
 from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, OrderSplit
 from .forms import SplitOrderForm
+from core.utils import combine_date_with_local_time, parse_date_input
 from product.models import Product, ProductClientPrice
 from clients.models import Client
 from .  import services as order_services
@@ -477,6 +478,7 @@ def update_order(request, order_pk):
     discount = None
     product_id = data.get('product_id')
     notes = data.get('notes')
+    submitted_order_date = None
 
     try:
         if 'quantity' in data:
@@ -485,6 +487,15 @@ def update_order(request, order_pk):
             discount = Decimal(str(data.get('discount', '0')))
     except (TypeError, ValueError):
         return HttpResponseBadRequest('Invalid quantity or discount format')
+
+    if 'order_date' in data:
+        try:
+            submitted_order_date = parse_date_input(
+                data.get('order_date'),
+                field_name='Fecha del pedido',
+            )
+        except ValueError as exc:
+            return HttpResponseBadRequest(str(exc))
 
     if notes is not None:
         order.notes = notes.strip() or None
@@ -512,6 +523,13 @@ def update_order(request, order_pk):
         order.save(update_fields=update_fields)
     elif notes is not None:
         order.save(update_fields=['notes', 'updated_at'])
+
+    if submitted_order_date is not None:
+        order.order_date = combine_date_with_local_time(
+            submitted_order_date,
+            order.order_date,
+        )
+        order.save(update_fields=['order_date', 'updated_at'])
 
     client = order.client
     order_total = order.total_amount

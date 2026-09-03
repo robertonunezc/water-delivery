@@ -1,3 +1,4 @@
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, Optional
 from dataclasses import dataclass, asdict
@@ -5,6 +6,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 
 from clients.services import balance_service
+from core.utils import combine_date_with_local_time, parse_date_input
 from orders.models import Order, OrderStatus
 
 from .models import Payment
@@ -36,6 +38,8 @@ class PaymentRequestData:
     amount: Optional[Decimal] = None
     credit_note: Optional[str] = None
     notes: Optional[str] = None
+    order_date: Optional[object] = None
+    payment_date: Optional[object] = None
 
 
 def get_unpaid_amount(order: Order) -> Decimal:
@@ -44,6 +48,30 @@ def get_unpaid_amount(order: Order) -> Decimal:
         Decimal(str(order.total_amount)) - Decimal(str(order.total_paid)),
         Decimal('0.00'),
     )
+
+
+def _apply_order_date(order: Order, raw_order_date: object) -> None:
+    selected_date = parse_date_input(raw_order_date, field_name='Fecha del pedido')
+    if selected_date is None:
+        return
+
+    order.order_date = combine_date_with_local_time(selected_date, order.order_date)
+    order.save(update_fields=['order_date', 'updated_at'])
+
+
+def _payment_date_from_request(data: PaymentRequestData) -> date | None:
+    raw_date = data.payment_date if data.payment_date is not None else data.order_date
+    return parse_date_input(raw_date, field_name='Fecha de pago')
+
+
+def _set_payment_date(payment: Payment, payment_date: date | None) -> object | None:
+    if payment_date is None:
+        return None
+
+    payment_datetime = combine_date_with_local_time(payment_date, payment.date)
+    Payment.objects.filter(pk=payment.pk).update(date=payment_datetime)
+    payment.date = payment_datetime
+    return payment_datetime
 
 
 def get_selected_unpaid_orders(
@@ -114,6 +142,7 @@ def pay_client_orders(
     request_user: User,
     allowed_order_ids: list[int] | None = None,
     payment_client: "Client | None" = None,
+    payment_date: date | None = None,
 ) -> dict[str, object]:
     """Pay selected unpaid client orders and add overpayment to balance."""
     selected_orders = get_selected_unpaid_orders(
@@ -153,6 +182,7 @@ def pay_client_orders(
                 amount=order_amount,
                 request_user=request_user,
                 payment_client=payment_client,
+                payment_date=payment_date,
             )
         elif order.type == 'credito':
             raise ClientOrderPaymentError(
@@ -165,6 +195,7 @@ def pay_client_orders(
                 amount=order_amount,
                 request_user=request_user,
                 payment_client=payment_client,
+                payment_date=payment_date,
             )
         if error:
             raise ClientOrderPaymentError(error['error'])
@@ -176,6 +207,7 @@ def pay_client_orders(
             client=client,
             amount=balance_added,
             transaction_type='added_in_order',
+            date=combine_date_with_local_time(payment_date) if payment_date else None,
             user=request_user,
             reference_order=selected_orders[-1],
             notes=(
@@ -202,9 +234,22 @@ def process_payment_request(
     """Process a payment request payload in either multi or legacy format."""
     if data.cantidad_cobrada is not None and Decimal(str(data.cantidad_cobrada)) < order.total_amount:
         raise ValueError(f'Cantidad a cobrar menor que el total de la orden: ${data.cantidad_cobrada} < ${order.total_amount}')
+    try:
+        selected_order_date = parse_date_input(
+            data.order_date,
+            field_name='Fecha del pedido',
+        )
+        data.payment_date = _payment_date_from_request(data)
+    except ValueError as exc:
+        return {'error': str(exc)}, 400
+
+    if selected_order_date is not None:
+        _apply_order_date(order=order, raw_order_date=selected_order_date)
+
     if data.notes is not None:
         order.notes = data.notes.strip() or None
         order.save(update_fields=['notes', 'updated_at'])
+
     requested_type = data.order_type
     _apply_order_type(order=order, requested_type=requested_type)
 
@@ -220,6 +265,7 @@ def process_payment_request(
             payments_data=payments_data,
             cantidad_cobrada=cantidad_cobrada,
             request_user=request_user,
+            payment_date=data.payment_date,
         )
 
     return process_legacy_payment(
@@ -236,6 +282,7 @@ def process_single_payment(
     request_user: User,
     credit_note: Optional[str] = None,
     payment_client: "Client | None" = None,
+    payment_date: date | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Process and persist one payment for an order."""
     if payment_method not in VALID_SETTLEMENT_METHODS:
@@ -261,8 +308,9 @@ def process_single_payment(
     # Persist payment first, then apply accounting explicitly.
     with transaction.atomic():
         payment.save(apply_accounting=False)
+        transaction_datetime = _set_payment_date(payment, payment_date)
         if payment.status == 'completed':
-            payment.apply_accounting_side_effects()
+            payment.apply_accounting_side_effects(transaction_date=transaction_datetime)
             payment.save(update_fields=['balance_used', 'updated_at'], apply_accounting=False)
             payment.link_pending_transaction_references()
 
@@ -276,6 +324,7 @@ def settle_credit_order_payment(
     amount: Decimal,
     request_user: User,
     payment_client: "Client | None" = None,
+    payment_date: date | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Record a credit-order payment and reduce the client's debt atomically."""
     pending_credit = order.payments.select_for_update().filter(
@@ -289,6 +338,7 @@ def settle_credit_order_payment(
         order=order,
         pending_credit=pending_credit,
         request_user=request_user,
+        payment_date=payment_date,
     )
     if reconciled_payment:
         return reconciled_payment, None
@@ -307,6 +357,7 @@ def settle_credit_order_payment(
         amount=amount,
         request_user=request_user,
         payment_client=payment_client,
+        payment_date=payment_date,
     )
     if error:
         return None, error
@@ -315,6 +366,7 @@ def settle_credit_order_payment(
         client=order.client,
         amount=amount,
         transaction_type=_credit_payment_transaction_type(payment_method),
+        transaction_date=payment_date,
         user=request_user,
         reference_order=order,
         reference_payment=payment,
@@ -331,6 +383,7 @@ def _reconcile_unapplied_credit_payment(
     order: Order,
     pending_credit: Payment,
     request_user: User,
+    payment_date: date | None = None,
 ) -> Optional[Payment]:
     """Apply a previously recorded payment that did not reduce credit debt."""
     credit_account = order.client.get_credit_account()
@@ -361,6 +414,7 @@ def _reconcile_unapplied_credit_payment(
         client=order.client,
         amount=payment.amount,
         transaction_type=_credit_payment_transaction_type(payment.method),
+        transaction_date=payment_date,
         user=request_user,
         reference_order=order,
         reference_payment=payment,
@@ -392,6 +446,7 @@ def process_multiple_payments(
     payments_data: list,
     cantidad_cobrada: Optional[object],
     request_user: User,
+    payment_date: date | None = None,
 ) -> tuple[dict, int]:
     """Process multiple payments for one order."""
     if not payments_data:
@@ -424,6 +479,7 @@ def process_multiple_payments(
             amount=amount,
             request_user=request_user,
             credit_note=payment_item.get('credit_note'),
+            payment_date=payment_date,
         )
         if error:
             return error, 400
@@ -440,6 +496,7 @@ def process_multiple_payments(
             order=order,
             cantidad_cobrada_value=cantidad_cobrada,
             user=request_user,
+            payment_date=payment_date,
         )
     except ValueError as exc:
         return {'error': str(exc)}, 400
@@ -482,6 +539,7 @@ def process_legacy_payment(
         amount=amount,
         request_user=request_user,
         credit_note=credit_note,
+        payment_date=data.payment_date,
     )
     if error:
         return error, 400
@@ -491,6 +549,7 @@ def process_legacy_payment(
             order=order,
             cantidad_cobrada_value=cantidad_cobrada,
             user=request_user,
+            payment_date=data.payment_date,
         )
     except ValueError as exc:
         return {'error': str(exc)}, 400
@@ -512,6 +571,7 @@ def apply_cantidad_cobrada(
     order: Order,
     cantidad_cobrada_value: Optional[object],
     user: User,
+    payment_date: date | None = None,
 ) -> dict[str, object]:
     """Apply charged amount to order and optionally add excess to client balance."""
     if cantidad_cobrada_value is None:
@@ -537,6 +597,7 @@ def apply_cantidad_cobrada(
             client=order.client,
             amount=balance_added,
             transaction_type='added_in_order',
+            date=combine_date_with_local_time(payment_date) if payment_date else None,
             user=user,
             reference_order=order,
             notes=(
@@ -589,12 +650,21 @@ def _process_credit_order_flow(
             payments_data=payments_data,
             request_user=request_user,
             pending_credit_payment=pending_credit_payment,
+            payment_date=data.payment_date,
         )
     
-    return _register_credit_order_debt(order=order, request_user=request_user)
+    return _register_credit_order_debt(
+        order=order,
+        request_user=request_user,
+        payment_date=data.payment_date,
+    )
 
 
-def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict, int]:
+def _register_credit_order_debt(
+    order: Order,
+    request_user: User,
+    payment_date: date | None = None,
+) -> tuple[dict, int]:
     """Apply prepaid balance first, then register the remaining order debt."""
     existing_credit_payment = order.payments.filter(method='pending_credit').first()
     if existing_credit_payment:
@@ -624,6 +694,7 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
                     payment_method='balance',
                     amount=balance_amount,
                     request_user=request_user,
+                    payment_date=payment_date,
                 )
                 if error:
                     raise ValueError(error['error'])
@@ -639,12 +710,14 @@ def _register_credit_order_debt(order: Order, request_user: User) -> tuple[dict,
                     created_by=request_user,
                 )
                 pending_payment.save(apply_accounting=False)
+                _set_payment_date(pending_payment, payment_date)
 
             if credit_amount > 0 and not existing_purchase:
                 balance_service.add_debt(
                     client=order.client,
                     amount=credit_amount,
                     transaction_type='purchase',
+                    transaction_date=payment_date,
                     user=request_user,
                     reference_order=order,
                     reference_payment=pending_payment,
@@ -678,6 +751,7 @@ def _settle_pending_credit_order(
     payments_data: list,
     request_user: User,
     pending_credit_payment: Payment,
+    payment_date: date | None = None,
 ) -> tuple[dict, int]:
     """Settle an existing pending credit order and close associated debt."""
     if not payments_data:
@@ -709,6 +783,7 @@ def _settle_pending_credit_order(
             payment_method=payment_item['payment_method'],
             amount=amount,
             request_user=request_user,
+            payment_date=payment_date,
         )
         if error:
             return error, 400
@@ -717,6 +792,7 @@ def _settle_pending_credit_order(
             client=order.client,
             amount=amount,
             transaction_type='payment',
+            transaction_date=payment_date,
             user=request_user,
             reference_order=order,
             reference_payment=payment,

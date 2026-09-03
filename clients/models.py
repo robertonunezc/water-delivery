@@ -445,6 +445,7 @@ class CreditTransaction(TimeStampedModel):
     credit_limit_before = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Anterior")
     credit_limit_after = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="Límite Posterior")
     notes = models.TextField(blank=True, null=True, verbose_name="Notas adicionales")
+    date = models.DateField(null=True, blank=True, verbose_name="Fecha de transacción", help_text="Fecha de la transacción. Si no se proporciona, se usará la fecha de creación.")
     
     # References to related objects
     reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")

@@ -1,6 +1,9 @@
+from datetime import date
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import formset_factory
+from django.utils import timezone
 from decimal import Decimal
 
 from product.models import Product
@@ -126,6 +129,21 @@ class ManualCreditTransactionForm(forms.Form):
             'min': '0.01'
         })
     )
+
+    date = forms.DateField(
+        required=False,
+        initial=timezone.localdate,
+        input_formats=["%Y-%m-%d"],
+        label="Fecha de Transacción",
+        help_text="Fecha en que se registra este movimiento de crédito",
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={
+                'class': 'pg-input',
+                'type': 'date'
+            }
+        )
+    )
     
     description = forms.CharField(
         max_length=255,
@@ -194,6 +212,9 @@ class ManualCreditTransactionForm(forms.Form):
         if len(notes) < 10:
             raise ValidationError("Las notas deben tener al menos 10 caracteres para explicar el motivo de la transacción.")
         return notes
+
+    def clean_date(self) -> date:
+        return self.cleaned_data.get('date') or timezone.localdate()
 
 
 class BulkBalanceDepositForm(forms.Form):

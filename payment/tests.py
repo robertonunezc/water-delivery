@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 from io import StringIO
 from types import SimpleNamespace
@@ -44,13 +44,21 @@ class PaymentServicesTests(SimpleTestCase):
 		client = SimpleNamespace(balance=Decimal('50.00'))
 		order = SimpleNamespace(id=10, total_amount=Decimal('100.00'), client=client)
 		user = SimpleNamespace(id=1)
+		payment_date = date(2026, 7, 14)
 
-		result = services.apply_cantidad_cobrada(order, '120.00', user)
+		result = services.apply_cantidad_cobrada(
+			order,
+			'120.00',
+			user,
+			payment_date=payment_date,
+		)
 
 		self.assertEqual(result['cantidad_cobrada'], Decimal('120.00'))
 		self.assertEqual(result['balance_added'], Decimal('20.00'))
 		self.assertEqual(order.cantidad_cobrada, Decimal('120.00'))
 		add_balance_mock.assert_called_once()
+		add_balance_date = add_balance_mock.call_args.kwargs['date']
+		self.assertEqual(timezone.localtime(add_balance_date).date(), payment_date)
 
 	@patch('payment.services.process_multiple_payments')
 	def test_process_payment_request_routes_to_multiple(self, process_multiple_mock):
@@ -70,6 +78,7 @@ class PaymentServicesTests(SimpleTestCase):
 			payments_data=data.payments_data,
 			cantidad_cobrada='100.00',
 			request_user=user,
+			payment_date=None,
 		)
 
 	@patch('payment.services.process_legacy_payment')

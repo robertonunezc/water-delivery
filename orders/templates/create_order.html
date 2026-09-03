@@ -18,7 +18,8 @@
       data-initial-breakdown='{{ initial_payment_breakdown|escapejs }}'
       data-initial-order-total="{{ order.total_amount|floatformat:2 }}"
       data-initial-discount="{{ order.discount|floatformat:2 }}"
-      data-initial-subtotal="{{ order.subtotal_amount|floatformat:2 }}">
+      data-initial-subtotal="{{ order.subtotal_amount|floatformat:2 }}"
+      data-initial-order-date="{{ order.order_date|date:'Y-m-d' }}">
     <!-- Header Section -->
     <div class="pg-row pg-mb-4">
       <div class="pg-col-12">
@@ -314,6 +315,21 @@
               </div>
               <div class="pg-card-body">
                 <div class="pg-mb-3">
+                  <label for="order-date" class="pg-label">
+                    <i class="fas fa-calendar-day pg-me-1"></i>Fecha del Pedido
+                  </label>
+                  <input
+                    type="date"
+                    class="pg-input"
+                    id="order-date"
+                    name="order_date"
+                    value="{{ order.order_date|date:'Y-m-d' }}">
+                  <div class="pg-field-help">
+                    La fecha se usará para registrar el pedido y sus pagos.
+                  </div>
+                </div>
+
+                <div class="pg-mb-3">
                   <label for="order-type-select" class="pg-label">
                     <i class="fas fa-file-invoice-dollar pg-me-1"></i>Tipo de Orden
                   </label>
@@ -443,6 +459,13 @@
           <div id="mobile-finalization-section" {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
           <div class="pg-row pg-mb-2">
             <div class="pg-col-6">
+              <input
+                type="date"
+                class="pg-input pg-mb-2"
+                id="order-date-mobile"
+                name="order_date_mobile"
+                value="{{ order.order_date|date:'Y-m-d' }}"
+                aria-label="Fecha del Pedido">
               <select class="pg-select pg-mb-2" id="order-type-select-mobile" name="order_type_mobile">
                 <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
                 <option value="credito" {% if order_type == 'credito' %}selected{% endif %} {% if not can_pay_with_credit %}disabled{% endif %}>

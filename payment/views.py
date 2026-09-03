@@ -19,10 +19,10 @@ def create_payment(request):
     
     Supports two formats:
     1. Single payment (backward compatible):
-       { order_id, payment_method, amount, credit_note?, cantidad_cobrada? }
+       { order_id, payment_method, amount, credit_note?, cantidad_cobrada?, order_date?, payment_date? }
     
     2. Multiple payments (new format - balance first):
-       { order_id, payments: [{amount, payment_method, credit_note?}, ...], cantidad_cobrada? }
+       { order_id, payments: [{amount, payment_method, credit_note?}, ...], cantidad_cobrada?, order_date?, payment_date? }
     """
     try:
         data = json.loads(request.body.decode('utf-8') or '{}')
@@ -42,6 +42,8 @@ def create_payment(request):
             credit_note=data.get('credit_note'),
             order_type=data.get('order_type'),
             notes=data.get('notes'),
+            order_date=data.get('order_date'),
+            payment_date=data.get('payment_date'),
         )
         response_data, status_code = services.process_payment_request(
             order=order,

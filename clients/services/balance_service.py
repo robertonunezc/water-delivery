@@ -7,6 +7,7 @@ All functions are wrapped with @transaction.atomic for consistency.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING, TypedDict
 
@@ -124,6 +125,7 @@ def deduct_balance(
     client: "Client",
     amount: Decimal,
     transaction_type: str = "payment",
+    date: object = None,
     user: "User | None" = None,
     reference_order: "Order | None" = None,
     reference_payment: "Payment | None" = None,
@@ -180,6 +182,7 @@ def deduct_balance(
         reference_payment=reference_payment,
         transfer_to_client=transfer_to_client,
         created_by=user,
+        date=date,
     )
 
 
@@ -188,6 +191,7 @@ def add_debt(
     client: "Client",
     amount: Decimal,
     transaction_type: str = "purchase",
+    transaction_date: date | None = None,
     user: "User | None" = None,
     reference_order: "Order | None" = None,
     reference_payment: "Payment | None" = None,
@@ -257,6 +261,7 @@ def add_debt(
         credit_limit_before=credit_limit_before,
         credit_limit_after=locked_client.credit_limit,
         notes=combined_notes,
+        date=transaction_date,
         reference_order=reference_order,
         reference_payment=reference_payment,
         created_by=user,
@@ -268,6 +273,7 @@ def pay_debt(
     client: "Client",
     amount: Decimal,
     transaction_type: str = "payment",
+    transaction_date: date | None = None,
     user: "User | None" = None,
     reference_order: "Order | None" = None,
     reference_payment: "Payment | None" = None,
@@ -328,6 +334,7 @@ def pay_debt(
         credit_limit_before=credit_limit_before,
         credit_limit_after=locked_client.credit_limit,
         notes=final_notes,
+        date=transaction_date,
         reference_order=reference_order,
         reference_payment=reference_payment,
         created_by=user,
@@ -441,6 +448,7 @@ def _build_reversal_note(prefix: str, reference_order: "Order | None") -> str:
 def update_credit_limit(
     client: "Client",
     new_limit: Decimal,
+    transaction_date: date | None = None,
     user: "User | None" = None,
     notes: str | None = None,
 ) -> "CreditTransaction | None":
@@ -496,6 +504,7 @@ def update_credit_limit(
         credit_limit_before=credit_limit_before,
         credit_limit_after=new_limit,
         notes=final_notes,
+        date=transaction_date,
         created_by=user,
     )
 

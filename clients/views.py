@@ -1,3 +1,4 @@
+from datetime import date, datetime, time
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -8,6 +9,7 @@ from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
 from django.views.decorators.http import require_POST
+from django.utils import timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, List
 from urllib.parse import urlencode
@@ -657,13 +659,22 @@ def _balance_history_item(balance_tx: Any) -> dict[str, Any]:
     }
 
 
+def _history_datetime(selected_date: date | None, fallback: datetime) -> datetime:
+    if selected_date is None:
+        return fallback
+    return timezone.make_aware(
+        datetime.combine(selected_date, time.min),
+        timezone.get_current_timezone(),
+    )
+
+
 def _credit_history_item(credit_tx: Any) -> dict[str, Any]:
     positive_types = ['payment', 'adjustment', 'forgiveness', 'correction']
     charge_types = ['purchase', 'interest', 'fee']
     return {
         'type': 'credit_transaction',
         'id': credit_tx.id,
-        'date': credit_tx.created_at,
+        'date': _history_datetime(credit_tx.date, credit_tx.created_at),
         'amount': credit_tx.amount,
         'method': credit_tx.get_transaction_type_display(),
         'status': 'Completado',
@@ -1191,6 +1202,7 @@ def _pay_credit_orders_from_received_amount(
     amount: Decimal,
     payment_method: str,
     request_user: Any,
+    transaction_date: date,
 ) -> dict[str, object]:
     return payment_services.pay_client_orders(
         client=client,
@@ -1199,6 +1211,7 @@ def _pay_credit_orders_from_received_amount(
         amount=amount,
         request_user=request_user,
         allowed_order_ids=_credit_order_allowed_ids(client),
+        payment_date=transaction_date,
     )
 
 
@@ -1207,6 +1220,7 @@ def _pay_credit_orders_from_balance(
     client: Client,
     selected_orders: List[Order],
     request_user: Any,
+    transaction_date: date,
 ) -> dict[str, object]:
     selected_total = get_selected_credit_orders_total(selected_orders)
     return payment_services.pay_client_orders(
@@ -1217,6 +1231,7 @@ def _pay_credit_orders_from_balance(
         request_user=request_user,
         allowed_order_ids=_credit_order_allowed_ids(client),
         payment_client=client,
+        payment_date=transaction_date,
     )
 
 
@@ -1233,6 +1248,7 @@ def pay_credit(request, pk):
             description = form.cleaned_data['description']
             notes = form.cleaned_data['notes']
             new_credit_limit = form.cleaned_data.get('new_credit_limit')
+            transaction_date = form.cleaned_data['date']
             
             try:
                 from clients.services import balance_service
@@ -1242,6 +1258,7 @@ def pay_credit(request, pk):
                     balance_service.update_credit_limit(
                         client=client,
                         new_limit=new_credit_limit,
+                        transaction_date=transaction_date,
                         user=request.user,
                         notes=f"{description}. {notes}"
                     )
@@ -1262,6 +1279,7 @@ def pay_credit(request, pk):
                         amount=amount,
                         payment_method=request.POST.get('payment_method', 'cash'),
                         request_user=request.user,
+                        transaction_date=transaction_date,
                     )
                     messages.success(
                         request,
@@ -1286,6 +1304,7 @@ def pay_credit(request, pk):
                         client=client,
                         selected_orders=selected_orders,
                         request_user=request.user,
+                        transaction_date=transaction_date,
                     )
                     messages.success(
                         request,
@@ -1301,6 +1320,7 @@ def pay_credit(request, pk):
                         client=client,
                         amount=amount,
                         transaction_type=transaction_type,
+                        transaction_date=transaction_date,
                         user=request.user,
                         notes=f"{description}. {notes}"
                     )

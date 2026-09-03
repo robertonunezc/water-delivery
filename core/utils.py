@@ -1,6 +1,8 @@
 from calendar import monthrange
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional
+
+from django.utils import timezone
 
 
 def is_business_day(check_date: date) -> bool:
@@ -70,3 +72,34 @@ def get_first_last_day_of_month(year, month):
     last_day = date(year, month, monthrange(year, month)[1])
     
     return first_day, last_day
+
+
+def parse_date_input(value: object, *, field_name: str = "Fecha") -> Optional[date]:
+    """Parse an HTML date input value into a date."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return timezone.localdate(value)
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.strptime(value, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError(f"{field_name} inválida. Use el formato AAAA-MM-DD.") from exc
+    raise ValueError(f"{field_name} inválida. Use el formato AAAA-MM-DD.")
+
+
+def combine_date_with_local_time(
+    selected_date: date,
+    reference_datetime: datetime | None = None,
+) -> datetime:
+    """Combine a selected local date with an existing or current local time."""
+    local_reference = (
+        timezone.localtime(reference_datetime)
+        if reference_datetime is not None
+        else timezone.localtime()
+    )
+    local_time = local_reference.time().replace(tzinfo=None)
+    combined = datetime.combine(selected_date, local_time)
+    return timezone.make_aware(combined, timezone.get_current_timezone())

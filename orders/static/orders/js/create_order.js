@@ -12,6 +12,7 @@ class PageConfig {
     this.initialOrderTotal = parseFloat(root.dataset.initialOrderTotal) || 0;
     this.initialDiscount = parseFloat(root.dataset.initialDiscount) || 0;
     this.initialSubtotal = parseFloat(root.dataset.initialSubtotal) || 0;
+    this.initialOrderDate = root.dataset.initialOrderDate || '';
   }
 
   parseJSON(raw) {
@@ -885,10 +886,12 @@ class PaymentController {
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
     this.feedbackElement = document.getElementById('payment-flow-feedback');
+    this.orderDateSavePromise = Promise.resolve();
   }
 
   init() {
     this.bindOrderTypeSync();
+    this.bindOrderDateSync();
     this.configureOrderTypeUI();
     this.finishButton?.addEventListener('click', () => this.handleFinish());
     this.finishButtonMobile?.addEventListener('click', () => this.handleFinish());
@@ -961,6 +964,38 @@ class PaymentController {
       this.configureOrderTypeUI();
       if (selectedType !== nextValue) this.showCreditBlockedFeedback();
     });
+  }
+
+  bindOrderDateSync() {
+    const desktop = document.getElementById('order-date');
+    const mobile = document.getElementById('order-date-mobile');
+
+    const saveOrderDate = value => {
+      if (!value) {
+        return;
+      }
+      this.orderDateSavePromise = this.orderDateSavePromise
+        .catch(() => {})
+        .then(() => this.api.updateOrder({ order_date: value }))
+        .catch(error => {
+          this.alertManager.show('danger', 'Error', 'No se pudo guardar la fecha del pedido.', 4000);
+          console.error('Order date update error', error);
+        });
+    };
+
+    desktop?.addEventListener('change', () => {
+      if (mobile) mobile.value = desktop.value;
+      saveOrderDate(desktop.value);
+    });
+
+    mobile?.addEventListener('change', () => {
+      if (desktop) desktop.value = mobile.value;
+      saveOrderDate(mobile.value);
+    });
+  }
+
+  async flushOrderDateSave() {
+    await this.orderDateSavePromise;
   }
 
   configureCreditOptionAvailability() {
@@ -1121,6 +1156,14 @@ class PaymentController {
     return this.config.orderType || 'contado';
   }
 
+  getOrderDate() {
+    const desktop = document.getElementById('order-date');
+    const mobile = document.getElementById('order-date-mobile');
+    if (desktop?.value) return desktop.value;
+    if (mobile?.value) return mobile.value;
+    return this.config.initialOrderDate || '';
+  }
+
   buildPayments(orderTotal) {
     const payments = [];
     const breakdown = this.paymentBreakdown.getBreakdown();
@@ -1186,14 +1229,15 @@ class PaymentController {
     const orderType = this.getOrderType();
 
     if (orderType === 'credito') {
-      const payload = {
-        order_id: this.config.orderId,
-        order_type: 'credito',
-        notes: this.orderNotesController?.getValue() || ''
-      };
-
       try {
         this.disableButtons();
+        await this.flushOrderDateSave();
+        const payload = {
+          order_id: this.config.orderId,
+          order_type: 'credito',
+          order_date: this.getOrderDate(),
+          notes: this.orderNotesController?.getValue() || ''
+        };
         const data = await this.api.submitPayment(payload);
         if (data.success) {
           this.handleCreditOrderPendingSuccess(data);
@@ -1213,16 +1257,18 @@ class PaymentController {
     if (!payments) return;
 
     const cantidadCobrada = this.getCantidadCobrada();
-    const payload = {
-      order_id: this.config.orderId,
-      order_type: orderType,
-      payments,
-      notes: this.orderNotesController?.getValue() || ''
-    };
-    if (cantidadCobrada !== null && cantidadCobrada > 0) payload.cantidad_cobrada = cantidadCobrada;
 
     try {
       this.disableButtons();
+      await this.flushOrderDateSave();
+      const payload = {
+        order_id: this.config.orderId,
+        order_type: orderType,
+        payments,
+        order_date: this.getOrderDate(),
+        notes: this.orderNotesController?.getValue() || ''
+      };
+      if (cantidadCobrada !== null && cantidadCobrada > 0) payload.cantidad_cobrada = cantidadCobrada;
       const data = await this.api.submitPayment(payload);
       if (data.success) {
         this.handleSuccess(data);
