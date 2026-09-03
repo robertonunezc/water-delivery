@@ -13,6 +13,7 @@
       data-client-balance="{{ client.balance|floatformat:2 }}"
       data-order-type="{{ order_type }}"
       data-has-pending-credit-payment="{{ has_pending_credit_payment|yesno:"true,false" }}"
+      data-can-pay-with-credit="{{ can_pay_with_credit|yesno:"true,false" }}"
       data-csrf-token="{{ csrf_token }}"
       data-initial-breakdown='{{ initial_payment_breakdown|escapejs }}'
       data-initial-order-total="{{ order.total_amount|floatformat:2 }}"
@@ -75,11 +76,11 @@
                       <div class="pg-row pg-gap-3 pg-flex-grow financial-credit-debt-grid">
                         <div class="pg-col-6 financial-credit-column">
                           <div class="pg-text-muted pg-mb-1 financial-summary-label">Crédito disponible</div>
-                          <div class="pg-fw-bold financial-summary-amount {% if client.can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% else %}pg-text-secondary{% endif %}">
-                            {% if client.can_pay_with_credit %}
+                          <div class="pg-fw-bold financial-summary-amount {% if can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% elif not can_pay_with_credit %}pg-text-danger{% else %}pg-text-secondary{% endif %}">
+                            {% if can_pay_with_credit %}
                               ${{ client.get_available_credit|floatformat:2 }}
                             {% else %}
-                              No disponible
+                              Bloqueado
                             {% endif %}
                           </div>
                         </div>
@@ -93,9 +94,10 @@
                       <div id="affordability-status" class="pg-ms-3 pg-text-end"></div>
                     </div>
                     <div class="pg-text-muted financial-summary-help">
-                      {% if not client.can_pay_with_credit %}
-                        Cliente no puede pagar con credito
-
+                      {% if not can_pay_with_credit %}
+                        <span class="pg-text-danger">
+                          <i class="fas fa-ban pg-me-1"></i>Cliente no puede pagar con credito
+                        </span>
                       {% endif %}
                     </div>
                   </div>
@@ -317,11 +319,19 @@
                   </label>
                   <select class="pg-select" id="order-type-select" name="order_type">
                     <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
-                    <option value="credito" {% if order_type == 'credito' %}selected{% endif %}>Crédito</option>
+                    <option value="credito" {% if order_type == 'credito' %}selected{% endif %} {% if not can_pay_with_credit %}disabled{% endif %}>
+                      Crédito{% if not can_pay_with_credit %} (bloqueado){% endif %}
+                    </option>
                   </select>
                   <div class="pg-field-help" id="order-type-help-text">
                     Las órdenes a crédito registran deuda y quedan pendientes hasta liquidarse.
                   </div>
+                  {% if not can_pay_with_credit %}
+                    <div class="pg-alert pg-alert-warning pg-py-2 pg-mt-2 pg-mb-0" id="credit-disabled-alert">
+                      <i class="fas fa-ban pg-me-1"></i>
+                      Cliente no puede pagar con credito. La opcion de credito esta bloqueada.
+                    </div>
+                  {% endif %}
                 </div>
                 <div id="payment-flow-feedback" class="pg-alert pg-alert-danger pg-py-2" hidden></div>
                 <div class="pg-mb-3" id="payment-method-select-container">
@@ -435,8 +445,15 @@
             <div class="pg-col-6">
               <select class="pg-select pg-mb-2" id="order-type-select-mobile" name="order_type_mobile">
                 <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
-                <option value="credito" {% if order_type == 'credito' %}selected{% endif %}>Crédito</option>
+                <option value="credito" {% if order_type == 'credito' %}selected{% endif %} {% if not can_pay_with_credit %}disabled{% endif %}>
+                  Crédito{% if not can_pay_with_credit %} (bloqueado){% endif %}
+                </option>
               </select>
+              {% if not can_pay_with_credit %}
+                <div class="pg-alert pg-alert-warning pg-alert-sm pg-p-2 pg-mb-2">
+                  <small><i class="fas fa-ban pg-me-1"></i>Credito bloqueado</small>
+                </div>
+              {% endif %}
               <select class="pg-select" id="payment-method-select-mobile" name="payment_type">
                 <option value="">Método de pago</option>
                 {% for code, label in payment_types %}

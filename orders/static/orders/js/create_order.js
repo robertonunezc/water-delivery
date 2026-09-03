@@ -6,6 +6,7 @@ class PageConfig {
     this.clientBalance = parseFloat(root.dataset.clientBalance) || 0;
     this.orderType = root.dataset.orderType || 'contado';
     this.hasPendingCreditPayment = root.dataset.hasPendingCreditPayment === 'true';
+    this.canPayWithCredit = root.dataset.canPayWithCredit !== 'false';
     this.csrfToken = root.dataset.csrfToken;
     this.initialBreakdown = this.parseJSON(root.dataset.initialBreakdown) || null;
     this.initialOrderTotal = parseFloat(root.dataset.initialOrderTotal) || 0;
@@ -939,22 +940,65 @@ class PaymentController {
   bindOrderTypeSync() {
     const desktop = document.getElementById('order-type-select');
     const mobile = document.getElementById('order-type-select-mobile');
+    this.configureCreditOptionAvailability();
 
     desktop?.addEventListener('change', () => {
-      if (mobile) mobile.value = desktop.value;
-      this.config.orderType = desktop.value;
+      const selectedType = desktop.value;
+      const nextValue = this.normalizeOrderTypeSelection(selectedType);
+      if (mobile) mobile.value = nextValue;
+      if (desktop.value !== nextValue) desktop.value = nextValue;
+      this.config.orderType = nextValue;
       this.configureOrderTypeUI();
+      if (selectedType !== nextValue) this.showCreditBlockedFeedback();
     });
 
     mobile?.addEventListener('change', () => {
-      if (desktop) desktop.value = mobile.value;
-      this.config.orderType = mobile.value;
+      const selectedType = mobile.value;
+      const nextValue = this.normalizeOrderTypeSelection(selectedType);
+      if (desktop) desktop.value = nextValue;
+      if (mobile.value !== nextValue) mobile.value = nextValue;
+      this.config.orderType = nextValue;
       this.configureOrderTypeUI();
+      if (selectedType !== nextValue) this.showCreditBlockedFeedback();
     });
+  }
+
+  configureCreditOptionAvailability() {
+    const creditOptions = document.querySelectorAll(
+      '#order-type-select option[value="credito"], #order-type-select-mobile option[value="credito"]'
+    );
+
+    creditOptions.forEach(option => {
+      option.disabled = !this.config.canPayWithCredit;
+      option.textContent = this.config.canPayWithCredit ? 'Crédito' : 'Crédito (bloqueado)';
+    });
+  }
+
+  normalizeOrderTypeSelection(selectedType) {
+    if (selectedType !== 'credito' || this.config.canPayWithCredit || this.config.hasPendingCreditPayment) {
+      return selectedType;
+    }
+
+    return 'contado';
+  }
+
+  showCreditBlockedFeedback() {
+    this.showFeedback('Cliente no puede pagar con credito.');
   }
 
   configureOrderTypeUI() {
     this.clearFeedback();
+    this.configureCreditOptionAvailability();
+    const requestedOrderType = this.getOrderType();
+    const normalizedOrderType = this.normalizeOrderTypeSelection(requestedOrderType);
+    if (normalizedOrderType !== requestedOrderType) {
+      const desktop = document.getElementById('order-type-select');
+      const mobile = document.getElementById('order-type-select-mobile');
+      if (desktop) desktop.value = normalizedOrderType;
+      if (mobile) mobile.value = normalizedOrderType;
+      this.config.orderType = normalizedOrderType;
+      this.showCreditBlockedFeedback();
+    }
     const orderType = this.getOrderType();
     const paymentMethodDesktop = document.getElementById('payment-method-select');
     const paymentMethodMobile = document.getElementById('payment-method-select-mobile');

@@ -435,18 +435,24 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         for value, label in PAYMENT_METHOD_CHOICES
         if value not in {'credit', 'pending_credit'}
     ]
-    # Calculate initial payment breakdown based on client balance and order total
-    initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
     has_delivery_address = client.addresses.filter(type='delivery').exists()
     has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
+    can_pay_with_credit = client.get_credit_account().can_pay_with_credit
+    selected_order_type = order.type
+    if not can_pay_with_credit and not has_pending_credit_payment:
+        selected_order_type = 'contado'
+
+    # Calculate initial payment breakdown based on client balance and order total
+    initial_breakdown = calculate_payment_breakdown(order.total_amount, client.balance)
 
     context = {
         'client': client, 
         'order': order, 
         'client_products': client_products, 
         'payment_types': payment_types,
-        'order_type': order.type,
+        'order_type': selected_order_type,
         'has_pending_credit_payment': has_pending_credit_payment,
+        'can_pay_with_credit': can_pay_with_credit,
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_delivery_address': has_delivery_address,
         'order_redirect_url': _get_order_redirect_url(request.user, client),
