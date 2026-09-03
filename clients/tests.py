@@ -673,8 +673,12 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
             total_amount=Decimal('100.00'),
         )
         created_at = timezone.now() - timedelta(minutes=minutes_old)
-        Order.objects.filter(pk=order.pk).update(created_at=created_at)
+        Order.objects.filter(pk=order.pk).update(
+            created_at=created_at,
+            order_date=created_at,
+        )
         order.created_at = created_at
+        order.order_date = created_at
         return order
 
     def _create_overdue_credit_order(
@@ -768,6 +772,38 @@ class ClientDetailOrderActionsTests(FastTenantTestCase):
         orders_page = response.context['orders']
         self.assertEqual(orders_page.number, 2)
         self.assertEqual(list(orders_page.object_list), [orders[10], orders[11]])
+
+    def test_recent_sales_uses_order_date_for_display_and_ordering(self) -> None:
+        older_order_date = timezone.make_aware(datetime(2026, 7, 10, 8, 0))
+        newer_order_date = timezone.make_aware(datetime(2026, 7, 14, 9, 30))
+        newer_created_at = timezone.make_aware(datetime(2026, 9, 3, 10, 15))
+        older_created_at = timezone.make_aware(datetime(2026, 9, 2, 10, 15))
+        created_newer_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+        created_older_order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('50.00'),
+        )
+        Order.objects.filter(pk=created_newer_order.pk).update(
+            order_date=older_order_date,
+            created_at=newer_created_at,
+        )
+        Order.objects.filter(pk=created_older_order.pk).update(
+            order_date=newer_order_date,
+            created_at=older_created_at,
+        )
+
+        response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+
+        orders_page = response.context['orders']
+        self.assertEqual(list(orders_page.object_list), [created_older_order, created_newer_order])
+        self.assertContains(response, '14/07/2026 09:30')
+        self.assertContains(response, '10/07/2026 08:00')
+        self.assertNotContains(response, '03/09/2026 10:15')
 
     def test_payment_history_is_paginated_independently(self) -> None:
         orders = [self._create_order(minutes_old=minutes) for minutes in range(12)]

@@ -248,7 +248,7 @@
                           {% endif %}
                         </span>
                       </td>
-                      <td>{{ order.created_at|date:"d/m/Y H:i" }}</td>
+                      <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
                       <td>
                         <span class="pg-badge pg-bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning pg-text-dark{% else %}danger{% endif %}">
                           {{ order.get_status_display_fixed }}
