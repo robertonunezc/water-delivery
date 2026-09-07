@@ -3077,6 +3077,29 @@ body.pg-modal-open {
     .route-client-actions-primary .pg-button {
         white-space: nowrap;
     }
+    .route-last-order {
+        align-items: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+    .route-last-order-status {
+        font-size: 0.95rem;
+        font-weight: 800;
+        line-height: 1.1;
+        padding: 0.35rem 0.55rem;
+    }
+    .route-last-order-date {
+        color: var(--pg-muted-foreground);
+        font-size: 0.78rem;
+        line-height: 1.15;
+    }
+    .route-last-order-today {
+        background: #fee2e2;
+        border: 1px solid #fecaca;
+        border-radius: 0.5rem;
+        padding: 0.4rem 0.5rem;
+    }
     @media (max-width: 900px) {
         .compact-card .pg-flex.pg-flex-wrap > div {
             margin-bottom: 0.25rem;
@@ -3125,17 +3148,17 @@ body.pg-modal-open {
         }
         .route-client-table .route-client-actions-cell {
             border-bottom: 1px solid var(--pg-border);
-            order: 2;
+            order: 3;
             padding-bottom: 0.65rem;
         }
         .route-client-table .route-client-finance-cell {
-            order: 3;
-        }
-        .route-client-table .route-client-products-cell {
             order: 4;
         }
-        .route-client-table .route-client-last-order-cell {
+        .route-client-table .route-client-products-cell {
             order: 5;
+        }
+        .route-client-table .route-client-last-order-cell {
+            order: 2;
         }
         .route-client-table td[data-label]::before {
             color: var(--pg-muted-foreground);
@@ -3151,6 +3174,10 @@ body.pg-modal-open {
         .route-client-table .route-client-actions-cell::before {
             content: none;
             display: none;
+        }
+        .route-client-table .route-client-last-order-cell::before {
+            font-size: 0.72rem;
+            margin-bottom: 0.35rem;
         }
         .route-client-mobile-heading {
             align-items: center;
@@ -3184,7 +3211,7 @@ body.pg-modal-open {
             grid-template-columns: repeat(2, minmax(0, 1fr));
             width: 100%;
         }
-        .route-client-actions-primary .pg-button {
+        .route-client-table .route-client-actions-primary .pg-button {
             align-items: center;
             justify-content: center;
             margin: 0;
@@ -3194,6 +3221,16 @@ body.pg-modal-open {
         }
         .route-client-table .pg-badge {
             white-space: normal;
+        }
+        .route-client-table .route-last-order {
+            gap: 0.35rem;
+        }
+        .route-client-table .route-last-order-status {
+            font-size: 1.05rem;
+            padding: 0.45rem 0.65rem;
+        }
+        .route-client-table .route-last-order-date {
+            font-size: 0.84rem;
         }
     }
 

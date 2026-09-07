@@ -104,9 +104,9 @@
                                     <tr>
                                         <th>#</th>
                                         <th>Cliente</th>
+                                        <th>Último Pedido</th>
                                         <th>Saldo/Crédito</th>
                                         <th>Productos y Precio</th>
-                                        <th>Último Pedido</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -122,6 +122,24 @@
                                             {% if not route_client.client.active %}
                                                 <span class="pg-badge pg-badge-warning">Inactivo</span>
                                             {% endif %}
+                                        </td>
+                                        <td class="route-client-last-order-cell" data-label="Último Pedido">
+                                            {% with route_client.client.recent_orders|first as last_order %}
+                                                {% if last_order %}
+                                                    <div class="route-last-order {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}route-last-order-today{% endif %}">
+                                                        <span class="pg-badge pg-badge-info route-last-order-status" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
+                                                            {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}
+                                                                HOY
+                                                            {% else %}
+                                                                {{ last_order.created_at|timesince }}
+                                                            {% endif %}
+                                                        </span>
+                                                        <span class="route-last-order-date">{{ last_order.created_at|date:"d/m/Y H:i" }}</span>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="pg-badge pg-badge-secondary route-last-order-status">Sin pedidos</span>
+                                                {% endif %}
+                                            {% endwith %}
                                         </td>
                                         <td class="route-client-finance-cell" data-label="Saldo/Crédito">
                                             <div class="pg-mb-1">
@@ -149,19 +167,6 @@
                                             {% else %}
                                                 <span class="pg-text-muted">Sin productos asignados</span>
                                             {% endif %}
-                                        </td>
-                                        <td class="route-client-last-order-cell" data-label="Último Pedido">
-                                            {% with route_client.client.recent_orders|first as last_order %}
-                                                {% if last_order %}
-                                                    <span class="pg-badge pg-badge-info" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
-                                                        {{ last_order.created_at|timesince }} 
-                                                    </span>
-                                                    <br>
-                                                    <small class="pg-text-muted">{{ last_order.created_at|date:"d/m/Y" }}</small>
-                                                {% else %}
-                                                    <span class="pg-badge pg-badge-secondary">Sin pedidos</span>
-                                                {% endif %}
-                                            {% endwith %}
                                         </td>
                                         <td class="route-client-actions-cell" data-label="Acciones">
                                             <div class="pg-button-group route-client-actions-primary" role="group">
@@ -234,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function() {
             badge.classList.remove('pg-bg-info', 'pg-bg-success', 'pg-bg-warning', 'pg-bg-danger');
             
             // Add appropriate class based on days
-            if (diffDays > 7) {
+            if (diffDays === 0 || diffDays > 7) {
                 badge.classList.add('pg-bg-danger');
             } else if (diffDays > 3) {
                 badge.classList.add('pg-bg-warning');
@@ -244,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Update text to show days
             if (diffDays === 0) {
-                badge.innerHTML = 'Hoy';
+                badge.innerHTML = 'HOY';
             } else if (diffDays === 1) {
                 badge.innerHTML = 'Hace 1 día';
             } else {
