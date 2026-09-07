@@ -79,7 +79,7 @@
                                         type="text"
                                         name="q"
                                         class="pg-input"
-                                        placeholder="Buscar por cliente, dirección o contacto"
+                                        placeholder="Buscar por cliente"
                                         value="{{ search_query|default:'' }}"
                                     >
                                     <button type="submit" class="pg-button pg-button-primary">Buscar</button>
@@ -98,14 +98,12 @@
                         </div>
                     </form>
                     {% if route_clients %}
-                        <div class="pg-table-responsive">
-                            <table class="pg-table pg-table-striped pg-table-hover compact-table">
+                        <div class="pg-table-responsive route-client-table-wrapper">
+                            <table class="pg-table pg-table-striped pg-table-hover compact-table route-client-table">
                                 <thead class="pg-table-dark">
                                     <tr>
                                         <th>#</th>
                                         <th>Cliente</th>
-                                        <th>Dirección</th>
-                                        <th>Contacto</th>
                                         <th>Saldo/Crédito</th>
                                         <th>Productos y Precio</th>
                                         <th>Último Pedido</th>
@@ -114,53 +112,18 @@
                                 </thead>
                                 <tbody>
                                     {% for route_client in route_clients %}
-                                    <tr>
-                                        <td>{{ route_client.sequence }}</td>
-                                        <td>
-                                            <strong>{{ route_client.client.name }}</strong>
+                                    <tr class="route-client-row">
+                                        <td class="route-client-sequence-cell" data-label="#">#{{ route_client.sequence }}</td>
+                                        <td class="route-client-name-cell" data-label="Cliente">
+                                            <div class="route-client-mobile-heading">
+                                                <span class="route-client-sequence-pill">#{{ route_client.sequence }}</span>
+                                                <strong>{{ route_client.client.name }}</strong>
+                                            </div>
                                             {% if not route_client.client.active %}
                                                 <span class="pg-badge pg-badge-warning">Inactivo</span>
                                             {% endif %}
-                                            {% if route_client.client.address_link %}
-                                                <br>
-                                                <a href="{{ route_client.client.address_link }}" target="_blank" class="pg-button pg-button-sm pg-button-outline-primary">
-                                                    Ver Dirección
-                                                </a>
-                                            {% endif %}
                                         </td>
-                                        <td>
-                                            {% with route_client.client.addresses.filter|first as address %}
-                                                {% if address %}
-                                                    {{ address.street }}
-                                                    {% if address.number %} #{{ address.number }}{% endif %}
-                                                    {% if address.interior_number %} Int. {{ address.interior_number }}{% endif %}
-                                                    <br>
-                                                    <small class="pg-text-muted">
-                                                        {{ address.neighborhood|default:"" }}
-                                                        {% if address.neighborhood and address.zip_code %}, {% endif %}
-                                                        {{ address.zip_code|default:"" }}
-                                                    </small>
-                                                {% else %}
-                                                    <span class="pg-text-muted">Sin dirección</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        </td>
-                                        <td>
-                                            {% with route_client.client.contacts.first as contact %}
-                                                {% if contact %}
-                                                    <strong>{{ contact.name }}</strong>
-                                                    {% if contact.phone %}
-                                                        <br><i class="fas fa-phone"></i> {{ contact.phone }}
-                                                    {% endif %}
-                                                    {% if contact.email %}
-                                                        <br><i class="fas fa-envelope"></i> <small>{{ contact.email }}</small>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="pg-text-muted">Sin contacto</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        </td>
-                                        <td>
+                                        <td class="route-client-finance-cell" data-label="Saldo/Crédito">
                                             <div class="pg-mb-1">
                                                 <small class="pg-text-muted">Saldo:</small>
                                                 <span class="pg-badge {% if route_client.client.balance > 0 %}pg-bg-success{% else %}pg-bg-secondary{% endif %}">
@@ -174,7 +137,7 @@
                                                 </span>
                                             </div>
                                         </td>
-                                        <td>
+                                        <td class="route-client-products-cell" data-label="Productos y Precio">
                                             {% if route_client.client.product_prices.all %}
                                                 {% for product_price in route_client.client.product_prices.all %}
                                                     <div class="pg-mb-1">
@@ -187,7 +150,7 @@
                                                 <span class="pg-text-muted">Sin productos asignados</span>
                                             {% endif %}
                                         </td>
-                                        <td>
+                                        <td class="route-client-last-order-cell" data-label="Último Pedido">
                                             {% with route_client.client.recent_orders|first as last_order %}
                                                 {% if last_order %}
                                                     <span class="pg-badge pg-badge-info" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
@@ -200,16 +163,16 @@
                                                 {% endif %}
                                             {% endwith %}
                                         </td>
-                                        <td>
-                                            <div class="pg-button-group" role="group">
-                                                <a href="{% url 'clients:detail' route_client.client.id %}" 
-                                                   class="pg-button pg-button-sm pg-button-info" 
+                                        <td class="route-client-actions-cell" data-label="Acciones">
+                                            <div class="pg-button-group route-client-actions-primary" role="group">
+                                                <a href="{% url 'clients:detail' route_client.client.id %}"
+                                                   class="pg-button pg-button-sm pg-button-info"
                                                    title="Ver detalles del cliente">
                                                     <i class="fas fa-eye"></i>
-                                                    Informacion
+                                                    Información
                                                 </a>
-                                                <a href="{% url 'orders:create_order' route_client.client.id %}" 
-                                                   class="pg-button pg-button-sm pg-button-success" 
+                                                <a href="{% url 'orders:create_order' route_client.client.id %}"
+                                                   class="pg-button pg-button-sm pg-button-success"
                                                    title="Crear pedido">
                                                     <i class="fas fa-plus-circle"></i>
                                                     Vender

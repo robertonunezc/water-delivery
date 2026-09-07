@@ -2401,14 +2401,7 @@ body.pg-modal-open {
         padding: 0.5rem 0.75rem;
         font-size: 1rem;
       }
-      
-      .order-summary-fixed {
-        position: sticky;
-        top: 20px;
-        max-height: calc(100vh - 40px);
-        overflow-y: auto;
-      }
-      
+
       .products-table-container {
         max-height: 60vh;
         overflow-y: auto;
@@ -2419,24 +2412,6 @@ body.pg-modal-open {
 
     /* Mobile/small tablet optimizations */
     @media (max-width: 767px) {
-      .order-summary-mobile {
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: white;
-        border-top: 2px solid var(--pg-border);
-        padding: 1rem;
-        z-index: 1000;
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-        max-height: 40vh;
-        overflow-y: auto;
-      }
-      
-      .main-content-mobile {
-        padding-bottom: 200px; /* Space for fixed summary */
-      }
-      
       .pg-button-group-mobile .pg-button {
         margin: 0.25rem;
         padding: 0.5rem 1rem;
@@ -2461,30 +2436,221 @@ body.pg-modal-open {
       background-color: rgba(0,123,255,.075);
     }
 
-    .financial-toggle-btn {
-      border-color: rgba(255, 255, 255, 0.7);
-    }
-
-    .financial-toggle-btn:focus {
-      box-shadow: none;
-    }
-
-    .financial-summary-card {
-      padding: 0.85rem 1rem;
-    }
-
-    .financial-summary-label {
-      font-size: 0.8rem;
-    }
-
-    .financial-summary-amount {
-      font-size: 1.6rem;
-      line-height: 1.1;
-    }
-
-    .financial-summary-help {
-      font-size: 0.78rem;
+    .order-page-title {
+      align-items: baseline;
+      color: var(--pg-foreground);
+      display: flex;
+      flex-wrap: wrap;
+      font-size: 1.35rem;
+      font-weight: 750;
+      gap: 0.2rem 0.45rem;
       line-height: 1.2;
+      min-width: 0;
+    }
+
+    .order-page-title .fas {
+      font-size: 0.85em;
+      line-height: 1;
+    }
+
+    .order-page-title-label {
+      color: var(--pg-muted-foreground);
+      font-weight: 650;
+    }
+
+    .order-page-client-name {
+      color: var(--pg-primary);
+      font-weight: 800;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .order-page-actions {
+      align-items: center;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      justify-content: flex-end;
+    }
+
+    .order-page-actions.pg-button-group-mobile .pg-button,
+    .order-page-actions .order-header-button {
+      font-size: 0.78rem;
+      line-height: 1.15;
+      margin: 0;
+      min-height: 2rem;
+      min-width: 0;
+      padding: 0.32rem 0.55rem;
+    }
+
+    .order-header-button .fas {
+      font-size: 0.85em;
+    }
+
+    .order-creation-layout {
+      display: grid;
+      gap: 1rem;
+    }
+
+    .order-products-form {
+      margin: 0;
+    }
+
+    .order-finalization-layout {
+      align-items: start;
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-finalization-empty {
+      margin-bottom: 0;
+    }
+
+    .order-payment-panel,
+    .order-checkout-panel {
+      height: 100%;
+    }
+
+    .order-payment-fields {
+      display: grid;
+      gap: 0 1rem;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .order-payment-field-wide,
+    .order-payment-breakdown {
+      grid-column: 1 / -1;
+    }
+
+    .order-payment-breakdown {
+      background: var(--pg-muted);
+      border: 1px solid var(--pg-border);
+      border-radius: 0.375rem;
+      padding: 0.85rem;
+    }
+
+    .order-payment-breakdown-title {
+      color: var(--pg-success);
+      font-size: 0.92rem;
+      font-weight: 750;
+      line-height: 1.2;
+      margin-bottom: 0.65rem;
+    }
+
+    .order-checkout-totals {
+      border-top: 1px solid var(--pg-border);
+      margin-top: 0.75rem;
+      padding-top: 0.75rem;
+    }
+
+    .order-checkout-panel #finish-order-btn {
+      margin-top: 1rem;
+    }
+
+    .client-financial-strip {
+      background: var(--pg-card);
+      border: 1px solid var(--pg-border);
+      border-left: 4px solid var(--pg-info);
+      border-radius: 0.375rem;
+      box-shadow: var(--pg-shadow-sm);
+      display: grid;
+      gap: 0.45rem;
+      padding: 0.6rem 0.75rem;
+    }
+
+    .client-financial-affordability {
+      display: flex;
+      font-size: 0.75rem;
+      justify-content: flex-end;
+      line-height: 1.15;
+      min-width: 0;
+    }
+
+    .client-financial-affordability:empty {
+      display: none;
+    }
+
+    .client-financial-affordability .pg-badge {
+      font-size: 0.72rem;
+      line-height: 1.15;
+      padding: 0.25rem 0.45rem;
+      text-align: right;
+      white-space: normal;
+    }
+
+    .financial-strip-metrics {
+      display: grid;
+      flex: 1 1 auto;
+      gap: 0.5rem;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      min-width: 0;
+    }
+
+    .financial-strip-metric {
+      align-items: baseline;
+      background: var(--pg-muted);
+      border: 1px solid var(--pg-border);
+      border-radius: 0.375rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem 0.45rem;
+      justify-content: space-between;
+      min-width: 0;
+      padding: 0.35rem 0.55rem;
+    }
+
+    .financial-strip-label {
+      color: var(--pg-muted-foreground);
+      font-size: 0.72rem;
+      font-weight: 650;
+      line-height: 1.15;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .financial-strip-value {
+      font-size: 0.98rem;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 767px) {
+      .order-page-title {
+        font-size: 1.1rem;
+      }
+
+      .order-page-actions {
+        justify-content: flex-start;
+      }
+
+      .order-page-actions.pg-button-group-mobile .pg-button {
+        padding: 0.3rem 0.45rem;
+      }
+
+      .client-financial-strip {
+        gap: 0.5rem;
+      }
+
+      .financial-strip-metrics {
+        gap: 0.4rem;
+        grid-template-columns: 1fr;
+      }
+
+      .client-financial-affordability {
+        justify-content: flex-start;
+      }
+
+      .client-financial-affordability .pg-badge {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 991px) {
+      .order-finalization-layout,
+      .order-payment-fields {
+        grid-template-columns: 1fr;
+      }
     }
 
     .order-workflow-header {
@@ -2905,23 +3071,129 @@ body.pg-modal-open {
     .pg-button-group .pg-button {
         margin: 0;
     }
-    @media (max-width: 768px) {
+    .route-client-sequence-pill {
+        display: none;
+    }
+    .route-client-actions-primary .pg-button {
+        white-space: nowrap;
+    }
+    @media (max-width: 900px) {
         .compact-card .pg-flex.pg-flex-wrap > div {
             margin-bottom: 0.25rem;
         }
         .compact-table {
             font-size: 0.75rem;
         }
-        .compact-table th,
-        .compact-table td {
-            padding: 0.25rem;
+        .route-client-table-wrapper.pg-table-responsive {
+            overflow-x: visible;
         }
-        .pg-button-group {
+        .route-client-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            display: block;
+            width: 100%;
+        }
+        .route-client-table thead {
+            display: none;
+        }
+        .route-client-table tbody {
+            display: grid;
+            gap: 0.7rem;
+        }
+        .route-client-table .route-client-row {
+            background: var(--pg-card);
+            border: 1px solid var(--pg-border);
+            border-radius: 0.5rem;
             display: flex;
             flex-direction: column;
+            padding: 0.65rem 0.75rem;
+            width: 100%;
         }
-        .pg-button-group .pg-button {
+        .route-client-table.compact-table td {
+            border: 0;
+            display: block;
+            font-size: 0.84rem;
+            padding: 0.4rem 0;
+            width: 100%;
+        }
+        .route-client-table .route-client-sequence-cell {
+            display: none;
+        }
+        .route-client-table .route-client-name-cell {
+            order: 1;
+            padding-top: 0;
+        }
+        .route-client-table .route-client-actions-cell {
+            border-bottom: 1px solid var(--pg-border);
+            order: 2;
+            padding-bottom: 0.65rem;
+        }
+        .route-client-table .route-client-finance-cell {
+            order: 3;
+        }
+        .route-client-table .route-client-products-cell {
+            order: 4;
+        }
+        .route-client-table .route-client-last-order-cell {
+            order: 5;
+        }
+        .route-client-table td[data-label]::before {
+            color: var(--pg-muted-foreground);
+            content: attr(data-label);
+            display: block;
+            font-size: 0.68rem;
+            font-weight: 750;
+            line-height: 1.1;
             margin-bottom: 0.25rem;
+            text-transform: uppercase;
+        }
+        .route-client-table .route-client-name-cell::before,
+        .route-client-table .route-client-actions-cell::before {
+            content: none;
+            display: none;
+        }
+        .route-client-mobile-heading {
+            align-items: center;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.45rem;
+            line-height: 1.2;
+        }
+        .route-client-mobile-heading strong {
+            min-width: 0;
+            overflow-wrap: anywhere;
+        }
+        .route-client-sequence-pill {
+            align-items: center;
+            background: var(--pg-muted);
+            border: 1px solid var(--pg-border);
+            border-radius: 999px;
+            color: var(--pg-muted-foreground);
+            display: inline-flex;
+            font-size: 0.72rem;
+            font-weight: 750;
+            justify-content: center;
+            line-height: 1;
+            min-height: 1.55rem;
+            min-width: 2rem;
+            padding: 0 0.4rem;
+        }
+        .route-client-table .route-client-actions-primary {
+            display: grid;
+            gap: 0.45rem;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            width: 100%;
+        }
+        .route-client-actions-primary .pg-button {
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            min-height: 2.4rem;
+            white-space: normal;
+            width: 100%;
+        }
+        .route-client-table .pg-badge {
+            white-space: normal;
         }
     }
 

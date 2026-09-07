@@ -21,22 +21,23 @@
       data-initial-subtotal="{{ order.subtotal_amount|floatformat:2 }}"
       data-initial-order-date="{{ order.order_date|date:'Y-m-d' }}">
     <!-- Header Section -->
-    <div class="pg-row pg-mb-4">
+    <div class="pg-row pg-mb-3 order-page-header">
       <div class="pg-col-12">
-        <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-start pg-align-md-center">
-          <h1 class="pg-mb-3 pg-mb-md-0">
-            <i class="fas fa-shopping-cart pg-me-2 pg-text-primary"></i>
-            Nuevo Pedido para <span class="pg-text-primary">{{ client.name }}</span>
+        <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-start pg-align-md-center pg-gap-2">
+          <h1 class="pg-mb-2 pg-mb-md-0 order-page-title">
+            <i class="fas fa-shopping-cart pg-me-1 pg-text-primary" aria-hidden="true"></i>
+            <span class="order-page-title-label">Nuevo pedido</span>
+            <span class="order-page-client-name">{{ client.name }}</span>
           </h1>
-          <div class="pg-button-group-mobile">
-            <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary pg-touch">
-              <i class="fas fa-user pg-me-2"></i>Ver Cliente
+          <div class="pg-button-group-mobile order-page-actions">
+            <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary order-header-button">
+              <i class="fas fa-user pg-me-1" aria-hidden="true"></i>Ver Cliente
             </a>
-            <a href="{% url 'clients:list' %}" class="pg-button pg-button-secondary pg-touch">
-              <i class="fas fa-arrow-left pg-me-2"></i>Volver
+            <a href="{% url 'clients:list' %}" class="pg-button pg-button-secondary order-header-button">
+              <i class="fas fa-arrow-left pg-me-1" aria-hidden="true"></i>Volver
             </a>
-            <button type="button" id="cancel-order-btn" class="pg-button pg-button-outline-danger pg-touch">
-              <i class="fas fa-ban pg-me-2"></i>Cancelar Pedido
+            <button type="button" id="cancel-order-btn" class="pg-button pg-button-outline-danger order-header-button">
+              <i class="fas fa-ban pg-me-1" aria-hidden="true"></i>Cancelar Pedido
             </button>
           </div>
         </div>
@@ -44,276 +45,140 @@
     </div>
     {% if has_delivery_address %}
     <!-- Client Financial Status -->
-      <div class="pg-row pg-mb-4">
+      <div class="pg-row pg-mb-3">
         <div class="pg-col-12">
-          <div class="pg-card pg-border-info pg-shadow-sm">
-            <div class="pg-card-header pg-bg-info pg-text-white pg-flex pg-justify-between pg-align-center order-workflow-header">
-              <h5 class="pg-mb-0">
-                <i class="fas fa-wallet pg-me-2"></i>Estado Financiero del Cliente
-              </h5>
-              <button class="pg-button pg-button-sm pg-button-outline-light financial-toggle-btn"
-                      type="button"
-                      data-pg-toggle="collapse"
-                      data-pg-target="#client-financial-status-collapse"
-                      aria-expanded="false"
-                      aria-controls="client-financial-status-collapse">
-                <i class="fas fa-chevron-down pg-me-1"></i>Ver detalle
-              </button>
-            </div>
-            <div class="pg-card-body pg-py-3 pg-border-bottom">
-              <div class="pg-row pg-gap-3 pg-align-stretch">
-                <div class="pg-col-12 pg-col-md-6">
-                  <div class="pg-h-100 pg-bg-light pg-rounded pg-border financial-summary-card">
-                    <div class="pg-text-muted pg-mb-1 financial-summary-label">Saldo disponible</div>
-                    <div class="pg-fw-bold financial-summary-amount {% if client.balance > 0 %}pg-text-success{% elif client.balance == 0 %}pg-text-secondary{% else %}pg-text-danger{% endif %}">
-                      ${{ client.balance|floatformat:2 }}
-                    </div>
-                    <div class="pg-text-muted financial-summary-help">Disponible para cubrir el pedido de inmediato.</div>
-                  </div>
-                </div>
-                <div class="pg-col-12 pg-col-md-6">
-                  <div class="pg-h-100 pg-bg-light pg-rounded pg-border financial-summary-card">
-                    <div class="pg-flex pg-justify-between pg-align-start">
-                      <div class="pg-row pg-gap-3 pg-flex-grow financial-credit-debt-grid">
-                        <div class="pg-col-6 financial-credit-column">
-                          <div class="pg-text-muted pg-mb-1 financial-summary-label">Crédito disponible</div>
-                          <div class="pg-fw-bold financial-summary-amount {% if can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% elif not can_pay_with_credit %}pg-text-danger{% else %}pg-text-secondary{% endif %}">
-                            {% if can_pay_with_credit %}
-                              ${{ client.get_available_credit|floatformat:2 }}
-                            {% else %}
-                              Bloqueado
-                            {% endif %}
-                          </div>
-                        </div>
-                        <div class="pg-col-6 financial-debt-column">
-                          <div class="pg-text-muted pg-mb-1 financial-summary-label">Deuda Actual</div>
-                          <div class="pg-fw-bold financial-summary-amount {% if client.current_debt > 0 %}pg-text-warning{% else %}pg-text-success{% endif %}">
-                            ${{ client.current_debt|floatformat:2 }}
-                          </div>
-                        </div>
-                      </div>
-                      <div id="affordability-status" class="pg-ms-3 pg-text-end"></div>
-                    </div>
-                    <div class="pg-text-muted financial-summary-help">
-                      {% if not can_pay_with_credit %}
-                        <span class="pg-text-danger">
-                          <i class="fas fa-ban pg-me-1"></i>Cliente no puede pagar con credito
-                        </span>
-                      {% endif %}
-                    </div>
-                  </div>
-                </div>
+          <section class="client-financial-strip" aria-label="Resumen financiero del cliente">
+            <div class="financial-strip-metrics" aria-label="Estado financiero del cliente">
+              <div class="financial-strip-metric financial-strip-balance">
+                <span class="financial-strip-label">Saldo disponible</span>
+                <strong class="financial-strip-value {% if client.balance > 0 %}pg-text-success{% elif client.balance == 0 %}pg-text-secondary{% else %}pg-text-danger{% endif %}">
+                  ${{ client.balance|floatformat:2 }}
+                </strong>
+              </div>
+              <div class="financial-strip-metric financial-strip-credit">
+                <span class="financial-strip-label">Crédito disponible</span>
+                <strong class="financial-strip-value {% if can_pay_with_credit and client.get_available_credit > 0 %}pg-text-info{% elif not can_pay_with_credit %}pg-text-danger{% else %}pg-text-secondary{% endif %}">
+                  {% if can_pay_with_credit %}
+                    ${{ client.get_available_credit|floatformat:2 }}
+                  {% else %}
+                    Bloqueado
+                  {% endif %}
+                </strong>
+              </div>
+              <div class="financial-strip-metric financial-strip-debt">
+                <span class="financial-strip-label">Deuda actual</span>
+                <strong class="financial-strip-value {% if client.current_debt > 0 %}pg-text-warning{% else %}pg-text-success{% endif %}">
+                  ${{ client.current_debt|floatformat:2 }}
+                </strong>
               </div>
             </div>
-
-          </div>
+            <div id="affordability-status" class="client-financial-affordability"></div>
+          </section>
         </div>
       </div>
 
-      <div class="pg-row">
-        <!-- Main Content Area -->
-        <div class="pg-col-12 pg-col-lg-7 pg-col-xl-8 main-content-mobile">
-          <form method="post">
-            {% csrf_token %}
+      <div class="order-creation-layout">
+        <form method="post" class="order-products-form">
+          {% csrf_token %}
 
-            <!-- Hidden Form Fields -->
-            <div class="pg-hidden">
-              {{ form.client }}
-              {{ form.order_date }}
-              {{ form.status }}
-              {{ form.notes }}
-              {% if form.total_amount %}
-                {{ form.total_amount }}
-              {% endif %}
+          <!-- Hidden Form Fields -->
+          <div class="pg-hidden">
+            {{ form.client }}
+            {{ form.order_date }}
+            {{ form.status }}
+            {{ form.notes }}
+            {% if form.total_amount %}
+              {{ form.total_amount }}
+            {% endif %}
+          </div>
+
+          <!-- Products Section -->
+          <section class="pg-card pg-shadow-sm order-products-section" aria-labelledby="order-products-title">
+            <div class="pg-card-header pg-bg-primary pg-text-white">
+              <h4 class="pg-mb-0" id="order-products-title">
+                <i class="fas fa-boxes pg-me-2"></i>Desglose de productos
+              </h4>
             </div>
-
-            <!-- Products Section -->
-            <div class="pg-card pg-shadow-sm">
-              <div class="pg-card-header pg-bg-primary pg-text-white">
-                <h4 class="pg-mb-0">
-                  <i class="fas fa-boxes pg-me-2"></i>Productos Disponibles
-                </h4>
-              </div>
-              <div class="pg-card-body pg-p-0">
-                <div class="products-table-container">
-                  <div class="pg-table-responsive">
-                    <table class="pg-table pg-table-hover pg-mb-0">
-                      <thead class="pg-table-light sticky-top">
-                        <tr>
-                          <th>Producto</th>
-                          <th class="pg-hidden pg-d-md-table-cell">Presentación</th>
-                          <th>Precio</th>
-                          <th>Cantidad</th>
-                          <th>Acciones</th>
+            <div class="pg-card-body pg-p-0">
+              <div class="products-table-container">
+                <div class="pg-table-responsive">
+                  <table class="pg-table pg-table-hover pg-mb-0">
+                    <thead class="pg-table-light sticky-top">
+                      <tr>
+                        <th>Producto</th>
+                        <th class="pg-hidden pg-d-md-table-cell">Presentación</th>
+                        <th>Precio</th>
+                        <th>Cantidad</th>
+                        <th>Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for client_product in client_products %}
+                        <tr data-product-id="{{ client_product.product.id }}"
+                            data-product-name="{{ client_product.product.name|escape }}"
+                            data-product-presentation="{{ client_product.product.get_presentation_display|escape }}"
+                            data-unit-price="{{ client_product.price }}">
+                          <td>
+                            <div class="pg-fw-bold">{{ client_product.product.name }}</div>
+                            <small class="pg-text-muted pg-d-md-none">{{ client_product.product.get_presentation_display }}</small>
+                          </td>
+                          <td class="pg-hidden pg-d-md-table-cell">{{ client_product.product.get_presentation_display }}</td>
+                          <td class="pg-fw-bold pg-text-success">${{ client_product.price }}</td>
+                          <td>
+                            <input type="number"
+                                  name="qty_{{ client_product.product.id }}"
+                                  min="0"
+                                  value="0"
+                                  class="pg-input quantity-input pg-w-20" />
+                          </td>
+                          <td>
+                            <div class="pg-button-group" role="group">
+                              <button type="button"
+                                      class="pg-button pg-button-success pg-button-sm pg-touch"
+                                      data-order="{{ order.pk }}"
+                                      data-product="{{ client_product.product.id }}"
+                                      title="Agregar producto">
+                                <i class="fas fa-plus"></i>
+                                <span class="pg-hidden pg-d-sm-inline pg-ms-1">Agregar</span>
+                              </button>
+                              <button type="button"
+                                      class="pg-button pg-button-danger pg-button-sm pg-touch"
+                                      data-order="{{ order.pk }}"
+                                      data-product="{{ client_product.product.id }}"
+                                      title="Quitar producto">
+                                <i class="fas fa-minus"></i>
+                                <span class="pg-hidden pg-d-sm-inline pg-ms-1">Quitar</span>
+                              </button>
+                            </div>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {% for client_product in client_products %}
-                          <tr data-product-id="{{ client_product.product.id }}"
-                              data-product-name="{{ client_product.product.name|escape }}"
-                              data-product-presentation="{{ client_product.product.get_presentation_display|escape }}"
-                              data-unit-price="{{ client_product.price }}">
-                            <td>
-                              <div class="pg-fw-bold">{{ client_product.product.name }}</div>
-                              <small class="pg-text-muted pg-d-md-none">{{ client_product.product.get_presentation_display }}</small>
-                            </td>
-                            <td class="pg-hidden pg-d-md-table-cell">{{ client_product.product.get_presentation_display }}</td>
-                            <td class="pg-fw-bold pg-text-success">${{ client_product.price }}</td>
-                            <td>
-                              <input type="number" 
-                                    name="qty_{{ client_product.product.id }}" 
-                                    min="0" 
-                                    value="0" 
-                                    class="pg-input quantity-input pg-w-20" />
-                            </td>
-                            <td>
-                              <div class="pg-button-group" role="group">
-                                <button type="button" 
-                                        class="pg-button pg-button-success pg-button-sm pg-touch" 
-                                        data-order="{{ order.pk }}" 
-                                        data-product="{{ client_product.product.id }}"
-                                        title="Agregar producto">
-                                  <i class="fas fa-plus"></i>
-                                  <span class="pg-hidden pg-d-sm-inline pg-ms-1">Agregar</span>
-                                </button>
-                                <button type="button" 
-                                        class="pg-button pg-button-danger pg-button-sm pg-touch" 
-                                        data-order="{{ order.pk }}" 
-                                        data-product="{{ client_product.product.id }}"
-                                        title="Quitar producto">
-                                  <i class="fas fa-minus"></i>
-                                  <span class="pg-hidden pg-d-sm-inline pg-ms-1">Quitar</span>
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
-          </form>
+          </section>
+        </form>
+
+        <div id="order-finalization-empty-state" class="pg-card pg-shadow-sm order-finalization-empty" {% if order.total_amount > 0 %}hidden{% endif %}>
+          <div class="pg-card-body pg-text-center pg-text-muted pg-py-4">
+            <i class="fas fa-arrow-up fa-2x pg-mb-2 pg-block"></i>
+            Agregue productos para habilitar los datos de cobro y checkout.
+          </div>
         </div>
 
-        <!-- Order Summary Sidebar -->
-        <div class="pg-col-12 pg-col-lg-5 pg-col-xl-4 pg-hidden pg-d-lg-block">
-          <div class="order-summary-fixed">
-            <!-- Order Summary Card -->
-            <div class="pg-card pg-shadow-sm pg-mb-3 order-summary-card">
-              <div class="pg-card-header pg-bg-info pg-text-white order-workflow-header">
-                <h4 class="pg-mb-0">
-                  <i class="fas fa-receipt pg-me-2"></i>Resumen del Pedido
-                </h4>
-              </div>
-              <div class="pg-card-body">
-                <ul class="pg-list" id="order-summary-products">
-                  {% for item in order.items.all %}
-                    <li class="pg-list-item pg-border-0 order-summary-item"
-                        data-product-id="{{ item.product.id }}"
-                        data-order-id="{{ order.pk }}">
-                      <div class="order-summary-details">
-                        <div class="pg-fw-bold order-summary-product">{{ item.product.get_full_name }}</div>
-                        <small class="pg-text-muted order-summary-quantity">Cantidad: {{ item.quantity }}</small>
-                      </div>
-                      <div class="order-summary-actions">
-                        <span class="pg-badge pg-bg-primary pg-rounded-pill order-summary-price">${{ item.get_total_price|default:"0.00" }}</span>
-                        <button type="button" 
-                                class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn pg-touch" 
-                                data-product-id="{{ item.product.id }}" 
-                                data-order-id="{{ order.pk }}" 
-                                title="Remover producto">
-                          <i class="fas fa-times"></i>
-                        </button>
-                      </div>
-                    </li>
-                  {% empty %}
-                    <li class="pg-list-item pg-border-0 pg-px-0 pg-text-muted pg-text-center pg-py-4">
-                      <i class="fas fa-shopping-cart fa-2x pg-mb-2 pg-block"></i>
-                      No hay productos en el pedido
-                    </li>
-                  {% endfor %}
-                </ul>
-              </div>
+        <div id="order-finalization-section"
+             class="order-finalization-layout"
+             {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
+          <section class="pg-card pg-shadow-sm order-payment-panel" aria-labelledby="order-payment-title">
+            <div class="pg-card-header pg-bg-warning pg-text-dark">
+              <h4 class="pg-mb-0" id="order-payment-title">
+                <i class="fas fa-credit-card pg-me-2"></i>Datos de cobro en panel ancho
+              </h4>
             </div>
-
-            <div id="order-finalization-empty-state" class="pg-card pg-shadow-sm pg-mb-4" {% if order.total_amount > 0 %}hidden{% endif %}>
-              <div class="pg-card-body pg-text-center pg-text-muted pg-py-4">
-                <i class="fas fa-arrow-left fa-2x pg-mb-2 pg-block"></i>
-                Agregue productos para habilitar el cobro y el cierre del pedido.
-              </div>
-            </div>
-
-            <div id="order-finalization-section" {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
-            <!-- Payment Breakdown Card (Balance First) -->
-            <div class="pg-card pg-shadow-sm pg-mb-4" id="payment-breakdown-card">
-              <div class="pg-card-header pg-bg-success pg-text-white">
-                <h5 class="pg-mb-0">
-                  <i class="fas fa-calculator pg-me-2"></i>Desglose de Pago
-                </h5>
-              </div>
-              <div class="pg-card-body">
-                <div id="payment-breakdown-content">
-                  <!-- Balance Payment Section -->
-                  <div class="payment-breakdown-item pg-mb-3" id="balance-payment-section" hidden>
-                    <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-success">
-                      <div>
-                        <i class="fas fa-piggy-bank pg-text-success pg-me-2"></i>
-                        <strong>Pago con Saldo</strong>
-                      </div>
-                      <div class="pg-text-end">
-                        <span class="pg-badge pg-bg-success pg-fs-6" id="balance-payment-amount">$0.00</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Remaining Payment Section -->
-                  <div class="payment-breakdown-item pg-mb-3" id="remaining-payment-section" hidden>
-                    <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-warning">
-                      <div>
-                        <i class="fas fa-money-bill-wave pg-text-warning pg-me-2"></i>
-                        <strong>Restante a pagar</strong>
-                      </div>
-                      <div class="pg-text-end">
-                        <span class="pg-badge pg-bg-warning pg-text-dark pg-fs-6" id="remaining-payment-amount">$0.00</span>
-                      </div>
-                    </div>
-                    
-                  </div>
-                  
-                  <!-- Full Payment Without Balance -->
-                  <div class="payment-breakdown-item pg-mb-3" id="no-balance-payment-section" hidden>
-                    <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-secondary">
-                      <div>
-                        <i class="fas fa-info-circle pg-text-secondary pg-me-2"></i>
-                        <span class="pg-text-muted">Sin saldo disponible</span>
-                      </div>
-                      <div class="pg-text-end">
-                        <span class="pg-badge pg-bg-secondary pg-fs-6" id="full-payment-amount">$0.00</span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <!-- Summary Message -->
-                  <div class="pg-alert pg-alert-light pg-border pg-mt-2" id="payment-breakdown-summary">
-                    <small class="pg-text-muted" id="payment-breakdown-message">
-                      <i class="fas fa-info-circle pg-me-1"></i>
-                      Agregue productos para ver el desglose de pago
-                    </small>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Payment Method Card -->
-            <div class="pg-card pg-shadow-sm pg-mb-4">
-              <div class="pg-card-header pg-bg-warning pg-text-dark">
-                <h5 class="pg-mb-0">
-                  <i class="fas fa-credit-card pg-me-2"></i>Método de Pago
-                </h5>
-              </div>
-              <div class="pg-card-body">
+            <div class="pg-card-body">
+              <div class="order-payment-fields">
                 <div class="pg-mb-3">
                   <label for="order-date" class="pg-label">
                     <i class="fas fa-calendar-day pg-me-1"></i>Fecha del Pedido
@@ -349,7 +214,9 @@
                     </div>
                   {% endif %}
                 </div>
-                <div id="payment-flow-feedback" class="pg-alert pg-alert-danger pg-py-2" hidden></div>
+
+                <div id="payment-flow-feedback" class="pg-alert pg-alert-danger pg-py-2 order-payment-field-wide" hidden></div>
+
                 <div class="pg-mb-3" id="payment-method-select-container">
                   <label for="payment-method-select" class="pg-label" id="payment-method-select-label">
                     <i class="fas fa-credit-card pg-me-1"></i>Método de pago
@@ -360,32 +227,81 @@
                     {% endfor %}
                   </select>
                 </div>
-                
-                <!-- Cantidad Cobrada Field -->
+
                 <div class="pg-mb-3">
                   <label for="cantidad_cobrada" class="pg-label">
                     <i class="fas fa-dollar-sign pg-me-1"></i>Cantidad Cobrada
                   </label>
                   <div class="pg-input-group">
                     <span class="pg-input-group-text">$</span>
-                    <input type="number" 
-                          class="pg-input" 
-                          id="cantidad_cobrada" 
+                    <input type="number"
+                          class="pg-input"
+                          id="cantidad_cobrada"
                           name="cantidad_cobrada"
-                          step="0.01" 
+                          step="0.01"
                           min="0"
                           placeholder="0.00">
                   </div>
                   <div class="pg-field-help">
                     Si cobra más del total, la diferencia se agregará al saldo del cliente
                   </div>
-                  <!-- Alert for balance addition -->
                   <div id="balance-addition-alert" class="pg-alert pg-alert-info pg-mt-2" hidden>
                     <i class="fas fa-info-circle pg-me-2"></i>
                     <span id="balance-addition-text"></span>
                   </div>
                 </div>
-                <div class="pg-pt-2 pg-border-top">
+
+                <div id="payment-breakdown-card" class="order-payment-breakdown order-payment-field-wide">
+                  <div class="order-payment-breakdown-title">
+                    <i class="fas fa-calculator pg-me-2"></i>Desglose de pago
+                  </div>
+                  <div id="payment-breakdown-content">
+                    <div class="payment-breakdown-item pg-mb-3" id="balance-payment-section" hidden>
+                      <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-success">
+                        <div>
+                          <i class="fas fa-piggy-bank pg-text-success pg-me-2"></i>
+                          <strong>Pago con Saldo</strong>
+                        </div>
+                        <div class="pg-text-end">
+                          <span class="pg-badge pg-bg-success pg-fs-6" id="balance-payment-amount">$0.00</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="payment-breakdown-item pg-mb-3" id="remaining-payment-section" hidden>
+                      <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-warning">
+                        <div>
+                          <i class="fas fa-money-bill-wave pg-text-warning pg-me-2"></i>
+                          <strong>Restante a pagar</strong>
+                        </div>
+                        <div class="pg-text-end">
+                          <span class="pg-badge pg-bg-warning pg-text-dark pg-fs-6" id="remaining-payment-amount">$0.00</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="payment-breakdown-item pg-mb-3" id="no-balance-payment-section" hidden>
+                      <div class="pg-flex pg-justify-between pg-align-center pg-p-2 pg-bg-light pg-rounded pg-border-start pg-border-4 pg-border-secondary">
+                        <div>
+                          <i class="fas fa-info-circle pg-text-secondary pg-me-2"></i>
+                          <span class="pg-text-muted">Sin saldo disponible</span>
+                        </div>
+                        <div class="pg-text-end">
+                          <span class="pg-badge pg-bg-secondary pg-fs-6" id="full-payment-amount">$0.00</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="pg-alert pg-alert-light pg-border pg-mt-2" id="payment-breakdown-summary">
+                      <small class="pg-text-muted" id="payment-breakdown-message">
+                        <i class="fas fa-info-circle pg-me-1"></i>
+                        Agregue productos para ver el desglose de pago
+                      </small>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="pg-pt-2 pg-border-top order-payment-field-wide">
                   <button class="pg-button pg-button-sm pg-button-outline-secondary"
                           type="button"
                           data-pg-toggle="collapse"
@@ -409,10 +325,44 @@
                 </div>
               </div>
             </div>
+          </section>
 
-            <!-- Total Card -->
-            <div class="pg-card pg-shadow-sm pg-mb-4">
-              <div class="pg-card-body">
+          <section class="pg-card pg-shadow-sm order-summary-card order-checkout-panel" aria-labelledby="order-checkout-title">
+            <div class="pg-card-header pg-bg-info pg-text-white order-workflow-header">
+              <h4 class="pg-mb-0" id="order-checkout-title">
+                <i class="fas fa-receipt pg-me-2"></i>Checkout
+              </h4>
+            </div>
+            <div class="pg-card-body">
+              <ul class="pg-list" id="order-summary-products">
+                {% for item in order.items.all %}
+                  <li class="pg-list-item pg-border-0 order-summary-item"
+                      data-product-id="{{ item.product.id }}"
+                      data-order-id="{{ order.pk }}">
+                    <div class="order-summary-details">
+                      <div class="pg-fw-bold order-summary-product">{{ item.product.get_full_name }}</div>
+                      <small class="pg-text-muted order-summary-quantity">Cantidad: {{ item.quantity }}</small>
+                    </div>
+                    <div class="order-summary-actions">
+                      <span class="pg-badge pg-bg-primary pg-rounded-pill order-summary-price">${{ item.get_total_price|default:"0.00" }}</span>
+                      <button type="button"
+                              class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn pg-touch"
+                              data-product-id="{{ item.product.id }}"
+                              data-order-id="{{ order.pk }}"
+                              title="Remover producto">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                  </li>
+                {% empty %}
+                  <li class="pg-list-item pg-border-0 pg-px-0 pg-text-muted pg-text-center pg-py-4">
+                    <i class="fas fa-shopping-cart fa-2x pg-mb-2 pg-block"></i>
+                    No hay productos en el pedido
+                  </li>
+                {% endfor %}
+              </ul>
+
+              <div class="order-checkout-totals">
                 <div class="pg-flex pg-justify-between pg-align-center pg-small pg-mb-1">
                   <span class="pg-text-muted">Subtotal</span>
                   <span class="pg-fw-semibold" id="summary-subtotal">${{ order.total_amount|default:"0.00" }}</span>
@@ -434,171 +384,21 @@
                   </span>
                 </div>
               </div>
-            </div>
 
-            <!-- Finish Order Button -->
-            <div class="pg-grid">
-              <button type="button" 
-                      id="finish-order-btn" 
-                      class="pg-button pg-button-success pg-button-lg pg-touch" 
-                      
+              <button type="button"
+                      id="finish-order-btn"
+                      class="pg-button pg-button-success pg-button-lg pg-touch pg-w-100"
                       data-order-id="{{ order.pk }}"
                       data-redirect="{{ order_redirect_url }}">
                 <i class="fas fa-check-circle pg-me-2"></i>Terminar Pedido
               </button>
             </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Mobile Order Summary (Fixed Bottom) -->
-        <div class="pg-d-lg-none order-summary-mobile">
-          <div id="mobile-finalization-empty-state" class="pg-text-center pg-text-muted pg-small pg-py-2" {% if order.total_amount > 0 %}hidden{% endif %}>
-            <i class="fas fa-arrow-up pg-me-1"></i>Agregue productos para continuar
-          </div>
-          <div id="mobile-finalization-section" {% if not order.total_amount or order.total_amount <= 0 %}hidden{% endif %}>
-          <div class="pg-row pg-mb-2">
-            <div class="pg-col-6">
-              <input
-                type="date"
-                class="pg-input pg-mb-2"
-                id="order-date-mobile"
-                name="order_date_mobile"
-                value="{{ order.order_date|date:'Y-m-d' }}"
-                aria-label="Fecha del Pedido">
-              <select class="pg-select pg-mb-2" id="order-type-select-mobile" name="order_type_mobile">
-                <option value="contado" {% if order_type == 'contado' %}selected{% endif %}>Contado</option>
-                <option value="credito" {% if order_type == 'credito' %}selected{% endif %} {% if not can_pay_with_credit %}disabled{% endif %}>
-                  Crédito{% if not can_pay_with_credit %} (bloqueado){% endif %}
-                </option>
-              </select>
-              {% if not can_pay_with_credit %}
-                <div class="pg-alert pg-alert-warning pg-alert-sm pg-p-2 pg-mb-2">
-                  <small><i class="fas fa-ban pg-me-1"></i>Credito bloqueado</small>
-                </div>
-              {% endif %}
-              <select class="pg-select" id="payment-method-select-mobile" name="payment_type">
-                <option value="">Método de pago</option>
-                {% for code, label in payment_types %}
-                  <option value="{{ code }}">{{ label }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="pg-col-6 pg-text-end">
-              <h4 class="pg-text-success pg-mb-0">
-                Total: $<span class="total-mobile">{{ order.total_amount|default:"0.00" }}</span>
-              </h4>
-            </div>
-          </div>
-
-          <div class="pg-row pg-mb-3 pg-align-center">
-            <div class="pg-col-6">
-              <div class="pg-small pg-text-muted">Descuento</div>
-              <div class="pg-fw-semibold pg-text-danger" id="summary-discount-mobile">${{ order.discount|default:"0.00" }}</div>
-            </div>
-            <div class="pg-col-6 pg-text-end">
-              <button type="button" class="pg-button pg-button-outline-secondary pg-w-100" data-pg-toggle="modal" data-pg-target="#discountModal">
-                <i class="fas fa-percentage pg-me-2"></i>Aplicar
-              </button>
-            </div>
-          </div>
-
-          <div class="pg-row pg-mb-3">
-            <div class="pg-col-12">
-              <button type="button"
-                      class="pg-button pg-button-outline-secondary pg-w-100"
-                      data-pg-toggle="modal"
-                      data-pg-target="#orderNotesModal">
-                <i class="fas fa-sticky-note pg-me-2"></i>Agregar nota
-              </button>
-            </div>
-          </div>
-
-          
-          <!-- Mobile Cantidad Cobrada -->
-          <div class="pg-row pg-mb-3">
-            <div class="pg-col-12">
-              <label for="cantidad_cobrada_mobile" class="pg-label pg-small">Cantidad Cobrada</label>
-              <div class="pg-input-group pg-input-group-sm">
-                <span class="pg-input-group-text">$</span>
-                <input type="number" 
-                      class="pg-input" 
-                      id="cantidad_cobrada_mobile" 
-                      name="cantidad_cobrada_mobile"
-                      step="0.01" 
-                      min="0"
-                      placeholder="0.00">
-              </div>
-              <div id="balance-addition-alert-mobile" class="pg-alert pg-alert-info pg-alert-sm pg-mt-1 pg-p-2" hidden>
-                <small id="balance-addition-text-mobile"></small>
-              </div>
-            </div>
-          </div>
-          
-          <div class="pg-row">
-            <div class="pg-col-6">
-              <button type="button" 
-                      class="pg-button pg-button-outline-info pg-button-lg pg-w-100" 
-                      data-pg-toggle="modal" 
-                      data-pg-target="#orderSummaryModal">
-                <i class="fas fa-list pg-me-2"></i>Ver Resumen
-              </button>
-            </div>
-            <div class="pg-col-6">
-              <button type="button" 
-                      id="finish-order-btn-mobile" 
-                      class="pg-button pg-button-success pg-button-lg pg-w-100" 
-                      data-order-id="{{ order.pk }}"
-                      data-redirect="{{ order_redirect_url }}">
-                <i class="fas fa-check-circle pg-me-2"></i>Terminar
-              </button>
-            </div>
-          </div>
-          </div>
+          </section>
         </div>
       </div>
     {%else%}
     <div class="pg-alert pg-alert-warning"> Debe agregar un domicilio de entrega para este cliente. Contacte al administrador</div>
     {% endif %}
-    <!-- Mobile Order Summary Modal -->
-    <div class="pg-modal pg-fade" id="orderSummaryModal" tabindex="-1">
-      <div class="pg-modal-dialog pg-modal-lg pg-modal-dialog-scrollable">
-        <div class="pg-modal-content">
-          <div class="pg-modal-header">
-            <h5 class="pg-modal-title">
-              <i class="fas fa-receipt pg-me-2"></i>Resumen del Pedido
-            </h5>
-            <button type="button" class="pg-modal-close" data-pg-dismiss="modal"></button>
-          </div>
-          <div class="pg-modal-body">
-            <ul class="pg-list" id="order-summary-products-mobile">
-              {% for item in order.items.all %}
-                <li class="pg-list-item pg-flex pg-justify-between pg-align-center">
-                  <div class="pg-flex-grow">
-                    <div class="pg-fw-bold">{{ item.product.get_full_name }}</div>
-                    <small class="pg-text-muted">Cantidad: {{ item.quantity }}</small>
-                  </div>
-                  <div class="pg-flex pg-align-center">
-                    <span class="pg-badge pg-bg-primary pg-rounded-pill pg-me-2">${{ item.get_total_price|default:"0.00" }}</span>
-                    <button type="button" 
-                            class="pg-button pg-button-sm pg-button-outline-danger remove-item-btn-mobile" 
-                            data-product-id="{{ item.product.id }}" 
-                            data-order-id="{{ order.pk }}">
-                      <i class="fas fa-times"></i>
-                    </button>
-                  </div>
-                </li>
-              {% empty %}
-                <li class="pg-list-item pg-text-muted pg-text-center pg-py-4">
-                  <i class="fas fa-shopping-cart fa-2x pg-mb-2 pg-block"></i>
-                  No hay productos en el pedido
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Discount Modal -->
     <div class="pg-modal pg-fade" id="discountModal" tabindex="-1" aria-labelledby="discountModalLabel" aria-hidden="true">
@@ -636,34 +436,6 @@
       </div>
     </div>
 
-    <div class="pg-modal pg-fade" id="orderNotesModal" tabindex="-1" aria-labelledby="orderNotesModalLabel" aria-hidden="true">
-      <div class="pg-modal-dialog">
-        <div class="pg-modal-content">
-          <div class="pg-modal-header">
-            <h5 class="pg-modal-title" id="orderNotesModalLabel">
-              <i class="fas fa-sticky-note pg-me-2"></i>Notas del pedido
-            </h5>
-            <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="pg-modal-body">
-            <label for="order-notes-mobile" class="pg-label">Notas</label>
-            <textarea
-              class="pg-input"
-              id="order-notes-mobile"
-              rows="5"
-              maxlength="1000"
-              placeholder="Agregue una nota opcional para este pedido">{{ order.notes|default_if_none:"" }}</textarea>
-            <div class="pg-flex pg-justify-between pg-align-center pg-mt-2">
-              <small class="pg-text-muted">La nota se guarda automaticamente.</small>
-              <small class="pg-text-muted" id="order-notes-status-mobile">Sin nota</small>
-            </div>
-          </div>
-          <div class="pg-modal-footer">
-            <button type="button" class="pg-button pg-button-outline-secondary" data-pg-dismiss="modal">Cerrar</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 {% endblock %}
 {% block extra_js %}

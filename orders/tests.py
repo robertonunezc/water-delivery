@@ -2,13 +2,15 @@ from datetime import date, timedelta
 from decimal import Decimal
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch, MagicMock
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.test import RequestFactory
+from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -26,6 +28,122 @@ from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
 from invoice.models import Invoice, InvoiceOrderLink
+
+
+class _EmptyOrderItems:
+    def all(self) -> list:
+        return []
+
+
+class _TemplateClient:
+    pk = 1
+    name = "Cliente Layout"
+    balance = Decimal("0.00")
+    current_debt = Decimal("0.00")
+
+    def get_available_credit(self) -> Decimal:
+        return Decimal("1000.00")
+
+
+@override_settings(
+    STORAGES={
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    },
+)
+class CreateOrderTemplateLayoutTest(SimpleTestCase):
+    """Render-only tests for the create order page layout."""
+
+    def _render_order_page(self, can_pay_with_credit: bool = True) -> str:
+        order = SimpleNamespace(
+            pk=1,
+            items=_EmptyOrderItems(),
+            total_amount=Decimal("0.00"),
+            discount=Decimal("0.00"),
+            subtotal_amount=Decimal("0.00"),
+            order_date=None,
+            notes="",
+        )
+        form = SimpleNamespace(
+            client="",
+            order_date="",
+            status="",
+            notes="",
+            total_amount="",
+        )
+        return render_to_string(
+            "create_order.html",
+            {
+                "client": _TemplateClient(),
+                "order": order,
+                "form": form,
+                "client_products": [],
+                "payment_types": [("cash", "Efectivo")],
+                "order_type": "contado",
+                "has_pending_credit_payment": False,
+                "can_pay_with_credit": can_pay_with_credit,
+                "initial_payment_breakdown": "{}",
+                "has_delivery_address": True,
+                "order_redirect_url": "/clients/",
+                "csrf_token": "TOKEN",
+            },
+        )
+
+    def test_products_render_above_two_column_payment_and_checkout_layout(self) -> None:
+        html = self._render_order_page()
+
+        self.assertIn("order-products-section", html)
+        self.assertIn("order-finalization-layout", html)
+        self.assertIn("order-payment-panel", html)
+        self.assertIn("order-checkout-panel", html)
+        products_start = html.index("order-products-section")
+        finalization_start = html.index("order-finalization-layout")
+        payment_start = html.index("order-payment-panel")
+        checkout_start = html.index("order-checkout-panel")
+        self.assertLess(products_start, finalization_start)
+        self.assertLess(finalization_start, payment_start)
+        self.assertLess(payment_start, checkout_start)
+        self.assertIn("Datos de cobro en panel ancho", html[payment_start:checkout_start])
+        self.assertIn("Checkout", html[checkout_start:])
+        self.assertNotIn("order-summary-fixed", html)
+        self.assertNotIn("order-summary-mobile", html)
+
+    def test_header_uses_client_name_title_and_compact_actions(self) -> None:
+        html = self._render_order_page()
+
+        self.assertIn("order-page-title", html)
+        self.assertIn("order-page-client-name", html)
+        self.assertIn("Cliente Layout", html)
+        self.assertIn("order-page-actions", html)
+        self.assertEqual(html.count("order-header-button"), 3)
+        header_start = html.index("order-page-title")
+        actions_start = html.index("order-page-actions")
+        header_end = html.index("client-financial-strip")
+        self.assertLess(header_start, actions_start)
+        self.assertNotIn("pg-touch", html[actions_start:header_end])
+
+    def test_financial_status_moves_affordability_below_metrics(self) -> None:
+        html = self._render_order_page()
+
+        self.assertNotIn("Estado Financiero", html)
+        metrics_start = html.index("financial-strip-metrics")
+        affordability_start = html.index("client-financial-affordability")
+        products_start = html.index("order-products-section")
+        self.assertLess(metrics_start, affordability_start)
+        self.assertLess(affordability_start, products_start)
+
+    def test_blocked_credit_shows_only_blocked_label(self) -> None:
+        html = self._render_order_page(can_pay_with_credit=False)
+
+        credit_start = html.index("financial-strip-credit")
+        debt_start = html.index("financial-strip-debt")
+        credit_column = html[credit_start:debt_start]
+        self.assertIn("Bloqueado", credit_column)
+        self.assertNotIn("No disponible", credit_column)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -526,9 +644,9 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         template_path = Path(__file__).resolve().parent / "templates" / "create_order.html"
         template_source = template_path.read_text()
 
-        self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 2)
+        self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 1)
 
-    def test_order_page_shows_credit_then_debt_in_two_summary_columns(self) -> None:
+    def test_order_page_renders_compact_financial_status_strip(self) -> None:
         self.customer.balance = Decimal("0.00")
         self.customer.credit_limit = Decimal("1000.00")
         self.customer.current_debt = Decimal("125.00")
@@ -550,12 +668,17 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         html = response.content.decode()
-        self.assertIn("financial-credit-debt-grid", html)
-        credit_column_start = html.index("financial-credit-column")
-        debt_column_start = html.index("financial-debt-column")
-        self.assertLess(credit_column_start, debt_column_start)
-        self.assertIn("Crédito disponible", html[credit_column_start:debt_column_start])
-        self.assertIn("Deuda Actual", html[debt_column_start:])
+        self.assertIn("client-financial-strip", html)
+        self.assertIn("financial-strip-metrics", html)
+        self.assertNotIn("financial-summary-card", html)
+        balance_start = html.index("financial-strip-balance")
+        credit_start = html.index("financial-strip-credit")
+        debt_start = html.index("financial-strip-debt")
+        self.assertLess(balance_start, credit_start)
+        self.assertLess(credit_start, debt_start)
+        self.assertIn("Saldo", html[balance_start:credit_start])
+        self.assertIn("Crédito", html[credit_start:debt_start])
+        self.assertIn("Deuda", html[debt_start:])
 
 
 class SplitOrderViewTestCase(FastTenantTestCase):
