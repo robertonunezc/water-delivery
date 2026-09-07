@@ -3071,11 +3071,34 @@ body.pg-modal-open {
     .pg-button-group .pg-button {
         margin: 0;
     }
-    .route-client-sequence-pill {
-        display: none;
-    }
     .route-client-actions-primary .pg-button {
         white-space: nowrap;
+    }
+    .route-client-mobile-heading {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        line-height: 1.2;
+    }
+    .route-client-mobile-heading strong {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+    .route-client-sequence-pill {
+        align-items: center;
+        background: var(--pg-muted);
+        border: 1px solid var(--pg-border);
+        border-radius: 999px;
+        color: var(--pg-muted-foreground);
+        display: inline-flex;
+        font-size: 0.72rem;
+        font-weight: 750;
+        justify-content: center;
+        line-height: 1;
+        min-height: 1.55rem;
+        min-width: 2rem;
+        padding: 0 0.4rem;
     }
     .route-last-order {
         align-items: flex-start;
@@ -3127,38 +3150,37 @@ body.pg-modal-open {
             background: var(--pg-card);
             border: 1px solid var(--pg-border);
             border-radius: 0.5rem;
-            display: flex;
-            flex-direction: column;
-            padding: 0.65rem 0.75rem;
+            display: grid;
+            gap: 0.7rem 0.75rem;
+            grid-template-areas:
+                "name name"
+                "last actions"
+                "finance products";
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            padding: 0.75rem;
             width: 100%;
         }
         .route-client-table.compact-table td {
             border: 0;
             display: block;
             font-size: 0.84rem;
-            padding: 0.4rem 0;
+            padding: 0;
             width: 100%;
         }
-        .route-client-table .route-client-sequence-cell {
-            display: none;
-        }
         .route-client-table .route-client-name-cell {
-            order: 1;
-            padding-top: 0;
+            grid-area: name;
         }
         .route-client-table .route-client-actions-cell {
-            border-bottom: 1px solid var(--pg-border);
-            order: 3;
-            padding-bottom: 0.65rem;
+            grid-area: actions;
         }
         .route-client-table .route-client-finance-cell {
-            order: 4;
+            grid-area: finance;
         }
         .route-client-table .route-client-products-cell {
-            order: 5;
+            grid-area: products;
         }
         .route-client-table .route-client-last-order-cell {
-            order: 2;
+            grid-area: last;
         }
         .route-client-table td[data-label]::before {
             color: var(--pg-muted-foreground);
@@ -3178,32 +3200,6 @@ body.pg-modal-open {
         .route-client-table .route-client-last-order-cell::before {
             font-size: 0.72rem;
             margin-bottom: 0.35rem;
-        }
-        .route-client-mobile-heading {
-            align-items: center;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.45rem;
-            line-height: 1.2;
-        }
-        .route-client-mobile-heading strong {
-            min-width: 0;
-            overflow-wrap: anywhere;
-        }
-        .route-client-sequence-pill {
-            align-items: center;
-            background: var(--pg-muted);
-            border: 1px solid var(--pg-border);
-            border-radius: 999px;
-            color: var(--pg-muted-foreground);
-            display: inline-flex;
-            font-size: 0.72rem;
-            font-weight: 750;
-            justify-content: center;
-            line-height: 1;
-            min-height: 1.55rem;
-            min-width: 2rem;
-            padding: 0 0.4rem;
         }
         .route-client-table .route-client-actions-primary {
             display: grid;
@@ -3231,6 +3227,27 @@ body.pg-modal-open {
         }
         .route-client-table .route-last-order-date {
             font-size: 0.84rem;
+        }
+        .route-client-table .route-client-finance-cell,
+        .route-client-table .route-client-products-cell {
+            background: var(--pg-muted);
+            border: 1px solid var(--pg-border);
+            border-radius: 0.375rem;
+            min-width: 0;
+            padding: 0.55rem 0.6rem;
+        }
+    }
+
+    @media (max-width: 560px) {
+        .route-client-table .route-client-row {
+            gap: 0.6rem;
+            grid-template-areas:
+                "name"
+                "last"
+                "actions"
+                "finance"
+                "products";
+            grid-template-columns: 1fr;
         }
     }
 

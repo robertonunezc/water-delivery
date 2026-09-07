@@ -102,7 +102,6 @@
                             <table class="pg-table pg-table-striped pg-table-hover compact-table route-client-table">
                                 <thead class="pg-table-dark">
                                     <tr>
-                                        <th>#</th>
                                         <th>Cliente</th>
                                         <th>Último Pedido</th>
                                         <th>Saldo/Crédito</th>
@@ -113,7 +112,6 @@
                                 <tbody>
                                     {% for route_client in route_clients %}
                                     <tr class="route-client-row">
-                                        <td class="route-client-sequence-cell" data-label="#">#{{ route_client.sequence }}</td>
                                         <td class="route-client-name-cell" data-label="Cliente">
                                             <div class="route-client-mobile-heading">
                                                 <span class="route-client-sequence-pill">#{{ route_client.sequence }}</span>
