@@ -11,6 +11,7 @@
       data-order-id="{{ order.pk }}"
       data-cancel-order-url="{% url 'orders:cancel_order' order.pk %}"
       data-client-balance="{{ client.balance|floatformat:2 }}"
+      data-available-credit="{{ client.get_available_credit|floatformat:2 }}"
       data-order-type="{{ order_type }}"
       data-has-pending-credit-payment="{{ has_pending_credit_payment|yesno:"true,false" }}"
       data-can-pay-with-credit="{{ can_pay_with_credit|yesno:"true,false" }}"
@@ -277,6 +278,44 @@
                         <div class="pg-text-end">
                           <span class="pg-badge pg-bg-warning pg-text-dark pg-fs-6" id="remaining-payment-amount">$0.00</span>
                         </div>
+                      </div>
+                      <div class="remaining-payment-split pg-mt-2" id="remaining-payment-split" hidden>
+                        <div class="remaining-payment-split-header">
+                          <span class="pg-fw-semibold">Pagos del restante</span>
+                          <button type="button" class="pg-button pg-button-sm pg-button-outline-secondary" id="remaining-payment-add-row">
+                            <i class="fas fa-plus pg-me-1"></i>Agregar método
+                          </button>
+                        </div>
+                        <div class="remaining-payment-rows" id="remaining-payment-rows"></div>
+                        <div class="remaining-payment-summary" id="remaining-payment-summary">
+                          <span>Total asignado: <strong id="remaining-payment-assigned">$0.00</strong></span>
+                          <span>Por asignar: <strong id="remaining-payment-unassigned">$0.00</strong></span>
+                        </div>
+                        <div class="pg-alert pg-alert-danger pg-py-2 pg-mt-2 pg-mb-0" id="remaining-payment-error" hidden></div>
+                        <template id="remaining-payment-row-template">
+                          <div class="remaining-payment-row">
+                            <div class="remaining-payment-row-field">
+                              <label class="pg-label">Monto</label>
+                              <div class="pg-input-group">
+                                <span class="pg-input-group-text">$</span>
+                                <input type="number" class="pg-input remaining-payment-amount-input" step="0.01" min="0.01" placeholder="0.00">
+                              </div>
+                            </div>
+                            <div class="remaining-payment-row-field">
+                              <label class="pg-label">Método</label>
+                              <select class="pg-select remaining-payment-method-select">
+                                {% for value, label in payment_types %}
+                                  {% if value != 'balance' %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                  {% endif %}
+                                {% endfor %}
+                              </select>
+                            </div>
+                            <button type="button" class="pg-button pg-button-sm pg-button-outline-danger remaining-payment-remove-row" title="Quitar pago" aria-label="Quitar pago">
+                              <i class="fas fa-trash"></i>
+                            </button>
+                          </div>
+                        </template>
                       </div>
                     </div>
 

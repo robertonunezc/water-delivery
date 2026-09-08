@@ -16,7 +16,7 @@ User = get_user_model()
 from clients.models import Client, ClientCreditConfig, CreditTransaction
 from clients.services import balance_service
 from clients.services.pending_payment_service import client_has_overdue_credit
-from orders.models import Order
+from orders.models import Order, OrderStatus
 from payment.models import Payment
 from payment import services
 from payment.services import PaymentRequestData
@@ -745,6 +745,107 @@ class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 		customer.refresh_from_db()
 		self.assertEqual(customer.balance, Decimal('10.00'))
 		self.assertEqual(customer.current_debt, Decimal('80.00'))
+		self.assertFalse(order.payments.exists())
+
+	def test_mixed_payment_rows_register_only_credit_portion_as_debt(self):
+		customer = Client.objects.create(
+			name='Cliente pago mixto con crédito',
+			type='corporate',
+			balance=Decimal('20.00'),
+			credit_limit=Decimal('200.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+		)
+		order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('100.00'),
+			type='contado',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(
+				order_type='contado',
+				payments_data=[
+					{'amount': '20.00', 'payment_method': 'balance'},
+					{'amount': '30.00', 'payment_method': 'cash'},
+					{'amount': '50.00', 'payment_method': 'credit'},
+				],
+			),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 200)
+		self.assertTrue(response['success'])
+		order.refresh_from_db()
+		customer.refresh_from_db()
+		self.assertEqual(order.type, 'credito')
+		self.assertEqual(order.status, OrderStatus.COMPLETED.value)
+		self.assertEqual(customer.balance, Decimal('0.00'))
+		self.assertEqual(customer.current_debt, Decimal('50.00'))
+		self.assertTrue(
+			order.payments.filter(
+				method='balance',
+				status='completed',
+				amount=Decimal('20.00'),
+			).exists()
+		)
+		self.assertTrue(
+			order.payments.filter(
+				method='cash',
+				status='completed',
+				amount=Decimal('30.00'),
+			).exists()
+		)
+		pending_credit = order.payments.get(method='pending_credit')
+		self.assertEqual(pending_credit.status, 'pending')
+		self.assertEqual(pending_credit.amount, Decimal('50.00'))
+		self.assertEqual(order.total_paid, Decimal('50.00'))
+		self.assertTrue(
+			CreditTransaction.objects.filter(
+				client=customer,
+				transaction_type='purchase',
+				amount=Decimal('50.00'),
+				reference_order=order,
+				reference_payment=pending_credit,
+			).exists()
+		)
+
+	def test_mixed_payment_rows_reject_credit_portion_over_available_limit_atomically(self):
+		customer = Client.objects.create(
+			name='Cliente pago mixto sin crédito suficiente',
+			type='corporate',
+			balance=Decimal('20.00'),
+			credit_limit=Decimal('40.00'),
+			current_debt=Decimal('0.00'),
+			can_pay_with_credit=True,
+		)
+		order = Order.objects.create(
+			client=customer,
+			total_amount=Decimal('100.00'),
+			type='contado',
+		)
+
+		response, status_code = services.process_payment_request(
+			order=order,
+			data=PaymentRequestData(
+				payments_data=[
+					{'amount': '20.00', 'payment_method': 'balance'},
+					{'amount': '30.00', 'payment_method': 'cash'},
+					{'amount': '50.00', 'payment_method': 'credit'},
+				],
+			),
+			request_user=self.user,
+		)
+
+		self.assertEqual(status_code, 400)
+		self.assertIn('excede el límite de crédito', response['error'])
+		order.refresh_from_db()
+		customer.refresh_from_db()
+		self.assertEqual(order.type, 'contado')
+		self.assertEqual(order.status, OrderStatus.PENDING.value)
+		self.assertEqual(customer.balance, Decimal('20.00'))
+		self.assertEqual(customer.current_debt, Decimal('0.00'))
 		self.assertFalse(order.payments.exists())
 
 class MigrateLegacyCreditOrdersCommandTests(FastTenantTestCase):

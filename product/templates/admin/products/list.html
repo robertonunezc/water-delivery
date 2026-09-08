@@ -80,6 +80,7 @@
 				<thead class="pg-table-light">
 					<tr>
 						<th>ID</th>
+						<th>Orden</th>
 						<th>Nombre</th>
 						<th>Presentación</th>
 						<th>Categoría</th>
@@ -92,6 +93,13 @@
 					{% for product in products %}
 						<tr>
 							<td>#{{ product.id }}</td>
+							<td>
+								{% if product.orden is not None %}
+									{{ product.orden }}
+								{% else %}
+									<span class="pg-text-muted">-</span>
+								{% endif %}
+							</td>
 							<td>
 								<div class="product-name">{{ product.name }}</div>
 								{% if product.note %}
@@ -128,7 +136,7 @@
 						</tr>
 					{% empty %}
 						<tr>
-							<td colspan="7" class="pg-text-center pg-py-4 pg-text-muted">No hay productos para mostrar.</td>
+							<td colspan="8" class="pg-text-center pg-py-4 pg-text-muted">No hay productos para mostrar.</td>
 						</tr>
 					{% endfor %}
 				</tbody>

@@ -82,7 +82,7 @@ class CreateOrderTemplateLayoutTest(SimpleTestCase):
                 "order": order,
                 "form": form,
                 "client_products": [],
-                "payment_types": [("cash", "Efectivo")],
+                "payment_types": [("cash", "Efectivo"), ("credit", "Crédito")],
                 "order_type": "contado",
                 "has_pending_credit_payment": False,
                 "can_pay_with_credit": can_pay_with_credit,
@@ -144,6 +144,13 @@ class CreateOrderTemplateLayoutTest(SimpleTestCase):
         credit_column = html[credit_start:debt_start]
         self.assertIn("Bloqueado", credit_column)
         self.assertNotIn("No disponible", credit_column)
+
+    def test_remaining_payment_split_controls_are_rendered(self) -> None:
+        html = self._render_order_page()
+
+        self.assertIn("remaining-payment-split", html)
+        self.assertIn("remaining-payment-rows", html)
+        self.assertIn("remaining-payment-add-row", html)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -679,6 +686,20 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         self.assertIn("Saldo", html[balance_start:credit_start])
         self.assertIn("Crédito", html[credit_start:debt_start])
         self.assertIn("Deuda", html[debt_start:])
+
+    def test_order_page_allows_credit_as_selectable_payment_method_when_enabled(self) -> None:
+        self.customer.credit_limit = Decimal("1000.00")
+        self.customer.current_debt = Decimal("0.00")
+        self.customer.can_pay_with_credit = True
+        self.customer.save(
+            update_fields=["credit_limit", "current_debt", "can_pay_with_credit"]
+        )
+        user = self._create_user_with_employee(username="cobranza", position="manager")
+        self.client.force_login(user)
+
+        context = self._get_order_page_context()
+
+        self.assertIn(("credit", "Crédito"), context["payment_types"])
 
 
 class SplitOrderViewTestCase(FastTenantTestCase):

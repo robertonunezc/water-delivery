@@ -59,16 +59,21 @@
 								{{ form.unit_of_measure.errors }}
 							</div>
 
-							<div class="pg-col-md-6">
+							<div class="pg-col-md-4">
 								<label class="pg-label">{{ form.category.label }}</label>
 								{{ form.category }}
 								{{ form.category.errors }}
 							</div>
-							<div class="pg-col-md-6">
+							<div class="pg-col-md-4">
 								<label class="pg-label">{{ form.price.label }}</label>
 								{{ form.price }}
 								<div class="pg-field-help">{{ form.price.help_text }}</div>
 								{{ form.price.errors }}
+							</div>
+							<div class="pg-col-md-4">
+								<label class="pg-label">{{ form.orden.label }}</label>
+								{{ form.orden }}
+								{{ form.orden.errors }}
 							</div>
 
 							<div class="pg-col-12">
@@ -128,9 +133,8 @@
 									<div class="pg-col-12 pg-border pg-rounded pg-p-3" data-price-search-row>
 										<div class="pg-row pg-gap-2">
 											{{ inline_form.errors }}
-											<div class="pg-col-md-3">{{ inline_form.client.label_tag }}{{ inline_form.client }}</div>
+											<div class="pg-col-md-4">{{ inline_form.client.label_tag }}{{ inline_form.client }}</div>
 											<div class="pg-col-md-2">{{ inline_form.price.label_tag }}{{ inline_form.price }}</div>
-											<div class="pg-col-md-1">{{ inline_form.orden.label_tag }}{{ inline_form.orden }}</div>
 											<div class="pg-col-md-4">{{ inline_form.note.label_tag }}{{ inline_form.note }}</div>
 											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.active }} <label class="pg-checkbox-label" for="{{ inline_form.active.id_for_label }}">Activo</label></div></div>
 											{% if inline_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.DELETE }} <label class="pg-checkbox-label" for="{{ inline_form.DELETE.id_for_label }}">Eliminar</label></div></div>{% endif %}

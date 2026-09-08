@@ -619,17 +619,18 @@ def _payment_status_class(status: str) -> str:
 
 
 def _payment_history_item(payment: Any) -> dict[str, Any]:
+    is_credit_debt = payment.method == 'pending_credit'
     return {
         'type': 'payment',
         'id': payment.id,
         'date': payment.date,
         'amount': payment.amount,
         'method': payment.get_method_display(),
-        'status': payment.get_status_display(),
-        'status_class': _payment_status_class(payment.status),
+        'status': 'DEUDA' if is_credit_debt else payment.get_status_display(),
+        'status_class': 'warning' if is_credit_debt else _payment_status_class(payment.status),
         'order_id': payment.order.id if payment.order else None,
         'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
-        'is_credit_debt': payment.method == 'pending_credit',
+        'is_credit_debt': is_credit_debt,
         'is_positive': True,
         'object': payment,
         'created_by': payment.created_by,
