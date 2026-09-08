@@ -1075,6 +1075,7 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
         price: str,
         active: bool = True,
         note: str = '',
+        orden: str = '',
     ) -> dict[str, str]:
         data = {
             'client_prices-TOTAL_FORMS': '1',
@@ -1083,6 +1084,7 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
             'client_prices-MAX_NUM_FORMS': '1000',
             'client_prices-0-product_id': str(product.pk),
             'client_prices-0-price': price,
+            'client_prices-0-orden': orden,
             'client_prices-0-note': note,
         }
         if active:
@@ -1097,6 +1099,7 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
         self.assertContains(response, 'Precios por producto')
         self.assertContains(response, self.product.name)
         self.assertContains(response, self.second_product.name)
+        self.assertContains(response, 'id="id_client_prices-0-orden"')
         formset = response.context['client_product_price_formset']
         prices_by_product = {
             form.product.pk: form.initial['price']
@@ -1127,6 +1130,109 @@ class ClientDetailProductPriceTabTests(FastTenantTestCase):
         self.assertEqual(self.client_price.price, 24.75)
         self.assertTrue(self.client_price.active)
         self.assertEqual(self.client_price.note, 'Contrato actualizado')
+
+    def test_update_product_prices_changes_existing_client_price_order(self) -> None:
+        response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='24.75',
+                note='Contrato actualizado',
+                orden='6',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.client_price.refresh_from_db()
+        self.assertEqual(self.client_price.orden, 6)
+
+    def test_update_product_prices_allows_blank_client_price_order(self) -> None:
+        self.client_price.orden = 6
+        self.client_price.save(update_fields=['orden'])
+
+        response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='24.75',
+                note='Contrato actualizado',
+                orden='',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.client_price.refresh_from_db()
+        self.assertIsNone(self.client_price.orden)
+
+    def test_update_product_prices_rejects_decimal_client_price_order(self) -> None:
+        self.client_price.orden = 6
+        self.client_price.save(update_fields=['orden'])
+
+        response = self.client.post(
+            reverse('clients:update_product_prices', args=[self.customer.pk]),
+            data=self._price_post_data(
+                product=self.product,
+                price='24.75',
+                note='Contrato actualizado',
+                orden='1.5',
+            ),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.client_price.refresh_from_db()
+        self.assertEqual(self.client_price.orden, 6)
+
+    def test_get_products_orders_by_client_price_order_desc_with_nulls_last(self) -> None:
+        high_priority_product = Product.objects.create(
+            name='Caja',
+            presentation='12',
+            unit_of_measure=5,
+            price=80.0,
+        )
+        ProductClientPrice.objects.create(
+            product=self.second_product,
+            client=self.customer,
+            price=12.0,
+            orden=None,
+        )
+        ProductClientPrice.objects.create(
+            product=high_priority_product,
+            client=self.customer,
+            price=80.0,
+            orden=6,
+        )
+        self.client_price.orden = 2
+        self.client_price.save(update_fields=['orden'])
+
+        product_ids = [
+            price_row.product_id
+            for price_row in self.customer.get_products()
+        ]
+
+        self.assertEqual(
+            product_ids,
+            [
+                high_priority_product.pk,
+                self.product.pk,
+                self.second_product.pk,
+            ],
+        )
+
+    def test_get_products_keeps_base_query_order_when_all_orders_are_blank(self) -> None:
+        ProductClientPrice.objects.create(
+            product=self.second_product,
+            client=self.customer,
+            price=12.0,
+            orden=None,
+        )
+
+        product_prices = self.customer.get_products()
+
+        self.assertEqual(product_prices.query.order_by, ())
+        self.assertEqual(
+            list(product_prices.values_list('product_id', flat=True)),
+            list(self.customer.product_prices.values_list('product_id', flat=True)),
+        )
 
     def test_update_product_prices_restores_soft_deleted_client_price(self) -> None:
         self.client_price.delete()
@@ -1218,6 +1324,7 @@ class ClientEditProductPriceTabTests(FastTenantTestCase):
         price: str,
         active: bool = True,
         note: str = '',
+        orden: str = '',
     ) -> dict[str, str]:
         data = {
             'section': 'prices',
@@ -1227,6 +1334,7 @@ class ClientEditProductPriceTabTests(FastTenantTestCase):
             'client_prices-MAX_NUM_FORMS': '1000',
             'client_prices-0-product_id': str(product.pk),
             'client_prices-0-price': price,
+            'client_prices-0-orden': orden,
             'client_prices-0-note': note,
         }
         if active:
@@ -1242,6 +1350,7 @@ class ClientEditProductPriceTabTests(FastTenantTestCase):
         self.assertContains(response, 'id="tab-prices"')
         self.assertContains(response, self.product.name)
         self.assertContains(response, self.second_product.name)
+        self.assertContains(response, 'id="id_client_prices-0-orden"')
         formset = response.context['client_product_price_formset']
         prices_by_product = {
             form.product.pk: form.initial['price']

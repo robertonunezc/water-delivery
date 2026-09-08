@@ -14,6 +14,8 @@ def create_or_restore_product_client_price(
     price: float,
     active: bool = True,
     note: Optional[str] = None,
+    orden: Optional[int] = None,
+    update_orden: bool = False,
     update_existing: bool = False,
     validate: bool = False,
 ) -> Tuple[ProductClientPrice, bool]:
@@ -33,6 +35,8 @@ def create_or_restore_product_client_price(
             price=price,
             active=active,
         )
+        if update_orden:
+            price_row.orden = orden
         if note is not None:
             price_row.note = note
         if validate:
@@ -48,6 +52,10 @@ def create_or_restore_product_client_price(
     price_row.active = active
     price_row.deleted_at = None
     update_fields = ['price', 'active', 'deleted_at', 'updated_at']
+
+    if update_orden:
+        price_row.orden = orden
+        update_fields.append('orden')
 
     if note is not None:
         price_row.note = note

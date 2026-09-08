@@ -40,10 +40,11 @@ class ProductForm(forms.ModelForm):
 class ProductClientPriceForm(forms.ModelForm):
     class Meta:
         model = ProductClientPrice
-        fields = ['client', 'price', 'active', 'note']
+        fields = ['client', 'price', 'orden', 'active', 'note']
         widgets = {
             'client': forms.Select(attrs={'class': 'pg-select'}),
             'price': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+            'orden': forms.NumberInput(attrs={'class': 'pg-input', 'step': '1', 'min': '0'}),
             'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
             'note': forms.TextInput(attrs={'class': 'pg-input'}),
         }
@@ -82,12 +83,13 @@ class ProductClientPriceBaseFormSet(BaseInlineFormSet):
             return super().save_new(form, commit=commit)
 
         restored_price.price = new_price.price
+        restored_price.orden = new_price.orden
         restored_price.note = new_price.note
         restored_price.active = new_price.active
         restored_price.deleted_at = None
 
         if commit:
-            restored_price.save(update_fields=['price', 'note', 'active', 'deleted_at', 'updated_at'])
+            restored_price.save(update_fields=['price', 'orden', 'note', 'active', 'deleted_at', 'updated_at'])
 
         return restored_price
 

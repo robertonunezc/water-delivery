@@ -88,6 +88,7 @@ class ProductClientPrice(TimeStampedModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="product", related_name='prices')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='product_prices', verbose_name="Cliente" )
     price = models.FloatField(default=0.0, verbose_name="Precio")
+    orden = models.PositiveIntegerField(null=True, blank=True, verbose_name="Orden")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido", verbose_name="Fecha de Validez")
     active = models.BooleanField(default=True, verbose_name="Activo")
@@ -95,4 +96,3 @@ class ProductClientPrice(TimeStampedModel):
         return "{} {} - ${}".format(self.product, self.client, self.price)
     def get_price_display(self):
         return "${:,.2f}".format(self.price) if hasattr(self, 'price') else "N/A"
-

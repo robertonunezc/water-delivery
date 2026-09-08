@@ -26,6 +26,7 @@ def build_client_product_price_initial(client: Client) -> list[dict[str, object]
         initial_rows.append({
             'product_id': product.pk,
             'price': price_row.price if price_row else product.price,
+            'orden': price_row.orden if price_row else None,
             'active': price_row.active if price_row else True,
             'note': price_row.note if price_row else '',
         })
@@ -52,6 +53,8 @@ def update_client_product_prices(
                 price=float(price),
                 active=form.cleaned_data.get('active', False),
                 note=form.cleaned_data.get('note', ''),
+                orden=form.cleaned_data.get('orden'),
+                update_orden=True,
                 update_existing=True,
                 validate=True,
             )

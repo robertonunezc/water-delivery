@@ -282,8 +282,11 @@ class Client(TimeStampedModel):
         from clients.invoice_info import InvoiceInfo
         return InvoiceInfo(self)
 
-    def get_products(self):
-        return self.product_prices.select_related('product').all()
+    def get_products(self) -> models.QuerySet:
+        product_prices = self.product_prices.select_related('product').all()
+        if not product_prices.filter(orden__isnull=False).exists():
+            return product_prices
+        return product_prices.order_by(models.F('orden').desc(nulls_last=True))
     # Backwards-compatible helpers
     def get_effective_billing_data(self):
         return self.billing_info.effective.data

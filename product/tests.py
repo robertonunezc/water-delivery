@@ -41,6 +41,7 @@ class ProductAdminPriceTabTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="product-client-price-search"')
         self.assertContains(response, 'data-price-search-row')
+        self.assertContains(response, 'id="id_prices-0-orden"')
 
     def test_price_tab_delete_label_targets_delete_checkbox(self) -> None:
         response = self.client.get(
@@ -92,6 +93,7 @@ class ProductAdminPriceTabTests(FastTenantTestCase):
                 'prices-0-id': '',
                 'prices-0-client': str(self.client_record.pk),
                 'prices-0-price': '30.00',
+                'prices-0-orden': '7',
                 'prices-0-active': 'on',
                 'prices-0-note': 'restaurado',
             },
@@ -101,6 +103,7 @@ class ProductAdminPriceTabTests(FastTenantTestCase):
         self.client_price.refresh_from_db()
         self.assertIsNone(self.client_price.deleted_at)
         self.assertEqual(self.client_price.price, 30.0)
+        self.assertEqual(self.client_price.orden, 7)
         self.assertEqual(self.client_price.note, 'restaurado')
         self.assertEqual(
             ProductClientPrice.all_objects.filter(

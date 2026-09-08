@@ -522,6 +522,7 @@
                         <th>Presentación</th>
                         <th>Precio base</th>
                         <th>Precio cliente</th>
+                        <th>Orden</th>
                         <th>Activo</th>
                         <th>Nota</th>
                       </tr>
@@ -556,6 +557,10 @@
                           <td>
                             {{ price_form.price }}
                             {{ price_form.price.errors }}
+                          </td>
+                          <td>
+                            {{ price_form.orden }}
+                            {{ price_form.orden.errors }}
                           </td>
                           <td>
                             <div class="pg-checkbox">
