@@ -19,7 +19,7 @@ from core.admin_mixins import SoftDeleteAdminMixin
 class ProductClientPriceInline(TabularInline):
     model = ProductClientPrice
     extra = 0
-    fields = ('client', 'price', 'orden', 'until_date', 'note')
+    fields = ('client', 'price', 'until_date', 'note')
     autocomplete_fields = ('client',)
 
 
@@ -31,7 +31,7 @@ class ProductCategoryAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
-    list_display = ('name', 'presentation', 'unit_of_measure', 'price', 'category','active')
+    list_display = ('orden', 'name', 'presentation', 'unit_of_measure', 'price', 'category','active')
     list_filter = ('category', 'unit_of_measure', 'active')
     search_fields = ('name', 'presentation')
     inlines = [ProductClientPriceInline]
@@ -161,7 +161,7 @@ class ProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
 @admin.register(ProductClientPrice)
 class ProductClientPriceAdmin(SoftDeleteAdminMixin, ModelAdmin):
-    list_display = ('product', 'client', 'price', 'orden', 'active', 'until_date')
+    list_display = ('product', 'client', 'price', 'active', 'until_date')
     search_fields = ('product__name', 'client__name')
     list_filter = ('until_date', 'active')
     autocomplete_fields = ('client',)

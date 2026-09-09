@@ -22,6 +22,15 @@ class ProductQuerySet(models.QuerySet):
     def include_inactive(self):
         return self.filter(deleted_at=None)
 
+    def ordered_for_clients(self) -> models.QuerySet:
+        return self.order_by(
+            models.F('orden').asc(nulls_last=True),
+            'name',
+            'presentation',
+            'unit_of_measure',
+            'id',
+        )
+
 
 class ProductManager(models.Manager):
     def get_queryset(self):
@@ -29,6 +38,9 @@ class ProductManager(models.Manager):
 
     def include_inactive(self):
         return ProductQuerySet(self.model, using=self._db)
+
+    def ordered_for_clients(self) -> models.QuerySet:
+        return self.get_queryset().ordered_for_clients()
 
 
 class ProductCategory(TimeStampedModel):
@@ -57,7 +69,7 @@ class Product(TimeStampedModel):
     category = models.ForeignKey(ProductCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', verbose_name="Categoría")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     active = models.BooleanField(default=True, verbose_name="Activo")
-    #order = models.IntegerField(default=0, verbose_name="Orden")
+    orden = models.PositiveIntegerField(null=True, blank=True, verbose_name="Orden")
     #quantity = models.IntegerField(default=0, verbose_name="Cantidad")
 
     #image = models.FileField(null=True, blank=True, upload_to='product_images/', verbose_name="Imagen")
@@ -88,7 +100,6 @@ class ProductClientPrice(TimeStampedModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="product", related_name='prices')
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='product_prices', verbose_name="Cliente" )
     price = models.FloatField(default=0.0, verbose_name="Precio")
-    orden = models.PositiveIntegerField(null=True, blank=True, verbose_name="Orden")
     note = models.TextField(blank=True, null=True, verbose_name="Notas")
     until_date = models.DateField(null=True, blank=True, help_text="Fecha hasta la cual es valido este precio, dejar en blanco para que sea indefinido", verbose_name="Fecha de Validez")
     active = models.BooleanField(default=True, verbose_name="Activo")

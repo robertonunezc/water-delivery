@@ -4,6 +4,7 @@ class PageConfig {
     this.orderId = root.dataset.orderId;
     this.cancelOrderUrl = root.dataset.cancelOrderUrl || '';
     this.clientBalance = parseFloat(root.dataset.clientBalance) || 0;
+    this.availableCredit = parseFloat(root.dataset.availableCredit) || 0;
     this.orderType = root.dataset.orderType || 'contado';
     this.hasPendingCreditPayment = root.dataset.hasPendingCreditPayment === 'true';
     this.canPayWithCredit = root.dataset.canPayWithCredit !== 'false';
@@ -222,6 +223,7 @@ class PaymentBreakdownManager {
     this.balanceAmount = document.getElementById('balance-payment-amount');
     this.remainingAmount = document.getElementById('remaining-payment-amount');
     this.fullPaymentAmount = document.getElementById('full-payment-amount');
+    this.remainingSplit = document.getElementById('remaining-payment-split');
     this.paymentMethodSelects = [
       document.getElementById('payment-method-select'),
       document.getElementById('payment-method-select-mobile'),
@@ -310,6 +312,16 @@ class PaymentBreakdownManager {
     setElementVisible(this.paymentMethodSelectContainer, visible);
   }
 
+  showRemainingSplit(visible) {
+    setElementVisible(this.remainingSplit, visible);
+  }
+
+  announceRemainingAmount(amount) {
+    document.dispatchEvent(new CustomEvent('remaining-payment-amount-changed', {
+      detail: { amount }
+    }));
+  }
+
   updateUI(breakdown, orderTotal) {
     this.setBreakdown(breakdown);
     this.hideSections();
@@ -325,6 +337,7 @@ class PaymentBreakdownManager {
       setElementVisible(this.noBalanceSection, false);
       this.setPaymentMethodLabel(false);
       this.showPaymentMethodSelector(true);
+      this.showRemainingSplit(false);
       this.unlockPaymentMethodSelection();
       return;
     }
@@ -348,6 +361,7 @@ class PaymentBreakdownManager {
         this.lockPaymentMethodToBalance();
         this.setPaymentMethodLabel(false);
         this.showPaymentMethodSelector(false);
+        this.showRemainingSplit(false);
         if (this.summaryMessage) {
           this.summaryMessage.innerHTML = `
             <i class="fas fa-check-circle pg-text-success pg-me-1"></i>
@@ -358,10 +372,13 @@ class PaymentBreakdownManager {
       } else {
         this.unlockPaymentMethodSelection();
         this.setPaymentMethodLabel(true);
-        this.showPaymentMethodSelector(true);
+        this.showPaymentMethodSelector(false);
+        this.showRemainingSplit(true);
         if (this.remainingSection) {
           setElementVisible(this.remainingSection, true);
-          if (this.remainingAmount) this.remainingAmount.textContent = '$' + parseFloat(breakdown.remaining_amount).toFixed(2);
+          const remaining = parseFloat(breakdown.remaining_amount) || 0;
+          if (this.remainingAmount) this.remainingAmount.textContent = '$' + remaining.toFixed(2);
+          this.announceRemainingAmount(remaining);
         }
         if (this.summaryMessage) {
           this.summaryMessage.innerHTML = `
@@ -374,6 +391,7 @@ class PaymentBreakdownManager {
       this.unlockPaymentMethodSelection();
       this.setPaymentMethodLabel(false);
       this.showPaymentMethodSelector(true);
+      this.showRemainingSplit(false);
       setElementVisible(this.noBalanceSection, false);
       if (this.summaryMessage) this.summaryMessage.innerHTML = '';
       setElementVisible(this.paymentMethodCard, true);
@@ -385,6 +403,202 @@ class PaymentBreakdownManager {
     setElementVisible(this.remainingSection, false);
     setElementVisible(this.noBalanceSection, false);
     setElementVisible(this.paymentMethodCard, false);
+    this.showRemainingSplit(false);
+  }
+}
+
+class RemainingPaymentSplitManager {
+  constructor(config) {
+    this.config = config;
+    this.remainingAmount = 0;
+    this.container = document.getElementById('remaining-payment-split');
+    this.rowsContainer = document.getElementById('remaining-payment-rows');
+    this.rowTemplate = document.getElementById('remaining-payment-row-template');
+    this.addButton = document.getElementById('remaining-payment-add-row');
+    this.assignedTotal = document.getElementById('remaining-payment-assigned');
+    this.unassignedTotal = document.getElementById('remaining-payment-unassigned');
+    this.errorElement = document.getElementById('remaining-payment-error');
+    this.tolerance = 0.009;
+  }
+
+  init() {
+    if (!this.container || !this.rowsContainer || !this.rowTemplate) return;
+
+    this.addButton?.addEventListener('click', () => this.addRow(this.getUnassignedAmount()));
+    this.rowsContainer.addEventListener('input', () => this.updateSummary());
+    this.rowsContainer.addEventListener('change', () => this.updateSummary());
+    this.rowsContainer.addEventListener('click', event => this.handleRowClick(event));
+    document.addEventListener('remaining-payment-amount-changed', event => {
+      this.setRemainingAmount(event.detail?.amount || 0);
+    });
+  }
+
+  setRemainingAmount(amount) {
+    const nextAmount = this.roundCurrency(amount);
+    const changed = Math.abs(nextAmount - this.remainingAmount) > this.tolerance;
+    this.remainingAmount = nextAmount;
+
+    if (this.remainingAmount <= 0) {
+      this.clearRows();
+      this.updateSummary();
+      return;
+    }
+
+    if (changed || this.getRows().length === 0) {
+      this.resetRows(this.remainingAmount);
+    } else {
+      this.updateSummary();
+    }
+  }
+
+  resetRows(amount) {
+    this.clearRows();
+    this.addRow(amount);
+  }
+
+  clearRows() {
+    if (this.rowsContainer) {
+      this.rowsContainer.innerHTML = '';
+    }
+    this.clearError();
+  }
+
+  addRow(amount = 0) {
+    if (!this.rowsContainer || !this.rowTemplate) return;
+
+    const fragment = this.rowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('.remaining-payment-row');
+    const amountInput = fragment.querySelector('.remaining-payment-amount-input');
+    const methodSelect = fragment.querySelector('.remaining-payment-method-select');
+
+    if (amountInput && amount > 0) {
+      amountInput.value = this.roundCurrency(amount).toFixed(2);
+    }
+    if (methodSelect && !this.config.canPayWithCredit) {
+      methodSelect.querySelector('option[value="credit"]')?.remove();
+    }
+    if (row) {
+      this.rowsContainer.appendChild(row);
+    }
+
+    this.updateRemoveButtons();
+    this.updateSummary();
+  }
+
+  handleRowClick(event) {
+    const button = event.target.closest('.remaining-payment-remove-row');
+    if (!button) return;
+
+    const row = button.closest('.remaining-payment-row');
+    if (!row) return;
+
+    if (this.getRows().length === 1) {
+      const input = row.querySelector('.remaining-payment-amount-input');
+      if (input) input.value = this.remainingAmount.toFixed(2);
+      this.updateSummary();
+      return;
+    }
+
+    row.remove();
+    this.updateRemoveButtons();
+    this.updateSummary();
+  }
+
+  updateRemoveButtons() {
+    const rows = this.getRows();
+    rows.forEach(row => {
+      const button = row.querySelector('.remaining-payment-remove-row');
+      if (button) button.disabled = rows.length <= 1;
+    });
+  }
+
+  getRows() {
+    if (!this.rowsContainer) return [];
+    return Array.from(this.rowsContainer.querySelectorAll('.remaining-payment-row'));
+  }
+
+  getAssignedAmount() {
+    return this.roundCurrency(
+      this.getRows().reduce((total, row) => {
+        const input = row.querySelector('.remaining-payment-amount-input');
+        return total + (parseFloat(input?.value || '0') || 0);
+      }, 0)
+    );
+  }
+
+  getUnassignedAmount() {
+    return this.roundCurrency(this.remainingAmount - this.getAssignedAmount());
+  }
+
+  updateSummary() {
+    const assigned = this.getAssignedAmount();
+    const unassigned = this.getUnassignedAmount();
+
+    if (this.assignedTotal) this.assignedTotal.textContent = `$${assigned.toFixed(2)}`;
+    if (this.unassignedTotal) {
+      this.unassignedTotal.textContent = `$${Math.abs(unassigned).toFixed(2)}`;
+      this.unassignedTotal.classList.toggle('pg-text-danger', Math.abs(unassigned) > this.tolerance);
+      this.unassignedTotal.classList.toggle('pg-text-success', Math.abs(unassigned) <= this.tolerance);
+    }
+  }
+
+  getPayments() {
+    this.clearError();
+    if (this.remainingAmount <= 0) return [];
+
+    const payments = [];
+    let creditTotal = 0;
+    for (const row of this.getRows()) {
+      const amountInput = row.querySelector('.remaining-payment-amount-input');
+      const methodSelect = row.querySelector('.remaining-payment-method-select');
+      const amount = parseFloat(amountInput?.value || '0') || 0;
+      const paymentMethod = methodSelect?.value || '';
+
+      if (amount <= 0) {
+        this.showError('Cada pago del restante debe tener un monto mayor a 0.');
+        return null;
+      }
+      if (!paymentMethod) {
+        this.showError('Seleccione un método para cada pago del restante.');
+        return null;
+      }
+      if (paymentMethod === 'credit') {
+        creditTotal += amount;
+      }
+
+      payments.push({
+        amount: this.roundCurrency(amount),
+        payment_method: paymentMethod
+      });
+    }
+
+    const assigned = this.getAssignedAmount();
+    if (Math.abs(assigned - this.remainingAmount) > this.tolerance) {
+      this.showError(`Los pagos del restante deben sumar $${this.remainingAmount.toFixed(2)}.`);
+      return null;
+    }
+
+    if (creditTotal > this.config.availableCredit + this.tolerance) {
+      this.showError(`Crédito insuficiente. Disponible: $${this.config.availableCredit.toFixed(2)}.`);
+      return null;
+    }
+
+    return payments;
+  }
+
+  showError(message) {
+    if (!this.errorElement) return;
+    this.errorElement.textContent = message;
+    setElementVisible(this.errorElement, true);
+  }
+
+  clearError() {
+    setElementVisible(this.errorElement, false);
+    if (this.errorElement) this.errorElement.textContent = '';
+  }
+
+  roundCurrency(value) {
+    return Math.round((parseFloat(value) || 0) * 100) / 100;
   }
 }
 
@@ -875,11 +1089,12 @@ class QuantityController {
 }
 
 class PaymentController {
-  constructor(config, api, alertManager, paymentBreakdown, amountManager, discountManager, orderNotesController) {
+  constructor(config, api, alertManager, paymentBreakdown, remainingPaymentSplit, amountManager, discountManager, orderNotesController) {
     this.config = config;
     this.api = api;
     this.alertManager = alertManager;
     this.paymentBreakdown = paymentBreakdown;
+    this.remainingPaymentSplit = remainingPaymentSplit;
     this.amountManager = amountManager;
     this.discountManager = discountManager;
     this.orderNotesController = orderNotesController;
@@ -1176,8 +1391,9 @@ class PaymentController {
 
       const remainingAmount = parseFloat(breakdown.remaining_amount) || 0;
       if (remainingAmount > 0) {
-        const method = this.getPaymentMethod() || 'cash';
-        payments.push({ amount: remainingAmount, payment_method: method });
+        const splitPayments = this.remainingPaymentSplit.getPayments();
+        if (!splitPayments) return null;
+        payments.push(...splitPayments);
       }
     } else {
       const method = this.getPaymentMethod();
@@ -1190,6 +1406,10 @@ class PaymentController {
     }
 
     return payments;
+  }
+
+  hasCreditPayment(payments) {
+    return payments.some(payment => payment.payment_method === 'credit');
   }
 
   disableButtons() {
@@ -1256,14 +1476,16 @@ class PaymentController {
     const payments = this.buildPayments(orderTotal);
     if (!payments) return;
 
-    const cantidadCobrada = this.getCantidadCobrada();
+    const hasCreditPayment = this.hasCreditPayment(payments);
+    const cantidadCobrada = hasCreditPayment ? null : this.getCantidadCobrada();
+    const payloadOrderType = hasCreditPayment ? 'credito' : orderType;
 
     try {
       this.disableButtons();
       await this.flushOrderDateSave();
       const payload = {
         order_id: this.config.orderId,
-        order_type: orderType,
+        order_type: payloadOrderType,
         payments,
         order_date: this.getOrderDate(),
         notes: this.orderNotesController?.getValue() || ''
@@ -1271,7 +1493,11 @@ class PaymentController {
       if (cantidadCobrada !== null && cantidadCobrada > 0) payload.cantidad_cobrada = cantidadCobrada;
       const data = await this.api.submitPayment(payload);
       if (data.success) {
-        this.handleSuccess(data);
+        if (data.order_pending_credit) {
+          this.handleCreditOrderPendingSuccess(data);
+        } else {
+          this.handleSuccess(data);
+        }
       } else {
         throw new Error(data.error || 'Error al procesar el pago');
       }
@@ -1355,6 +1581,7 @@ class OrderPageApp {
     this.alertManager = new AlertManager();
     this.affordabilityStatusManager = new AffordabilityStatusManager(this.config);
     this.paymentBreakdownManager = new PaymentBreakdownManager(this.config);
+    this.remainingPaymentSplitManager = new RemainingPaymentSplitManager(this.config);
     this.summaryManager = new OrderSummaryManager();
     this.amountFieldManager = new AmountFieldManager();
     this.api = new OrderApi(this.config);
@@ -1377,6 +1604,7 @@ class OrderPageApp {
       this.api,
       this.alertManager,
       this.paymentBreakdownManager,
+      this.remainingPaymentSplitManager,
       this.amountFieldManager,
       this.discountManager,
       this.orderNotesController
@@ -1386,6 +1614,7 @@ class OrderPageApp {
   init() {
     this.navigationController.init();
     this.orderNotesController.init();
+    this.remainingPaymentSplitManager.init();
     this.discountManager.init();
     if (this.config.initialDiscount) {
       this.discountManager.setAmount(this.config.initialDiscount);

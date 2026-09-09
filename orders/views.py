@@ -109,6 +109,19 @@ def calculate_payment_breakdown(order_total, client_balance):
             'message': f'Saldo: ${client_balance:.2f} + Otro método: ${remaining:.2f}'
         }
 
+
+def _get_checkout_payment_types(can_pay_with_credit: bool) -> list[tuple[str, str]]:
+    """Return user-selectable payment methods for order checkout."""
+    payment_types = [
+        (value, label)
+        for value, label in PAYMENT_METHOD_CHOICES
+        if value != 'pending_credit'
+    ]
+    if can_pay_with_credit:
+        payment_types.append(('credit', 'Crédito'))
+    return payment_types
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def create_payment_for_order(request, order_pk):
@@ -431,14 +444,10 @@ def get_or_create_order(request, client_pk=None, order_id=None):
 
     owner = request.user
     client_products = client.get_products()
-    payment_types = [
-        (value, label)
-        for value, label in PAYMENT_METHOD_CHOICES
-        if value not in {'credit', 'pending_credit'}
-    ]
     has_delivery_address = client.addresses.filter(type='delivery').exists()
     has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
     can_pay_with_credit = client.get_credit_account().can_pay_with_credit
+    payment_types = _get_checkout_payment_types(can_pay_with_credit)
     selected_order_type = order.type
     if not can_pay_with_credit and not has_pending_credit_payment:
         selected_order_type = 'contado'

@@ -30,7 +30,7 @@ def _category_queryset() -> QuerySet:
 def list_products_admin(request):
     search_query = request.GET.get('search', '').strip()
 
-    queryset = Product.all_objects.select_related('category').order_by('name')
+    queryset = Product.all_objects.select_related('category').ordered_for_clients()
 
     if search_query:
         queryset = queryset.filter(

@@ -1,5 +1,5 @@
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Optional
 from dataclasses import dataclass, asdict
 from django.contrib.auth.models import User
@@ -23,6 +23,7 @@ VALID_SETTLEMENT_METHODS = {
     'paypal',
     'bank_transfer',
 }
+USER_SELECTED_CREDIT_METHOD = 'credit'
 
 
 class ClientOrderPaymentError(ValueError):
@@ -250,9 +251,11 @@ def process_payment_request(
         order.notes = data.notes.strip() or None
         order.save(update_fields=['notes', 'updated_at'])
 
+    if _payments_data_has_credit(data.payments_data):
+        return _process_credit_order_flow(order=order, data=data, request_user=request_user)
+
     requested_type = data.order_type
     _apply_order_type(order=order, requested_type=requested_type)
-
     if order.type == 'credito':
         return _process_credit_order_flow(order=order, data=data, request_user=request_user)
 
@@ -315,6 +318,52 @@ def process_single_payment(
             payment.link_pending_transaction_references()
 
     return payment, None
+
+
+def _payments_data_has_credit(payments_data: Optional[list[dict]]) -> bool:
+    """Return whether submitted payment rows include user-selected credit."""
+    if not isinstance(payments_data, list):
+        return False
+    return any(
+        isinstance(payment_item, dict)
+        and payment_item.get('payment_method') == USER_SELECTED_CREDIT_METHOD
+        for payment_item in payments_data
+    )
+
+
+def _parse_payment_rows(payments_data: list) -> list[dict[str, object]]:
+    """Normalize submitted payment rows for service-level processing."""
+    parsed_rows = []
+    for payment_item in payments_data:
+        if (
+            not isinstance(payment_item, dict)
+            or 'amount' not in payment_item
+            or 'payment_method' not in payment_item
+        ):
+            raise ValueError('Cada transaccion de pago debe tener un metodo de pago asignado')
+
+        try:
+            amount = Decimal(str(payment_item['amount']))
+        except (InvalidOperation, TypeError, ValueError) as exc:
+            raise ValueError('Monto de pago inválido.') from exc
+
+        if amount <= 0:
+            raise ValueError('El monto de cada pago debe ser mayor a 0.')
+
+        payment_method = str(payment_item['payment_method'])
+        if (
+            payment_method != USER_SELECTED_CREDIT_METHOD
+            and payment_method not in VALID_SETTLEMENT_METHODS
+        ):
+            raise ValueError('Método de pago inválido para este flujo.')
+
+        parsed_rows.append({
+            'amount': amount,
+            'payment_method': payment_method,
+            'credit_note': payment_item.get('credit_note'),
+        })
+
+    return parsed_rows
 
 
 @transaction.atomic
@@ -652,12 +701,142 @@ def _process_credit_order_flow(
             pending_credit_payment=pending_credit_payment,
             payment_date=data.payment_date,
         )
+
+    if payments_data:
+        return _register_credit_order_from_payment_rows(
+            order=order,
+            payments_data=payments_data,
+            request_user=request_user,
+            payment_date=data.payment_date,
+        )
     
     return _register_credit_order_debt(
         order=order,
         request_user=request_user,
         payment_date=data.payment_date,
     )
+
+
+def _register_credit_order_from_payment_rows(
+    order: Order,
+    payments_data: list,
+    request_user: User,
+    payment_date: date | None = None,
+) -> tuple[dict, int]:
+    """Register a credit order from explicit payment rows."""
+    if not payments_data:
+        return {'error': 'No payments provided'}, 400
+
+    try:
+        payment_rows = _parse_payment_rows(payments_data)
+    except ValueError as exc:
+        return {'error': str(exc)}, 400
+
+    order_total = Decimal(str(order.total_amount))
+    total_payment_amount = sum(
+        (payment_row['amount'] for payment_row in payment_rows),
+        Decimal('0.00'),
+    )
+    if total_payment_amount != order_total:
+        return {
+            'error': (
+                f'La suma de los pagos (${total_payment_amount:.2f}) debe ser igual '
+                f'al total de la orden (${order_total:.2f})'
+            )
+        }, 400
+
+    existing_credit_payment = order.payments.filter(method='pending_credit').first()
+    if existing_credit_payment:
+        return {
+            'error': 'La orden a credito ya tiene un registro pendiente de liquidacion.'
+        }, 400
+
+    credit_amount = sum(
+        (
+            payment_row['amount']
+            for payment_row in payment_rows
+            if payment_row['payment_method'] == USER_SELECTED_CREDIT_METHOD
+        ),
+        Decimal('0.00'),
+    )
+    created_payments = []
+
+    try:
+        with transaction.atomic():
+            for payment_row in payment_rows:
+                payment_method = payment_row['payment_method']
+                if payment_method == USER_SELECTED_CREDIT_METHOD:
+                    continue
+
+                payment, error = process_single_payment(
+                    order=order,
+                    payment_method=payment_method,
+                    amount=payment_row['amount'],
+                    request_user=request_user,
+                    credit_note=payment_row.get('credit_note'),
+                    payment_date=payment_date,
+                )
+                if error:
+                    raise ValueError(error['error'])
+
+                created_payments.append({
+                    'payment_id': payment.id,
+                    'amount': str(payment.amount),
+                    'method': payment.get_method_display(),
+                    'method_code': payment.method,
+                })
+
+            if credit_amount > 0:
+                pending_payment = Payment(
+                    amount=credit_amount,
+                    method='pending_credit',
+                    client=order.client,
+                    order=order,
+                    status='pending',
+                    created_by=request_user,
+                )
+                pending_payment.save(apply_accounting=False)
+                _set_payment_date(pending_payment, payment_date)
+                balance_service.add_debt(
+                    client=order.client,
+                    amount=credit_amount,
+                    transaction_type='purchase',
+                    transaction_date=payment_date,
+                    user=request_user,
+                    reference_order=order,
+                    reference_payment=pending_payment,
+                    notes=(
+                        f'Pedido #{order.id} registrado parcialmente a crédito '
+                        f'por ${credit_amount:.2f}'
+                    ),
+                )
+                created_payments.append({
+                    'payment_id': pending_payment.id,
+                    'amount': str(pending_payment.amount),
+                    'method': 'Crédito',
+                    'method_code': USER_SELECTED_CREDIT_METHOD,
+                })
+
+            order.type = 'credito'
+            order.status = OrderStatus.COMPLETED.value
+            order.save(update_fields=['type', 'status', 'updated_at'])
+    except ValueError as exc:
+        return {'error': str(exc)}, 400
+
+    message = (
+        'Orden registrada con pago mixto. Queda crédito pendiente de pago.'
+        if credit_amount > 0
+        else 'Orden pagada completamente.'
+    )
+    response_data = {
+        'success': True,
+        'payments': created_payments,
+        'order_total': str(order.total_amount),
+        'payment_count': len(created_payments),
+        'order_pending_credit': credit_amount > 0,
+        'message': message,
+    }
+    return response_data, 200
 
 
 def _register_credit_order_debt(

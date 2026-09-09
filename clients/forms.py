@@ -416,16 +416,6 @@ class ClientProductPriceForm(forms.Form):
             'min': '0',
         }),
     )
-    orden = forms.IntegerField(
-        required=False,
-        min_value=0,
-        label='Orden',
-        widget=forms.NumberInput(attrs={
-            'class': 'pg-input',
-            'step': '1',
-            'min': '0',
-        }),
-    )
     active = forms.BooleanField(
         required=False,
         initial=True,

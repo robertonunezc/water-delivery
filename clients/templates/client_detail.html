@@ -388,7 +388,7 @@
                     <th>Pedido</th>
                     <th>Método/Tipo</th>
                     <th>Estado</th>
-                    <th>Pagado</th>
+                    <th>Total</th>
                     <th>Por</th>
                   </tr>
                 </thead>
@@ -438,7 +438,7 @@
                       <td class="pg-fw-bold">
                         {% if payment_data.type == 'payment' %}
                           {% if payment_data.is_credit_debt %}
-                            <span class="pg-badge pg-bg-warning pg-text-dark">Deuda</span>
+                            <span class="pg-text-danger">${{ payment_data.amount|floatformat:2 }}</span>
                           {% else %}
                             <span class="pg-text-success">${{ payment_data.amount|floatformat:2 }}</span>
                           {% endif %}
@@ -522,7 +522,6 @@
                         <th>Presentación</th>
                         <th>Precio base</th>
                         <th>Precio cliente</th>
-                        <th>Orden</th>
                         <th>Activo</th>
                         <th>Nota</th>
                       </tr>
@@ -557,10 +556,6 @@
                           <td>
                             {{ price_form.price }}
                             {{ price_form.price.errors }}
-                          </td>
-                          <td>
-                            {{ price_form.orden }}
-                            {{ price_form.orden.errors }}
                           </td>
                           <td>
                             <div class="pg-checkbox">
