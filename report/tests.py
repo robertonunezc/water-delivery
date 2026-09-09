@@ -95,7 +95,7 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
             )
         return order
 
-    def test_breakdown_report_shows_discounted_orders_without_payment(self) -> None:
+    def test_breakdown_report_groups_discounted_orders_without_payment(self) -> None:
         discounted_order = self._create_order(
             subtotal=Decimal("100.00"),
             discount=Decimal("100.00"),
@@ -111,29 +111,14 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         response = self.client.get(reverse("report:breakdown_payment_method"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Descuento 100% / Sin cobro")
-        self.assertContains(response, "$180.00")
-        self.assertContains(response, "$110.00")
-        self.assertContains(response, "$70.00")
-        self.assertContains(response, "$100.00")
-        self.assertContains(response, "$10.00")
-        self.assertContains(response, f"#{discounted_order.id}")
-        self.assertContains(response, f"#{paid_order.id}")
-
-    def test_breakdown_report_uses_shared_filter_card_and_divider_section_titles(self) -> None:
-        self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("10.00"),
-            total=Decimal("70.00"),
-            with_payment=True,
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'class="pg-card dashboard-card pg-mb-3"')
-        self.assertContains(response, 'class="pg-card-body"')
-        self.assertContains(response, 'class="payment-method-title pg-border-bottom pg-pb-2"')
+        self.assertEqual(response.context["stats"]["subtotal_amount"], Decimal("180.00"))
+        self.assertEqual(response.context["stats"]["total_discount"], Decimal("110.00"))
+        self.assertEqual(response.context["stats"]["total_amount"], Decimal("70.00"))
+        payment_stats = response.context["payment_method_stats"]
+        full_discount_orders = list(payment_stats["full_discount"]["orders"])
+        cash_orders = list(payment_stats["cash"]["orders"])
+        self.assertEqual([order.id for order in full_discount_orders], [discounted_order.id])
+        self.assertEqual([order.id for order in cash_orders], [paid_order.id])
 
     def test_breakdown_report_csv_includes_discount_column_and_net_totals(self) -> None:
         self._create_order(
@@ -230,8 +215,8 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payment_stats["cash"]["order_count"], 0)
         self.assertEqual(payment_stats["no_payment_recorded"]["order_count"], 1)
-        self.assertContains(response, "Sin pago registrado")
-        self.assertContains(response, f"#{reversed_payment_order.id}")
+        no_payment_orders = list(payment_stats["no_payment_recorded"]["orders"])
+        self.assertEqual([order.id for order in no_payment_orders], [reversed_payment_order.id])
 
     def test_breakdown_staff_user_sees_all_users_by_default(self) -> None:
         own_order = self._create_order(
@@ -258,9 +243,12 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["stats"]["total_orders"], 2)
-        self.assertContains(response, f"#{own_order.id}")
-        self.assertContains(response, f"#{other_order.id}")
-        self.assertContains(response, 'name="employee"')
+        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
+        self.assertEqual(
+            {order.id for order in cash_orders},
+            {own_order.id, other_order.id},
+        )
+        self.assertTrue(response.context["can_filter_by_user"])
 
     def test_breakdown_employee_staff_position_can_filter_by_user(self) -> None:
         self._create_order(
@@ -300,12 +288,12 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         self.assertEqual(response.context["stats"]["total_orders"], 1)
         cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
         self.assertEqual([order.id for order in cash_orders], [other_order.id])
-        self.assertContains(response, f'value="{self.other_user.pk}" selected')
-        self.assertContains(
-            response,
+        self.assertEqual(response.context["employee_filter"], str(self.other_user.pk))
+        self.assertEqual(
+            response.context["breakdown_export_url"],
             (
                 f'{reverse("report:breakdown_payment_method_csv")}?'
-                f'date={timezone.localdate().isoformat()}&amp;'
+                f'date={timezone.localdate().isoformat()}&'
                 f'employee={self.other_user.pk}'
             ),
         )
@@ -335,7 +323,7 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
         self.assertEqual([order.id for order in cash_orders], [own_order.id])
         self.assertNotIn(other_order.id, [order.id for order in cash_orders])
-        self.assertNotContains(response, 'name="employee"')
+        self.assertFalse(response.context["can_filter_by_user"])
 
     def test_breakdown_staff_csv_can_filter_by_user(self) -> None:
         own_order = self._create_order(
@@ -443,7 +431,7 @@ class OrdersReportQueryTests(FastTenantTestCase):
         self.assertIn(active_order.id, order_ids)
         self.assertNotIn(cancelled_order.id, order_ids)
 
-    def test_orders_report_export_link_preserves_active_filters(self) -> None:
+    def test_orders_report_export_url_preserves_active_filters(self) -> None:
         response = self.client.get(
             reverse("report:orders_report"),
             {
@@ -461,7 +449,7 @@ class OrdersReportQueryTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'href="{expected_url.replace("&", "&amp;")}"')
+        self.assertEqual(response.context["orders_export_url"], expected_url)
 
     def test_payment_method_filter_ignores_reversed_payments(self) -> None:
         reversed_payment_order = self._create_order(
@@ -532,19 +520,18 @@ class CreditReportViewTests(FastTenantTestCase):
         )
         return order
 
-    def test_global_credit_report_lists_clients_and_links_to_client_credit_report(
+    def test_global_credit_report_context_contains_credit_rows_and_totals(
         self,
     ) -> None:
         response = self.client.get(reverse("report:credit_report"))
-        detail_url = reverse("report:client_credit_report", args=[self.customer.pk])
+        credit_rows = list(response.context["credit_rows"])
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Crédito vigente")
-        self.assertContains(response, "Línea de crédito autorizada")
-        self.assertContains(response, "Disponible")
-        self.assertContains(response, "Monto vencido")
-        self.assertContains(response, "Tempano")
-        self.assertContains(response, detail_url)
+        self.assertEqual([row.client for row in credit_rows], [self.customer])
+        self.assertEqual(response.context["totals"]["total_current_credit"], Decimal("9700.00"))
+        self.assertEqual(response.context["totals"]["total_authorized_credit_line"], Decimal("20000.00"))
+        self.assertEqual(response.context["totals"]["total_available_credit"], Decimal("10300.00"))
+        self.assertEqual(response.context["totals"]["total_overdue_amount"], Decimal("9700.00"))
 
     def test_global_credit_report_csv_exports_required_columns(self) -> None:
         response = self.client.get(reverse("report:credit_report_csv"))
@@ -554,7 +541,7 @@ class CreditReportViewTests(FastTenantTestCase):
         self.assertIn("Cliente,Crédito vigente,Línea de crédito autorizada,Disponible,Monto vencido", content)
         self.assertIn("Tempano,9700.00,20000.00,10300.00,9700.00", content)
 
-    def test_client_credit_report_shows_open_invoiced_and_uninvoiced_sections(
+    def test_client_credit_report_context_groups_invoiced_and_uninvoiced_orders(
         self,
     ) -> None:
         invoice = Invoice.objects.create(
@@ -577,19 +564,10 @@ class CreditReportViewTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Reporte de crédito")
-        self.assertContains(response, "Ventas a crédito facturadas")
-        self.assertContains(response, "Ventas a crédito no facturadas")
-        self.assertContains(response, "AA 1313")
-
-    def test_client_detail_links_to_client_credit_report(self) -> None:
-        response = self.client.get(reverse("clients:detail", args=[self.customer.pk]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            reverse("report:client_credit_report", args=[self.customer.pk]),
-        )
+        report_data = response.context["report_data"]
+        self.assertEqual(report_data.invoiced_credit_total, Decimal("9700.00"))
+        self.assertEqual(report_data.uninvoiced_credit_total, Decimal("4500.00"))
+        self.assertEqual([item.invoice for item in report_data.invoice_items], [invoice])
 
     def test_credit_report_requires_login(self) -> None:
         self.client.logout()

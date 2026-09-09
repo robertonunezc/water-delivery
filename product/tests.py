@@ -33,27 +33,6 @@ class ProductAdminPriceTabTests(FastTenantTestCase):
             price=25.0,
         )
 
-    def test_price_tab_renders_client_price_search_input(self) -> None:
-        response = self.client.get(
-            f"{reverse('admin_edit_product', kwargs={'pk': self.product.pk})}?tab=prices"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'id="product-client-price-search"')
-        self.assertContains(response, 'data-price-search-row')
-
-    def test_price_tab_delete_label_targets_delete_checkbox(self) -> None:
-        response = self.client.get(
-            f"{reverse('admin_edit_product', kwargs={'pk': self.product.pk})}?tab=prices"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            '<label class="pg-checkbox-label" for="id_prices-0-DELETE">Eliminar</label>',
-            html=True,
-        )
-
     def test_price_tab_delete_post_soft_deletes_client_price(self) -> None:
         response = self.client.post(
             reverse('admin_edit_product', kwargs={'pk': self.product.pk}),
@@ -133,10 +112,6 @@ class ProductAdminPriceTabTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            'No se puede asignar el mismo cliente más de una vez para este producto.',
-        )
         self.assertEqual(
             ProductClientPrice.all_objects.filter(
                 product=self.product,

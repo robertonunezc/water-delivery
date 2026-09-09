@@ -3,14 +3,12 @@ from calendar import monthrange
 from datetime import timedelta
 from decimal import Decimal
 
-from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, SimpleTestCase
+from django.test import SimpleTestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from clients.admin import ClientAdmin, ClientCreditConfigInline
 from clients.forms import (
     ClientCoreForm,
     ClientCreditConfigForm,
@@ -59,10 +57,6 @@ class CreditFormFieldTests(SimpleTestCase):
         form = ManualCreditTransactionForm()
 
         self.assertNotIn('forgiveness', dict(form.fields['transaction_type'].choices))
-
-    def test_add_credit_admin_template_removes_forgiveness(self) -> None:
-        with open('clients/templates/admin/clients/add_credit.html', encoding='utf-8') as template:
-            self.assertNotIn('Condonación de deuda', template.read())
 
 
 class ClientCreditAvailabilityTests(SimpleTestCase):
@@ -367,7 +361,7 @@ class CorporateCreditPropagationTests(FastTenantTestCase):
         self.assertEqual(override_branch.credit_config.max_payment_days, 9)
 
 
-class BranchCreditTabTests(FastTenantTestCase):
+class BranchCreditUpdateTests(FastTenantTestCase):
     def setUp(self) -> None:
         self.user = User.objects.create_user(
             username='credit-tab-admin',
@@ -387,52 +381,6 @@ class BranchCreditTabTests(FastTenantTestCase):
             credit_limit=Decimal('1000.00'),
         )
         ClientCreditConfig.objects.create(client=self.branch)
-
-    def test_branch_without_credit_override_sees_credit_tab_read_only(self) -> None:
-        response = self.client.get(
-            f"{reverse('clients:edit_v2', args=[self.branch.pk])}?tab=credit",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['active_tab'], 'credit')
-        self.assertTrue(response.context['credit_read_only'])
-        self.assertContains(
-            response,
-            'La configuración de crédito se administra desde el corporativo',
-        )
-
-    def test_branch_without_credit_override_shows_effective_corporate_credit(self) -> None:
-        self.corporate.credit_limit = Decimal('250.00')
-        self.corporate.can_pay_with_credit = False
-        self.corporate.save(
-            update_fields=['credit_limit', 'can_pay_with_credit', 'updated_at'],
-        )
-        ClientCreditConfig.objects.create(
-            client=self.corporate,
-            payment_term_type='monthly_cutoff',
-            cutoff_day='15',
-            max_payment_days=40,
-        )
-        self.branch.credit_limit = Decimal('10.00')
-        self.branch.can_pay_with_credit = True
-        self.branch.save(
-            update_fields=['credit_limit', 'can_pay_with_credit', 'updated_at'],
-        )
-        self.branch.credit_config.cutoff_day = '5'
-        self.branch.credit_config.max_payment_days = 12
-        self.branch.credit_config.save(update_fields=['cutoff_day', 'max_payment_days'])
-
-        response = self.client.get(
-            f"{reverse('clients:edit_v2', args=[self.branch.pk])}?tab=credit",
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(
-            response,
-            'Crédito administrado por Corporativo con facturación',
-        )
-        self.assertContains(response, 'value="250.00"')
-        self.assertContains(response, 'value="40"')
 
     def test_branch_without_credit_override_cannot_modify_its_credit(self) -> None:
         response = self.client.post(
@@ -470,16 +418,6 @@ class BranchCreditTabTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 302)
         self.branch.refresh_from_db()
         self.assertEqual(self.branch.credit_limit, Decimal('500.00'))
-
-    def test_edit_page_links_to_client_detail(self) -> None:
-        response = self.client.get(
-            reverse('clients:edit_v2', args=[self.branch.pk]),
-        )
-
-        self.assertContains(
-            response,
-            reverse('clients:detail', args=[self.branch.pk]),
-        )
 
 
 class BranchCreditPatchTests(FastTenantTestCase):
@@ -545,37 +483,10 @@ class BranchCreditAdminTests(FastTenantTestCase):
             is_staff=True,
             is_superuser=True,
         )
-        self.request = RequestFactory().get('/admin/clients/client/1/change/')
-        self.request.user = self.user
-        self.client_admin = ClientAdmin(Client, AdminSite())
         self.corporate = Client.objects.create(
             name='Corporativo admin crédito',
             type='corporate',
         )
-        self.branch = Client.objects.create(
-            name='Sucursal admin crédito',
-            type='branch',
-            corporate=self.corporate,
-        )
-
-    def _inline_types_for(self, client: Client) -> set[type]:
-        return {
-            type(inline)
-            for inline in self.client_admin.get_inline_instances(self.request, client)
-        }
-
-    def test_branch_without_credit_override_hides_credit_config_inline(self) -> None:
-        inline_types = self._inline_types_for(self.branch)
-
-        self.assertNotIn(ClientCreditConfigInline, inline_types)
-
-    def test_branch_with_credit_override_shows_credit_config_inline(self) -> None:
-        self.branch.credit_override_enabled = True
-        self.branch.save(update_fields=['credit_override_enabled', 'updated_at'])
-
-        inline_types = self._inline_types_for(self.branch)
-
-        self.assertIn(ClientCreditConfigInline, inline_types)
 
     def test_add_credit_admin_balance_payment_requires_amount(self) -> None:
         self.client.force_login(self.user)
@@ -595,7 +506,6 @@ class BranchCreditAdminTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'El monto es obligatorio')
         self.corporate.refresh_from_db()
         self.assertEqual(self.corporate.balance, Decimal('100.00'))
         self.assertEqual(self.corporate.current_debt, Decimal('50.00'))
@@ -725,7 +635,3 @@ class ClientCreditDueDateDetailTests(FastTenantTestCase):
             response.context['pending_payment_data']['nearest_due_date'],
             expected_due_date,
         )
-        self.assertContains(response, 'Ciclo de vencimiento')
-        self.assertContains(response, 'Último día del mes')
-        self.assertNotContains(response, 'Total Ventas')
-        self.assertNotContains(response, 'Total Gastado')

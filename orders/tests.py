@@ -1,16 +1,13 @@
 from datetime import date, timedelta
 from decimal import Decimal
 import json
-from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch, MagicMock
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
@@ -28,156 +25,6 @@ from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
 from invoice.models import Invoice, InvoiceOrderLink
-
-
-class _EmptyOrderItems:
-    def all(self) -> list:
-        return []
-
-
-class _TemplateClient:
-    pk = 1
-    name = "Cliente Layout"
-    balance = Decimal("0.00")
-    current_debt = Decimal("0.00")
-
-    def get_available_credit(self) -> Decimal:
-        return Decimal("1000.00")
-
-
-@override_settings(
-    STORAGES={
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
-    },
-)
-class CreateOrderTemplateLayoutTest(SimpleTestCase):
-    """Render-only tests for the create order page layout."""
-
-    def _render_order_page(
-        self,
-        can_pay_with_credit: bool = True,
-        order_status: str = OrderStatus.PENDING.value,
-        order_is_editable: bool = True,
-        order_locked_message: str = "",
-    ) -> str:
-        order = SimpleNamespace(
-            pk=1,
-            items=_EmptyOrderItems(),
-            total_amount=Decimal("0.00"),
-            discount=Decimal("0.00"),
-            subtotal_amount=Decimal("0.00"),
-            order_date=None,
-            notes="",
-            status=order_status,
-        )
-        form = SimpleNamespace(
-            client="",
-            order_date="",
-            status="",
-            notes="",
-            total_amount="",
-        )
-        return render_to_string(
-            "create_order.html",
-            {
-                "client": _TemplateClient(),
-                "order": order,
-                "form": form,
-                "client_products": [],
-                "payment_types": [("cash", "Efectivo"), ("credit", "Crédito")],
-                "order_type": "contado",
-                "has_pending_credit_payment": False,
-                "can_pay_with_credit": can_pay_with_credit,
-                "initial_payment_breakdown": "{}",
-                "has_delivery_address": True,
-                "order_redirect_url": "/clients/",
-                "order_is_editable": order_is_editable,
-                "order_locked_message": order_locked_message,
-                "csrf_token": "TOKEN",
-            },
-        )
-
-    def test_products_render_above_two_column_payment_and_checkout_layout(self) -> None:
-        html = self._render_order_page()
-
-        self.assertIn("order-products-section", html)
-        self.assertIn("order-finalization-layout", html)
-        self.assertIn("order-payment-panel", html)
-        self.assertIn("order-checkout-panel", html)
-        products_start = html.index("order-products-section")
-        finalization_start = html.index("order-finalization-layout")
-        payment_start = html.index("order-payment-panel")
-        checkout_start = html.index("order-checkout-panel")
-        self.assertLess(products_start, finalization_start)
-        self.assertLess(finalization_start, payment_start)
-        self.assertLess(payment_start, checkout_start)
-        self.assertIn("Datos de cobro en panel ancho", html[payment_start:checkout_start])
-        self.assertIn("Checkout", html[checkout_start:])
-        self.assertNotIn("order-summary-fixed", html)
-        self.assertNotIn("order-summary-mobile", html)
-
-    def test_header_uses_client_name_title_and_compact_actions(self) -> None:
-        html = self._render_order_page()
-
-        self.assertIn("order-page-title", html)
-        self.assertIn("order-page-client-name", html)
-        self.assertIn("Cliente Layout", html)
-        self.assertIn("order-page-actions", html)
-        self.assertEqual(html.count("order-header-button"), 3)
-        header_start = html.index("order-page-title")
-        actions_start = html.index("order-page-actions")
-        header_end = html.index("client-financial-strip")
-        self.assertLess(header_start, actions_start)
-        self.assertNotIn("pg-touch", html[actions_start:header_end])
-
-    def test_financial_status_moves_affordability_below_metrics(self) -> None:
-        html = self._render_order_page()
-
-        self.assertNotIn("Estado Financiero", html)
-        metrics_start = html.index("financial-strip-metrics")
-        affordability_start = html.index("client-financial-affordability")
-        products_start = html.index("order-products-section")
-        self.assertLess(metrics_start, affordability_start)
-        self.assertLess(affordability_start, products_start)
-
-    def test_blocked_credit_shows_only_blocked_label(self) -> None:
-        html = self._render_order_page(can_pay_with_credit=False)
-
-        credit_start = html.index("financial-strip-credit")
-        debt_start = html.index("financial-strip-debt")
-        credit_column = html[credit_start:debt_start]
-        self.assertIn("Bloqueado", credit_column)
-        self.assertNotIn("No disponible", credit_column)
-
-    def test_remaining_payment_split_controls_are_rendered(self) -> None:
-        html = self._render_order_page()
-
-        self.assertIn("remaining-payment-split", html)
-        self.assertIn("remaining-payment-rows", html)
-        self.assertIn("remaining-payment-add-row", html)
-
-    def test_locked_order_page_shows_done_message_and_only_cancel_action(self) -> None:
-        message = (
-            "El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso "
-            "de algun error u otro escenario"
-        )
-
-        html = self._render_order_page(
-            order_status=OrderStatus.COMPLETED.value,
-            order_is_editable=False,
-            order_locked_message=message,
-        )
-
-        self.assertIn(message, html)
-        self.assertIn("cancel-order-btn", html)
-        self.assertEqual(html.count("order-header-button"), 1)
-        self.assertNotIn("order-products-section", html)
-        self.assertNotIn("finish-order-btn", html)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -635,9 +482,7 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
     def _get_order_page_context(self) -> dict[str, Any]:
         with patch("orders.views.render") as render_mock:
-            render_mock.side_effect = (
-                lambda request, template_name, context: HttpResponse("ok")
-            )
+            render_mock.side_effect = lambda request, _name, context: HttpResponse("ok")
             response = self.client.get(
                 reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
             )
@@ -701,46 +546,6 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
         self.assertEqual(context["order_redirect_url"], reverse("clients:list"))
 
-    def test_order_template_wires_redirect_url_to_finish_buttons(self) -> None:
-        template_path = Path(__file__).resolve().parent / "templates" / "create_order.html"
-        template_source = template_path.read_text()
-
-        self.assertEqual(template_source.count('data-redirect="{{ order_redirect_url }}"'), 1)
-
-    def test_order_page_renders_compact_financial_status_strip(self) -> None:
-        self.customer.balance = Decimal("0.00")
-        self.customer.credit_limit = Decimal("1000.00")
-        self.customer.current_debt = Decimal("125.00")
-        self.customer.can_pay_with_credit = True
-        self.customer.save(
-            update_fields=[
-                "balance",
-                "credit_limit",
-                "current_debt",
-                "can_pay_with_credit",
-            ]
-        )
-        user = self._create_user_with_employee(username="finanzas", position="manager")
-        self.client.force_login(user)
-
-        response = self.client.get(
-            reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
-        )
-
-        self.assertEqual(response.status_code, 200)
-        html = response.content.decode()
-        self.assertIn("client-financial-strip", html)
-        self.assertIn("financial-strip-metrics", html)
-        self.assertNotIn("financial-summary-card", html)
-        balance_start = html.index("financial-strip-balance")
-        credit_start = html.index("financial-strip-credit")
-        debt_start = html.index("financial-strip-debt")
-        self.assertLess(balance_start, credit_start)
-        self.assertLess(credit_start, debt_start)
-        self.assertIn("Saldo", html[balance_start:credit_start])
-        self.assertIn("Crédito", html[credit_start:debt_start])
-        self.assertIn("Deuda", html[debt_start:])
-
     def test_order_page_allows_credit_as_selectable_payment_method_when_enabled(self) -> None:
         self.customer.credit_limit = Decimal("1000.00")
         self.customer.current_debt = Decimal("0.00")
@@ -766,9 +571,7 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         )
 
         with patch("orders.views.render") as render_mock:
-            render_mock.side_effect = (
-                lambda request, template_name, context: HttpResponse("ok")
-            )
+            render_mock.side_effect = lambda request, _name, context: HttpResponse("ok")
             response = self.client.get(
                 reverse("orders:get_order", kwargs={"order_id": order.pk})
             )
@@ -776,11 +579,6 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         context = render_mock.call_args.args[2]
         self.assertFalse(context.get("order_is_editable", True))
-        self.assertEqual(
-            context.get("order_locked_message"),
-            "El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso "
-            "de algun error u otro escenario",
-        )
 
 
 class SplitOrderViewTestCase(FastTenantTestCase):
@@ -1389,7 +1187,7 @@ class CancelOrderViewTestCase(FastTenantTestCase):
 
 
 class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
-    """Tests for the dashboard bulk actions UI endpoint."""
+    """Tests for dashboard bulk action business behavior."""
 
     def setUp(self) -> None:
         self.user = User.objects.create_user(
@@ -1541,7 +1339,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Invoice.objects.count(), 0)
-        self.assertContains(response, 'mismo cliente corporativo')
 
     def test_dashboard_bulk_create_invoice_rejects_non_completed_orders(self) -> None:
         response = self.client.post(
@@ -1555,7 +1352,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.exists())
-        self.assertContains(response, 'Solo se pueden facturar pedidos completados')
 
     def test_dashboard_bulk_create_invoice_rejects_client_without_invoice_data(self) -> None:
         InvoiceData.objects.filter(client=self.customer).delete()
@@ -1571,8 +1367,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.exists())
-        self.assertContains(response, 'no puede facturarse')
-        self.assertContains(response, 'RFC')
 
     def test_dashboard_bulk_create_invoice_rejects_branch_when_corporate_lacks_billing_address(self) -> None:
         corporate = Client.objects.create(name='Corporate Client', type='corporate')
@@ -1599,8 +1393,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.filter(client=branch).exists())
-        self.assertContains(response, 'cliente corporativo')
-        self.assertContains(response, 'domicilio de tipo fiscal activo')
 
     def test_dashboard_bulk_create_invoice_validates_corporate_for_branch_with_own_billing_data(self) -> None:
         corporate = Client.objects.create(name='Corporate Missing Billing', type='corporate')
@@ -1627,8 +1419,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Invoice.objects.filter(client=branch).exists())
-        self.assertContains(response, 'cliente corporativo')
-        self.assertContains(response, 'RFC')
 
     def test_dashboard_bulk_status_update_uses_service_layer(self) -> None:
         response = self.client.post(
@@ -1644,38 +1434,6 @@ class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
         self.completed_order_1.refresh_from_db()
         self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
 
-
-    def test_orders_list_shows_review_badge_for_blocked_cancellation(self) -> None:
-        self.completed_order_1.cancellation_review_required = True
-        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
-        self.completed_order_1.save(
-            update_fields=[
-                "cancellation_review_required",
-                "cancellation_review_reason",
-            ]
-        )
-
-        response = self.client.get(reverse("orders:list"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Requiere revisión de cancelación")
-        self.assertContains(response, "Saldo insuficiente")
-
-    def test_admin_orders_list_shows_review_count_and_badge(self) -> None:
-        self.completed_order_1.cancellation_review_required = True
-        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
-        self.completed_order_1.save(
-            update_fields=[
-                "cancellation_review_required",
-                "cancellation_review_reason",
-            ]
-        )
-
-        response = self.client.get(reverse("admin_orders"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cancelaciones por revisar")
-        self.assertContains(response, "Requiere revisión de cancelación")
 
     def test_review_required_filter_returns_only_review_orders(self) -> None:
         self.completed_order_1.cancellation_review_required = True

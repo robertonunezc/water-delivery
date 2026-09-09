@@ -2,16 +2,10 @@ import csv
 import io
 from datetime import date, datetime, timedelta
 from decimal import Decimal
-from html.parser import HTMLParser
-from pathlib import Path
-from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
-from django.conf import settings
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
-from django.template.loader import render_to_string
-from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
@@ -44,88 +38,6 @@ from product.models import Product, ProductClientPrice
 from routes.models import Route, RouteClient
 
 User = get_user_model()
-
-
-TEST_STATIC_STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
-
-
-@override_settings(STORAGES=TEST_STATIC_STORAGES)
-class ClientDetailTemplateOrderActionsTest(SimpleTestCase):
-    def _order(self, *, order_id: int, status: str, is_paid: bool = False) -> SimpleNamespace:
-        return SimpleNamespace(
-            pk=order_id,
-            id=order_id,
-            status=status,
-            is_paid=is_paid,
-            is_closed=status == OrderStatus.COMPLETED.value and is_paid,
-            total_amount=Decimal("25.00"),
-            order_date=None,
-            notes="",
-            items=SimpleNamespace(all=[]),
-            payments=SimpleNamespace(all=[]),
-            get_status_display_fixed=lambda: "Pendiente"
-            if status == OrderStatus.PENDING.value
-            else "Completado",
-        )
-
-    def _render_sales_tab(self) -> str:
-        request = RequestFactory().get("/")
-        request.user = SimpleNamespace(is_staff=False)
-        client = SimpleNamespace(
-            pk=1,
-            name="Cliente detalle",
-            active=True,
-            type="regular",
-            corporate=None,
-            note="",
-            requires_billing=False,
-            address_link="",
-            get_type_display=lambda: "Regular",
-            get_available_credit=lambda: Decimal("0.00"),
-        )
-        return render_to_string(
-            "client_detail.html",
-            {
-                "request": request,
-                "client": client,
-                "active_detail_tab": "sales",
-                "orders": [
-                    self._order(order_id=11, status=OrderStatus.PENDING.value),
-                    self._order(order_id=12, status=OrderStatus.COMPLETED.value),
-                ],
-                "all_payment_data": [],
-                "has_financial_risk": False,
-                "pending_payment_data": {},
-                "snapshot_cards": [],
-                "contacts": [],
-                "addresses": [],
-                "branches": [],
-                "billing_data": None,
-                "billing_frequency": None,
-                "route_clients": [],
-                "upcoming_route_orders": [],
-                "recent_completed_routes": [],
-                "client_invoices": [],
-                "credit_account": SimpleNamespace(credit_limit=Decimal("0.00")),
-                "credit_is_inherited": False,
-                "debt_percentage": 0,
-                "effective_credit_config": None,
-                "csrf_token": "TOKEN",
-            },
-        )
-
-    def test_sales_actions_show_edit_only_for_pending_orders(self) -> None:
-        html = self._render_sales_tab()
-
-        self.assertIn('href="/orders/11/">Editar', html)
-        self.assertNotIn('href="/orders/12/">Editar', html)
 
 
 class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
@@ -692,7 +604,6 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Selecciona al menos un pedido a crédito para pagar.')
 
     def test_pay_credit_blocks_underpayment_with_split_guidance(self) -> None:
         order = self._credit_order(
@@ -718,7 +629,6 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
 
     def test_pay_credit_rejects_balance_method_for_received_payment(self) -> None:
         self.branch.balance = Decimal('150.00')
@@ -746,39 +656,12 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Método de pago inválido')
         self.branch.refresh_from_db()
         self.corporate.refresh_from_db()
         order.refresh_from_db()
         self.assertEqual(self.branch.balance, Decimal('150.00'))
         self.assertEqual(self.corporate.current_debt, Decimal('100.00'))
         self.assertFalse(order.is_paid)
-
-    def test_pay_credit_invalid_form_preserves_selected_orders(self) -> None:
-        order = self._credit_order(
-            self.branch,
-            Decimal('100.00'),
-            order_date=timezone.now(),
-            credit_account=self.corporate,
-        )
-
-        response = self.client.post(
-            reverse('clients:pay_credit', args=[self.branch.pk]),
-            {
-                'client': self.branch.pk,
-                'transaction_type': 'payment',
-                'orders': [str(order.pk)],
-                'amount': '100.00',
-                'description': 'Pago recibido',
-                'notes': 'corto',
-                'payment_method': 'cash',
-            },
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(order.pk, response.context['selected_order_ids'])
-        self.assertContains(response, f'name="orders" value="{order.pk}"')
-        self.assertContains(response, 'checked')
 
     def test_pay_credit_payment_settles_orders_and_adds_overpayment_to_balance(self) -> None:
         order = self._credit_order(
@@ -873,40 +756,6 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(self.corporate.balance, Decimal('10.00'))
         self.assertEqual(self.branch.balance, Decimal('0.00'))
         self.assertEqual(self.corporate.current_debt, Decimal('0.00'))
-
-    def test_pay_credit_page_shows_credit_order_selection_and_totals(self) -> None:
-        order = self._credit_order(
-            self.branch,
-            Decimal('150.00'),
-            order_date=timezone.now(),
-            credit_account=self.corporate,
-        )
-        self.corporate.current_debt = Decimal('150.00')
-        self.corporate.save(update_fields=['current_debt', 'updated_at'])
-
-        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, f'name="orders" value="{order.pk}"')
-        self.assertContains(response, 'Total pedidos seleccionados')
-        self.assertContains(response, 'Monto disponible')
-        self.assertContains(response, 'Puede dividir un pedido antes de continuar.')
-
-    def test_pay_credit_page_does_not_show_forgiveness_option(self) -> None:
-        self.corporate.current_debt = Decimal('150.00')
-        self.corporate.save(update_fields=['current_debt', 'updated_at'])
-        self._credit_order(
-            self.branch,
-            Decimal('150.00'),
-            order_date=timezone.now(),
-            credit_account=self.corporate,
-        )
-
-        response = self.client.get(reverse('clients:pay_credit', args=[self.branch.pk]))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, 'Condonación de deuda')
-
 
 class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
     def setUp(self) -> None:

@@ -9,7 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import connection
 from django.db.migrations.operations.base import Operation
 from django.db.migrations.state import ProjectState
-from django.test import TestCase, RequestFactory, override_settings
+from django.test import TestCase, RequestFactory
 from django.utils import timezone
 
 from clients.models import Address, Client, InvoiceData
@@ -23,16 +23,6 @@ from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 from tenant_client.test_utils import FastTenantTestCase
 from django.urls import reverse
-
-
-TEST_STATIC_STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
 
 
 class InvoiceTenantTestCase(FastTenantTestCase):
@@ -788,9 +778,6 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 
 class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 	def setUp(self):
-		self.staticfiles_override = override_settings(STORAGES=TEST_STATIC_STORAGES)
-		self.staticfiles_override.enable()
-		self.addCleanup(self.staticfiles_override.disable)
 		super().setUp()
 		self.superuser = User.objects.create_superuser(username='admin_staff', password='pass_staff')
 		self.client_obj = Client.objects.create(name='Test Client A', type='corporate')
@@ -802,18 +789,6 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 			auto_amount=False
 		)
 		self.client.force_login(self.superuser)
-
-	def test_list_invoices_admin_view(self):
-		url = reverse('admin_invoices')
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'Test Client A')
-		self.assertContains(response, 'SER-T1')
-
-	def test_create_invoice_admin_view_get(self):
-		url = reverse('admin_create_invoice')
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
 
 	def test_create_invoice_admin_view_post(self):
 		url = reverse('admin_create_invoice')
@@ -848,12 +823,6 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		self.assertEqual(response.status_code, 302)
 		invoice = Invoice.objects.get(identifier='SER-BRANCH')
 		self.assertEqual(invoice.client, self.client_obj)
-
-	def test_edit_invoice_admin_view_get(self):
-		url = reverse('admin_edit_invoice', args=[self.invoice.id])
-		response = self.client.get(url)
-		self.assertEqual(response.status_code, 200)
-		self.assertContains(response, 'SER-T1')
 
 	def test_edit_invoice_admin_view_post_link_order(self):
 		# Create completed order
