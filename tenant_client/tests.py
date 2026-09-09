@@ -1,4 +1,5 @@
 from django.test import SimpleTestCase
+from django_tenants.test.cases import FastTenantTestCase as DjangoTenantsFastTenantTestCase
 from django_tenants.test.cases import TenantTestCase
 
 from tenant_client.test_utils import FastTenantTestCase
@@ -7,6 +8,9 @@ from tenant_client.test_utils import FastTenantTestCase
 class FastTenantTestCaseContractTests(SimpleTestCase):
     def test_wrapper_uses_tenant_test_case_base(self):
         self.assertTrue(issubclass(FastTenantTestCase, TenantTestCase))
+
+    def test_wrapper_uses_fast_tenant_test_case_base(self):
+        self.assertTrue(issubclass(FastTenantTestCase, DjangoTenantsFastTenantTestCase))
 
     def test_wrapper_generates_class_specific_schema_name(self):
         schema_name = FastTenantTestCase.get_test_schema_name()

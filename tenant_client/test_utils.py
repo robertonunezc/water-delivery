@@ -9,7 +9,7 @@ import re
 from datetime import date, timedelta
 from django.db import connection
 from django.test import override_settings
-from django_tenants.test.cases import TenantTestCase
+from django_tenants.test.cases import FastTenantTestCase as DjangoTenantsFastTenantTestCase
 from django_tenants.test.client import TenantClient
 from .models import ClientTenant, Domain
 
@@ -106,13 +106,14 @@ class TenantTestMixin:
         tenant.delete()
 
 
-class FastTenantTestCase(TenantTestCase):
+class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
     """
     Base test case for tenant-specific tests.
 
     This compatibility wrapper creates an isolated tenant schema per test
     class. It keeps the existing import surface used across the project while
-    avoiding shared-schema state between tenant-aware suites.
+    reusing django-tenants' fast setup path so shared migrations are not rerun
+    for every tenant-aware test class.
 
     Example:
         class ClientModelTest(FastTenantTestCase):
