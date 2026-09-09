@@ -125,11 +125,11 @@
 							</td>
 							<td>${{ client.balance|floatformat:2 }}</td>
 							<td>
-								{% if client.current_debt > 0 %}
-									<span class="pg-text-danger">${{ client.current_debt|floatformat:2 }}</span>
+								{% if client.display_current_debt > 0 %}
+									<span class="pg-text-danger">${{ client.display_current_debt|floatformat:2 }}</span>
 									
 								{% else %}
-									<span class="pg-text-success">${{ client.current_debt|floatformat:2 }}</span>
+									<span class="pg-text-success">${{ client.display_current_debt|floatformat:2 }}</span>
 								{% endif %}
 							</td>
 							{% comment %} <td>

@@ -12,6 +12,7 @@
                 <th>Contacto</th>
                 <th>Direcciones</th>
                 <th>Notas</th>
+                {% if table_context == 'client_list' %}<th>Deuda</th>{% endif %}
                 <th>Acciones</th>
             </tr>
             </thead>
@@ -50,6 +51,15 @@
                         {% if show_id %}<td>#{{ item.id }}</td>{% endif %}
                         {% include 'includes/client_table_row.html' with client=item %}
                         <td>{{ item.note|default_if_none:"-"|truncatechars:30 }}</td>
+                        {% if table_context == 'client_list' %}
+                            <td>
+                                {% if item.display_current_debt > 0 %}
+                                    <span class="pg-text-danger">${{ item.display_current_debt|floatformat:2 }}</span>
+                                {% else %}
+                                    <span class="pg-text-success">${{ item.display_current_debt|floatformat:2 }}</span>
+                                {% endif %}
+                            </td>
+                        {% endif %}
                         <td>
                             <div class="pg-button-group pg-flex pg-flex-wrap pg-gap-1" role="group">
                                 {% if table_context == 'client_list' %}
@@ -224,6 +234,19 @@
                         </div>
                         <div>{{ item.note|default_if_none:"-"|truncatechars:80 }}</div>
                     </div>
+
+                    {% if table_context == 'client_list' %}
+                        <div class="pg-small pg-text-muted pg-mb-3">
+                            <div class="pg-fw-semibold pg-text-dark pg-mb-1">
+                                <i class="fas fa-credit-card pg-me-1"></i>Deuda
+                            </div>
+                            {% if item.display_current_debt > 0 %}
+                                <span class="pg-text-danger">${{ item.display_current_debt|floatformat:2 }}</span>
+                            {% else %}
+                                <span class="pg-text-success">${{ item.display_current_debt|floatformat:2 }}</span>
+                            {% endif %}
+                        </div>
+                    {% endif %}
 
                     <div class="pg-flex pg-flex-wrap pg-gap-2">
                         {% if table_context == 'client_list' %}

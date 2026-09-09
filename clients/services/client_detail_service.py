@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from clients.models import Client
+from clients.services.client_debt_service import get_client_display_current_debt
 
 ZERO = Decimal("0.00")
 
@@ -13,25 +14,9 @@ def _money(value: Any) -> str:
     return f"${float(value):.2f}"
 
 
-def _decimal(value: Any) -> Decimal:
-    return Decimal(str(value or ZERO))
-
-
-def _get_inherited_branch_debt(client: Client, credit_account: Client) -> Decimal:
-    summary = (
-        credit_account.credit_transactions.filter(reference_order__client=client)
-        .aggregate_summary()
-    )
-    debt = summary["total_purchases"] - summary["total_payments"]
-    return max(debt, ZERO)
-
-
 def get_client_detail_current_debt(client: Client) -> Decimal:
     """Return the debt amount shown on the client detail page."""
-    credit_account = client.get_credit_account()
-    if credit_account.pk == client.pk:
-        return _decimal(client.current_debt)
-    return _get_inherited_branch_debt(client, credit_account)
+    return get_client_display_current_debt(client)
 
 
 def _pending_invoice_count(client_invoices: Sequence[Any]) -> int:

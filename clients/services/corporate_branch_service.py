@@ -11,6 +11,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client
+from clients.services.client_debt_service import (
+    get_client_display_current_debt,
+    with_display_current_debt,
+)
 from clients.services.client_service import get_upcoming_route_orders
 from orders.models import Order, OrderStatus
 from payment.models import Payment
@@ -32,7 +36,8 @@ def build_corporate_branch_workspace(
     date_from, date_to = _resolve_date_range(params, today=today)
     active_tab = _resolve_active_tab(params.get('tab'))
     branches = list(
-        corporate.branches.filter(type='branch').order_by('-active', 'name')
+        with_display_current_debt(corporate.branches.filter(type='branch'))
+        .order_by('-active', 'name')
     )
     selected_branch = _resolve_selected_branch(branches, params.get('branch'))
 
@@ -252,13 +257,14 @@ def _build_branch_rows(
     for branch in branches:
         order_data = order_totals.get(branch.pk, {})
         is_selected = bool(selected_branch and branch.pk == selected_branch.pk)
+        current_debt = _get_branch_current_debt(branch)
         rows.append(
             {
                 'branch': branch,
                 'order_count': order_data.get('order_count', 0),
                 'sales_total': order_data.get('sales_total', ZERO),
                 'payment_total': payment_totals.get(branch.pk, ZERO),
-                'current_debt': branch.current_debt or ZERO,
+                'current_debt': current_debt,
                 'cancelled_order_count': order_data.get('cancelled_order_count', 0),
                 'cancelled_order_amount': order_data.get('cancelled_order_amount', ZERO),
                 'is_selected': is_selected,
@@ -271,6 +277,13 @@ def _build_branch_rows(
             }
         )
     return rows
+
+
+def _get_branch_current_debt(branch: Client) -> Decimal:
+    current_debt = getattr(branch, 'display_current_debt', None)
+    if current_debt is None:
+        return get_client_display_current_debt(branch)
+    return Decimal(str(current_debt or ZERO))
 
 
 def _build_corporate_summary(branch_rows: Sequence[dict[str, Any]]) -> dict[str, Any]:

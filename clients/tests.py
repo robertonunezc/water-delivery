@@ -190,6 +190,53 @@ class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
         self.assertEqual(context['selected_branch_summary']['payment_total'], Decimal('80.00'))
         self.assertNotIn(self.branch_a_outside_range, context['orders_page'].object_list)
 
+    def test_build_workspace_shows_inherited_branch_debt(self) -> None:
+        corporate = Client.objects.create(
+            name='Corporativo deuda heredada',
+            type='corporate',
+            current_debt=Decimal('123.45'),
+            credit_limit=Decimal('1000.00'),
+        )
+        branch = Client.objects.create(
+            name='Sucursal deuda heredada',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal('0.00'),
+        )
+        order = Order.objects.create(
+            client=branch,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('123.45'),
+            type='credito',
+        )
+        CreditTransaction.objects.create(
+            client=corporate,
+            transaction_type='purchase',
+            amount=Decimal('123.45'),
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('123.45'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+        )
+
+        context = build_corporate_branch_workspace(
+            corporate,
+            {'branch': str(branch.pk)},
+            today=date(2026, 7, 22),
+        )
+
+        self.assertEqual(context['branches'][0]['current_debt'], Decimal('123.45'))
+        self.assertEqual(
+            context['selected_branch_summary']['current_debt'],
+            Decimal('123.45'),
+        )
+        self.assertEqual(
+            context['corporate_summary']['total_current_debt'],
+            Decimal('123.45'),
+        )
+
     def test_build_workspace_ignores_branch_id_from_other_corporate(self) -> None:
         context = build_corporate_branch_workspace(
             self.corporate,
@@ -199,6 +246,57 @@ class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
 
         self.assertEqual(context['selected_branch'], self.branch_a)
 
+
+
+class ClientListDebtDisplayTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='client-list-debt-user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.corporate = Client.objects.create(
+            name='Corporativo listado deuda',
+            type='corporate',
+            current_debt=Decimal('678.90'),
+            credit_limit=Decimal('1000.00'),
+        )
+        self.branch = Client.objects.create(
+            name='Sucursal listado deuda',
+            type='branch',
+            corporate=self.corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal('0.00'),
+        )
+        self.order = Order.objects.create(
+            client=self.branch,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('123.45'),
+            type='credito',
+        )
+        CreditTransaction.objects.create(
+            client=self.corporate,
+            transaction_type='purchase',
+            amount=Decimal('123.45'),
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('123.45'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=self.order,
+        )
+
+    def test_admin_client_list_shows_inherited_branch_debt(self) -> None:
+        response = self.client.get(reverse('admin_clients'))
+
+        self.assertContains(response, 'Sucursal listado deuda')
+        self.assertContains(response, '$123.45')
+
+    def test_credit_client_list_includes_inherited_branch_debt(self) -> None:
+        response = self.client.get(f"{reverse('clients:list')}?mode=credits")
+
+        self.assertContains(response, 'Sucursal listado deuda')
+        self.assertContains(response, '$123.45')
 
 
 class ClientBillingInheritanceTestCase(FastTenantTestCase):

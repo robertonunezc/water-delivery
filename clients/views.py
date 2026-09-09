@@ -32,6 +32,7 @@ from .services.client_detail_service import (
     build_client_detail_snapshot,
     get_client_detail_current_debt,
 )
+from .services.client_debt_service import with_display_current_debt
 from .services.client_service import (
     initialize_branch_credit_from_corporate,
     sync_inherited_branch_credit_from_corporate,
@@ -1062,12 +1063,15 @@ def get_clients(request):
         client_list_mode = ''
     
     # Start with all clients
-    clients_queryset = Client.objects.select_related().prefetch_related(
-        'contacts', 'addresses'
+    clients_queryset = with_display_current_debt(
+        Client.objects.select_related('corporate').prefetch_related(
+            'contacts',
+            'addresses',
+        )
     ).order_by('-created_at', 'name')
 
     if client_list_mode == 'credits':
-        clients_queryset = clients_queryset.filter(current_debt__gt=0)
+        clients_queryset = clients_queryset.filter(display_current_debt__gt=0)
     
     # Apply search filter if query exists
     if search_query:
