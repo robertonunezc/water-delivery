@@ -292,7 +292,7 @@
                             Acciones
                           </button>
                           <ul class="pg-dropdown-menu pg-dropdown-menu-end">
-                            {% if not order.is_closed %}
+                            {% if order.status == 'PENDING' %}
                               <li><a class="pg-dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
                             {% endif %}
                             {% if order.status == 'COMPLETED' %}
