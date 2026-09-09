@@ -31,14 +31,12 @@
             <span class="order-page-client-name">{{ client.name }}</span>
           </h1>
           <div class="pg-button-group-mobile order-page-actions">
-            {% if order_is_editable %}
               <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary order-header-button">
                 <i class="fas fa-user pg-me-1" aria-hidden="true"></i>Ver Cliente
               </a>
               <a href="{% url 'clients:list' %}" class="pg-button pg-button-secondary order-header-button">
                 <i class="fas fa-arrow-left pg-me-1" aria-hidden="true"></i>Volver
               </a>
-            {% endif %}
             <button type="button" id="cancel-order-btn" class="pg-button pg-button-outline-danger order-header-button">
               <i class="fas fa-ban pg-me-1" aria-hidden="true"></i>Cancelar Pedido
             </button>
