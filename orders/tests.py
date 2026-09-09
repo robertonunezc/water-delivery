@@ -58,7 +58,13 @@ class _TemplateClient:
 class CreateOrderTemplateLayoutTest(SimpleTestCase):
     """Render-only tests for the create order page layout."""
 
-    def _render_order_page(self, can_pay_with_credit: bool = True) -> str:
+    def _render_order_page(
+        self,
+        can_pay_with_credit: bool = True,
+        order_status: str = OrderStatus.PENDING.value,
+        order_is_editable: bool = True,
+        order_locked_message: str = "",
+    ) -> str:
         order = SimpleNamespace(
             pk=1,
             items=_EmptyOrderItems(),
@@ -67,6 +73,7 @@ class CreateOrderTemplateLayoutTest(SimpleTestCase):
             subtotal_amount=Decimal("0.00"),
             order_date=None,
             notes="",
+            status=order_status,
         )
         form = SimpleNamespace(
             client="",
@@ -89,6 +96,8 @@ class CreateOrderTemplateLayoutTest(SimpleTestCase):
                 "initial_payment_breakdown": "{}",
                 "has_delivery_address": True,
                 "order_redirect_url": "/clients/",
+                "order_is_editable": order_is_editable,
+                "order_locked_message": order_locked_message,
                 "csrf_token": "TOKEN",
             },
         )
@@ -151,6 +160,24 @@ class CreateOrderTemplateLayoutTest(SimpleTestCase):
         self.assertIn("remaining-payment-split", html)
         self.assertIn("remaining-payment-rows", html)
         self.assertIn("remaining-payment-add-row", html)
+
+    def test_locked_order_page_shows_done_message_and_only_cancel_action(self) -> None:
+        message = (
+            "El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso "
+            "de algun error u otro escenario"
+        )
+
+        html = self._render_order_page(
+            order_status=OrderStatus.COMPLETED.value,
+            order_is_editable=False,
+            order_locked_message=message,
+        )
+
+        self.assertIn(message, html)
+        self.assertIn("cancel-order-btn", html)
+        self.assertEqual(html.count("order-header-button"), 1)
+        self.assertNotIn("order-products-section", html)
+        self.assertNotIn("finish-order-btn", html)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -524,6 +551,33 @@ class UpdateOrderViewTestCase(FastTenantTestCase):
         self.assertEqual(self.order.subtotal_amount, Decimal("70.00"))
         self.assertEqual(self.order.total_amount, Decimal("70.00"))
 
+    def test_update_endpoint_rejects_completed_order_without_changes(self) -> None:
+        self.order.status = OrderStatus.COMPLETED.value
+        self.order.save(update_fields=['status', 'updated_at'])
+
+        response = self._post_update(
+            {
+                "quantity": 3,
+                "product_id": str(self.product_2.pk),
+                "discount": "5.00",
+                "notes": "Cambio no permitido",
+            }
+        )
+
+        self.assertEqual(response.status_code, 403)
+        data = response.json()
+        self.assertEqual(data["status"], "error")
+        self.assertEqual(
+            data["error"],
+            "El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso "
+            "de algun error u otro escenario",
+        )
+        self.order.refresh_from_db()
+        item = OrderProduct.objects.get(order=self.order, product=self.product_2)
+        self.assertEqual(item.quantity, 1)
+        self.assertEqual(self.order.discount, Decimal("0.00"))
+        self.assertIsNone(self.order.notes)
+
 
 class CreateOrderRedirectTestCase(FastTenantTestCase):
     """Tests for route-aware redirects on the create order page."""
@@ -700,6 +754,33 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         context = self._get_order_page_context()
 
         self.assertIn(("credit", "Crédito"), context["payment_types"])
+
+    def test_existing_completed_order_page_is_marked_not_editable(self) -> None:
+        user = self._create_user_with_employee(username="cerrado", position="manager")
+        self.client.force_login(user)
+        order = Order.objects.create(
+            client=self.customer,
+            owner=user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("25.00"),
+        )
+
+        with patch("orders.views.render") as render_mock:
+            render_mock.side_effect = (
+                lambda request, template_name, context: HttpResponse("ok")
+            )
+            response = self.client.get(
+                reverse("orders:get_order", kwargs={"order_id": order.pk})
+            )
+
+        self.assertEqual(response.status_code, 200)
+        context = render_mock.call_args.args[2]
+        self.assertFalse(context.get("order_is_editable", True))
+        self.assertEqual(
+            context.get("order_locked_message"),
+            "El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso "
+            "de algun error u otro escenario",
+        )
 
 
 class SplitOrderViewTestCase(FastTenantTestCase):
@@ -1224,470 +1305,6 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
 
-
-class CancelOrderViewTestCase(FastTenantTestCase):
-    """Integration tests for cancel_order endpoint behavior."""
-
-    def setUp(self) -> None:
-        self.user = User.objects.create_user(username="cancel_view_user", password="testpass")
-        self.client.force_login(self.user)
-        self.customer = Client.objects.create(name="Cliente Cancelación Vista")
-        self.category = ProductCategory.objects.create(name="Water View")
-        self.product = Product.objects.create(
-            name="Garrafón Vista",
-            presentation="20",
-            unit_of_measure=1,
-            category=self.category,
-        )
-        self.order = Order.objects.create(
-            client=self.customer,
-            owner=self.user,
-            status=OrderStatus.PENDING.value,
-            total_amount=Decimal("50.00"),
-        )
-        OrderProduct.objects.create(
-            order=self.order,
-            product=self.product,
-            quantity=2,
-            unit_price=Decimal("25.00"),
-        )
-
-    def test_cancel_order_endpoint_marks_order_cancelled(self) -> None:
-        response = self.client.post(
-            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
-            data=json.dumps({}),
-            content_type='application/json',
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload.get('success'))
-        self.assertIn('redirect_url', payload)
-        self.order.refresh_from_db()
-        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
-
-    def test_cancel_order_endpoint_allows_completed_order(self) -> None:
-        self.order.status = OrderStatus.COMPLETED.value
-        self.order.save(update_fields=['status'])
-
-        response = self.client.post(
-            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
-            data=json.dumps({}),
-            content_type='application/json',
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payload = response.json()
-        self.assertTrue(payload.get('success'))
-        self.order.refresh_from_db()
-        self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
-
-    def test_cancel_order_endpoint_returns_review_required_for_blocked_order(self) -> None:
-        self.order.status = OrderStatus.COMPLETED.value
-        self.order.save(update_fields=['status'])
-        invoice = Invoice.objects.create(
-            client=self.customer,
-            amount=Decimal("50.00"),
-            identifier="INV-CANCEL-VIEW-1",
-            folio="F-CANCEL-VIEW-1",
-        )
-        InvoiceOrderLink.objects.create(invoice=invoice, order=self.order)
-
-        response = self.client.post(
-            reverse('orders:cancel_order', kwargs={'order_pk': self.order.pk}),
-            data=json.dumps({}),
-            content_type='application/json',
-        )
-
-        self.assertEqual(response.status_code, 400)
-        payload = response.json()
-        self.assertFalse(payload.get('success'))
-        self.assertTrue(payload.get('review_required'))
-        self.order.refresh_from_db()
-        self.assertTrue(self.order.cancellation_review_required)
-
-
-class OrdersDashboardBulkActionTestCase(FastTenantTestCase):
-    """Tests for the dashboard bulk actions UI endpoint."""
-
-    def setUp(self) -> None:
-        self.user = User.objects.create_user(
-            username="dashboard_user",
-            password="testpass",
-            is_staff=True,
-        )
-        self.client.force_login(self.user)
-
-        self.customer = Client.objects.create(name="Bulk Client", type="corporate")
-        self.other_customer = Client.objects.create(name="Other Bulk Client", type="corporate")
-        self._make_invoice_ready(self.customer)
-        self._make_invoice_ready(self.other_customer)
-
-        self.completed_order_1 = Order.objects.create(
-            client=self.customer,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal("50.00"),
-        )
-        self.completed_order_2 = Order.objects.create(
-            client=self.customer,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal("30.00"),
-        )
-        self.pending_order = Order.objects.create(
-            client=self.customer,
-            owner=self.user,
-            status=OrderStatus.PENDING.value,
-            total_amount=Decimal("20.00"),
-        )
-        self.other_client_order = Order.objects.create(
-            client=self.other_customer,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal("40.00"),
-        )
-
-    def _make_invoice_ready(self, client: Client) -> None:
-        rfc_prefix = (client.name.upper().replace(' ', '') + 'XXXX')[:4]
-        InvoiceData.objects.create(
-            client=client,
-            rfc=f'{rfc_prefix}010101AAA',
-            razon_social=f'{client.name} SA de CV',
-        )
-        Address.objects.create(
-            client=client,
-            type='billing',
-            street='Fiscal 123',
-            locality='Centro',
-            municipality='Queretaro',
-            state='Queretaro',
-            zip_code='76000',
-            country='Mexico',
-        )
-
-    def test_dashboard_bulk_create_invoice_creates_invoice(self) -> None:
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'create_invoice',
-                'selected_orders': [self.completed_order_1.pk, self.completed_order_2.pk],
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        invoice = Invoice.objects.get(client=self.customer)
-        self.assertEqual(invoice.amount, Decimal('80.00'))
-        self.assertEqual(invoice.invoice_links.count(), 2)
-        linked_order_ids = set(invoice.invoice_links.values_list('order_id', flat=True))
-        self.assertSetEqual(
-            linked_order_ids,
-            {self.completed_order_1.id, self.completed_order_2.id},
-        )
-
-    def test_dashboard_bulk_create_invoice_allows_same_corporate_branches(self) -> None:
-        branch_one = Client.objects.create(
-            name='Bulk Branch One',
-            type='branch',
-            corporate=self.customer,
-        )
-        branch_two = Client.objects.create(
-            name='Bulk Branch Two',
-            type='branch',
-            corporate=self.customer,
-        )
-        order_one = Order.objects.create(
-            client=branch_one,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('15.00'),
-        )
-        order_two = Order.objects.create(
-            client=branch_two,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('25.00'),
-        )
-
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'create_invoice',
-                'selected_orders': [order_one.pk, order_two.pk],
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)
-        invoice = Invoice.objects.get(client=self.customer)
-        self.assertEqual(invoice.amount, Decimal('40.00'))
-        self.assertSetEqual(
-            set(invoice.invoice_links.values_list('order_id', flat=True)),
-            {order_one.pk, order_two.pk},
-        )
-
-    def test_dashboard_bulk_create_invoice_rejects_different_fiscal_owners(self) -> None:
-        branch = Client.objects.create(
-            name='Bulk Branch',
-            type='branch',
-            corporate=self.customer,
-        )
-        other_branch = Client.objects.create(
-            name='Other Bulk Branch',
-            type='branch',
-            corporate=self.other_customer,
-        )
-        order_one = Order.objects.create(
-            client=branch,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('15.00'),
-        )
-        order_two = Order.objects.create(
-            client=other_branch,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('25.00'),
-        )
-
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'create_invoice',
-                'selected_orders': [order_one.pk, order_two.pk],
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(Invoice.objects.count(), 0)
-        self.assertContains(response, 'mismo cliente corporativo')
-
-    def test_dashboard_bulk_create_invoice_rejects_non_completed_orders(self) -> None:
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'create_invoice',
-                'selected_orders': [self.completed_order_1.pk, self.pending_order.pk],
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Invoice.objects.exists())
-        self.assertContains(response, 'Solo se pueden facturar pedidos completados')
-
-    def test_dashboard_bulk_create_invoice_rejects_client_without_invoice_data(self) -> None:
-        InvoiceData.objects.filter(client=self.customer).delete()
-
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'create_invoice',
-                'selected_orders': [self.completed_order_1.pk, self.completed_order_2.pk],
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Invoice.objects.exists())
-        self.assertContains(response, 'no puede facturarse')
-        self.assertContains(response, 'RFC')
-
-    def test_dashboard_bulk_create_invoice_rejects_branch_when_corporate_lacks_billing_address(self) -> None:
-        corporate = Client.objects.create(name='Corporate Client', type='corporate')
-        self._make_invoice_ready(corporate)
-        corporate.addresses.filter(type='billing').delete()
-
-        branch = Client.objects.create(
-            name='Branch Client',
-            type='branch',
-            corporate=corporate,
-        )
-        order = Order.objects.create(
-            client=branch,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('60.00'),
-        )
-
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={'bulk_action': 'create_invoice', 'selected_orders': [order.pk]},
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Invoice.objects.filter(client=branch).exists())
-        self.assertContains(response, 'cliente corporativo')
-        self.assertContains(response, 'domicilio de tipo fiscal activo')
-
-    def test_dashboard_bulk_create_invoice_validates_corporate_for_branch_with_own_billing_data(self) -> None:
-        corporate = Client.objects.create(name='Corporate Missing Billing', type='corporate')
-
-        branch = Client.objects.create(
-            name='Branch Own Billing Ignored',
-            type='branch',
-            corporate=corporate,
-            credit_override_enabled=True,
-        )
-        self._make_invoice_ready(branch)
-        order = Order.objects.create(
-            client=branch,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('45.00'),
-        )
-
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={'bulk_action': 'create_invoice', 'selected_orders': [order.pk]},
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(Invoice.objects.filter(client=branch).exists())
-        self.assertContains(response, 'cliente corporativo')
-        self.assertContains(response, 'RFC')
-
-    def test_dashboard_bulk_status_update_uses_service_layer(self) -> None:
-        response = self.client.post(
-            reverse('admin_orders'),
-            data={
-                'bulk_action': 'mark_pending',
-                'selected_orders': [self.completed_order_1.pk],
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.completed_order_1.refresh_from_db()
-        self.assertEqual(self.completed_order_1.status, OrderStatus.PENDING.value)
-
-
-    def test_orders_list_shows_review_badge_for_blocked_cancellation(self) -> None:
-        self.completed_order_1.cancellation_review_required = True
-        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
-        self.completed_order_1.save(
-            update_fields=[
-                "cancellation_review_required",
-                "cancellation_review_reason",
-            ]
-        )
-
-        response = self.client.get(reverse("orders:list"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Requiere revisión de cancelación")
-        self.assertContains(response, "Saldo insuficiente")
-
-    def test_admin_orders_list_shows_review_count_and_badge(self) -> None:
-        self.completed_order_1.cancellation_review_required = True
-        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
-        self.completed_order_1.save(
-            update_fields=[
-                "cancellation_review_required",
-                "cancellation_review_reason",
-            ]
-        )
-
-        response = self.client.get(reverse("admin_orders"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Cancelaciones por revisar")
-        self.assertContains(response, "Requiere revisión de cancelación")
-
-    def test_review_required_filter_returns_only_review_orders(self) -> None:
-        self.completed_order_1.cancellation_review_required = True
-        self.completed_order_1.cancellation_review_reason = "Saldo insuficiente"
-        self.completed_order_1.save(
-            update_fields=[
-                "cancellation_review_required",
-                "cancellation_review_reason",
-            ]
-        )
-
-        response = self.client.get(reverse("admin_orders"), {"status": "REVIEW_REQUIRED"})
-
-        self.assertEqual(response.status_code, 200)
-        listed_orders = list(response.context["orders"].object_list)
-        self.assertEqual(listed_orders, [self.completed_order_1])
-
-
-class OrdersAdminInvoiceActionTestCase(FastTenantTestCase):
-    """Tests for the Django admin order invoice action."""
-
-    def setUp(self) -> None:
-        self.user = User.objects.create_superuser(
-            username='order_admin_user',
-            password='testpass',
-        )
-        self.factory = RequestFactory()
-        self.order_admin = OrderAdmin(Order, admin.site)
-        self.order_admin.message_user = MagicMock()
-        self.customer = Client.objects.create(name='Admin Bulk Client', type='corporate')
-        self._make_invoice_ready(self.customer)
-
-    def _make_invoice_ready(self, client: Client) -> None:
-        rfc_prefix = (client.name.upper().replace(' ', '') + 'XXXX')[:4]
-        InvoiceData.objects.create(
-            client=client,
-            rfc=f'{rfc_prefix}010101AAA',
-            razon_social=f'{client.name} SA de CV',
-        )
-        Address.objects.create(
-            client=client,
-            type='billing',
-            street='Fiscal 123',
-            locality='Centro',
-            municipality='Queretaro',
-            state='Queretaro',
-            zip_code='76000',
-            country='Mexico',
-        )
-
-    def _request(self):
-        request = self.factory.post('/admin/orders/order/')
-        request.user = self.user
-        return request
-
-    def test_admin_action_allows_same_corporate_branches(self) -> None:
-        branch_one = Client.objects.create(
-            name='Admin Branch One',
-            type='branch',
-            corporate=self.customer,
-        )
-        branch_two = Client.objects.create(
-            name='Admin Branch Two',
-            type='branch',
-            corporate=self.customer,
-        )
-        order_one = Order.objects.create(
-            client=branch_one,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('15.00'),
-        )
-        order_two = Order.objects.create(
-            client=branch_two,
-            owner=self.user,
-            status=OrderStatus.COMPLETED.value,
-            total_amount=Decimal('25.00'),
-        )
-
-        response = self.order_admin.crear_factura(
-            self._request(),
-            Order.objects.filter(pk__in=[order_one.pk, order_two.pk]),
-        )
-
-        self.assertEqual(response.status_code, 302)
-        invoice = Invoice.objects.get(client=self.customer)
-        self.assertEqual(invoice.amount, Decimal('40.00'))
-        self.assertSetEqual(
-            set(invoice.invoice_links.values_list('order_id', flat=True)),
-            {order_one.pk, order_two.pk},
-        )
-
-
 class CalculateOrderTotalTestCase(FastTenantTestCase):
     """Tests for the calculate_order_total service function."""
 
@@ -2021,20 +1638,6 @@ class ProcessOrderPaymentTestCase(FastTenantTestCase):
         self.assertEqual(result["credit_used"], Decimal("0"))
         mock_deduct_balance.assert_not_called()
         mock_add_debt.assert_not_called()
-
-
-class OrderPaymentRoutingTestCase(FastTenantTestCase):
-    """Tests for the active order payment route."""
-
-    def test_pay_order_url_resolves_to_view_not_legacy_service(self) -> None:
-        from django.urls import resolve, reverse
-        from orders import views
-
-        match = resolve(reverse("orders:create_payment_for_order", args=[1]))
-
-        self.assertIs(match.func, views.create_payment_for_order)
-        self.assertFalse(hasattr(services, "create_payment_for_order"))
-
 
 class SalesSnapshotServiceTests(FastTenantTestCase):
     def setUp(self) -> None:

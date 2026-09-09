@@ -4,12 +4,14 @@ from datetime import date, datetime, timedelta
 from decimal import Decimal
 from html.parser import HTMLParser
 from pathlib import Path
+from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
-from django.test import SimpleTestCase, override_settings
+from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
@@ -52,6 +54,78 @@ TEST_STATIC_STORAGES = {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
+
+
+@override_settings(STORAGES=TEST_STATIC_STORAGES)
+class ClientDetailTemplateOrderActionsTest(SimpleTestCase):
+    def _order(self, *, order_id: int, status: str, is_paid: bool = False) -> SimpleNamespace:
+        return SimpleNamespace(
+            pk=order_id,
+            id=order_id,
+            status=status,
+            is_paid=is_paid,
+            is_closed=status == OrderStatus.COMPLETED.value and is_paid,
+            total_amount=Decimal("25.00"),
+            order_date=None,
+            notes="",
+            items=SimpleNamespace(all=[]),
+            payments=SimpleNamespace(all=[]),
+            get_status_display_fixed=lambda: "Pendiente"
+            if status == OrderStatus.PENDING.value
+            else "Completado",
+        )
+
+    def _render_sales_tab(self) -> str:
+        request = RequestFactory().get("/")
+        request.user = SimpleNamespace(is_staff=False)
+        client = SimpleNamespace(
+            pk=1,
+            name="Cliente detalle",
+            active=True,
+            type="regular",
+            corporate=None,
+            note="",
+            requires_billing=False,
+            address_link="",
+            get_type_display=lambda: "Regular",
+            get_available_credit=lambda: Decimal("0.00"),
+        )
+        return render_to_string(
+            "client_detail.html",
+            {
+                "request": request,
+                "client": client,
+                "active_detail_tab": "sales",
+                "orders": [
+                    self._order(order_id=11, status=OrderStatus.PENDING.value),
+                    self._order(order_id=12, status=OrderStatus.COMPLETED.value),
+                ],
+                "all_payment_data": [],
+                "has_financial_risk": False,
+                "pending_payment_data": {},
+                "snapshot_cards": [],
+                "contacts": [],
+                "addresses": [],
+                "branches": [],
+                "billing_data": None,
+                "billing_frequency": None,
+                "route_clients": [],
+                "upcoming_route_orders": [],
+                "recent_completed_routes": [],
+                "client_invoices": [],
+                "credit_account": SimpleNamespace(credit_limit=Decimal("0.00")),
+                "credit_is_inherited": False,
+                "debt_percentage": 0,
+                "effective_credit_config": None,
+                "csrf_token": "TOKEN",
+            },
+        )
+
+    def test_sales_actions_show_edit_only_for_pending_orders(self) -> None:
+        html = self._render_sales_tab()
+
+        self.assertIn('href="/orders/11/">Editar', html)
+        self.assertNotIn('href="/orders/12/">Editar', html)
 
 
 class CorporateBranchWorkspaceServiceTests(FastTenantTestCase):
@@ -1270,4 +1344,3 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
 
         self.assertEqual(billing_card['value'], 'Próxima: 08/07/2026')
         self.assertEqual(billing_card['note'], '1 factura pendiente')
-

@@ -47,6 +47,10 @@ ORDER_DASHBOARD_BULK_ACTIONS = (
 )
 
 ROUTE_REDIRECT_EMPLOYEE_POSITIONS = {'staff', 'driver'}
+ORDER_LOCKED_MESSAGE = (
+    'El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso '
+    'de algun error u otro escenario'
+)
 
 
 def _should_redirect_order_to_route(user: AbstractBaseUser) -> bool:
@@ -63,6 +67,10 @@ def _get_order_redirect_url(user: AbstractBaseUser, client: Client) -> str:
         return reverse('clients:list')
 
     return reverse('routes:detail', kwargs={'route_id': route.pk})
+
+
+def _order_is_editable(order: Order) -> bool:
+    return order.status == OrderStatus.PENDING.value
 
 
 def calculate_payment_breakdown(order_total, client_balance):
@@ -443,6 +451,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         order = get_object_or_404(Order, pk=order_data.id)
 
     owner = request.user
+    order_is_editable = _order_is_editable(order)
     client_products = client.get_products()
     has_delivery_address = client.addresses.filter(type='delivery').exists()
     has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
@@ -466,6 +475,8 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         'initial_payment_breakdown': json.dumps(initial_breakdown),
         'has_delivery_address': has_delivery_address,
         'order_redirect_url': _get_order_redirect_url(request.user, client),
+        'order_is_editable': order_is_editable,
+        'order_locked_message': ORDER_LOCKED_MESSAGE if not order_is_editable else '',
     }
     log.info(
         f"Opened order id:{order.id} for client {client.id} by user {owner.username}"
@@ -478,6 +489,15 @@ def get_or_create_order(request, client_pk=None, order_id=None):
 @transaction.atomic
 def update_order(request, order_pk):
     order = get_object_or_404(Order, pk=order_pk)
+    if not _order_is_editable(order):
+        return JsonResponse(
+            {
+                'status': 'error',
+                'error': ORDER_LOCKED_MESSAGE,
+            },
+            status=403,
+        )
+
     try:
         data = json.loads(request.body.decode('utf-8') or '{}')
     except json.JSONDecodeError:
