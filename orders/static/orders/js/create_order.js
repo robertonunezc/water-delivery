@@ -32,6 +32,17 @@ function setElementVisible(element, visible) {
   element.classList.toggle('pg-hidden', !visible);
 }
 
+function navigateAfterOrderCompletion() {
+  const fallbackUrl = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+
+  if (window.history.length > 1) {
+    window.history.back();
+    return;
+  }
+
+  window.location.href = fallbackUrl;
+}
+
 class AlertManager {
   show(type, title, message, timeout = 5000) {
     const alertDiv = document.createElement('div');
@@ -1544,7 +1555,7 @@ class PaymentController {
     this.alertManager.show('success', 'Éxito', message, 8000);
     this.markCompleted();
     setTimeout(() => {
-      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      navigateAfterOrderCompletion();
     }, 3000);
   }
 
@@ -1553,7 +1564,7 @@ class PaymentController {
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
     setTimeout(() => {
-      window.location.href = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
+      navigateAfterOrderCompletion();
     }, 2000);
   }
 
