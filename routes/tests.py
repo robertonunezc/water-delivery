@@ -1,7 +1,6 @@
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.urls import reverse
 
 from clients.models import Address, Client, Contact
@@ -16,7 +15,7 @@ User = get_user_model()
 
 
 class RouteClientValidationTest(FastTenantTestCase):
-    """Test client assignment validation and duplicate detection"""
+    """Test route client assignment validation."""
     
     def setUp(self):
         """Set up test data"""
@@ -66,8 +65,8 @@ class RouteClientValidationTest(FastTenantTestCase):
             is_active=True
         )
     
-    def test_duplicate_client_assignment_validation(self):
-        """Test that form validation catches duplicate client assignments"""
+    def test_allows_client_assignment_to_multiple_routes(self):
+        """Test that form validation allows the same client on different routes"""
         form_data = {
             'client': self.client1.id,
             'sequence': 1,
@@ -78,26 +77,6 @@ class RouteClientValidationTest(FastTenantTestCase):
         }
         
         # Create form for route2 with client1 (already assigned to route1)
-        form = RouteClientInlineForm(data=form_data)
-        form._formset = type('MockFormset', (), {'instance': self.route2})()
-        
-        self.assertFalse(form.is_valid())
-        self.assertIn('client', form.errors)
-        self.assertIn('CONFLICTO DE ASIGNACIÓN', str(form.errors['client']))
-    
-    def test_duplicate_client_assignment_with_confirmation(self):
-        """Test that form accepts duplicate assignment with confirmation"""
-        form_data = {
-            'client': self.client1.id,
-            'sequence': 1,
-            'interval_weeks': 1,
-            'anchor_date': date.today(),
-            'is_active': True,
-            'notes': 'Test assignment',
-            'confirm_duplicate_assignment': True
-        }
-        
-        # Use inline form with confirmation
         form = RouteClientInlineForm(data=form_data)
         form._formset = type('MockFormset', (), {'instance': self.route2})()
         
@@ -135,12 +114,12 @@ class RouteClientValidationTest(FastTenantTestCase):
         
         self.assertTrue(form.is_valid())
     
-    def test_check_client_assignments_ajax_view(self):
-        """Test the AJAX endpoint for checking client assignments"""
+    def test_check_client_assignments_allows_existing_route_assignments(self):
+        """Test AJAX endpoint allows clients already assigned to other routes"""
         self.client_test = self.client
         self.client_test.login(username='testadmin', password='testpass123')
         
-        # Test with existing assignment
+        # Test with existing assignment on a different route
         response = self.client_test.get(
             reverse('routes:check_client_assignments'),
             {
@@ -151,8 +130,8 @@ class RouteClientValidationTest(FastTenantTestCase):
         
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertTrue(data['has_conflicts'])
-        self.assertIn('Route Monday', data['existing_routes'][0])
+        self.assertFalse(data['has_conflicts'])
+        self.assertEqual(data['existing_routes'], [])
     
     def test_check_client_assignments_no_conflict(self):
         """Test AJAX endpoint with no conflicts"""

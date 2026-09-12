@@ -389,10 +389,8 @@ def routes_api_json(request):
 
 @staff_member_required
 def check_client_assignments(request):
-    """AJAX endpoint to check if a client is already assigned to other routes"""
+    """AJAX endpoint for route assignment eligibility."""
     client_id = request.GET.get('client_id')
-    current_route_id = request.GET.get('current_route_id')
-    current_assignment_id = request.GET.get('current_assignment_id')
     
     if not client_id:
         return JsonResponse({'error': 'Client ID is required'}, status=400)
@@ -402,36 +400,9 @@ def check_client_assignments(request):
     except Client.DoesNotExist:
         return JsonResponse({'error': 'Client not found'}, status=404)
     
-    # Find existing active assignments for this client
-    existing_assignments = RouteClient.objects.filter(
-        client=client,
-        is_active=True
-    ).select_related('route')
-    
-    # Exclude current assignment if editing
-    if current_assignment_id:
-        existing_assignments = existing_assignments.exclude(id=current_assignment_id)
-    
-    # Exclude current route if adding to a route
-    if current_route_id:
-        existing_assignments = existing_assignments.exclude(route_id=current_route_id)
-    
-    if existing_assignments.exists():
-        # Build list of existing routes
-        existing_routes = []
-        for assignment in existing_assignments:
-            route_info = f"{assignment.route.name} ({assignment.route.get_weekday_display()})"
-            existing_routes.append(route_info)
-        
-        return JsonResponse({
-            'has_conflicts': True,
-            'existing_routes': existing_routes,
-            'client_name': client.name,
-            'message': f"Cliente '{client.name}' ya está asignado a otras rutas."
-        })
-    
     return JsonResponse({
         'has_conflicts': False,
+        'existing_routes': [],
         'client_name': client.name,
-        'message': f"Cliente '{client.name}' no tiene conflictos de asignación."
+        'message': f"Cliente '{client.name}' puede asignarse a múltiples rutas."
     })

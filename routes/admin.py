@@ -10,13 +10,12 @@ class RouteClientInline(TabularInline):
     form = RouteClientInlineForm
     extra = 1
     autocomplete_fields = ('client',)
-    fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'confirm_duplicate_assignment')
+    fields = ('client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active')
     ordering = ('sequence',)
     verbose_name = "Cliente de la Ruta"
     verbose_name_plural = "Clientes de la Ruta"
     
     class Media:
-        js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
             'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }
@@ -43,7 +42,6 @@ class RouteAdmin(SoftDeleteAdminMixin, ModelAdmin):
     inlines = [RouteClientInline,]
     
     class Media:
-        js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
             'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }
@@ -67,7 +65,6 @@ class RouteClientAdmin(SoftDeleteAdminMixin, ModelAdmin):
     ordering = ('route', 'sequence')
     
     class Media:
-        js = ('routes/js/route_validation_fallback.js', 'routes/js/route_client_admin.js')
         css = {
             'all': ('core/css/design-system.css', 'routes/css/route_admin.css', 'admin/css/widgets.css')
         }

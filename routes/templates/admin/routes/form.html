@@ -102,12 +102,6 @@
 										<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.is_active }} <label class="pg-checkbox-label">Activo</label></div></div>
 										{% if form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
 										<div class="pg-col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
-										{% if form.confirm_duplicate_assignment %}
-											<div class="pg-col-12">
-												<div class="pg-checkbox">{{ form.confirm_duplicate_assignment }} <label class="pg-checkbox-label">{{ form.confirm_duplicate_assignment.label }}</label></div>
-												<div class="pg-field-help">{{ form.confirm_duplicate_assignment.help_text }}</div>
-											</div>
-										{% endif %}
 										{{ form.id }}
 									</div>
 									{{ form.non_field_errors }}
@@ -125,12 +119,6 @@
 										<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ route_client_formset.empty_form.is_active }} <label class="pg-checkbox-label">Activo</label></div></div>
 										{% if route_client_formset.empty_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ route_client_formset.empty_form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
 										<div class="pg-col-12">{{ route_client_formset.empty_form.notes.label_tag }}{{ route_client_formset.empty_form.notes }}</div>
-										{% if route_client_formset.empty_form.confirm_duplicate_assignment %}
-											<div class="pg-col-12">
-												<div class="pg-checkbox">{{ route_client_formset.empty_form.confirm_duplicate_assignment }} <label class="pg-checkbox-label">{{ route_client_formset.empty_form.confirm_duplicate_assignment.label }}</label></div>
-												<div class="pg-field-help">{{ route_client_formset.empty_form.confirm_duplicate_assignment.help_text }}</div>
-											</div>
-										{% endif %}
 										{{ route_client_formset.empty_form.id }}
 									</div>
 								</div>

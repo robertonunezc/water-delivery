@@ -1,4 +1,8 @@
+import shutil
+import subprocess
+import textwrap
 from datetime import date
+from pathlib import Path
 from unittest.mock import patch
 
 from django.conf import settings
@@ -98,6 +102,113 @@ class TimezoneConfigurationTests(SimpleTestCase):
         excluded_hours = DatabaseScheduler.get_excluded_hours_for_crontab_tasks()
 
         self.assertGreater(len(excluded_hours), 0)
+
+
+class DesignSystemAssetTests(SimpleTestCase):
+    def test_mobile_nav_toggle_adds_open_class_used_by_css(self) -> None:
+        node_path = shutil.which("node")
+        if node_path is None:
+            self.skipTest("Node.js is required to execute the design-system.js behavior test.")
+
+        project_root = Path(__file__).resolve().parents[1]
+        script_path = project_root / "core/static/core/js/design-system.js"
+        test_script = textwrap.dedent(
+            """
+            const fs = require("fs");
+            const vm = require("vm");
+
+            class ClassList {
+              constructor() {
+                this.names = new Set();
+              }
+              add(...names) {
+                names.forEach((name) => this.names.add(name));
+              }
+              remove(...names) {
+                names.forEach((name) => this.names.delete(name));
+              }
+              contains(name) {
+                return this.names.has(name);
+              }
+              toggle(name, force) {
+                const shouldAdd = force === undefined ? !this.names.has(name) : Boolean(force);
+                if (shouldAdd) {
+                  this.names.add(name);
+                } else {
+                  this.names.delete(name);
+                }
+                return shouldAdd;
+              }
+              value() {
+                return Array.from(this.names).sort().join(" ");
+              }
+            }
+
+            const listeners = {};
+            const menu = {
+              classList: new ClassList(),
+            };
+            const trigger = {
+              attrs: {
+                "data-pg-toggle": "nav",
+                "data-pg-target": "#navbarNav",
+                "aria-expanded": "false",
+              },
+              getAttribute(name) {
+                return this.attrs[name] || null;
+              },
+              setAttribute(name, value) {
+                this.attrs[name] = String(value);
+              },
+              closest(selector) {
+                if (selector === "[data-pg-toggle], [data-pg-dismiss]") return this;
+                return null;
+              },
+            };
+
+            const document = {
+              readyState: "complete",
+              body: { classList: new ClassList() },
+              querySelector(selector) {
+                return selector === "#navbarNav" ? menu : null;
+              },
+              querySelectorAll() {
+                return [];
+              },
+              addEventListener(type, listener) {
+                listeners[type] = listener;
+              },
+            };
+            const window = {
+              addEventListener() {},
+              getComputedStyle() {
+                return { overflow: "visible", overflowX: "visible", overflowY: "visible" };
+              },
+            };
+
+            vm.runInNewContext(fs.readFileSync(process.argv[1], "utf8"), { document, window, console });
+            listeners.click({ target: trigger, preventDefault() {} });
+
+            if (!menu.classList.contains("pg-open")) {
+              throw new Error(`Expected nav menu to receive pg-open; classes: ${menu.classList.value() || "(none)"}`);
+            }
+            if (menu.classList.contains("pg-show")) {
+              throw new Error("Nav menu should not use the collapse-only pg-show class.");
+            }
+            if (trigger.attrs["aria-expanded"] !== "true") {
+              throw new Error(`Expected aria-expanded=true; got ${trigger.attrs["aria-expanded"]}`);
+            }
+            """
+        )
+
+        result = subprocess.run(
+            [node_path, "-e", test_script, str(script_path)],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 class DashboardDateRangeTests(SimpleTestCase):

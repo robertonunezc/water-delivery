@@ -175,6 +175,15 @@
     setExpanded(trigger, willOpen);
   }
 
+  function toggleNav(trigger) {
+    var target = closestTarget(trigger);
+    if (!target) return;
+
+    var willOpen = !target.classList.contains("pg-open");
+    target.classList.toggle("pg-open", willOpen);
+    setExpanded(trigger, willOpen);
+  }
+
   function activateTab(trigger) {
     var target = closestTarget(trigger);
     if (!target) return;
@@ -266,7 +275,7 @@
     }
     if (toggle === "nav") {
       event.preventDefault();
-      toggleCollapse(trigger);
+      toggleNav(trigger);
     }
   }
 
@@ -328,6 +337,7 @@
     closeModal: closeModal,
     openModal: openModal,
     activateTab: activateTab,
+    toggleNav: toggleNav,
     toggleCollapse: toggleCollapse
   };
 })();
