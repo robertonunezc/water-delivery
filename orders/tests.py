@@ -637,6 +637,58 @@ class SplitOrderViewTestCase(FastTenantTestCase):
         self.assertTrue(OrderSplit.objects.filter(source_order=self.order).exists())
 
 
+class OrderReceiptModelTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-user", password="testpass")
+        self.customer = Client.objects.create(name="Receipt Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("120.00"),
+        )
+
+    def test_order_receipt_is_one_to_one_with_order(self) -> None:
+        from django.db import IntegrityError
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            contact_phone="4421234567",
+            contact_position="Compras",
+            created_by=self.user,
+        )
+
+        with self.assertRaises(IntegrityError):
+            OrderReceipt.objects.create(
+                order=self.order,
+                method=ReceiptDeliveryMethod.EMAIL,
+                pdf_url="receipts/orders/1-copy.pdf",
+                contact_name="Ana Lopez",
+                contact_email="ana@example.com",
+                created_by=self.user,
+            )
+
+    def test_order_receipt_defaults_to_unsent(self) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        self.assertIsNone(receipt.sent_at)
+        self.assertEqual(str(receipt), f"Recibo pedido #{self.order.pk} - email")
+
+
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
 

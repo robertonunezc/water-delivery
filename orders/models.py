@@ -335,3 +335,67 @@ class OrderSplit(TimeStampedModel):
     
     def __str__(self):
         return f"Split: Order #{self.source_order.id} → Order #{self.child_order.id}"
+
+
+RECEIPT_DELIVERY_METHOD_CHOICES = (
+    ("email", "Email"),
+    ("sms", "SMS"),
+    ("whatsapp", "WhatsApp"),
+)
+
+
+class ReceiptDeliveryMethod:
+    EMAIL = "email"
+    SMS = "sms"
+    WHATSAPP = "whatsapp"
+
+
+class OrderReceipt(TimeStampedModel):
+    order = models.OneToOneField(
+        "Order",
+        on_delete=models.PROTECT,
+        related_name="receipt",
+        verbose_name="Pedido",
+    )
+    method = models.CharField(
+        max_length=20,
+        choices=RECEIPT_DELIVERY_METHOD_CHOICES,
+        default=ReceiptDeliveryMethod.EMAIL,
+        verbose_name="Metodo de envio",
+    )
+    sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
+    pdf_url = models.CharField(max_length=500, verbose_name="PDF privado")
+    contact_name = models.CharField(max_length=100, verbose_name="Nombre de contacto")
+    contact_email = models.EmailField(verbose_name="Correo de contacto")
+    contact_phone = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        verbose_name="Telefono de contacto",
+    )
+    contact_position = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        verbose_name="Puesto de contacto",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_order_receipts",
+        verbose_name="Creado por",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Recibo de pedido"
+        verbose_name_plural = "Recibos de pedidos"
+        indexes = [
+            models.Index(fields=["method"], name="orders_receipt_method_idx"),
+            models.Index(fields=["sent_at"], name="orders_receipt_sent_idx"),
+        ]
+
+    def __str__(self) -> str:
+        return f"Recibo pedido #{self.order_id} - {self.method}"

@@ -7,7 +7,7 @@ from django.http import HttpResponse
 from django.shortcuts import redirect
 from decimal import Decimal
 import csv
-from .models import Order, OrderProduct, OrderStatus, OrderSplit
+from .models import Order, OrderProduct, OrderReceipt, OrderStatus, OrderSplit
 from django.core.exceptions import PermissionDenied, ValidationError
 from unfold.admin import ModelAdmin, TabularInline
 from core.admin_mixins import SoftDeleteAdminMixin
@@ -945,3 +945,23 @@ class OrderSplitAdmin(SoftDeleteAdminMixin, ModelAdmin):
         
         return format_html(''.join(summary))
     split_summary.short_description = 'Resumen de la División'
+
+
+@admin.register(OrderReceipt)
+class OrderReceiptAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "order",
+        "method",
+        "contact_email",
+        "sent_at",
+        "created_at",
+    )
+    search_fields = (
+        "order__id",
+        "order__client__name",
+        "contact_name",
+        "contact_email",
+    )
+    list_filter = ("method", "sent_at", "created_at")
+    readonly_fields = ("created_at", "updated_at", "deleted_at")
