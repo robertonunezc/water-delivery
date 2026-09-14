@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.test import RequestFactory
+from django.test import RequestFactory, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -687,6 +687,73 @@ class OrderReceiptModelTests(FastTenantTestCase):
 
         self.assertIsNone(receipt.sent_at)
         self.assertEqual(str(receipt), f"Recibo pedido #{self.order.pk} - email")
+
+
+class ReceiptStorageServiceTests(FastTenantTestCase):
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="https://example-account.r2.cloudflarestorage.com",
+        RECEIPT_R2_BUCKET_NAME="receipt-bucket",
+        RECEIPT_R2_ACCESS_KEY_ID="access-key",
+        RECEIPT_R2_SECRET_ACCESS_KEY="secret-key",
+        RECEIPT_R2_OBJECT_PREFIX="receipts/test",
+        RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=900,
+    )
+    @patch("orders.services.receipt_storage_service.boto3.client")
+    def test_upload_pdf_returns_private_object_key(self, client_mock: MagicMock) -> None:
+        from orders.services.receipt_storage_service import CloudflareR2ReceiptStorage
+
+        storage_client = client_mock.return_value
+        storage = CloudflareR2ReceiptStorage.from_settings()
+
+        key = storage.upload_pdf(order_id=42, pdf_bytes=b"%PDF-test")
+
+        self.assertEqual(key, "receipts/test/orders/42/receipt.pdf")
+        storage_client.put_object.assert_called_once_with(
+            Bucket="receipt-bucket",
+            Key="receipts/test/orders/42/receipt.pdf",
+            Body=b"%PDF-test",
+            ContentType="application/pdf",
+        )
+
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="https://example-account.r2.cloudflarestorage.com",
+        RECEIPT_R2_BUCKET_NAME="receipt-bucket",
+        RECEIPT_R2_ACCESS_KEY_ID="access-key",
+        RECEIPT_R2_SECRET_ACCESS_KEY="secret-key",
+        RECEIPT_R2_OBJECT_PREFIX="receipts",
+        RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=600,
+    )
+    @patch("orders.services.receipt_storage_service.boto3.client")
+    def test_download_pdf_reads_private_object(self, client_mock: MagicMock) -> None:
+        from io import BytesIO
+        from orders.services.receipt_storage_service import CloudflareR2ReceiptStorage
+
+        storage_client = client_mock.return_value
+        storage_client.get_object.return_value = {"Body": BytesIO(b"%PDF-private")}
+        storage = CloudflareR2ReceiptStorage.from_settings()
+
+        content = storage.download_pdf("receipts/orders/42/receipt.pdf")
+
+        self.assertEqual(content, b"%PDF-private")
+        storage_client.get_object.assert_called_once_with(
+            Bucket="receipt-bucket",
+            Key="receipts/orders/42/receipt.pdf",
+        )
+
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="",
+        RECEIPT_R2_BUCKET_NAME="",
+        RECEIPT_R2_ACCESS_KEY_ID="",
+        RECEIPT_R2_SECRET_ACCESS_KEY="",
+    )
+    def test_missing_r2_settings_raise_clear_error(self) -> None:
+        from orders.services.receipt_storage_service import (
+            CloudflareR2ReceiptStorage,
+            ReceiptStorageError,
+        )
+
+        with self.assertRaisesMessage(ReceiptStorageError, "Cloudflare R2"):
+            CloudflareR2ReceiptStorage.from_settings()
 
 
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
