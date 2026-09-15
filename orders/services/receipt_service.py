@@ -11,8 +11,12 @@ from orders.services.receipt_delivery_service import (
     ReceiptDeliveryError,
     ReceiptDeliveryService,
 )
-from orders.services.receipt_pdf_service import ReceiptContactSnapshot, generate_receipt_pdf
-from orders.services.receipt_storage_service import get_receipt_storage
+from orders.services.receipt_pdf_service import (
+    ReceiptContactSnapshot,
+    ReceiptPdfError,
+    generate_receipt_pdf,
+)
+from orders.services.receipt_storage_service import ReceiptStorageError, get_receipt_storage
 
 User = get_user_model()
 
@@ -55,12 +59,15 @@ def create_signed_receipt(
     if str(cleaned_data.get("method") or "email") == "email" and not contact.email:
         raise ReceiptCreationError("El correo de contacto es requerido para enviar el recibo.")
 
-    pdf_bytes = generate_receipt_pdf(
-        order=order,
-        contact=contact,
-        signature_data_url=str(cleaned_data["signature_data"]),
-    )
-    pdf_url = get_receipt_storage().upload_pdf(order_id=order.pk, pdf_bytes=pdf_bytes)
+    try:
+        pdf_bytes = generate_receipt_pdf(
+            order=order,
+            contact=contact,
+            signature_data_url=str(cleaned_data["signature_data"]),
+        )
+        pdf_url = get_receipt_storage().upload_pdf(order_id=order.pk, pdf_bytes=pdf_bytes)
+    except (ReceiptPdfError, ReceiptStorageError) as exc:
+        raise ReceiptCreationError(str(exc)) from exc
 
     try:
         receipt = OrderReceipt.objects.create(

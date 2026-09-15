@@ -1089,6 +1089,30 @@ class ReceiptServiceTests(FastTenantTestCase):
 
         pdf_mock.assert_not_called()
 
+    @patch("orders.services.receipt_service.get_receipt_storage")
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signed_receipt_converts_pdf_errors_to_creation_errors(
+        self,
+        pdf_mock: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.services.receipt_pdf_service import ReceiptPdfError
+        from orders.services.receipt_service import (
+            ReceiptCreationError,
+            create_signed_receipt,
+        )
+
+        pdf_mock.side_effect = ReceiptPdfError("La firma no es valida.")
+
+        with self.assertRaisesMessage(ReceiptCreationError, "firma"):
+            create_signed_receipt(
+                order=self.order,
+                cleaned_data=self.cleaned_data,
+                user=self.user,
+            )
+
+        storage_factory.assert_not_called()
+
     @patch("orders.services.receipt_service.ReceiptDeliveryService")
     def test_resend_receipt_reuses_existing_receipt(
         self,
