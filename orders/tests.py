@@ -733,6 +733,7 @@ class ReceiptStorageServiceTests(FastTenantTestCase):
         RECEIPT_R2_BUCKET_NAME="receipt-bucket",
         RECEIPT_R2_ACCESS_KEY_ID="access-key",
         RECEIPT_R2_SECRET_ACCESS_KEY="secret-key",
+        RECEIPT_R2_REGION="auto",
         RECEIPT_R2_OBJECT_PREFIX="receipts/test",
         RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=900,
     )
@@ -742,6 +743,9 @@ class ReceiptStorageServiceTests(FastTenantTestCase):
 
         storage_client = client_mock.return_value
         storage = CloudflareR2ReceiptStorage.from_settings()
+
+        client_mock.assert_called_once()
+        self.assertEqual(client_mock.call_args.kwargs["region_name"], "auto")
 
         key = storage.upload_pdf(order_id=42, pdf_bytes=b"%PDF-test")
 

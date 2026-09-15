@@ -17,6 +17,7 @@ class ReceiptStorageConfig:
     bucket_name: str
     access_key_id: str
     secret_access_key: str
+    region: str
     object_prefix: str
     signed_url_expires_seconds: int
 
@@ -29,6 +30,7 @@ class CloudflareR2ReceiptStorage:
             endpoint_url=config.endpoint_url,
             aws_access_key_id=config.access_key_id,
             aws_secret_access_key=config.secret_access_key,
+            region_name=config.region,
             config=Config(signature_version="s3v4"),
         )
 
@@ -39,6 +41,7 @@ class CloudflareR2ReceiptStorage:
             bucket_name=settings.RECEIPT_R2_BUCKET_NAME,
             access_key_id=settings.RECEIPT_R2_ACCESS_KEY_ID,
             secret_access_key=settings.RECEIPT_R2_SECRET_ACCESS_KEY,
+            region=settings.RECEIPT_R2_REGION,
             object_prefix=settings.RECEIPT_R2_OBJECT_PREFIX.strip("/"),
             signed_url_expires_seconds=settings.RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS,
         )
