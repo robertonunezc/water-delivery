@@ -827,7 +827,12 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     active_detail_tab = _get_active_client_detail_tab(request)
-    orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-order_date', '-id')
+    orders = (
+        client.orders.all()
+        .select_related('receipt')
+        .prefetch_related('items__product', 'payments')
+        .order_by('-order_date', '-id')
+    )
     payments = client.payments.all()
     all_payment_data = _build_payment_history(client)
     orders_page = _paginate_client_detail_items(request, orders, page_param='orders_page')

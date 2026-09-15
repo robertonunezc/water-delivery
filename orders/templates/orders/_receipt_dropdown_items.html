@@ -1,0 +1,18 @@
+{% if order.status == 'COMPLETED' %}
+  {% if order.receipt %}
+    <li>
+      <form method="post" action="{% url 'orders:resend_receipt' order.id %}" class="pg-m-0">
+        {% csrf_token %}
+        <button type="submit" class="pg-dropdown-item">
+          {% if order.receipt.sent_at %}
+            Reenviar recibo
+          {% else %}
+            Reintentar envio de recibo
+          {% endif %}
+        </button>
+      </form>
+    </li>
+  {% else %}
+    <li><a class="pg-dropdown-item" href="{% url 'orders:sign_receipt' order.id %}">Firmar recibo</a></li>
+  {% endif %}
+{% endif %}

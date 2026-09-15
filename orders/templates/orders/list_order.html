@@ -234,6 +234,25 @@
                           <i class="fas fa-edit"></i>
                         </a>
                       {% endif %}
+                      {% if order.status == 'COMPLETED' %}
+                        {% if order.receipt %}
+                          <form method="post" action="{% url 'orders:resend_receipt' order.id %}" class="pg-d-inline">
+                            {% csrf_token %}
+                            <button
+                              type="submit"
+                              class="pg-button pg-button-sm pg-button-outline-success"
+                              title="{% if order.receipt.sent_at %}Reenviar recibo{% else %}Reintentar envio de recibo{% endif %}">
+                              <i class="fas fa-paper-plane"></i>
+                            </button>
+                          </form>
+                        {% else %}
+                          <a href="{% url 'orders:sign_receipt' order.id %}"
+                             class="pg-button pg-button-sm pg-button-outline-success"
+                             title="Firmar recibo">
+                            <i class="fas fa-signature"></i>
+                          </a>
+                        {% endif %}
+                      {% endif %}
                       {% if user.is_staff %}
                         <a href="{% url 'admin:orders_order_change' order.id %}" 
                            class="pg-button pg-button-sm pg-button-outline-secondary" 

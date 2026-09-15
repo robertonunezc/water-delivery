@@ -409,7 +409,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
 def _build_orders_list_context(request, per_page: int = 15) -> dict:
     """Build context for order listing views with shared filters and pagination."""
     # Base queryset with optimized queries
-    orders = Order.objects.select_related('client').prefetch_related(
+    orders = Order.objects.select_related('client', 'receipt').prefetch_related(
         Prefetch('items', queryset=OrderProduct.objects.select_related('product')),
         'client__contacts',
         'client__addresses'

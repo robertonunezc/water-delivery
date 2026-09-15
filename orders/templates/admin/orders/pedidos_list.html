@@ -209,6 +209,7 @@
                     {% if order.status == 'COMPLETED' %}
                       <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                     {% endif %}
+                    {% include 'orders/_receipt_dropdown_items.html' %}
                     {% if order.status == 'PENDING' %}
                       <li><a class="pg-dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
                     {% endif %}

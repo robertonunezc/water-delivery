@@ -1226,6 +1226,91 @@ class OrderReceiptViewTests(FastTenantTestCase):
         self.assertContains(response, "receipt-signature-canvas")
 
 
+class CompletedOrderReceiptActionTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-action-user", password="testpass")
+        self.staff_user = User.objects.create_user(
+            username="receipt-action-staff",
+            password="testpass",
+            is_staff=True,
+        )
+        self.customer = Client.objects.create(name="Receipt Action Client")
+        self.order_without_receipt = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("75.00"),
+        )
+        self.order_with_receipt = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("85.00"),
+        )
+
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        self.receipt = OrderReceipt.objects.create(
+            order=self.order_with_receipt,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/2/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+    def test_orders_list_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("orders:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Reintentar envio de recibo")
+
+    def test_admin_orders_list_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse("admin_orders"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Reintentar envio de recibo")
+
+    def test_client_detail_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("clients:detail", args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Reintentar envio de recibo")
+
+
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
 
