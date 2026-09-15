@@ -18,6 +18,7 @@ import json
 from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, OrderSplit
 from .forms import OrderReceiptSignForm, SplitOrderForm
 from core.utils import combine_date_with_local_time, parse_date_input
+from core.services.feature_flags import is_receipt_signature_enabled
 from product.models import Product, ProductClientPrice
 from clients.models import Client
 from .  import services as order_services
@@ -585,6 +586,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         'order_redirect_url': _get_order_redirect_url(request.user, client),
         'order_is_editable': order_is_editable,
         'order_locked_message': ORDER_LOCKED_MESSAGE if not order_is_editable else '',
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
     }
     log.info(
         f"Opened order id:{order.id} for client {client.id} by user {owner.username}"

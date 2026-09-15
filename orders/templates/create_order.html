@@ -443,10 +443,12 @@
                       data-receipt-sign-url="{% url 'orders:sign_receipt' order.pk %}">
                 <i class="fas fa-check-circle pg-me-2"></i>Terminar Pedido
               </button>
-              <label class="pg-flex pg-align-center pg-gap-2 pg-mt-2 pg-small" for="send-receipt-after-payment">
-                <input type="checkbox" id="send-receipt-after-payment" class="pg-checkbox">
-                <span>Firmar y enviar recibo</span>
-              </label>
+              {% if receipt_signature_enabled %}
+                <label class="pg-flex pg-align-center pg-gap-2 pg-mt-2 pg-small" for="send-receipt-after-payment">
+                  <input type="checkbox" id="send-receipt-after-payment" class="pg-checkbox">
+                  <span>Firmar y enviar recibo</span>
+                </label>
+              {% endif %}
             </div>
           </section>
         </div>
