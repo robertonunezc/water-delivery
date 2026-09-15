@@ -1190,6 +1190,24 @@ class OrderReceiptViewTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 302)
         resend_mock.assert_called_once_with(receipt)
 
+    def test_sign_receipt_get_renders_form(self) -> None:
+        from clients.models import Contact
+
+        Contact.objects.create(
+            client=self.customer,
+            name="Ana Lopez",
+            email="ana@example.com",
+            phone="4421234567",
+            position="Compras",
+        )
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Firmar y enviar recibo")
+        self.assertContains(response, "id_signature_data")
+        self.assertContains(response, "receipt-signature-canvas")
+
 
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
