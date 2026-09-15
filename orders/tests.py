@@ -1098,6 +1098,99 @@ class ReceiptServiceTests(FastTenantTestCase):
         delivery_cls.return_value.send.assert_called_once_with(receipt)
 
 
+class OrderReceiptViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-view-user", password="testpass")
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(name="Receipt View Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("95.00"),
+        )
+
+    def test_sign_receipt_requires_login(self) -> None:
+        self.client.logout()
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_sign_receipt_rejects_pending_order(self) -> None:
+        self.order.status = OrderStatus.PENDING.value
+        self.order.save(update_fields=["status"])
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+
+    @patch("orders.views.create_signed_receipt")
+    def test_sign_receipt_post_uses_service(self, create_receipt_mock: MagicMock) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import ReceiptCreationResult
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        create_receipt_mock.return_value = ReceiptCreationResult(
+            receipt=receipt,
+            created=True,
+            delivery_succeeded=True,
+            delivery_error="",
+        )
+
+        response = self.client.post(
+            reverse("orders:sign_receipt", args=[self.order.pk]),
+            data={
+                "method": "email",
+                "contact_name": "Ana Lopez",
+                "contact_email": "ana@example.com",
+                "contact_phone": "4421234567",
+                "contact_position": "Compras",
+                "signature_data": (
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+                    "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        create_receipt_mock.assert_called_once()
+
+    @patch("orders.views.resend_receipt")
+    def test_resend_receipt_view_uses_existing_receipt(self, resend_mock: MagicMock) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import ReceiptCreationResult
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        resend_mock.return_value = ReceiptCreationResult(
+            receipt=receipt,
+            created=False,
+            delivery_succeeded=True,
+            delivery_error="",
+        )
+
+        response = self.client.post(reverse("orders:resend_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        resend_mock.assert_called_once_with(receipt)
+
+
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
 
