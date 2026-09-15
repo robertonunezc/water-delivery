@@ -756,6 +756,87 @@ class ReceiptStorageServiceTests(FastTenantTestCase):
             CloudflareR2ReceiptStorage.from_settings()
 
 
+class ReceiptPdfServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="pdf-user", password="testpass")
+        self.customer = Client.objects.create(name="PDF Client")
+        self.category = ProductCategory.objects.create(name="Agua")
+        self.product = Product.objects.create(
+            name="Garrafon",
+            presentation="20L",
+            unit_of_measure=1,
+            category=self.category,
+            price=Decimal("30.00"),
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            subtotal_amount=Decimal("60.00"),
+            discount=Decimal("5.00"),
+            total_amount=Decimal("55.00"),
+            cantidad_cobrada=Decimal("60.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("30.00"),
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=self.order,
+            amount=Decimal("55.00"),
+            method="cash",
+            status="completed",
+            created_by=self.user,
+        )
+
+    def test_generate_receipt_pdf_returns_pdf_bytes(self) -> None:
+        from orders.services.receipt_pdf_service import (
+            ReceiptContactSnapshot,
+            generate_receipt_pdf,
+        )
+
+        signature = (
+            "data:image/png;base64,"
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+            "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        )
+        pdf_bytes = generate_receipt_pdf(
+            order=self.order,
+            contact=ReceiptContactSnapshot(
+                name="Ana Lopez",
+                email="ana@example.com",
+                phone="4421234567",
+                position="Compras",
+            ),
+            signature_data_url=signature,
+        )
+
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+        self.assertGreater(len(pdf_bytes), 1000)
+
+    def test_generate_receipt_pdf_rejects_invalid_signature_data(self) -> None:
+        from orders.services.receipt_pdf_service import (
+            ReceiptContactSnapshot,
+            ReceiptPdfError,
+            generate_receipt_pdf,
+        )
+
+        with self.assertRaisesMessage(ReceiptPdfError, "firma"):
+            generate_receipt_pdf(
+                order=self.order,
+                contact=ReceiptContactSnapshot(
+                    name="Ana Lopez",
+                    email="ana@example.com",
+                    phone="4421234567",
+                    position="Compras",
+                ),
+                signature_data_url="not-a-data-url",
+            )
+
+
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
 
