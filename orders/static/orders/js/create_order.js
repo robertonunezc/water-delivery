@@ -32,7 +32,12 @@ function setElementVisible(element, visible) {
   element.classList.toggle('pg-hidden', !visible);
 }
 
-function navigateAfterOrderCompletion() {
+function navigateAfterOrderCompletion(redirectUrl = '') {
+  if (redirectUrl) {
+    window.location.href = redirectUrl;
+    return;
+  }
+
   const fallbackUrl = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
 
   if (window.history.length > 1) {
@@ -1111,6 +1116,7 @@ class PaymentController {
     this.orderNotesController = orderNotesController;
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
+    this.receiptCheckbox = document.getElementById('send-receipt-after-payment');
     this.feedbackElement = document.getElementById('payment-flow-feedback');
     this.orderDateSavePromise = Promise.resolve();
   }
@@ -1390,6 +1396,14 @@ class PaymentController {
     return this.config.initialOrderDate || '';
   }
 
+  getReceiptSignUrl() {
+    return this.finishButton?.dataset.receiptSignUrl || '';
+  }
+
+  shouldRedirectToReceipt() {
+    return Boolean(this.receiptCheckbox?.checked && this.getReceiptSignUrl());
+  }
+
   buildPayments(orderTotal) {
     const payments = [];
     const breakdown = this.paymentBreakdown.getBreakdown();
@@ -1554,8 +1568,9 @@ class PaymentController {
 
     this.alertManager.show('success', 'Éxito', message, 8000);
     this.markCompleted();
+    const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';
     setTimeout(() => {
-      navigateAfterOrderCompletion();
+      navigateAfterOrderCompletion(redirectUrl);
     }, 3000);
   }
 

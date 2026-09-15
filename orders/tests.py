@@ -560,6 +560,23 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
         self.assertIn(("credit", "Crédito"), context["payment_types"])
 
+    def test_order_page_renders_receipt_checkbox_and_sign_url(self) -> None:
+        user = self._create_user_with_employee(username="recibos", position="manager")
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order = response.context["order"]
+        self.assertContains(response, 'id="send-receipt-after-payment"')
+        self.assertContains(response, "Firmar y enviar recibo")
+        self.assertContains(
+            response,
+            f'data-receipt-sign-url="{reverse("orders:sign_receipt", args=[order.pk])}"',
+        )
+
     def test_existing_completed_order_page_is_marked_not_editable(self) -> None:
         user = self._create_user_with_employee(username="cerrado", position="manager")
         self.client.force_login(user)
