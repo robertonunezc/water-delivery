@@ -32,19 +32,6 @@ def _get_bool_env(name: str, default: bool = False) -> bool:
 def is_prod() -> bool:
     return os.getenv('ENV') == 'prod'
 
-
-def _get_launchdarkly_sdk_key() -> str:
-    explicit_key = os.getenv("LAUNCHDARKLY_SDK_KEY", "").strip()
-    if explicit_key:
-        return explicit_key
-
-    environment = os.getenv("LAUNCHDARKLY_ENVIRONMENT", os.getenv("ENV", "")).strip().lower()
-    if environment in {"prod", "production"}:
-        return os.getenv("LAUNCHDARKLY_PROD_SDK_KEY", "").strip()
-    if environment in {"test", "testing", "staging"}:
-        return os.getenv("LAUNCHDARKLY_TEST_SDK_KEY", "").strip()
-    return ""
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -359,8 +346,7 @@ RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS = int(
     os.getenv("RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS", "900")
 )
 
-LAUNCHDARKLY_ENVIRONMENT = os.getenv("LAUNCHDARKLY_ENVIRONMENT", os.getenv("ENV", ""))
-LAUNCHDARKLY_SDK_KEY = _get_launchdarkly_sdk_key()
+LAUNCHDARKLY_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY", "").strip()
 LAUNCHDARKLY_ENABLED = _get_bool_env(
     "LAUNCHDARKLY_ENABLED",
     default=bool(LAUNCHDARKLY_SDK_KEY) and "test" not in sys.argv,
