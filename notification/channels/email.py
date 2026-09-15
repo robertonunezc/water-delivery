@@ -1,4 +1,5 @@
 import os
+from django.http import response
 import requests
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -33,7 +34,7 @@ class SendEmail(SendNotification):
         attachments: Iterable[EmailAttachment] | None = None,
     ) -> None:
         self.to = to
-        self.from_ = from_
+        self.from_ = os.getenv('SEND_EMAIL_FROM', from_)
         self.subject = subject
         self.body = body
         self.attachments = list(attachments or [])
@@ -52,6 +53,7 @@ class SendEmail(SendNotification):
             )
             for attachment in self.attachments
         ]
+        
         response = requests.post(
             f"https://api.mailgun.net/v3/{from_domain}/messages",
             auth=("api", email_api_key),
@@ -63,6 +65,8 @@ class SendEmail(SendNotification):
             },
             files=files or None,
         )
+        print("STATUS:", response.status_code)
+        print("BODY:", response.text)       
         if response.status_code != 200:
             print(f"Error al enviar el email: {response.text}")
             raise Exception(f"Error al enviar el email: {response.text}")
