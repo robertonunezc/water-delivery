@@ -245,7 +245,7 @@
                               <i class="fas fa-paper-plane"></i>
                             </button>
                           </form>
-                        {% else %}
+                        {% elif receipt_signature_enabled %}
                           <a href="{% url 'orders:sign_receipt' order.id %}"
                              class="pg-button pg-button-sm pg-button-outline-success"
                              title="Firmar recibo">

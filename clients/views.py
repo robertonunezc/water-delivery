@@ -48,6 +48,7 @@ from .services.product_price_service import (
     build_client_product_price_initial,
     update_client_product_prices,
 )
+from core.services.feature_flags import is_receipt_signature_enabled
 from orders.models import Order
 from payment import services as payment_services
 from payment.models import PAYMENT_METHOD_CHOICES
@@ -921,6 +922,7 @@ def detail(request, pk):
             'completed_orders': completed_orders,
         },
         'pending_payment_data': pending_payment_data,
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
         **snapshot_context,
     }
     

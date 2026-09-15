@@ -5,6 +5,7 @@ from django.contrib.auth.models import AbstractBaseUser
 from django.http import HttpRequest, HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -140,6 +141,17 @@ def _get_checkout_payment_types(can_pay_with_credit: bool) -> list[tuple[str, st
     return payment_types
 
 
+def _get_safe_next_url(request: HttpRequest, fallback_url_name: str) -> str:
+    next_url = request.POST.get("next", "") or request.GET.get("next", "")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse(fallback_url_name)
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
@@ -180,7 +192,7 @@ def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
                         "Recibo firmado guardado, pero no se pudo enviar. "
                         "Use reenviar para intentar otra vez.",
                     )
-                return redirect("orders:list")
+                return redirect("report:orders_report")
     else:
         form = OrderReceiptSignForm(client=order.client)
 
@@ -214,7 +226,7 @@ def resend_receipt_view(request: HttpRequest, order_id: int) -> HttpResponse:
         messages.success(request, "Recibo reenviado correctamente.")
     else:
         messages.warning(request, "No se pudo reenviar el recibo. Intente nuevamente.")
-    return redirect("orders:list")
+    return redirect(_get_safe_next_url(request, "orders:list"))
 
 
 @login_required
@@ -544,6 +556,7 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
         'review_required_count': review_required_count,
         'page_stats': page_stats,
         'today': date.today(),
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
     }
 
 

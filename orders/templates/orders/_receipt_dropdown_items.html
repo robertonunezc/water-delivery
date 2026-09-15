@@ -4,6 +4,9 @@
     <li>
       <form method="post" action="{% url 'orders:resend_receipt' order.id %}" class="pg-m-0">
         {% csrf_token %}
+        {% if receipt_action_redirect_url %}
+          <input type="hidden" name="next" value="{{ receipt_action_redirect_url }}">
+        {% endif %}
         <button type="submit" class="pg-dropdown-item">
           {% if order.receipt.sent_at %}
             Reenviar recibo
@@ -13,7 +16,7 @@
         </button>
       </form>
     </li>
-  {% else %}
+  {% elif receipt_signature_enabled %}
     <li><a class="pg-dropdown-item" href="{% url 'orders:sign_receipt' order.id %}">Firmar recibo</a></li>
   {% endif %}
 {% endif %}
