@@ -1578,8 +1578,9 @@ class PaymentController {
     this.clearFeedback();
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
+    const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';
     setTimeout(() => {
-      navigateAfterOrderCompletion();
+      navigateAfterOrderCompletion(redirectUrl);
     }, 2000);
   }
 

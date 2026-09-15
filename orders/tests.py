@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.test import RequestFactory, override_settings
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -25,6 +25,23 @@ from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
 from invoice.models import Invoice, InvoiceOrderLink
+
+
+class CreateOrderReceiptRedirectScriptTests(SimpleTestCase):
+    def test_credit_pending_success_path_uses_receipt_redirect(self) -> None:
+        from pathlib import Path
+
+        script = Path("orders/static/orders/js/create_order.js").read_text()
+        credit_success_body = script.split(
+            "handleCreditOrderPendingSuccess(data) {",
+            1,
+        )[1].split("  markCompleted()", 1)[0]
+
+        self.assertIn(
+            "const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';",
+            credit_success_body,
+        )
+        self.assertIn("navigateAfterOrderCompletion(redirectUrl);", credit_success_body)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -575,6 +592,10 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
         self.assertContains(
             response,
             f'data-receipt-sign-url="{reverse("orders:sign_receipt", args=[order.pk])}"',
+        )
+        self.assertContains(
+            response,
+            'orders/js/create_order.js?v=receipt-signature-redirect',
         )
 
     def test_existing_completed_order_page_is_marked_not_editable(self) -> None:
