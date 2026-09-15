@@ -837,6 +837,77 @@ class ReceiptPdfServiceTests(FastTenantTestCase):
             )
 
 
+class ReceiptDeliveryServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="delivery-user", password="testpass")
+        self.customer = Client.objects.create(name="Delivery Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("80.00"),
+        )
+
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_delivery_sends_receipt_pdf_attachment_and_sets_sent_at(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import ReceiptDeliveryService
+
+        storage_factory.return_value.download_pdf.return_value = b"%PDF-private"
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        sent = ReceiptDeliveryService().send(receipt)
+
+        self.assertIsNotNone(sent.sent_at)
+        email_instance = send_email_cls.return_value
+        email_instance.send_email.assert_called_once()
+        attachment = send_email_cls.call_args.kwargs["attachments"][0]
+        self.assertEqual(attachment.filename, f"recibo-pedido-{self.order.pk}.pdf")
+        self.assertEqual(attachment.content, b"%PDF-private")
+
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_delivery_failure_leaves_receipt_unsent(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import (
+            ReceiptDeliveryError,
+            ReceiptDeliveryService,
+        )
+
+        storage_factory.return_value.download_pdf.return_value = b"%PDF-private"
+        send_email_cls.return_value.send_email.side_effect = RuntimeError("mailgun down")
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        with self.assertRaises(ReceiptDeliveryError):
+            ReceiptDeliveryService().send(receipt)
+
+        receipt.refresh_from_db()
+        self.assertIsNone(receipt.sent_at)
+
+
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):
     """Tests for order cancellation query helpers."""
 
