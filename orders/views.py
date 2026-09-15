@@ -2,9 +2,10 @@ from datetime import date, timedelta
 from botocore import client
 from django.contrib import messages
 from django.contrib.auth.models import AbstractBaseUser
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import HttpRequest, HttpResponse, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
@@ -16,14 +17,24 @@ from decimal import Decimal
 import json
 
 from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, OrderSplit
-from .forms import SplitOrderForm
+from .forms import OrderReceiptSignForm, SplitOrderForm
 from core.utils import combine_date_with_local_time, parse_date_input
+from core.services.feature_flags import is_receipt_signature_enabled
 from product.models import Product, ProductClientPrice
 from clients.models import Client
 from .  import services as order_services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
 from payment import services as payment_services
 from routes import services as route_services
+from orders.services.receipt_service import (
+    ReceiptCreationError,
+    create_signed_receipt,
+    resend_receipt,
+)
+from orders.services.receipt_storage_service import (
+    ReceiptStorageError,
+    get_receipt_storage,
+)
 
 log = order_services.get_logger(__name__)
 
@@ -128,6 +139,116 @@ def _get_checkout_payment_types(can_pay_with_credit: bool) -> list[tuple[str, st
     if can_pay_with_credit:
         payment_types.append(('credit', 'Crédito'))
     return payment_types
+
+
+def _get_safe_next_url(request: HttpRequest, fallback_url_name: str) -> str:
+    next_url = request.POST.get("next", "") or request.GET.get("next", "")
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return reverse(fallback_url_name)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
+    order = get_object_or_404(
+        Order.objects.select_related("client").prefetch_related(
+            "client__contacts",
+            "items__product",
+            "payments",
+        ),
+        pk=order_id,
+    )
+    if order.status != OrderStatus.COMPLETED.value:
+        messages.error(request, "Solo se pueden firmar recibos de pedidos completados.")
+        return redirect(_get_order_redirect_url(request.user, order.client))
+
+    existing_receipt = getattr(order, "receipt", None)
+    if request.method == "GET" and existing_receipt is not None:
+        messages.info(request, "Este pedido ya tiene un recibo firmado. Puede reenviarlo.")
+        return redirect("orders:list")
+
+    if request.method == "POST":
+        form = OrderReceiptSignForm(request.POST, client=order.client)
+        if form.is_valid():
+            try:
+                result = create_signed_receipt(
+                    order=order,
+                    cleaned_data=form.cleaned_data,
+                    user=request.user,
+                )
+            except ReceiptCreationError as exc:
+                messages.error(request, str(exc))
+            else:
+                if result.delivery_succeeded:
+                    messages.success(request, "Recibo firmado y enviado correctamente.")
+                else:
+                    messages.warning(
+                        request,
+                        "Recibo firmado guardado, pero no se pudo enviar. "
+                        "Use reenviar para intentar otra vez.",
+                    )
+                return redirect("report:orders_report")
+    else:
+        form = OrderReceiptSignForm(client=order.client)
+
+    return render(
+        request,
+        "orders/receipt_sign.html",
+        {
+            "order": order,
+            "client": order.client,
+            "contacts": list(order.client.contacts.all()),
+            "form": form,
+        },
+    )
+
+
+@login_required
+@require_http_methods(["POST"])
+def resend_receipt_view(request: HttpRequest, order_id: int) -> HttpResponse:
+    order = get_object_or_404(
+        Order.objects.select_related("client", "receipt"),
+        pk=order_id,
+        status=OrderStatus.COMPLETED.value,
+    )
+    receipt = getattr(order, "receipt", None)
+    if receipt is None:
+        messages.error(request, "Este pedido no tiene un recibo firmado.")
+        return redirect("orders:sign_receipt", order_id=order.pk)
+
+    result = resend_receipt(receipt)
+    if result.delivery_succeeded:
+        messages.success(request, "Recibo reenviado correctamente.")
+    else:
+        messages.warning(request, "No se pudo reenviar el recibo. Intente nuevamente.")
+    return redirect(_get_safe_next_url(request, "orders:list"))
+
+
+@login_required
+@require_http_methods(["GET"])
+def receipt_pdf_view(request: HttpRequest, order_id: int) -> HttpResponse:
+    order = get_object_or_404(
+        Order.objects.select_related("client", "receipt"),
+        pk=order_id,
+        status=OrderStatus.COMPLETED.value,
+    )
+    receipt = getattr(order, "receipt", None)
+    if receipt is None:
+        messages.error(request, "Este pedido no tiene un recibo firmado.")
+        return redirect("orders:sign_receipt", order_id=order.pk)
+
+    try:
+        signed_url = get_receipt_storage().generate_signed_url(receipt.pdf_url)
+    except ReceiptStorageError as exc:
+        messages.error(request, str(exc))
+        return redirect("orders:list")
+
+    return redirect(signed_url)
 
 
 @login_required
@@ -327,7 +448,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
 def _build_orders_list_context(request, per_page: int = 15) -> dict:
     """Build context for order listing views with shared filters and pagination."""
     # Base queryset with optimized queries
-    orders = Order.objects.select_related('client').prefetch_related(
+    orders = Order.objects.select_related('client', 'receipt').prefetch_related(
         Prefetch('items', queryset=OrderProduct.objects.select_related('product')),
         'client__contacts',
         'client__addresses'
@@ -435,6 +556,7 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
         'review_required_count': review_required_count,
         'page_stats': page_stats,
         'today': date.today(),
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
     }
 
 
@@ -477,6 +599,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         'order_redirect_url': _get_order_redirect_url(request.user, client),
         'order_is_editable': order_is_editable,
         'order_locked_message': ORDER_LOCKED_MESSAGE if not order_is_editable else '',
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
     }
     log.info(
         f"Opened order id:{order.id} for client {client.id} by user {owner.username}"

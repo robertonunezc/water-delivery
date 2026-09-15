@@ -298,6 +298,7 @@
                             {% if order.status == 'COMPLETED' %}
                               <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                             {% endif %}
+                            {% include 'orders/_receipt_dropdown_items.html' %}
                             {% if not order.is_paid and order.status != 'CANCELLED' %}
                               <li><a class="pg-dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
                             {% endif %}

@@ -48,6 +48,7 @@ from .services.product_price_service import (
     build_client_product_price_initial,
     update_client_product_prices,
 )
+from core.services.feature_flags import is_receipt_signature_enabled
 from orders.models import Order
 from payment import services as payment_services
 from payment.models import PAYMENT_METHOD_CHOICES
@@ -827,7 +828,12 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     active_detail_tab = _get_active_client_detail_tab(request)
-    orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-order_date', '-id')
+    orders = (
+        client.orders.all()
+        .select_related('receipt')
+        .prefetch_related('items__product', 'payments')
+        .order_by('-order_date', '-id')
+    )
     payments = client.payments.all()
     all_payment_data = _build_payment_history(client)
     orders_page = _paginate_client_detail_items(request, orders, page_param='orders_page')
@@ -916,6 +922,7 @@ def detail(request, pk):
             'completed_orders': completed_orders,
         },
         'pending_payment_data': pending_payment_data,
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
         **snapshot_context,
     }
     
