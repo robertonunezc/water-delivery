@@ -1256,6 +1256,33 @@ class OrderReceiptViewTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 302)
         resend_mock.assert_called_once_with(receipt)
 
+    @patch("orders.views.get_receipt_storage")
+    def test_receipt_pdf_view_redirects_to_signed_url(
+        self,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        storage_factory.return_value.generate_signed_url.return_value = (
+            "https://signed.example/receipt.pdf"
+        )
+
+        response = self.client.get(reverse("orders:receipt_pdf", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "https://signed.example/receipt.pdf")
+        storage_factory.return_value.generate_signed_url.assert_called_once_with(
+            "receipts/orders/1/receipt.pdf"
+        )
+
     def test_sign_receipt_get_renders_form(self) -> None:
         from clients.models import Contact
 
@@ -1340,6 +1367,11 @@ class CompletedOrderReceiptActionTests(FastTenantTestCase):
             response,
             reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
         )
+        self.assertContains(
+            response,
+            reverse("orders:receipt_pdf", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Ver recibo")
         self.assertContains(response, "Reintentar envio de recibo")
 
     def test_client_detail_shows_sign_and_resend_receipt_actions(self) -> None:

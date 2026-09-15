@@ -29,6 +29,10 @@ from orders.services.receipt_service import (
     create_signed_receipt,
     resend_receipt,
 )
+from orders.services.receipt_storage_service import (
+    ReceiptStorageError,
+    get_receipt_storage,
+)
 
 log = order_services.get_logger(__name__)
 
@@ -210,6 +214,28 @@ def resend_receipt_view(request: HttpRequest, order_id: int) -> HttpResponse:
     else:
         messages.warning(request, "No se pudo reenviar el recibo. Intente nuevamente.")
     return redirect("orders:list")
+
+
+@login_required
+@require_http_methods(["GET"])
+def receipt_pdf_view(request: HttpRequest, order_id: int) -> HttpResponse:
+    order = get_object_or_404(
+        Order.objects.select_related("client", "receipt"),
+        pk=order_id,
+        status=OrderStatus.COMPLETED.value,
+    )
+    receipt = getattr(order, "receipt", None)
+    if receipt is None:
+        messages.error(request, "Este pedido no tiene un recibo firmado.")
+        return redirect("orders:sign_receipt", order_id=order.pk)
+
+    try:
+        signed_url = get_receipt_storage().generate_signed_url(receipt.pdf_url)
+    except ReceiptStorageError as exc:
+        messages.error(request, str(exc))
+        return redirect("orders:list")
+
+    return redirect(signed_url)
 
 
 @login_required
