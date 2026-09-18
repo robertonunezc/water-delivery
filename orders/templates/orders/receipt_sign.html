@@ -5,7 +5,9 @@
 <div class="pg-container pg-mt-4 receipt-sign-page">
   <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
     <div>
-      <h1 class="pg-h4 pg-mb-1">Firmar y enviar recibo</h1>
+      <h1 class="pg-h4 pg-mb-1">
+        {% if signature_only %}Solo firmar recibo{% else %}Firmar y enviar recibo{% endif %}
+      </h1>
       <p class="pg-text-muted pg-mb-0">Pedido #{{ order.pk }} - {{ client.name }}</p>
     </div>
     <a href="{% url 'orders:list' %}" class="pg-button pg-button-outline-secondary">Volver</a>
@@ -13,10 +15,15 @@
 
   <form method="post" id="receipt-sign-form" class="pg-card pg-shadow-sm">
     {% csrf_token %}
-    {{ form.method }}
+    {% if signature_only %}
+      <input type="hidden" name="mode" value="sign_only">
+    {% else %}
+      {{ form.method }}
+    {% endif %}
     {{ form.signature_data }}
 
     <div class="pg-card-body">
+      {% if not signature_only %}
       {% if contacts|length > 1 %}
         <div class="pg-mb-3">
           <label for="{{ form.contact_id.id_for_label }}" class="pg-label">Contacto</label>
@@ -55,6 +62,7 @@
           {{ form.contact_position }}
         </div>
       </div>
+      {% endif %}
 
       <div class="pg-mt-4">
         <label class="pg-label" for="receipt-signature-canvas">Firma</label>
@@ -65,7 +73,9 @@
           class="pg-w-100 pg-border pg-rounded"></canvas>
         <div class="pg-flex pg-gap-2 pg-mt-2">
           <button type="button" class="pg-button pg-button-outline-secondary" id="receipt-signature-clear">Limpiar</button>
-          <button type="submit" class="pg-button pg-button-primary" id="receipt-submit-button">Enviar recibo</button>
+          <button type="submit" class="pg-button pg-button-primary" id="receipt-submit-button">
+            {% if signature_only %}Guardar recibo{% else %}Enviar recibo{% endif %}
+          </button>
         </div>
       </div>
     </div>

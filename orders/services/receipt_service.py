@@ -6,7 +6,7 @@ from typing import Any
 from django.contrib.auth import get_user_model
 from django.db import IntegrityError
 
-from orders.models import Order, OrderReceipt, OrderStatus
+from orders.models import Order, OrderReceipt, OrderStatus, ReceiptDeliveryMethod
 from orders.services.receipt_delivery_service import (
     ReceiptDeliveryError,
     ReceiptDeliveryService,
@@ -92,7 +92,67 @@ def create_signed_receipt(
     return _send_receipt(receipt=receipt, created=True)
 
 
+def create_signature_only_receipt(
+    order: Order,
+    signature_data: str,
+    user: User,
+) -> ReceiptCreationResult:
+    if order.status != OrderStatus.COMPLETED.value:
+        raise ReceiptCreationError("Solo se pueden firmar recibos de pedidos completados.")
+
+    existing = getattr(order, "receipt", None)
+    if existing is not None:
+        return ReceiptCreationResult(
+            receipt=existing,
+            created=False,
+            delivery_succeeded=False,
+            delivery_error="",
+        )
+
+    try:
+        pdf_bytes = generate_receipt_pdf(
+            order=order,
+            contact=None,
+            signature_data_url=signature_data,
+        )
+        pdf_url = get_receipt_storage().upload_pdf(order_id=order.pk, pdf_bytes=pdf_bytes)
+    except (ReceiptPdfError, ReceiptStorageError) as exc:
+        raise ReceiptCreationError(str(exc)) from exc
+
+    try:
+        receipt = OrderReceipt.objects.create(
+            order=order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url=pdf_url,
+            contact_name="",
+            contact_email="",
+            created_by=user,
+        )
+    except IntegrityError:
+        receipt = OrderReceipt.objects.get(order=order)
+        return ReceiptCreationResult(
+            receipt=receipt,
+            created=False,
+            delivery_succeeded=False,
+            delivery_error="",
+        )
+
+    return ReceiptCreationResult(
+        receipt=receipt,
+        created=True,
+        delivery_succeeded=False,
+        delivery_error="",
+    )
+
+
 def resend_receipt(receipt: OrderReceipt) -> ReceiptCreationResult:
+    if receipt.method == ReceiptDeliveryMethod.NONE:
+        return ReceiptCreationResult(
+            receipt=receipt,
+            created=False,
+            delivery_succeeded=False,
+            delivery_error="",
+        )
     return _send_receipt(receipt=receipt, created=False)
 
 

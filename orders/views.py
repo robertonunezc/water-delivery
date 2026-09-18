@@ -16,8 +16,15 @@ from django.db.models import Q, Sum, Count, Prefetch
 from decimal import Decimal
 import json
 
-from .models import Order, OrderProduct, OrderStatus, ORDER_STATUS_CHOICES, OrderSplit
-from .forms import OrderReceiptSignForm, SplitOrderForm
+from .models import (
+    ORDER_STATUS_CHOICES,
+    Order,
+    OrderProduct,
+    OrderSplit,
+    OrderStatus,
+    ReceiptDeliveryMethod,
+)
+from .forms import OrderReceiptSignForm, OrderReceiptSignOnlyForm, SplitOrderForm
 from core.utils import combine_date_with_local_time, parse_date_input
 from core.services.feature_flags import is_receipt_signature_enabled
 from product.models import Product, ProductClientPrice
@@ -28,6 +35,7 @@ from payment import services as payment_services
 from routes import services as route_services
 from orders.services.receipt_service import (
     ReceiptCreationError,
+    create_signature_only_receipt,
     create_signed_receipt,
     resend_receipt,
 )
@@ -62,6 +70,7 @@ ORDER_LOCKED_MESSAGE = (
     'El pedido esta terminado. Puede cancelarlo y crear uno nuevo en caso '
     'de algun error u otro escenario'
 )
+RECEIPT_SIGN_ONLY_MODE = "sign_only"
 
 
 def _should_redirect_order_to_route(user: AbstractBaseUser) -> bool:
@@ -169,22 +178,41 @@ def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
 
     existing_receipt = getattr(order, "receipt", None)
     if request.method == "GET" and existing_receipt is not None:
-        messages.info(request, "Este pedido ya tiene un recibo firmado. Puede reenviarlo.")
+        if existing_receipt.method == ReceiptDeliveryMethod.NONE:
+            messages.info(request, "Este pedido ya tiene un recibo firmado.")
+        else:
+            messages.info(request, "Este pedido ya tiene un recibo firmado. Puede reenviarlo.")
         return redirect("orders:list")
 
+    signature_only = (
+        request.POST.get("mode") if request.method == "POST" else request.GET.get("mode")
+    ) == RECEIPT_SIGN_ONLY_MODE
+
     if request.method == "POST":
-        form = OrderReceiptSignForm(request.POST, client=order.client)
+        if signature_only:
+            form = OrderReceiptSignOnlyForm(request.POST)
+        else:
+            form = OrderReceiptSignForm(request.POST, client=order.client)
         if form.is_valid():
             try:
-                result = create_signed_receipt(
-                    order=order,
-                    cleaned_data=form.cleaned_data,
-                    user=request.user,
-                )
+                if signature_only:
+                    result = create_signature_only_receipt(
+                        order=order,
+                        signature_data=form.cleaned_data["signature_data"],
+                        user=request.user,
+                    )
+                else:
+                    result = create_signed_receipt(
+                        order=order,
+                        cleaned_data=form.cleaned_data,
+                        user=request.user,
+                    )
             except ReceiptCreationError as exc:
                 messages.error(request, str(exc))
             else:
-                if result.delivery_succeeded:
+                if signature_only:
+                    messages.success(request, "Recibo firmado y guardado correctamente.")
+                elif result.delivery_succeeded:
                     messages.success(request, "Recibo firmado y enviado correctamente.")
                 else:
                     messages.warning(
@@ -194,7 +222,10 @@ def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
                     )
                 return redirect("report:orders_report")
     else:
-        form = OrderReceiptSignForm(client=order.client)
+        if signature_only:
+            form = OrderReceiptSignOnlyForm()
+        else:
+            form = OrderReceiptSignForm(client=order.client)
 
     return render(
         request,
@@ -204,6 +235,7 @@ def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
             "client": order.client,
             "contacts": list(order.client.contacts.all()),
             "form": form,
+            "signature_only": signature_only,
         },
     )
 

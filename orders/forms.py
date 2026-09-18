@@ -184,3 +184,13 @@ class OrderReceiptSignForm(forms.Form):
     def _contact_label(self, contact: Contact) -> str:
         email = contact.email or "sin correo"
         return f"{contact.name} - {email}"
+
+
+class OrderReceiptSignOnlyForm(forms.Form):
+    signature_data = forms.CharField(widget=forms.HiddenInput())
+
+    def clean_signature_data(self) -> str:
+        value = self.cleaned_data.get("signature_data", "")
+        if not value.startswith("data:image/png;base64,"):
+            raise forms.ValidationError("Capture la firma antes de guardar el recibo.")
+        return value

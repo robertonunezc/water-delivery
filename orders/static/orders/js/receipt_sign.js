@@ -73,7 +73,7 @@
   form.addEventListener('submit', event => {
     if (!hasSignature) {
       event.preventDefault();
-      window.alert('Capture la firma antes de enviar el recibo.');
+      window.alert('Capture la firma antes de continuar.');
       return;
     }
     signatureInput.value = canvas.toDataURL('image/png');

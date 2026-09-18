@@ -2,6 +2,7 @@ from decimal import Decimal
 from datetime import date
 
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import DecimalField, F, OuterRef, Q, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
@@ -338,6 +339,7 @@ class OrderSplit(TimeStampedModel):
 
 
 RECEIPT_DELIVERY_METHOD_CHOICES = (
+    ("none", "Sin envio"),
     ("email", "Email"),
     ("sms", "SMS"),
     ("whatsapp", "WhatsApp"),
@@ -345,6 +347,7 @@ RECEIPT_DELIVERY_METHOD_CHOICES = (
 
 
 class ReceiptDeliveryMethod:
+    NONE = "none"
     EMAIL = "email"
     SMS = "sms"
     WHATSAPP = "whatsapp"
@@ -365,8 +368,12 @@ class OrderReceipt(TimeStampedModel):
     )
     sent_at = models.DateTimeField(null=True, blank=True, verbose_name="Enviado en")
     pdf_url = models.CharField(max_length=500, verbose_name="PDF privado")
-    contact_name = models.CharField(max_length=100, verbose_name="Nombre de contacto")
-    contact_email = models.EmailField(verbose_name="Correo de contacto")
+    contact_name = models.CharField(
+        max_length=100,
+        blank=True,
+        verbose_name="Nombre de contacto",
+    )
+    contact_email = models.EmailField(blank=True, verbose_name="Correo de contacto")
     contact_phone = models.CharField(
         max_length=20,
         blank=True,
@@ -399,3 +406,10 @@ class OrderReceipt(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Recibo pedido #{self.order_id} - {self.method}"
+
+    def clean(self) -> None:
+        super().clean()
+        if self.method == ReceiptDeliveryMethod.EMAIL and not self.contact_email:
+            raise ValidationError(
+                {"contact_email": "El correo es requerido para enviar el recibo."}
+            )

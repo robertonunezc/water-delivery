@@ -448,6 +448,10 @@
                   <input type="checkbox" id="send-receipt-after-payment" class="pg-checkbox">
                   <span>Firmar y enviar recibo</span>
                 </label>
+                <label class="pg-flex pg-align-center pg-gap-2 pg-mt-2 pg-small" for="sign-receipt-only-after-payment">
+                  <input type="checkbox" id="sign-receipt-only-after-payment" class="pg-checkbox">
+                  <span>Solo firmar</span>
+                </label>
               {% endif %}
             </div>
           </section>
@@ -498,5 +502,5 @@
   </div>
 {% endblock %}
 {% block extra_js %}
-  <script src="{% static 'orders/js/create_order.js' %}?v=receipt-signature-redirect"></script>
+  <script src="{% static 'orders/js/create_order.js' %}?v=receipt-signature-modes"></script>
 {% endblock %}

@@ -37,7 +37,7 @@ class ReceiptContactSnapshot:
 
 def generate_receipt_pdf(
     order: Order,
-    contact: ReceiptContactSnapshot,
+    contact: ReceiptContactSnapshot | None,
     signature_data_url: str,
 ) -> bytes:
     signature_bytes = _decode_signature(signature_data_url)
@@ -71,19 +71,31 @@ def generate_receipt_pdf(
         _payments_table(order),
         Spacer(1, 0.2 * inch),
         _totals_table(order),
-        Spacer(1, 0.2 * inch),
-        Paragraph("Contacto", styles["Heading3"]),
-        Paragraph(f"Nombre: {_safe_text(contact.name)}", styles["Normal"]),
-        Paragraph(f"Correo: {_safe_text(contact.email)}", styles["Normal"]),
-        Paragraph(
-            f"Telefono: {_safe_text(contact.phone or 'Sin telefono')}",
-            styles["Normal"],
-        ),
-        Paragraph(f"Puesto: {_safe_text(contact.position or 'Sin puesto')}", styles["Normal"]),
-        Spacer(1, 0.2 * inch),
-        Paragraph("Firma", styles["Heading3"]),
-        Image(BytesIO(signature_bytes), width=3.2 * inch, height=1.1 * inch),
     ]
+    if contact is not None:
+        elements.extend(
+            [
+                Spacer(1, 0.2 * inch),
+                Paragraph("Contacto", styles["Heading3"]),
+                Paragraph(f"Nombre: {_safe_text(contact.name)}", styles["Normal"]),
+                Paragraph(f"Correo: {_safe_text(contact.email)}", styles["Normal"]),
+                Paragraph(
+                    f"Telefono: {_safe_text(contact.phone or 'Sin telefono')}",
+                    styles["Normal"],
+                ),
+                Paragraph(
+                    f"Puesto: {_safe_text(contact.position or 'Sin puesto')}",
+                    styles["Normal"],
+                ),
+            ]
+        )
+    elements.extend(
+        [
+            Spacer(1, 0.2 * inch),
+            Paragraph("Firma", styles["Heading3"]),
+            Image(BytesIO(signature_bytes), width=3.2 * inch, height=1.1 * inch),
+        ]
+    )
     document.build(elements)
     return output.getvalue()
 

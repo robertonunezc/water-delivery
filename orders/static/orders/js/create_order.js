@@ -1117,6 +1117,7 @@ class PaymentController {
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
     this.receiptCheckbox = document.getElementById('send-receipt-after-payment');
+    this.signatureOnlyCheckbox = document.getElementById('sign-receipt-only-after-payment');
     this.feedbackElement = document.getElementById('payment-flow-feedback');
     this.orderDateSavePromise = Promise.resolve();
   }
@@ -1127,6 +1128,16 @@ class PaymentController {
     this.configureOrderTypeUI();
     this.finishButton?.addEventListener('click', () => this.handleFinish());
     this.finishButtonMobile?.addEventListener('click', () => this.handleFinish());
+    this.receiptCheckbox?.addEventListener('change', () => {
+      if (this.receiptCheckbox.checked && this.signatureOnlyCheckbox) {
+        this.signatureOnlyCheckbox.checked = false;
+      }
+    });
+    this.signatureOnlyCheckbox?.addEventListener('change', () => {
+      if (this.signatureOnlyCheckbox.checked && this.receiptCheckbox) {
+        this.receiptCheckbox.checked = false;
+      }
+    });
 
     //document.addEventListener('amount-validation-changed', () => this.validateFinishButtonState());
     //this.validateFinishButtonState();
@@ -1397,11 +1408,15 @@ class PaymentController {
   }
 
   getReceiptSignUrl() {
-    return this.finishButton?.dataset.receiptSignUrl || '';
+    const url = this.finishButton?.dataset.receiptSignUrl || '';
+    if (!url || !this.signatureOnlyCheckbox?.checked) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}mode=sign_only`;
   }
 
   shouldRedirectToReceipt() {
-    return Boolean(this.receiptCheckbox?.checked && this.getReceiptSignUrl());
+    const selected = this.receiptCheckbox?.checked || this.signatureOnlyCheckbox?.checked;
+    return Boolean(selected && this.getReceiptSignUrl());
   }
 
   buildPayments(orderTotal) {
