@@ -18,6 +18,7 @@ from clients.services.credit_report_service import (
     get_client_credit_report,
     get_global_credit_report,
 )
+from core.services.feature_flags import is_receipt_signature_enabled
 from orders.models import Order, ORDER_STATUS_CHOICES, OrderStatus
 from payment.models import PAYMENT_METHOD_CHOICES, Payment
 
@@ -420,7 +421,7 @@ def orders_report(request):
     sort_by = request.GET.get('sort_by', '-order_date').strip()
     
     orders_queryset = _get_report_orders_queryset(status_filter).select_related(
-        'client', 'owner',
+        'client', 'owner', 'receipt',
     ).prefetch_related(
         'items__product',
         'client__contacts',
@@ -568,6 +569,8 @@ def orders_report(request):
         'employees': employees,
         'today_date': today.strftime('%Y-%m-%d'),
         'orders_export_url': _build_orders_export_url(request),
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
+        'receipt_action_redirect_url': request.get_full_path(),
     }
     
     return render(request, 'report/orders_report.html', context)

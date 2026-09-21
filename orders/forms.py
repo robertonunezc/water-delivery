@@ -1,4 +1,6 @@
 from django import forms
+from clients.models import Client, Contact
+from orders.models import ReceiptDeliveryMethod
 from .models import Order, OrderProduct
 from decimal import Decimal
 
@@ -132,3 +134,63 @@ class OrderForm(forms.ModelForm):
         if cantidad_cobrada > total_amount:
             return cantidad_cobrada - total_amount
         return Decimal('0.00')
+
+
+class OrderReceiptSignForm(forms.Form):
+    contact_id = forms.ChoiceField(required=False, label="Contacto")
+    method = forms.ChoiceField(
+        choices=((ReceiptDeliveryMethod.EMAIL, "Email"),),
+        initial=ReceiptDeliveryMethod.EMAIL,
+        widget=forms.HiddenInput(),
+    )
+    contact_name = forms.CharField(max_length=100, label="Nombre")
+    contact_email = forms.EmailField(label="Correo electronico")
+    contact_phone = forms.CharField(max_length=20, required=False, label="Telefono")
+    contact_position = forms.CharField(max_length=100, required=False, label="Puesto")
+    signature_data = forms.CharField(widget=forms.HiddenInput())
+
+    def __init__(self, *args, client: Client, **kwargs) -> None:
+        self.client = client
+        super().__init__(*args, **kwargs)
+        contacts = list(client.contacts.all().order_by("name", "id"))
+        self.fields["contact_id"].choices = [
+            (contact.pk, self._contact_label(contact))
+            for contact in contacts
+        ]
+        if len(contacts) == 1 and not self.is_bound:
+            self._apply_contact_initial(contacts[0])
+
+    def clean_contact_id(self) -> str:
+        value = self.cleaned_data.get("contact_id") or ""
+        if not value:
+            return ""
+        if not self.client.contacts.filter(pk=value).exists():
+            raise forms.ValidationError("Contacto invalido para este cliente.")
+        return value
+
+    def clean_signature_data(self) -> str:
+        value = self.cleaned_data.get("signature_data", "")
+        if not value.startswith("data:image/png;base64,"):
+            raise forms.ValidationError("Capture la firma antes de enviar el recibo.")
+        return value
+
+    def _apply_contact_initial(self, contact: Contact) -> None:
+        self.fields["contact_id"].initial = contact.pk
+        self.fields["contact_name"].initial = contact.name
+        self.fields["contact_email"].initial = contact.email or ""
+        self.fields["contact_phone"].initial = contact.phone or ""
+        self.fields["contact_position"].initial = contact.position or ""
+
+    def _contact_label(self, contact: Contact) -> str:
+        email = contact.email or "sin correo"
+        return f"{contact.name} - {email}"
+
+
+class OrderReceiptSignOnlyForm(forms.Form):
+    signature_data = forms.CharField(widget=forms.HiddenInput())
+
+    def clean_signature_data(self) -> str:
+        value = self.cleaned_data.get("signature_data", "")
+        if not value.startswith("data:image/png;base64,"):
+            raise forms.ValidationError("Capture la firma antes de guardar el recibo.")
+        return value

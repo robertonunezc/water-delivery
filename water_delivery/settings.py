@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 
 import os
+import sys
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -334,3 +335,28 @@ STATIC_URL = '/static/'
 # Media files
 MEDIA_ROOT = '/app/media/'
 MEDIA_URL = '/media/'
+
+RECEIPT_R2_ENDPOINT_URL = os.getenv("RECEIPT_R2_ENDPOINT_URL", "")
+RECEIPT_R2_BUCKET_NAME = os.getenv("RECEIPT_R2_BUCKET_NAME", "")
+RECEIPT_R2_ACCESS_KEY_ID = os.getenv("RECEIPT_R2_ACCESS_KEY_ID", "")
+RECEIPT_R2_SECRET_ACCESS_KEY = os.getenv("RECEIPT_R2_SECRET_ACCESS_KEY", "")
+RECEIPT_R2_REGION = os.getenv("RECEIPT_R2_REGION", "auto")
+RECEIPT_R2_OBJECT_PREFIX = os.getenv("RECEIPT_R2_OBJECT_PREFIX", "receipts")
+RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS = int(
+    os.getenv("RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS", "900")
+)
+
+LAUNCHDARKLY_SDK_KEY = os.getenv("LAUNCHDARKLY_SDK_KEY", "").strip()
+LAUNCHDARKLY_ENABLED = _get_bool_env(
+    "LAUNCHDARKLY_ENABLED",
+    default=bool(LAUNCHDARKLY_SDK_KEY) and "test" not in sys.argv,
+)
+LAUNCHDARKLY_START_WAIT_SECONDS = float(os.getenv("LAUNCHDARKLY_START_WAIT_SECONDS", "0"))
+LAUNCHDARKLY_RECEIPT_SIGNATURE_FLAG_KEY = os.getenv(
+    "LAUNCHDARKLY_RECEIPT_SIGNATURE_FLAG_KEY",
+    "sign-in-order",
+)
+LAUNCHDARKLY_RECEIPT_SIGNATURE_DEFAULT = _get_bool_env(
+    "LAUNCHDARKLY_RECEIPT_SIGNATURE_DEFAULT",
+    default=True,
+)

@@ -2,6 +2,7 @@ import csv
 import io
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
@@ -956,6 +957,34 @@ class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
                 request_user=self.user,
             )
 
+    def test_selected_payment_lists_every_paid_or_cancelled_order(self) -> None:
+        from payment import services as payment_services
+
+        paid_order = self._order(self.customer, Decimal('100.00'))
+        Payment.objects.create(
+            client=self.customer,
+            order=paid_order,
+            amount=Decimal('100.00'),
+            method='cash',
+            status='completed',
+            created_by=self.user,
+        )
+        cancelled_order = self._order(
+            self.customer,
+            Decimal('80.00'),
+            status=OrderStatus.CANCELLED.value,
+        )
+
+        with self.assertRaises(payment_services.ClientOrderPaymentError) as error:
+            payment_services.get_selected_unpaid_orders(
+                self.customer,
+                [paid_order.pk, cancelled_order.pk],
+            )
+
+        message = str(error.exception)
+        self.assertIn(f'#{paid_order.pk}', message)
+        self.assertIn(f'#{cancelled_order.pk}', message)
+
     def test_pay_client_orders_settles_credit_and_preserves_history(self) -> None:
         from payment import services as payment_services
 
@@ -1032,6 +1061,184 @@ class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
             ).exists(),
         )
 
+class ClientReceiptBundleViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='receipt-bundle-user',
+            password='testpass123',
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(name='Cliente recibos')
+        self.other_customer = Client.objects.create(name='Cliente ajeno')
+        self.receipt_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('100.00'),
+        )
+        self.missing_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('80.00'),
+        )
+        self.other_order = Order.objects.create(
+            client=self.other_customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('60.00'),
+        )
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_returns_attached_and_missing_orders(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        from orders.services.receipt_delivery_service import ReceiptBundleDeliveryResult
+
+        service_cls.return_value.send.return_value = ReceiptBundleDeliveryResult(
+            attached_order_ids=(self.receipt_order.pk,),
+            missing_order_ids=(self.missing_order.pk,),
+        )
+
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [self.receipt_order.pk, self.missing_order.pk],
+                'recipient_name': 'Maria Compras',
+                'recipient_email': 'maria@example.com',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                'success': True,
+                'message': 'Se enviaron 1 recibo(s) correctamente.',
+                'attached_order_ids': [self.receipt_order.pk],
+                'missing_order_ids': [self.missing_order.pk],
+            },
+        )
+        service_cls.return_value.send.assert_called_once()
+        call_kwargs = service_cls.return_value.send.call_args.kwargs
+        self.assertEqual(
+            [order.pk for order in call_kwargs['orders']],
+            [self.receipt_order.pk, self.missing_order.pk],
+        )
+        self.assertEqual(call_kwargs['recipient_name'], 'Maria Compras')
+        self.assertEqual(call_kwargs['recipient_email'], 'maria@example.com')
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_requires_authentication(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        self.client.logout()
+
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [self.receipt_order.pk],
+                'recipient_email': 'maria@example.com',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        service_cls.assert_not_called()
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_rejects_order_from_another_client(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [self.receipt_order.pk, self.other_order.pk],
+                'recipient_email': 'maria@example.com',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()['success'])
+        self.assertIn('no pertenece', response.json()['message'])
+        service_cls.assert_not_called()
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_rejects_invalid_email(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [self.receipt_order.pk],
+                'recipient_email': 'correo-invalido',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(response.json()['success'])
+        self.assertIn('correo', response.json()['message'].lower())
+        service_cls.assert_not_called()
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_rejects_more_than_page_size(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        extra_orders = [
+            Order.objects.create(
+                client=self.customer,
+                owner=self.user,
+                status=OrderStatus.COMPLETED.value,
+                total_amount=Decimal('10.00'),
+            )
+            for _ in range(9)
+        ]
+
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [
+                    self.receipt_order.pk,
+                    self.missing_order.pk,
+                    *[order.pk for order in extra_orders],
+                ],
+                'recipient_email': 'maria@example.com',
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('10 pedidos', response.json()['message'])
+        service_cls.assert_not_called()
+
+    @patch('clients.views.ReceiptBundleDeliveryService')
+    def test_send_selected_receipts_returns_delivery_failure(
+        self,
+        service_cls: MagicMock,
+    ) -> None:
+        from orders.services.receipt_delivery_service import ReceiptDeliveryError
+
+        service_cls.return_value.send.side_effect = ReceiptDeliveryError('mailgun down')
+
+        response = self.client.post(
+            reverse('clients:send_selected_order_receipts', args=[self.customer.pk]),
+            {
+                'orders': [self.receipt_order.pk],
+                'recipient_email': 'maria@example.com',
+            },
+        )
+
+        self.assertEqual(response.status_code, 502)
+        self.assertEqual(
+            response.json(),
+            {
+                'success': False,
+                'message': 'No se pudieron enviar los recibos. Intenta nuevamente.',
+            },
+        )
 
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):

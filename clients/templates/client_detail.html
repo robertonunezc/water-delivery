@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block extra_css %}
 {% endblock %}
@@ -68,11 +69,6 @@
         </div>
         <div>
           <div class="pg-flex pg-flex-wrap pg-gap-2">
-            {% if pending_payment_data.overdue_orders %}
-              <button type="submit" class="pg-button pg-button-danger" form="selected-orders-payment-form">
-                Pagar seleccionados
-              </button>
-            {% endif %}
             <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button pg-button-outline-danger">
               {{ credit_report_url_label }}
             </a>
@@ -84,7 +80,6 @@
           <table class="pg-table pg-table-sm pg-table-hover pg-mb-0">
             <thead class="pg-table-danger">
               <tr>
-                <th class="pg-w-10"></th>
                 <th>Orden #</th>
                 <th>Fecha</th>
                 <th>Días Vencidos</th>
@@ -96,11 +91,6 @@
             <tbody>
               {% for overdue_order in pending_payment_data.overdue_orders %}
                 <tr>
-                  <td>
-                    {% if not overdue_order.is_paid and overdue_order.status != 'CANCELLED' %}
-                      <input class="pg-checkbox-input client-order-payment-checkbox" type="checkbox" name="orders" value="{{ overdue_order.pk }}" form="selected-orders-payment-form">
-                    {% endif %}
-                  </td>
                   <td>
                     <a href="{% url 'orders:get_order' overdue_order.id %}" class="pg-text-danger pg-fw-bold">
                       #{{ overdue_order.id }}
@@ -194,8 +184,16 @@
             <h2 class="pg-h5 pg-mb-0">Ventas Recientes</h2>
             <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-center pg-justify-end">
               {% if orders %}
-                <button type="submit" class="pg-button pg-button-primary pg-button-sm" form="selected-orders-payment-form">
-                  Pagar seleccionados
+                <label class="pg-visually-hidden" for="client-order-bulk-action">Acciones masivas</label>
+                <select class="pg-select" id="client-order-bulk-action">
+                  <option value="">Acciones masivas</option>
+                  <option value="pay">Pagar seleccionados</option>
+                  {% if receipt_signature_enabled %}
+                    <option value="send_receipts">Enviar recibos</option>
+                  {% endif %}
+                </select>
+                <button type="button" class="pg-button pg-button-primary pg-button-sm" id="apply-client-order-bulk-action" disabled>
+                  <i class="fas fa-play pg-me-1" aria-hidden="true"></i>Aplicar
                 </button>
               {% endif %}
               <small class="pg-text-muted">
@@ -212,7 +210,9 @@
               <table class="pg-table pg-table-hover pg-align-middle">
                 <thead class="pg-table-light">
                   <tr>
-                    <th class="pg-w-10"></th>
+                    <th class="pg-w-10">
+                      <input class="pg-checkbox-input" type="checkbox" id="select-all-client-orders" aria-label="Seleccionar todos los pedidos visibles">
+                    </th>
                     <th>ID</th>
                     <th>Fecha</th>
                     <th>Estado</th>
@@ -227,9 +227,14 @@
                   {% for order in orders %}
                     <tr>
                       <td>
-                        {% if not order.is_paid and order.status != 'CANCELLED' %}
-                          <input class="pg-checkbox-input client-order-payment-checkbox" type="checkbox" name="orders" value="{{ order.pk }}" form="selected-orders-payment-form">
-                        {% endif %}
+                        <input
+                          class="pg-checkbox-input client-order-bulk-checkbox"
+                          type="checkbox"
+                          name="orders"
+                          value="{{ order.pk }}"
+                          form="selected-orders-payment-form"
+                          data-has-receipt="{% if order.receipt and not order.receipt.deleted_at %}true{% else %}false{% endif %}"
+                          aria-label="Seleccionar pedido #{{ order.pk }}">
                       </td>
                       <td>
                         <span class="client-order-id-cell">
@@ -298,6 +303,7 @@
                             {% if order.status == 'COMPLETED' %}
                               <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                             {% endif %}
+                            {% include 'orders/_receipt_dropdown_items.html' %}
                             {% if not order.is_paid and order.status != 'CANCELLED' %}
                               <li><a class="pg-dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
                             {% endif %}
@@ -357,6 +363,72 @@
                   {% endif %}
                 </ul>
               </nav>
+            {% endif %}
+            {% if receipt_signature_enabled %}
+              <button
+                type="button"
+                class="pg-d-none"
+                id="open-receipt-bundle-modal"
+                data-pg-toggle="modal"
+                data-pg-target="#receipt-bundle-modal"
+                aria-hidden="true"
+                tabindex="-1">
+              </button>
+              <div class="pg-modal pg-fade" id="receipt-bundle-modal" tabindex="-1" aria-labelledby="receipt-bundle-modal-label" aria-hidden="true">
+                <div class="pg-modal-dialog pg-modal-dialog-centered pg-modal-dialog-scrollable">
+                  <form
+                    class="pg-modal-content"
+                    id="receipt-bundle-form"
+                    data-send-url="{% url 'clients:send_selected_order_receipts' client.pk %}">
+                    {% csrf_token %}
+                    <div class="pg-modal-header">
+                      <h3 class="pg-modal-title" id="receipt-bundle-modal-label">Enviar recibos firmados</h3>
+                      <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="pg-modal-body">
+                      <div class="pg-mb-3">
+                        <label for="receipt-bundle-contact" class="pg-form-label">Contacto</label>
+                        <select class="pg-select" id="receipt-bundle-contact">
+                          <option value="">Capturar destinatario manualmente</option>
+                          {% for contact in contacts %}
+                            <option value="{{ contact.pk }}" data-name="{{ contact.name }}" data-email="{{ contact.email|default:'' }}">
+                              {{ contact.name }}{% if contact.email %} - {{ contact.email }}{% endif %}
+                            </option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                      <div class="pg-mb-3">
+                        <label for="receipt-bundle-recipient-name" class="pg-form-label">Nombre</label>
+                        <input class="pg-input" id="receipt-bundle-recipient-name" name="recipient_name" maxlength="100" autocomplete="name">
+                      </div>
+                      <div class="pg-mb-3">
+                        <label for="receipt-bundle-recipient-email" class="pg-form-label">Correo</label>
+                        <input class="pg-input" id="receipt-bundle-recipient-email" name="recipient_email" type="email" required autocomplete="email">
+                      </div>
+                      <div class="pg-alert pg-alert-info pg-mb-3">
+                        Se adjuntarán <strong id="receipt-bundle-available-count">0</strong> recibo(s) firmado(s).
+                        Los pedidos sin recibo no bloquean el envío.
+                      </div>
+                      <div class="pg-mb-3">
+                        <strong>Recibos disponibles</strong>
+                        <ul class="pg-mb-0" id="receipt-bundle-available-orders"></ul>
+                      </div>
+                      <div class="pg-alert pg-alert-warning pg-d-none pg-mb-3" id="receipt-bundle-missing-section">
+                        <strong>Pedidos sin recibo firmado</strong>
+                        <ul class="pg-mb-1" id="receipt-bundle-missing-orders"></ul>
+                        Firma o crea estos recibos antes de intentar enviarlos.
+                      </div>
+                      <div class="pg-alert pg-d-none pg-mb-0" id="receipt-bundle-result" role="status"></div>
+                    </div>
+                    <div class="pg-modal-footer">
+                      <button type="button" class="pg-button pg-button-secondary" data-pg-dismiss="modal">Cerrar</button>
+                      <button type="submit" class="pg-button pg-button-primary" id="send-receipt-bundle">
+                        <i class="fas fa-envelope pg-me-1" aria-hidden="true"></i>Enviar
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
             {% endif %}
           {% else %}
             <p class="pg-text-muted">No hay ventas registradas para este cliente.</p>
@@ -867,6 +939,7 @@
 {% endblock %}
 
 {% block extra_js %}
+  <script src="{% static 'clients/js/client_order_bulk_actions.js' %}"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       const cancelButtons = Array.from(document.querySelectorAll('.client-order-cancel-action'));

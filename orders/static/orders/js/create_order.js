@@ -32,7 +32,12 @@ function setElementVisible(element, visible) {
   element.classList.toggle('pg-hidden', !visible);
 }
 
-function navigateAfterOrderCompletion() {
+function navigateAfterOrderCompletion(redirectUrl = '') {
+  if (redirectUrl) {
+    window.location.href = redirectUrl;
+    return;
+  }
+
   const fallbackUrl = document.getElementById('finish-order-btn')?.dataset.redirect || '/clients/';
 
   if (window.history.length > 1) {
@@ -1111,6 +1116,8 @@ class PaymentController {
     this.orderNotesController = orderNotesController;
     this.finishButton = document.getElementById('finish-order-btn');
     this.finishButtonMobile = document.getElementById('finish-order-btn-mobile');
+    this.receiptCheckbox = document.getElementById('send-receipt-after-payment');
+    this.signatureOnlyCheckbox = document.getElementById('sign-receipt-only-after-payment');
     this.feedbackElement = document.getElementById('payment-flow-feedback');
     this.orderDateSavePromise = Promise.resolve();
   }
@@ -1121,6 +1128,16 @@ class PaymentController {
     this.configureOrderTypeUI();
     this.finishButton?.addEventListener('click', () => this.handleFinish());
     this.finishButtonMobile?.addEventListener('click', () => this.handleFinish());
+    this.receiptCheckbox?.addEventListener('change', () => {
+      if (this.receiptCheckbox.checked && this.signatureOnlyCheckbox) {
+        this.signatureOnlyCheckbox.checked = false;
+      }
+    });
+    this.signatureOnlyCheckbox?.addEventListener('change', () => {
+      if (this.signatureOnlyCheckbox.checked && this.receiptCheckbox) {
+        this.receiptCheckbox.checked = false;
+      }
+    });
 
     //document.addEventListener('amount-validation-changed', () => this.validateFinishButtonState());
     //this.validateFinishButtonState();
@@ -1390,6 +1407,18 @@ class PaymentController {
     return this.config.initialOrderDate || '';
   }
 
+  getReceiptSignUrl() {
+    const url = this.finishButton?.dataset.receiptSignUrl || '';
+    if (!url || !this.signatureOnlyCheckbox?.checked) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}mode=sign_only`;
+  }
+
+  shouldRedirectToReceipt() {
+    const selected = this.receiptCheckbox?.checked || this.signatureOnlyCheckbox?.checked;
+    return Boolean(selected && this.getReceiptSignUrl());
+  }
+
   buildPayments(orderTotal) {
     const payments = [];
     const breakdown = this.paymentBreakdown.getBreakdown();
@@ -1554,8 +1583,9 @@ class PaymentController {
 
     this.alertManager.show('success', 'Éxito', message, 8000);
     this.markCompleted();
+    const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';
     setTimeout(() => {
-      navigateAfterOrderCompletion();
+      navigateAfterOrderCompletion(redirectUrl);
     }, 3000);
   }
 
@@ -1563,8 +1593,9 @@ class PaymentController {
     this.clearFeedback();
     const message = data.message || 'Orden a crédito registrada y pendiente de pago.';
     this.alertManager.show('success', 'Orden a crédito', message, 6000);
+    const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';
     setTimeout(() => {
-      navigateAfterOrderCompletion();
+      navigateAfterOrderCompletion(redirectUrl);
     }, 2000);
   }
 

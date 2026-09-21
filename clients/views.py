@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, time
 from django.http import Http404, HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
@@ -26,6 +27,7 @@ from .forms import (
     ClientCreditConfigForm,
     AddressInlineForm,
     ClientProductPriceFormSet,
+    ReceiptBundleEmailForm,
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from .services.client_detail_service import (
@@ -48,12 +50,20 @@ from .services.product_price_service import (
     build_client_product_price_initial,
     update_client_product_prices,
 )
+from core.services.feature_flags import is_receipt_signature_enabled
 from orders.models import Order
+from orders.services.receipt_delivery_service import (
+    ReceiptBundleDeliveryService,
+    ReceiptDeliveryError,
+)
 from payment import services as payment_services
 from payment.models import PAYMENT_METHOD_CHOICES
 from product.services import ensure_client_product_prices
 from routes.forms import ClientRouteAssignmentForm
 from routes.models import RouteClient
+
+
+logger = logging.getLogger(__name__)
 
 
 def _is_admin_user(user) -> bool:
@@ -748,6 +758,37 @@ def _parse_payment_amount(raw_amount: str) -> Decimal:
         raise payment_services.ClientOrderPaymentError('El monto de pago es inválido.')
 
 
+def _receipt_bundle_error(message: str, status: int = 400) -> JsonResponse:
+    return JsonResponse({'success': False, 'message': message}, status=status)
+
+
+def _get_receipt_bundle_orders(client: Client, order_ids: List[int]) -> List[Order]:
+    if not order_ids:
+        raise ValueError('Selecciona al menos un pedido para enviar sus recibos.')
+
+    deduped_ids = [order_id for order_id in dict.fromkeys(order_ids)]
+    if len(deduped_ids) > CLIENT_DETAIL_PAGE_SIZE:
+        raise ValueError(
+            f'Puedes enviar hasta {CLIENT_DETAIL_PAGE_SIZE} pedidos por correo.'
+        )
+    orders_by_id = {
+        order.pk: order
+        for order in Order.objects.filter(pk__in=deduped_ids).select_related(
+            'client',
+            'receipt',
+        )
+    }
+    selected_orders = []
+    for order_id in deduped_ids:
+        order = orders_by_id.get(order_id)
+        if order is None:
+            raise ValueError(f'Pedido #{order_id} no encontrado.')
+        if order.client_id != client.pk:
+            raise ValueError(f'El pedido #{order_id} no pertenece al cliente.')
+        selected_orders.append(order)
+    return selected_orders
+
+
 def _selected_order_payment_context(
     client: Client,
     selected_orders: List[Order],
@@ -824,10 +865,66 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 @login_required
+@require_POST
+def send_selected_order_receipts(request: HttpRequest, pk: int) -> JsonResponse:
+    client = get_object_or_404(Client, pk=pk)
+    try:
+        selected_orders = _get_receipt_bundle_orders(
+            client,
+            _parse_order_ids(request),
+        )
+    except ValueError as exc:
+        return _receipt_bundle_error(str(exc))
+
+    form = ReceiptBundleEmailForm(request.POST)
+    if not form.is_valid():
+        email_errors = form.errors.get('recipient_email')
+        message = (
+            str(email_errors[0])
+            if email_errors
+            else 'Revisa los datos del destinatario.'
+        )
+        return _receipt_bundle_error(message)
+
+    try:
+        result = ReceiptBundleDeliveryService().send(
+            orders=selected_orders,
+            recipient_name=form.cleaned_data['recipient_name'].strip(),
+            recipient_email=form.cleaned_data['recipient_email'],
+        )
+    except ReceiptDeliveryError:
+        logger.exception(
+            'Bulk receipt delivery failed for client_id=%s',
+            client.pk,
+        )
+        return _receipt_bundle_error(
+            'No se pudieron enviar los recibos. Intenta nuevamente.',
+            status=502,
+        )
+
+    attached_ids = [order_id for order_id in result.attached_order_ids]
+    return JsonResponse(
+        {
+            'success': True,
+            'message': f'Se enviaron {len(attached_ids)} recibo(s) correctamente.',
+            'attached_order_ids': attached_ids,
+            'missing_order_ids': [
+                order_id for order_id in result.missing_order_ids
+            ],
+        }
+    )
+
+
+@login_required
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     active_detail_tab = _get_active_client_detail_tab(request)
-    orders = client.orders.all().prefetch_related('items__product', 'payments').order_by('-order_date', '-id')
+    orders = (
+        client.orders.all()
+        .select_related('receipt')
+        .prefetch_related('items__product', 'payments')
+        .order_by('-order_date', '-id')
+    )
     payments = client.payments.all()
     all_payment_data = _build_payment_history(client)
     orders_page = _paginate_client_detail_items(request, orders, page_param='orders_page')
@@ -916,6 +1013,7 @@ def detail(request, pk):
             'completed_orders': completed_orders,
         },
         'pending_payment_data': pending_payment_data,
+        'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
         **snapshot_context,
     }
     

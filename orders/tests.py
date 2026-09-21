@@ -7,7 +7,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponse
-from django.test import RequestFactory
+from django.test import RequestFactory, SimpleTestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -25,6 +25,23 @@ from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from routes.models import Route, RouteClient
 from invoice.models import Invoice, InvoiceOrderLink
+
+
+class CreateOrderReceiptRedirectScriptTests(SimpleTestCase):
+    def test_credit_pending_success_path_uses_receipt_redirect(self) -> None:
+        from pathlib import Path
+
+        script = Path("orders/static/orders/js/create_order.js").read_text()
+        credit_success_body = script.split(
+            "handleCreditOrderPendingSuccess(data) {",
+            1,
+        )[1].split("  markCompleted()", 1)[0]
+
+        self.assertIn(
+            "const redirectUrl = this.shouldRedirectToReceipt() ? this.getReceiptSignUrl() : '';",
+            credit_success_body,
+        )
+        self.assertIn("navigateAfterOrderCompletion(redirectUrl);", credit_success_body)
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -560,6 +577,29 @@ class CreateOrderRedirectTestCase(FastTenantTestCase):
 
         self.assertIn(("credit", "Crédito"), context["payment_types"])
 
+    def test_order_page_renders_receipt_checkbox_and_sign_url(self) -> None:
+        user = self._create_user_with_employee(username="recibos", position="manager")
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse("orders:create_order", kwargs={"client_pk": self.customer.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        order = response.context["order"]
+        self.assertContains(response, 'id="send-receipt-after-payment"')
+        self.assertContains(response, "Firmar y enviar recibo")
+        self.assertContains(response, 'id="sign-receipt-only-after-payment"')
+        self.assertContains(response, "Solo firmar")
+        self.assertContains(
+            response,
+            f'data-receipt-sign-url="{reverse("orders:sign_receipt", args=[order.pk])}"',
+        )
+        self.assertContains(
+            response,
+            'orders/js/create_order.js?v=receipt-signature-modes',
+        )
+
     def test_existing_completed_order_page_is_marked_not_editable(self) -> None:
         user = self._create_user_with_employee(username="cerrado", position="manager")
         self.client.force_login(user)
@@ -635,6 +675,1043 @@ class SplitOrderViewTestCase(FastTenantTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response.url, reverse("admin_orders"))
         self.assertTrue(OrderSplit.objects.filter(source_order=self.order).exists())
+
+
+class OrderReceiptModelTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-user", password="testpass")
+        self.customer = Client.objects.create(name="Receipt Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("120.00"),
+        )
+
+    def test_order_receipt_is_one_to_one_with_order(self) -> None:
+        from django.db import IntegrityError
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            contact_phone="4421234567",
+            contact_position="Compras",
+            created_by=self.user,
+        )
+
+        with self.assertRaises(IntegrityError):
+            OrderReceipt.objects.create(
+                order=self.order,
+                method=ReceiptDeliveryMethod.EMAIL,
+                pdf_url="receipts/orders/1-copy.pdf",
+                contact_name="Ana Lopez",
+                contact_email="ana@example.com",
+                created_by=self.user,
+            )
+
+    def test_order_receipt_defaults_to_unsent(self) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        self.assertIsNone(receipt.sent_at)
+        self.assertEqual(str(receipt), f"Recibo pedido #{self.order.pk} - email")
+
+    def test_order_receipt_allows_signature_without_delivery_contact(self) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        receipt = OrderReceipt(
+            order=self.order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="",
+            contact_email="",
+            created_by=self.user,
+        )
+
+        receipt.full_clean()
+
+    def test_order_receipt_email_delivery_requires_contact_email(self) -> None:
+        from django.core.exceptions import ValidationError
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        receipt = OrderReceipt(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1.pdf",
+            contact_name="",
+            contact_email="",
+            created_by=self.user,
+        )
+
+        with self.assertRaises(ValidationError):
+            receipt.full_clean()
+
+
+class ReceiptStorageServiceTests(FastTenantTestCase):
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="https://example-account.r2.cloudflarestorage.com",
+        RECEIPT_R2_BUCKET_NAME="receipt-bucket",
+        RECEIPT_R2_ACCESS_KEY_ID="access-key",
+        RECEIPT_R2_SECRET_ACCESS_KEY="secret-key",
+        RECEIPT_R2_REGION="auto",
+        RECEIPT_R2_OBJECT_PREFIX="receipts/test",
+        RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=900,
+    )
+    @patch("orders.services.receipt_storage_service.boto3.client")
+    def test_upload_pdf_returns_private_object_key(self, client_mock: MagicMock) -> None:
+        from orders.services.receipt_storage_service import CloudflareR2ReceiptStorage
+
+        storage_client = client_mock.return_value
+        storage = CloudflareR2ReceiptStorage.from_settings()
+
+        client_mock.assert_called_once()
+        self.assertEqual(client_mock.call_args.kwargs["region_name"], "auto")
+
+        key = storage.upload_pdf(order_id=42, pdf_bytes=b"%PDF-test")
+
+        self.assertEqual(key, "receipts/test/orders/42/receipt.pdf")
+        storage_client.put_object.assert_called_once_with(
+            Bucket="receipt-bucket",
+            Key="receipts/test/orders/42/receipt.pdf",
+            Body=b"%PDF-test",
+            ContentType="application/pdf",
+        )
+
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="https://example-account.r2.cloudflarestorage.com",
+        RECEIPT_R2_BUCKET_NAME="receipt-bucket",
+        RECEIPT_R2_ACCESS_KEY_ID="access-key",
+        RECEIPT_R2_SECRET_ACCESS_KEY="secret-key",
+        RECEIPT_R2_OBJECT_PREFIX="receipts",
+        RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=600,
+    )
+    @patch("orders.services.receipt_storage_service.boto3.client")
+    def test_download_pdf_reads_private_object(self, client_mock: MagicMock) -> None:
+        from io import BytesIO
+        from orders.services.receipt_storage_service import CloudflareR2ReceiptStorage
+
+        storage_client = client_mock.return_value
+        storage_client.get_object.return_value = {"Body": BytesIO(b"%PDF-private")}
+        storage = CloudflareR2ReceiptStorage.from_settings()
+
+        content = storage.download_pdf("receipts/orders/42/receipt.pdf")
+
+        self.assertEqual(content, b"%PDF-private")
+        storage_client.get_object.assert_called_once_with(
+            Bucket="receipt-bucket",
+            Key="receipts/orders/42/receipt.pdf",
+        )
+
+    @override_settings(
+        RECEIPT_R2_ENDPOINT_URL="",
+        RECEIPT_R2_BUCKET_NAME="",
+        RECEIPT_R2_ACCESS_KEY_ID="",
+        RECEIPT_R2_SECRET_ACCESS_KEY="",
+    )
+    def test_missing_r2_settings_raise_clear_error(self) -> None:
+        from orders.services.receipt_storage_service import (
+            CloudflareR2ReceiptStorage,
+            ReceiptStorageError,
+        )
+
+        with self.assertRaisesMessage(ReceiptStorageError, "Cloudflare R2"):
+            CloudflareR2ReceiptStorage.from_settings()
+
+
+class ReceiptPdfServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="pdf-user", password="testpass")
+        self.customer = Client.objects.create(name="PDF Client")
+        self.category = ProductCategory.objects.create(name="Agua")
+        self.product = Product.objects.create(
+            name="Garrafon",
+            presentation="20L",
+            unit_of_measure=1,
+            category=self.category,
+            price=Decimal("30.00"),
+        )
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            subtotal_amount=Decimal("60.00"),
+            discount=Decimal("5.00"),
+            total_amount=Decimal("55.00"),
+            cantidad_cobrada=Decimal("60.00"),
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=2,
+            unit_price=Decimal("30.00"),
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=self.order,
+            amount=Decimal("55.00"),
+            method="cash",
+            status="completed",
+            created_by=self.user,
+        )
+
+    def test_generate_receipt_pdf_returns_pdf_bytes(self) -> None:
+        from orders.services.receipt_pdf_service import (
+            ReceiptContactSnapshot,
+            generate_receipt_pdf,
+        )
+
+        signature = (
+            "data:image/png;base64,"
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+            "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        )
+        pdf_bytes = generate_receipt_pdf(
+            order=self.order,
+            contact=ReceiptContactSnapshot(
+                name="Ana Lopez",
+                email="ana@example.com",
+                phone="4421234567",
+                position="Compras",
+            ),
+            signature_data_url=signature,
+        )
+
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+        self.assertGreater(len(pdf_bytes), 1000)
+
+    def test_generate_receipt_pdf_rejects_invalid_signature_data(self) -> None:
+        from orders.services.receipt_pdf_service import (
+            ReceiptContactSnapshot,
+            ReceiptPdfError,
+            generate_receipt_pdf,
+        )
+
+        with self.assertRaisesMessage(ReceiptPdfError, "firma"):
+            generate_receipt_pdf(
+                order=self.order,
+                contact=ReceiptContactSnapshot(
+                    name="Ana Lopez",
+                    email="ana@example.com",
+                    phone="4421234567",
+                    position="Compras",
+                ),
+                signature_data_url="not-a-data-url",
+            )
+
+    def test_generate_receipt_pdf_without_contact_returns_pdf_bytes(self) -> None:
+        from orders.services.receipt_pdf_service import generate_receipt_pdf
+
+        signature = (
+            "data:image/png;base64,"
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+            "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+        )
+
+        pdf_bytes = generate_receipt_pdf(
+            order=self.order,
+            contact=None,
+            signature_data_url=signature,
+        )
+
+        self.assertTrue(pdf_bytes.startswith(b"%PDF"))
+        self.assertGreater(len(pdf_bytes), 1000)
+
+
+class ReceiptDeliveryServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="delivery-user", password="testpass")
+        self.customer = Client.objects.create(name="Delivery Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("80.00"),
+        )
+
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_delivery_sends_receipt_pdf_attachment_and_sets_sent_at(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import ReceiptDeliveryService
+
+        storage_factory.return_value.download_pdf.return_value = b"%PDF-private"
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        sent = ReceiptDeliveryService().send(receipt)
+
+        self.assertIsNotNone(sent.sent_at)
+        email_instance = send_email_cls.return_value
+        email_instance.send_email.assert_called_once()
+        attachment = send_email_cls.call_args.kwargs["attachments"][0]
+        self.assertEqual(attachment.filename, f"recibo-pedido-{self.order.pk}.pdf")
+        self.assertEqual(attachment.content, b"%PDF-private")
+
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_delivery_failure_leaves_receipt_unsent(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import (
+            ReceiptDeliveryError,
+            ReceiptDeliveryService,
+        )
+
+        storage_factory.return_value.download_pdf.return_value = b"%PDF-private"
+        send_email_cls.return_value.send_email.side_effect = RuntimeError("mailgun down")
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+
+        with self.assertRaises(ReceiptDeliveryError):
+            ReceiptDeliveryService().send(receipt)
+
+        receipt.refresh_from_db()
+        self.assertIsNone(receipt.sent_at)
+
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_bundle_delivery_attaches_existing_receipts_and_reports_missing_orders(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import ReceiptBundleDeliveryService
+
+        second_receipt_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("55.00"),
+        )
+        missing_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("45.00"),
+        )
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Contacto original",
+            contact_email="original@example.com",
+            contact_phone="4421234567",
+            contact_position="Compras",
+            created_by=self.user,
+        )
+        OrderReceipt.objects.create(
+            order=second_receipt_order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/2/receipt.pdf",
+            contact_name="Segundo contacto",
+            contact_email="second@example.com",
+            created_by=self.user,
+        )
+        deleted_receipt = OrderReceipt.objects.create(
+            order=missing_order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/3/receipt.pdf",
+            contact_email="deleted@example.com",
+            created_by=self.user,
+        )
+        deleted_receipt.delete()
+        missing_order.refresh_from_db()
+        storage_factory.return_value.download_pdf.side_effect = [
+            b"%PDF-first",
+            b"%PDF-second",
+        ]
+
+        result = ReceiptBundleDeliveryService().send(
+            orders=[self.order, second_receipt_order, missing_order],
+            recipient_name="Maria Compras",
+            recipient_email="maria@example.com",
+        )
+
+        self.assertEqual(
+            result.attached_order_ids,
+            (self.order.pk, second_receipt_order.pk),
+        )
+        self.assertEqual(result.missing_order_ids, (missing_order.pk,))
+        attachments = send_email_cls.call_args.kwargs["attachments"]
+        self.assertEqual(len(attachments), 2)
+        self.assertEqual(
+            [attachment.filename for attachment in attachments],
+            [
+                f"recibo-pedido-{self.order.pk}.pdf",
+                f"recibo-pedido-{second_receipt_order.pk}.pdf",
+            ],
+        )
+        self.assertEqual(
+            [attachment.content for attachment in attachments],
+            [b"%PDF-first", b"%PDF-second"],
+        )
+        self.assertEqual(send_email_cls.call_args.kwargs["to"], "maria@example.com")
+        send_email_cls.return_value.send_email.assert_called_once()
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.method, ReceiptDeliveryMethod.NONE)
+        self.assertEqual(receipt.contact_name, "Contacto original")
+        self.assertEqual(receipt.contact_email, "original@example.com")
+        self.assertEqual(receipt.contact_phone, "4421234567")
+        self.assertEqual(receipt.contact_position, "Compras")
+        self.assertIsNone(receipt.sent_at)
+
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_bundle_delivery_rejects_selection_without_receipts(
+        self,
+        send_email_cls: MagicMock,
+    ) -> None:
+        from orders.services.receipt_delivery_service import (
+            ReceiptBundleDeliveryService,
+            ReceiptDeliveryError,
+        )
+
+        with self.assertRaisesMessage(ReceiptDeliveryError, "No hay recibos firmados"):
+            ReceiptBundleDeliveryService().send(
+                orders=[self.order],
+                recipient_name="Maria Compras",
+                recipient_email="maria@example.com",
+            )
+
+        send_email_cls.assert_not_called()
+
+
+class OrderReceiptSignFormTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.customer = Client.objects.create(name="Form Client")
+
+    def test_form_preselects_single_contact(self) -> None:
+        from clients.models import Contact
+        from orders.forms import OrderReceiptSignForm
+
+        contact = Contact.objects.create(
+            client=self.customer,
+            name="Ana Lopez",
+            email="ana@example.com",
+            phone="4421234567",
+            position="Compras",
+        )
+
+        form = OrderReceiptSignForm(client=self.customer)
+
+        self.assertEqual(form.fields["contact_id"].initial, contact.pk)
+        self.assertEqual(form.fields["contact_name"].initial, "Ana Lopez")
+        self.assertEqual(form.fields["contact_email"].initial, "ana@example.com")
+
+    def test_form_exposes_dropdown_when_multiple_contacts_exist(self) -> None:
+        from clients.models import Contact
+        from orders.forms import OrderReceiptSignForm
+
+        first = Contact.objects.create(
+            client=self.customer,
+            name="Ana",
+            email="ana@example.com",
+        )
+        second = Contact.objects.create(
+            client=self.customer,
+            name="Luis",
+            email="luis@example.com",
+        )
+
+        form = OrderReceiptSignForm(client=self.customer)
+
+        choices = list(form.fields["contact_id"].choices)
+        self.assertIn((first.pk, "Ana - ana@example.com"), choices)
+        self.assertIn((second.pk, "Luis - luis@example.com"), choices)
+
+    def test_sign_only_form_requires_signature_without_contact_fields(self) -> None:
+        from orders.forms import OrderReceiptSignOnlyForm
+
+        form = OrderReceiptSignOnlyForm(
+            data={
+                "signature_data": (
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+                    "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+                ),
+            }
+        )
+
+        self.assertTrue(form.is_valid())
+        self.assertNotIn("contact_name", form.fields)
+        self.assertNotIn("contact_email", form.fields)
+
+
+class ReceiptServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username="receipt-service-user",
+            password="testpass",
+        )
+        self.customer = Client.objects.create(name="Service Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("75.00"),
+        )
+        self.cleaned_data = {
+            "method": "email",
+            "contact_name": "Ana Lopez",
+            "contact_email": "ana@example.com",
+            "contact_phone": "4421234567",
+            "contact_position": "Compras",
+            "signature_data": (
+                "data:image/png;base64,"
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+                "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+            ),
+        }
+
+    @patch("orders.services.receipt_service.ReceiptDeliveryService")
+    @patch("orders.services.receipt_service.get_receipt_storage")
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signed_receipt_uploads_pdf_and_sends_email(
+        self,
+        pdf_mock: MagicMock,
+        storage_factory: MagicMock,
+        delivery_cls: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt
+        from orders.services.receipt_service import create_signed_receipt
+
+        pdf_mock.return_value = b"%PDF-created"
+        storage_factory.return_value.upload_pdf.return_value = "receipts/orders/1/receipt.pdf"
+
+        result = create_signed_receipt(
+            order=self.order,
+            cleaned_data=self.cleaned_data,
+            user=self.user,
+        )
+
+        receipt = OrderReceipt.objects.get(order=self.order)
+        self.assertTrue(result.created)
+        self.assertTrue(result.delivery_succeeded)
+        self.assertEqual(receipt.contact_email, "ana@example.com")
+        self.assertEqual(receipt.pdf_url, "receipts/orders/1/receipt.pdf")
+        delivery_cls.return_value.send.assert_called_once_with(receipt)
+
+    @patch("orders.services.receipt_service.ReceiptDeliveryService")
+    @patch("orders.services.receipt_service.get_receipt_storage")
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signed_receipt_keeps_unsent_receipt_when_delivery_fails(
+        self,
+        pdf_mock: MagicMock,
+        storage_factory: MagicMock,
+        delivery_cls: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt
+        from orders.services.receipt_delivery_service import ReceiptDeliveryError
+        from orders.services.receipt_service import create_signed_receipt
+
+        pdf_mock.return_value = b"%PDF-created"
+        storage_factory.return_value.upload_pdf.return_value = "receipts/orders/1/receipt.pdf"
+        delivery_cls.return_value.send.side_effect = ReceiptDeliveryError("mailgun down")
+
+        result = create_signed_receipt(
+            order=self.order,
+            cleaned_data=self.cleaned_data,
+            user=self.user,
+        )
+
+        receipt = OrderReceipt.objects.get(order=self.order)
+        self.assertTrue(result.created)
+        self.assertFalse(result.delivery_succeeded)
+        self.assertEqual(result.delivery_error, "mailgun down")
+        self.assertIsNone(receipt.sent_at)
+
+    @patch("orders.services.receipt_service.ReceiptDeliveryService")
+    @patch("orders.services.receipt_service.get_receipt_storage")
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signature_only_receipt_stores_pdf_without_delivery(
+        self,
+        pdf_mock: MagicMock,
+        storage_factory: MagicMock,
+        delivery_cls: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import create_signature_only_receipt
+
+        pdf_mock.return_value = b"%PDF-created"
+        storage_factory.return_value.upload_pdf.return_value = "receipts/orders/1/receipt.pdf"
+
+        result = create_signature_only_receipt(
+            order=self.order,
+            signature_data=self.cleaned_data["signature_data"],
+            user=self.user,
+        )
+
+        receipt = OrderReceipt.objects.get(order=self.order)
+        self.assertTrue(result.created)
+        self.assertFalse(result.delivery_succeeded)
+        self.assertEqual(result.delivery_error, "")
+        self.assertEqual(receipt.method, ReceiptDeliveryMethod.NONE)
+        self.assertEqual(receipt.contact_name, "")
+        self.assertEqual(receipt.contact_email, "")
+        self.assertIsNone(receipt.sent_at)
+        pdf_mock.assert_called_once_with(
+            order=self.order,
+            contact=None,
+            signature_data_url=self.cleaned_data["signature_data"],
+        )
+        delivery_cls.assert_not_called()
+
+    def test_create_signed_receipt_rejects_pending_order(self) -> None:
+        from orders.services.receipt_service import (
+            ReceiptCreationError,
+            create_signed_receipt,
+        )
+
+        self.order.status = OrderStatus.PENDING.value
+        self.order.save(update_fields=["status"])
+
+        with self.assertRaisesMessage(ReceiptCreationError, "completados"):
+            create_signed_receipt(
+                order=self.order,
+                cleaned_data=self.cleaned_data,
+                user=self.user,
+            )
+
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signed_receipt_rejects_missing_email_before_pdf_generation(
+        self,
+        pdf_mock: MagicMock,
+    ) -> None:
+        from orders.services.receipt_service import (
+            ReceiptCreationError,
+            create_signed_receipt,
+        )
+
+        self.cleaned_data["contact_email"] = ""
+
+        with self.assertRaisesMessage(ReceiptCreationError, "correo"):
+            create_signed_receipt(
+                order=self.order,
+                cleaned_data=self.cleaned_data,
+                user=self.user,
+            )
+
+        pdf_mock.assert_not_called()
+
+    @patch("orders.services.receipt_service.get_receipt_storage")
+    @patch("orders.services.receipt_service.generate_receipt_pdf")
+    def test_create_signed_receipt_converts_pdf_errors_to_creation_errors(
+        self,
+        pdf_mock: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.services.receipt_pdf_service import ReceiptPdfError
+        from orders.services.receipt_service import (
+            ReceiptCreationError,
+            create_signed_receipt,
+        )
+
+        pdf_mock.side_effect = ReceiptPdfError("La firma no es valida.")
+
+        with self.assertRaisesMessage(ReceiptCreationError, "firma"):
+            create_signed_receipt(
+                order=self.order,
+                cleaned_data=self.cleaned_data,
+                user=self.user,
+            )
+
+        storage_factory.assert_not_called()
+
+    @patch("orders.services.receipt_service.ReceiptDeliveryService")
+    def test_resend_receipt_reuses_existing_receipt(
+        self,
+        delivery_cls: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import resend_receipt
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        delivery_cls.return_value.send.return_value = receipt
+
+        result = resend_receipt(receipt)
+
+        self.assertFalse(result.created)
+        self.assertTrue(result.delivery_succeeded)
+        self.assertEqual(result.receipt.pdf_url, "receipts/orders/1/receipt.pdf")
+        delivery_cls.return_value.send.assert_called_once_with(receipt)
+
+    @patch("orders.services.receipt_service.ReceiptDeliveryService")
+    def test_resend_signature_only_receipt_does_not_attempt_delivery(
+        self,
+        delivery_cls: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import resend_receipt
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="",
+            contact_email="",
+            created_by=self.user,
+        )
+
+        result = resend_receipt(receipt)
+
+        self.assertFalse(result.delivery_succeeded)
+        self.assertEqual(result.delivery_error, "")
+        delivery_cls.assert_not_called()
+
+
+class OrderReceiptViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-view-user", password="testpass")
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(name="Receipt View Client")
+        self.order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("95.00"),
+        )
+
+    def test_sign_receipt_requires_login(self) -> None:
+        self.client.logout()
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("/login", response.url)
+
+    def test_sign_receipt_rejects_pending_order(self) -> None:
+        self.order.status = OrderStatus.PENDING.value
+        self.order.save(update_fields=["status"])
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+
+    @patch("orders.views.create_signed_receipt")
+    def test_sign_receipt_post_uses_service(self, create_receipt_mock: MagicMock) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import ReceiptCreationResult
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        create_receipt_mock.return_value = ReceiptCreationResult(
+            receipt=receipt,
+            created=True,
+            delivery_succeeded=True,
+            delivery_error="",
+        )
+
+        response = self.client.post(
+            reverse("orders:sign_receipt", args=[self.order.pk]),
+            data={
+                "method": "email",
+                "contact_name": "Ana Lopez",
+                "contact_email": "ana@example.com",
+                "contact_phone": "4421234567",
+                "contact_position": "Compras",
+                "signature_data": (
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+                    "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+                ),
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        create_receipt_mock.assert_called_once()
+
+    @patch("orders.views.resend_receipt")
+    def test_resend_receipt_view_uses_existing_receipt(self, resend_mock: MagicMock) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import ReceiptCreationResult
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        resend_mock.return_value = ReceiptCreationResult(
+            receipt=receipt,
+            created=False,
+            delivery_succeeded=True,
+            delivery_error="",
+        )
+
+        response = self.client.post(reverse("orders:resend_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        resend_mock.assert_called_once_with(receipt)
+
+    @patch("orders.views.get_receipt_storage")
+    def test_receipt_pdf_view_redirects_to_signed_url(
+        self,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        storage_factory.return_value.generate_signed_url.return_value = (
+            "https://signed.example/receipt.pdf"
+        )
+
+        response = self.client.get(reverse("orders:receipt_pdf", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "https://signed.example/receipt.pdf")
+        storage_factory.return_value.generate_signed_url.assert_called_once_with(
+            "receipts/orders/1/receipt.pdf"
+        )
+
+    def test_sign_receipt_get_renders_form(self) -> None:
+        from clients.models import Contact
+
+        Contact.objects.create(
+            client=self.customer,
+            name="Ana Lopez",
+            email="ana@example.com",
+            phone="4421234567",
+            position="Compras",
+        )
+
+        response = self.client.get(reverse("orders:sign_receipt", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Firmar y enviar recibo")
+        self.assertContains(response, "id_signature_data")
+        self.assertContains(response, "receipt-signature-canvas")
+
+    def test_sign_receipt_get_renders_signature_only_mode(self) -> None:
+        response = self.client.get(
+            reverse("orders:sign_receipt", args=[self.order.pk]),
+            {"mode": "sign_only"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Solo firmar recibo")
+        self.assertContains(response, "Guardar recibo")
+        self.assertContains(response, "receipt-signature-canvas")
+        self.assertNotContains(response, "id_contact_name")
+        self.assertNotContains(response, "id_contact_email")
+
+    @patch("orders.views.create_signature_only_receipt")
+    def test_sign_receipt_post_signature_only_uses_non_delivery_service(
+        self,
+        create_receipt_mock: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_service import ReceiptCreationResult
+
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="",
+            contact_email="",
+            created_by=self.user,
+        )
+        create_receipt_mock.return_value = ReceiptCreationResult(
+            receipt=receipt,
+            created=True,
+            delivery_succeeded=False,
+            delivery_error="",
+        )
+
+        response = self.client.post(
+            reverse("orders:sign_receipt", args=[self.order.pk]),
+            data={
+                "mode": "sign_only",
+                "signature_data": (
+                    "data:image/png;base64,"
+                    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/"
+                    "x8AAwMCAO+/p9sAAAAASUVORK5CYII="
+                ),
+            },
+        )
+
+        self.assertRedirects(response, reverse("report:orders_report"))
+        create_receipt_mock.assert_called_once_with(
+            order=self.order,
+            signature_data=response.wsgi_request.POST["signature_data"],
+            user=self.user,
+        )
+
+
+class CompletedOrderReceiptActionTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="receipt-action-user", password="testpass")
+        self.staff_user = User.objects.create_user(
+            username="receipt-action-staff",
+            password="testpass",
+            is_staff=True,
+        )
+        self.customer = Client.objects.create(name="Receipt Action Client")
+        self.order_without_receipt = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("75.00"),
+        )
+        self.order_with_receipt = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("85.00"),
+        )
+        self.order_with_signature_only_receipt = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("90.00"),
+        )
+
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+
+        self.receipt = OrderReceipt.objects.create(
+            order=self.order_with_receipt,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/2/receipt.pdf",
+            contact_name="Ana Lopez",
+            contact_email="ana@example.com",
+            created_by=self.user,
+        )
+        self.signature_only_receipt = OrderReceipt.objects.create(
+            order=self.order_with_signature_only_receipt,
+            method="none",
+            pdf_url="receipts/orders/3/receipt.pdf",
+            contact_name="",
+            contact_email="",
+            created_by=self.user,
+        )
+
+    def test_orders_list_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("orders:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Reintentar envio de recibo")
+
+    def test_admin_orders_list_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse("admin_orders"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(
+            response,
+            reverse("orders:receipt_pdf", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Ver recibo")
+        self.assertContains(response, "Reintentar envio de recibo")
+
+    def test_client_detail_shows_sign_and_resend_receipt_actions(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("clients:detail", args=[self.customer.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            reverse("orders:sign_receipt", args=[self.order_without_receipt.pk]),
+        )
+        self.assertContains(response, "Firmar recibo")
+        self.assertContains(
+            response,
+            reverse("orders:resend_receipt", args=[self.order_with_receipt.pk]),
+        )
+        self.assertContains(response, "Reintentar envio de recibo")
+
+    def test_orders_list_hides_resend_for_signature_only_receipt(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("orders:list"))
+
+        self.assertContains(
+            response,
+            reverse(
+                "orders:receipt_pdf",
+                args=[self.order_with_signature_only_receipt.pk],
+            ),
+        )
+        self.assertNotContains(
+            response,
+            reverse(
+                "orders:resend_receipt",
+                args=[self.order_with_signature_only_receipt.pk],
+            ),
+        )
 
 
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):

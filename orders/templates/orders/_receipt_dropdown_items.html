@@ -1,0 +1,24 @@
+{% if order.status == 'COMPLETED' %}
+  {% if order.receipt %}
+    <li><a class="pg-dropdown-item" href="{% url 'orders:receipt_pdf' order.id %}">Ver recibo</a></li>
+    {% if order.receipt.method != 'none' %}
+    <li>
+      <form method="post" action="{% url 'orders:resend_receipt' order.id %}" class="pg-m-0">
+        {% csrf_token %}
+        {% if receipt_action_redirect_url %}
+          <input type="hidden" name="next" value="{{ receipt_action_redirect_url }}">
+        {% endif %}
+        <button type="submit" class="pg-dropdown-item">
+          {% if order.receipt.sent_at %}
+            Reenviar recibo
+          {% else %}
+            Reintentar envio de recibo
+          {% endif %}
+        </button>
+      </form>
+    </li>
+    {% endif %}
+  {% elif receipt_signature_enabled %}
+    <li><a class="pg-dropdown-item" href="{% url 'orders:sign_receipt' order.id %}">Firmar recibo</a></li>
+  {% endif %}
+{% endif %}

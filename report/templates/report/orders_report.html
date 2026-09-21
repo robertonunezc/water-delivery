@@ -323,21 +323,21 @@
                       </div>
                     </td>
                     <td class="pg-text-center">
-                      <div class="pg-button-group" role="group">
-                        <a href="#" 
-                           class="pg-button pg-button-sm pg-button-outline-primary" 
-                           title="Ver detalles"
-                           data-pg-toggle="modal"
-                           data-pg-target="#orderModal{{ order.id }}">
-                          <i class="fas fa-eye"></i>
-                        </a>
-                        {% if order.status == 'PENDING' %}
-                          <a href="#" 
-                             class="pg-button pg-button-sm pg-button-outline-success" 
-                             title="Marcar como completado">
-                            <i class="fas fa-check"></i>
-                          </a>
-                        {% endif %}
+                      <div class="pg-dropdown">
+                        <button class="pg-button pg-button-sm pg-button-outline-secondary pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
+                          Acciones
+                        </button>
+                        <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                          <li>
+                            <a href="#"
+                               class="pg-dropdown-item"
+                               data-pg-toggle="modal"
+                               data-pg-target="#orderModal{{ order.id }}">
+                              Ver detalles
+                            </a>
+                          </li>
+                          {% include 'orders/_receipt_dropdown_items.html' %}
+                        </ul>
                       </div>
                     </td>
                   </tr>
