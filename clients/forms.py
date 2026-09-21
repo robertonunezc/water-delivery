@@ -551,6 +551,16 @@ class ContactForm(forms.ModelForm):
         }
 
 
+class ReceiptBundleEmailForm(forms.Form):
+    recipient_name = forms.CharField(max_length=100, required=False)
+    recipient_email = forms.EmailField(
+        error_messages={
+            'required': 'Ingresa un correo para enviar los recibos.',
+            'invalid': 'Ingresa un correo válido para enviar los recibos.',
+        },
+    )
+
+
 class InvoiceDataForm(forms.ModelForm):
     class Meta:
         model = InvoiceData

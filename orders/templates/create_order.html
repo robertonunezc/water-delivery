@@ -444,14 +444,54 @@
                 <i class="fas fa-check-circle pg-me-2"></i>Terminar Pedido
               </button>
               {% if receipt_signature_enabled %}
-                <label class="pg-flex pg-align-center pg-gap-2 pg-mt-2 pg-small" for="send-receipt-after-payment">
-                  <input type="checkbox" id="send-receipt-after-payment" class="pg-checkbox">
-                  <span>Firmar y enviar recibo</span>
-                </label>
-                <label class="pg-flex pg-align-center pg-gap-2 pg-mt-2 pg-small" for="sign-receipt-only-after-payment">
-                  <input type="checkbox" id="sign-receipt-only-after-payment" class="pg-checkbox">
-                  <span>Solo firmar</span>
-                </label>
+                <fieldset class="receipt-signing-options">
+                  <legend class="receipt-signing-options-title">
+                    <i class="fas fa-file-signature" aria-hidden="true"></i>
+                    Recibo firmado
+                  </legend>
+                  <div class="receipt-signing-options-grid">
+                    <div class="receipt-signing-option-control">
+                      <input
+                        type="checkbox"
+                        id="send-receipt-after-payment"
+                        class="receipt-signing-option-input">
+                      <label
+                        class="receipt-signing-option receipt-signing-option-send"
+                        for="send-receipt-after-payment">
+                        <span class="receipt-signing-option-icon" aria-hidden="true">
+                          <i class="fas fa-envelope-open-text"></i>
+                        </span>
+                        <span class="receipt-signing-option-copy">
+                          <span class="receipt-signing-option-label">Firmar y enviar recibo</span>
+                          <span class="receipt-signing-option-description">Firma y envío por correo</span>
+                        </span>
+                        <span class="receipt-signing-option-check" aria-hidden="true">
+                          <i class="fas fa-check"></i>
+                        </span>
+                      </label>
+                    </div>
+                    <div class="receipt-signing-option-control">
+                      <input
+                        type="checkbox"
+                        id="sign-receipt-only-after-payment"
+                        class="receipt-signing-option-input">
+                      <label
+                        class="receipt-signing-option receipt-signing-option-store"
+                        for="sign-receipt-only-after-payment">
+                        <span class="receipt-signing-option-icon" aria-hidden="true">
+                          <i class="fas fa-signature"></i>
+                        </span>
+                        <span class="receipt-signing-option-copy">
+                          <span class="receipt-signing-option-label">Solo firmar</span>
+                          <span class="receipt-signing-option-description">Firma y guarda sin enviar</span>
+                        </span>
+                        <span class="receipt-signing-option-check" aria-hidden="true">
+                          <i class="fas fa-check"></i>
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                </fieldset>
               {% endif %}
             </div>
           </section>

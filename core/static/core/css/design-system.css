@@ -2589,6 +2589,173 @@ body.pg-modal-open {
       margin-top: 1rem;
     }
 
+    .receipt-signing-options {
+      border: 0;
+      margin: 0.9rem 0 0;
+      min-width: 0;
+      padding: 0;
+    }
+
+    .receipt-signing-options-title {
+      align-items: center;
+      color: var(--pg-foreground);
+      display: flex;
+      font-size: 0.88rem;
+      font-weight: 750;
+      gap: 0.45rem;
+      margin-bottom: 0.55rem;
+      padding: 0;
+      width: 100%;
+    }
+
+    .receipt-signing-options-title .fas {
+      color: var(--pg-info);
+    }
+
+    .receipt-signing-options-grid {
+      display: grid;
+      gap: 0.55rem;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    }
+
+    .receipt-signing-option-control {
+      min-width: 0;
+      position: relative;
+    }
+
+    .receipt-signing-option-input {
+      height: 1px;
+      opacity: 0;
+      pointer-events: none;
+      position: absolute;
+      width: 1px;
+    }
+
+    .receipt-signing-option {
+      align-items: center;
+      background: var(--pg-card);
+      border: 1px solid var(--pg-border);
+      border-radius: 0.5rem;
+      cursor: pointer;
+      display: grid;
+      gap: 0.7rem;
+      grid-template-columns: 2.5rem minmax(0, 1fr) 1.4rem;
+      min-height: 4.75rem;
+      padding: 0.7rem 0.75rem;
+      transition: border-color 0.16s ease, background-color 0.16s ease, box-shadow 0.16s ease;
+      width: 100%;
+    }
+
+    .receipt-signing-option:hover {
+      background: var(--pg-muted);
+      border-color: color-mix(in srgb, var(--pg-info) 45%, var(--pg-border));
+    }
+
+    .receipt-signing-option-icon {
+      align-items: center;
+      background: var(--pg-muted);
+      border-radius: 0.375rem;
+      color: var(--pg-muted-foreground);
+      display: flex;
+      font-size: 1.05rem;
+      height: 2.5rem;
+      justify-content: center;
+      width: 2.5rem;
+    }
+
+    .receipt-signing-option-copy {
+      display: grid;
+      gap: 0.15rem;
+      min-width: 0;
+    }
+
+    .receipt-signing-option-label {
+      color: var(--pg-foreground);
+      font-size: 0.88rem;
+      font-weight: 750;
+      line-height: 1.2;
+    }
+
+    .receipt-signing-option-description {
+      color: var(--pg-muted-foreground);
+      font-size: 0.76rem;
+      line-height: 1.25;
+    }
+
+    .receipt-signing-option-check {
+      align-items: center;
+      border: 2px solid var(--pg-border);
+      border-radius: 0.3rem;
+      color: transparent;
+      display: flex;
+      height: 1.35rem;
+      justify-content: center;
+      transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+      width: 1.35rem;
+    }
+
+    .receipt-signing-option-check .fas {
+      font-size: 0.68rem;
+    }
+
+    .receipt-signing-option-input:focus-visible + .receipt-signing-option {
+      outline: 3px solid color-mix(in srgb, var(--pg-info) 35%, transparent);
+      outline-offset: 2px;
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option {
+      background: color-mix(in srgb, var(--pg-info) 8%, var(--pg-card));
+      border-color: var(--pg-info);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pg-info) 30%, transparent);
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option .receipt-signing-option-icon {
+      background: var(--pg-info-soft);
+      color: var(--pg-info);
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option .receipt-signing-option-check {
+      background: var(--pg-info);
+      border-color: var(--pg-info);
+      color: var(--pg-info-foreground);
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option-store {
+      background: color-mix(in srgb, var(--pg-success) 8%, var(--pg-card));
+      border-color: var(--pg-success);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--pg-success) 30%, transparent);
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option-store .receipt-signing-option-icon {
+      background: var(--pg-success-soft);
+      color: var(--pg-success);
+    }
+
+    .receipt-signing-option-input:checked + .receipt-signing-option-store .receipt-signing-option-check {
+      background: var(--pg-success);
+      border-color: var(--pg-success);
+      color: var(--pg-success-foreground);
+    }
+
+    @media (max-width: 575px) {
+      .receipt-signing-options {
+        margin-top: 0.75rem;
+      }
+
+      .receipt-signing-options-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .receipt-signing-option {
+        min-height: 4.9rem;
+        padding: 0.75rem;
+      }
+
+      .receipt-signing-option-label {
+        font-size: 0.92rem;
+      }
+    }
+
     .client-financial-strip {
       background: var(--pg-card);
       border: 1px solid var(--pg-border);

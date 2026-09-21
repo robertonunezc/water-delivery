@@ -999,6 +999,113 @@ class ReceiptDeliveryServiceTests(FastTenantTestCase):
         receipt.refresh_from_db()
         self.assertIsNone(receipt.sent_at)
 
+    @patch("orders.services.receipt_delivery_service.get_receipt_storage")
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_bundle_delivery_attaches_existing_receipts_and_reports_missing_orders(
+        self,
+        send_email_cls: MagicMock,
+        storage_factory: MagicMock,
+    ) -> None:
+        from orders.models import OrderReceipt, ReceiptDeliveryMethod
+        from orders.services.receipt_delivery_service import ReceiptBundleDeliveryService
+
+        second_receipt_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("55.00"),
+        )
+        missing_order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("45.00"),
+        )
+        receipt = OrderReceipt.objects.create(
+            order=self.order,
+            method=ReceiptDeliveryMethod.NONE,
+            pdf_url="receipts/orders/1/receipt.pdf",
+            contact_name="Contacto original",
+            contact_email="original@example.com",
+            contact_phone="4421234567",
+            contact_position="Compras",
+            created_by=self.user,
+        )
+        OrderReceipt.objects.create(
+            order=second_receipt_order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/2/receipt.pdf",
+            contact_name="Segundo contacto",
+            contact_email="second@example.com",
+            created_by=self.user,
+        )
+        deleted_receipt = OrderReceipt.objects.create(
+            order=missing_order,
+            method=ReceiptDeliveryMethod.EMAIL,
+            pdf_url="receipts/orders/3/receipt.pdf",
+            contact_email="deleted@example.com",
+            created_by=self.user,
+        )
+        deleted_receipt.delete()
+        missing_order.refresh_from_db()
+        storage_factory.return_value.download_pdf.side_effect = [
+            b"%PDF-first",
+            b"%PDF-second",
+        ]
+
+        result = ReceiptBundleDeliveryService().send(
+            orders=[self.order, second_receipt_order, missing_order],
+            recipient_name="Maria Compras",
+            recipient_email="maria@example.com",
+        )
+
+        self.assertEqual(
+            result.attached_order_ids,
+            (self.order.pk, second_receipt_order.pk),
+        )
+        self.assertEqual(result.missing_order_ids, (missing_order.pk,))
+        attachments = send_email_cls.call_args.kwargs["attachments"]
+        self.assertEqual(len(attachments), 2)
+        self.assertEqual(
+            [attachment.filename for attachment in attachments],
+            [
+                f"recibo-pedido-{self.order.pk}.pdf",
+                f"recibo-pedido-{second_receipt_order.pk}.pdf",
+            ],
+        )
+        self.assertEqual(
+            [attachment.content for attachment in attachments],
+            [b"%PDF-first", b"%PDF-second"],
+        )
+        self.assertEqual(send_email_cls.call_args.kwargs["to"], "maria@example.com")
+        send_email_cls.return_value.send_email.assert_called_once()
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.method, ReceiptDeliveryMethod.NONE)
+        self.assertEqual(receipt.contact_name, "Contacto original")
+        self.assertEqual(receipt.contact_email, "original@example.com")
+        self.assertEqual(receipt.contact_phone, "4421234567")
+        self.assertEqual(receipt.contact_position, "Compras")
+        self.assertIsNone(receipt.sent_at)
+
+    @patch("orders.services.receipt_delivery_service.SendEmail")
+    def test_bundle_delivery_rejects_selection_without_receipts(
+        self,
+        send_email_cls: MagicMock,
+    ) -> None:
+        from orders.services.receipt_delivery_service import (
+            ReceiptBundleDeliveryService,
+            ReceiptDeliveryError,
+        )
+
+        with self.assertRaisesMessage(ReceiptDeliveryError, "No hay recibos firmados"):
+            ReceiptBundleDeliveryService().send(
+                orders=[self.order],
+                recipient_name="Maria Compras",
+                recipient_email="maria@example.com",
+            )
+
+        send_email_cls.assert_not_called()
+
 
 class OrderReceiptSignFormTests(FastTenantTestCase):
     def setUp(self) -> None:

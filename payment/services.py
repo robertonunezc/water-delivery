@@ -121,6 +121,7 @@ def _validate_selected_orders(
         raise ClientOrderPaymentError('Selecciona al menos un pedido para pagar.')
 
     allowed_ids = set(allowed_order_ids or [])
+    ineligible_orders = []
     for order in orders:
         if allowed_order_ids is not None and order.pk not in allowed_ids:
             raise ClientOrderPaymentError(
@@ -129,9 +130,15 @@ def _validate_selected_orders(
         if allowed_order_ids is None and order.client_id != client.id:
             raise ClientOrderPaymentError(f'El pedido #{order.id} no pertenece al cliente.')
         if order.status == OrderStatus.CANCELLED.value:
-            raise ClientOrderPaymentError(f'El pedido #{order.id} está cancelado.')
-        if get_unpaid_amount(order) <= 0:
-            raise ClientOrderPaymentError(f'El pedido #{order.id} ya está pagado.')
+            ineligible_orders.append(f'#{order.id} (está cancelado)')
+        elif get_unpaid_amount(order) <= 0:
+            ineligible_orders.append(f'#{order.id} (ya está pagado)')
+
+    if ineligible_orders:
+        details = ', '.join(ineligible_orders)
+        raise ClientOrderPaymentError(
+            f'No se pueden pagar los siguientes pedidos: {details}.'
+        )
 
 
 @transaction.atomic
