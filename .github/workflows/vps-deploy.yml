@@ -145,6 +145,16 @@ jobs:
           GRAFANA_CLOUD_USER: ${{ secrets['GRAFANA_CLOUD_USER'] }}
           GRAFANA_CLOUD_LOKI_URL: ${{ secrets['GRAFANA_CLOUD_LOKI_URL'] }}
           LOG_HOSTNAME: ${{ secrets.EC2_HOST }}
+          SEND_EMAIL_KEY: ${{ secrets['SEND_EMAIL_KEY'] }}
+          SEND_EMAIL_DOMAIN: ${{ secrets['SEND_EMAIL_DOMAIN'] }}
+          SEND_EMAIL_FROM: ${{ secrets['SEND_EMAIL_FROM'] }}
+          RECEIPT_R2_ENDPOINT_URL: ${{ secrets['RECEIPT_R2_ENDPOINT_URL'] }}
+          RECEIPT_R2_BUCKET_NAME: ${{ secrets['RECEIPT_R2_BUCKET_NAME'] }}
+          RECEIPT_R2_ACCESS_KEY_ID: ${{ secrets['RECEIPT_R2_ACCESS_KEY_ID'] }}
+          RECEIPT_R2_SECRET_ACCESS_KEY: ${{ secrets['RECEIPT_R2_SECRET_ACCESS_KEY'] }}
+          RECEIPT_R2_REGION: ${{ secrets['RECEIPT_R2_REGION'] }}
+          RECEIPT_R2_OBJECT_PREFIX: ${{ secrets['RECEIPT_R2_OBJECT_PREFIX'] }}
+          RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS: ${{ secrets['RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS'] }}
 
         run: |
           set -euo pipefail
@@ -165,6 +175,18 @@ jobs:
             printf '%s\n' "POSTGRES_USER=${POSTGRES_USER}"
             printf '%s\n' "POSTGRES_PASSWORD=${POSTGRES_PASSWORD}"
             printf '%s\n' "REDIS_PASSWORD=${REDIS_PASSWORD}"
+            printf '%s\n' "SEND_EMAIL_KEY=${SEND_EMAIL_KEY}"
+            printf '%s\n' "SEND_EMAIL_DOMAIN=${SEND_EMAIL_DOMAIN}"
+            if [ -n "${SEND_EMAIL_FROM:-}" ]; then
+              printf '%s\n' "SEND_EMAIL_FROM=${SEND_EMAIL_FROM}"
+            fi
+            printf '%s\n' "RECEIPT_R2_ENDPOINT_URL=${RECEIPT_R2_ENDPOINT_URL}"
+            printf '%s\n' "RECEIPT_R2_BUCKET_NAME=${RECEIPT_R2_BUCKET_NAME}"
+            printf '%s\n' "RECEIPT_R2_ACCESS_KEY_ID=${RECEIPT_R2_ACCESS_KEY_ID}"
+            printf '%s\n' "RECEIPT_R2_SECRET_ACCESS_KEY=${RECEIPT_R2_SECRET_ACCESS_KEY}"
+            printf '%s\n' "RECEIPT_R2_REGION=${RECEIPT_R2_REGION:-auto}"
+            printf '%s\n' "RECEIPT_R2_OBJECT_PREFIX=${RECEIPT_R2_OBJECT_PREFIX:-receipts}"
+            printf '%s\n' "RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS=${RECEIPT_R2_SIGNED_URL_EXPIRES_SECONDS:-900}"
           } > "$ENV_FILE"
 
           install -m 600 /dev/null "$LOGGING_ENV_FILE"
