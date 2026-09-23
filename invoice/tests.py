@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import connection
+from django.forms.models import inlineformset_factory
 from django.db.migrations.operations.base import Operation
 from django.db.migrations.state import ProjectState
 from django.test import TestCase, RequestFactory
@@ -18,7 +19,12 @@ from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceSchedule
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.models import Invoice, InvoiceOrderLink
-from invoice.admin import InvoiceAdmin, InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
+from invoice.admin import (
+	InvoiceAdmin,
+	InvoiceOrderLinkAdmin,
+	InvoiceOrderLinkAdminForm,
+	InvoiceOrderLinkInlineFormSet,
+)
 from invoice.services import validate_invoice_order_total
 from invoice.views import invoiceable_orders, invoice_client
 from tenant_client.test_utils import FastTenantTestCase
@@ -776,6 +782,74 @@ class CreateInvoiceFromOrdersServiceTests(InvoiceTenantTestCase):
 		self.assertEqual(invoice.amount, Decimal('0'))
 
 
+class CreateInvoiceWithOrdersServiceTests(InvoiceTenantTestCase):
+	def setUp(self):
+		self.client_obj = Client.objects.create(
+			name='Manual Invoice Client',
+			type='corporate',
+		)
+
+	def test_saves_invoice_and_links_orders(self):
+		from invoice.services import create_invoice_with_orders
+
+		order = Order.objects.create(
+			client=self.client_obj,
+			total_amount=Decimal('50.00'),
+			status='COMPLETED',
+		)
+		invoice = Invoice(
+			client=self.client_obj,
+			amount=Decimal('75.00'),
+			identifier='MANUAL-WITH-ORDER',
+			folio='MANUAL-WITH-ORDER',
+		)
+
+		created_invoice = create_invoice_with_orders(
+			invoice=invoice,
+			orders=[order],
+		)
+
+		self.assertIsNotNone(created_invoice.pk)
+		self.assertEqual(created_invoice.invoice_links.get().order, order)
+
+	def test_rejects_empty_orders_without_saving_invoice(self):
+		from invoice.services import create_invoice_with_orders
+
+		invoice = Invoice(
+			client=self.client_obj,
+			amount=Decimal('75.00'),
+			identifier='MANUAL-NO-ORDERS',
+			folio='MANUAL-NO-ORDERS',
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'al menos una venta'):
+			create_invoice_with_orders(invoice=invoice, orders=[])
+
+		self.assertIsNone(invoice.pk)
+		self.assertFalse(Invoice.objects.filter(identifier='MANUAL-NO-ORDERS').exists())
+
+	def test_rejects_orders_exceeding_manual_invoice_amount(self):
+		from invoice.services import create_invoice_with_orders
+
+		order = Order.objects.create(
+			client=self.client_obj,
+			total_amount=Decimal('80.00'),
+			status='COMPLETED',
+		)
+		invoice = Invoice(
+			client=self.client_obj,
+			amount=Decimal('75.00'),
+			identifier='MANUAL-OVER-CAP',
+			folio='MANUAL-OVER-CAP',
+		)
+
+		with self.assertRaisesMessage(ValidationError, 'excede el monto'):
+			create_invoice_with_orders(invoice=invoice, orders=[order])
+
+		self.assertIsNone(invoice.pk)
+		self.assertFalse(Invoice.objects.filter(identifier='MANUAL-OVER-CAP').exists())
+
+
 class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 	def setUp(self):
 		super().setUp()
@@ -790,18 +864,50 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		)
 		self.client.force_login(self.superuser)
 
+	def _completed_order(self, client, amount='50.00'):
+		return Order.objects.create(
+			client=client,
+			total_amount=Decimal(amount),
+			status='COMPLETED',
+		)
+
+	def test_create_invoice_admin_view_requires_linked_orders(self):
+		url = reverse('admin_create_invoice')
+		data = {
+			'client': self.client_obj.id,
+			'identifier': 'SER-NO-ORDERS',
+			'folio': 'FOL-NO-ORDERS',
+			'amount': '150.00',
+			'auto_amount': False,
+		}
+
+		response = self.client.post(url, data)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertFormError(
+			response.context['form'],
+			'orders',
+			'Debe vincular al menos una venta para crear la factura.',
+		)
+		self.assertFalse(Invoice.objects.filter(identifier='SER-NO-ORDERS').exists())
+
 	def test_create_invoice_admin_view_post(self):
+		order = self._completed_order(self.client_obj)
 		url = reverse('admin_create_invoice')
 		data = {
 			'client': self.client_obj.id,
 			'identifier': 'SER-NEW',
 			'folio': 'FOL-NEW',
 			'amount': '150.00',
-			'auto_amount': False
+			'auto_amount': False,
+			'orders': [order.id],
 		}
 		response = self.client.post(url, data)
 		self.assertEqual(response.status_code, 302) # Redirect to edit page
-		self.assertTrue(Invoice.objects.filter(identifier='SER-NEW').exists())
+		invoice = Invoice.objects.get(identifier='SER-NEW')
+		self.assertTrue(
+			InvoiceOrderLink.objects.filter(invoice=invoice, order=order).exists()
+		)
 
 	def test_create_invoice_admin_view_post_branch_uses_corporate(self):
 		branch = Client.objects.create(
@@ -809,13 +915,15 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 			type='branch',
 			corporate=self.client_obj,
 		)
+		order = self._completed_order(branch)
 		url = reverse('admin_create_invoice')
 		data = {
 			'client': branch.id,
 			'identifier': 'SER-BRANCH',
 			'folio': 'FOL-BRANCH',
 			'amount': '150.00',
-			'auto_amount': False
+			'auto_amount': False,
+			'orders': [order.id],
 		}
 
 		response = self.client.post(url, data)
@@ -823,6 +931,7 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		self.assertEqual(response.status_code, 302)
 		invoice = Invoice.objects.get(identifier='SER-BRANCH')
 		self.assertEqual(invoice.client, self.client_obj)
+		self.assertEqual(invoice.invoice_links.get().order, order)
 
 	def test_edit_invoice_admin_view_post_link_order(self):
 		# Create completed order
@@ -872,6 +981,38 @@ class InvoiceAdminSaveModelTests(InvoiceTenantTestCase):
 
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.client, self.corporate)
+
+	def test_add_form_requires_at_least_one_order_inline(self):
+		formset_class = inlineformset_factory(
+			Invoice,
+			InvoiceOrderLink,
+			formset=InvoiceOrderLinkInlineFormSet,
+			fields=('order', 'is_paid', 'partially_paid'),
+			extra=0,
+			can_delete=True,
+		)
+		invoice = Invoice(
+			client=self.corporate,
+			amount=Decimal('75.00'),
+			identifier='ADM-NO-ORDERS',
+			folio='ADM-NO-ORDERS',
+		)
+		formset = formset_class(
+			data={
+				'invoice_links-TOTAL_FORMS': '0',
+				'invoice_links-INITIAL_FORMS': '0',
+				'invoice_links-MIN_NUM_FORMS': '0',
+				'invoice_links-MAX_NUM_FORMS': '1000',
+			},
+			instance=invoice,
+			prefix='invoice_links',
+		)
+
+		self.assertFalse(formset.is_valid())
+		self.assertIn(
+			'Debe vincular al menos una venta para crear la factura.',
+			formset.non_form_errors(),
+		)
 
 
 class InvoiceBalanceSnapshotServiceTests(InvoiceTenantTestCase):

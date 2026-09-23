@@ -41,6 +41,14 @@
             {% endif %}
           </div>
 
+          <div class="pg-col-md-12">
+            <label for="{{ form.orders.id_for_label }}" class="pg-label">Ventas vinculadas *</label>
+            {{ form.orders }}
+            <div class="pg-field-help">
+              Selecciona una o más ventas completadas y pendientes de facturar.
+            </div>
+          </div>
+
           <!-- Serie / Folio -->
           <div class="pg-col-md-6">
             <label for="{{ form.identifier.id_for_label }}" class="pg-label">Serie (Identificador) *</label>
@@ -104,6 +112,9 @@
     constructor() {
       this.autoAmountCheckbox = document.getElementById('{{ form.auto_amount.id_for_label }}');
       this.amountInput = document.getElementById('{{ form.amount.id_for_label }}');
+      this.clientSelect = document.getElementById('{{ form.client.id_for_label }}');
+      this.ordersSelect = document.getElementById('{{ form.orders.id_for_label }}');
+      this.ordersUrl = "{% url 'invoice:invoiceable_orders' 0 %}";
       this.init();
     }
 
@@ -113,6 +124,13 @@
         this.autoAmountCheckbox.addEventListener('change', () => this.handleModeChange());
         // Run initial check
         this.handleModeChange();
+      }
+
+      if (this.clientSelect && this.ordersSelect) {
+        this.clientSelect.addEventListener('change', () => this.loadOrders());
+        if (this.clientSelect.value && this.ordersSelect.options.length === 0) {
+          this.loadOrders();
+        }
       }
     }
 
@@ -126,6 +144,50 @@
         this.amountInput.disabled = false;
         this.amountInput.placeholder = '0.00';
       }
+    }
+
+    async loadOrders() {
+      const clientId = this.clientSelect.value;
+      this.ordersSelect.innerHTML = '';
+
+      if (!clientId) {
+        this.addOrderOption('', 'Selecciona un cliente primero');
+        this.ordersSelect.disabled = true;
+        return;
+      }
+
+      this.addOrderOption('', 'Cargando ventas...');
+      this.ordersSelect.disabled = true;
+
+      try {
+        const url = this.ordersUrl.replace('/0/', `/${clientId}/`);
+        const response = await fetch(`${url}?scope=fiscal_owner`);
+        if (!response.ok) {
+          throw new Error('No fue posible cargar las ventas');
+        }
+
+        const data = await response.json();
+        this.ordersSelect.innerHTML = '';
+        data.orders.forEach((order) => {
+          this.addOrderOption(order.id, order.display);
+        });
+
+        if (data.orders.length === 0) {
+          this.addOrderOption('', 'No hay ventas disponibles para facturar');
+        }
+      } catch (error) {
+        this.ordersSelect.innerHTML = '';
+        this.addOrderOption('', 'No fue posible cargar las ventas');
+      } finally {
+        this.ordersSelect.disabled = false;
+      }
+    }
+
+    addOrderOption(value, label) {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      this.ordersSelect.appendChild(option);
     }
   }
 

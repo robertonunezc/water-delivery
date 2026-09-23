@@ -8,8 +8,9 @@ Contains business logic for billing operations including:
 - Date range utilities
 """
 from datetime import date, timedelta, datetime
-from typing import Optional, List, Dict, Tuple
+from typing import Optional, List, Dict, Sequence, Tuple
 from decimal import Decimal
+from django.db import transaction
 from django.db.models import Count, Sum, Q, Prefetch
 from django.core.exceptions import ValidationError
 from calendar import monthrange
@@ -265,6 +266,44 @@ def set_billing_date_to_clients() -> Optional[date]:
 
 
 # Billing Order Validation Services
+
+
+def create_invoice_with_orders(
+    *,
+    invoice: 'invoice.models.Invoice',
+    orders: Sequence[Order],
+) -> 'invoice.models.Invoice':
+    """Create an invoice and its order links in one transaction."""
+    from invoice.models import InvoiceOrderLink
+
+    order_ids = [order.pk for order in orders]
+    if not order_ids:
+        raise ValidationError(
+            'Debe vincular al menos una venta para crear la factura.'
+        )
+
+    with transaction.atomic():
+        locked_orders = list(
+            Order.objects.select_for_update()
+            .select_related('client')
+            .filter(pk__in=order_ids)
+        )
+        if len(locked_orders) != len(set(order_ids)):
+            raise ValidationError('Una o más ventas seleccionadas ya no existen.')
+
+        invoice.client = get_invoice_fiscal_owner(invoice.client)
+        order_amounts = [order.total_amount for order in locked_orders]
+        if invoice.auto_amount:
+            invoice.amount = sum(order_amounts, Decimal('0'))
+        else:
+            validate_invoice_orders_total_limit(invoice.amount, order_amounts)
+
+        invoice.save()
+        for order in locked_orders:
+            validate_order_can_link_to_invoice(invoice=invoice, order=order)
+            InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+    return invoice
 
 
 def add_order_to_invoice(

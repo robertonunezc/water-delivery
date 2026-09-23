@@ -1,8 +1,15 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from typing import Any
+
 from invoice.models import Invoice, InvoiceOrderLink
-from invoice.services import get_invoice_fiscal_owner, get_invoiceable_orders_for_client
+from invoice.services import (
+    get_invoice_fiscal_owner,
+    get_invoiceable_orders_for_client,
+    validate_invoice_orders_total_limit,
+)
 from clients.models import Client
+from orders.models import Order
 
 class InvoiceForm(forms.ModelForm):
     class Meta:
@@ -41,6 +48,57 @@ class InvoiceForm(forms.ModelForm):
         if not auto_amount and amount is None:
             raise ValidationError({'amount': 'El monto es obligatorio para facturas de cálculo manual.'})
         
+        return cleaned_data
+
+
+class InvoiceCreateForm(InvoiceForm):
+    orders = forms.ModelMultipleChoiceField(
+        queryset=Order.objects.none(),
+        required=True,
+        label='Ventas vinculadas',
+        error_messages={
+            'required': 'Debe vincular al menos una venta para crear la factura.',
+        },
+        widget=forms.SelectMultiple(attrs={'class': 'pg-select', 'size': 8}),
+    )
+
+    class Meta(InvoiceForm.Meta):
+        fields = [*InvoiceForm.Meta.fields, 'orders']
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        client = self._selected_client()
+        if client is not None:
+            self.fields['orders'].queryset = get_invoiceable_orders_for_client(
+                client=client,
+                scope='fiscal_owner',
+                as_dict=False,
+            )
+
+    def _selected_client(self) -> Client | None:
+        client_value = self.data.get(self.add_prefix('client')) if self.is_bound else None
+        if isinstance(client_value, Client):
+            return client_value
+        try:
+            return Client.objects.filter(pk=int(client_value)).first()
+        except (TypeError, ValueError):
+            return None
+
+    def clean(self) -> dict[str, Any]:
+        cleaned_data = super().clean()
+        orders = cleaned_data.get('orders')
+        amount = cleaned_data.get('amount')
+        auto_amount = cleaned_data.get('auto_amount')
+
+        if orders is not None and amount is not None and not auto_amount:
+            try:
+                validate_invoice_orders_total_limit(
+                    amount,
+                    [order.total_amount for order in orders],
+                )
+            except ValidationError as exc:
+                self.add_error('orders', exc)
+
         return cleaned_data
 
 

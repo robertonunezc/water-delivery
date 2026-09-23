@@ -129,14 +129,14 @@ class InvoiceOrderLinkInlineFormSet(BaseInlineFormSet):
 
 	def clean(self):
 		"""Validate all invoice-order links before saving."""
+		from django.core.exceptions import ValidationError
 		from invoice.services import validate_invoice_orders_total_limit
 
 		super().clean()
-
-		invoice = self.instance
-		if invoice.auto_amount:
+		if any(self.errors):
 			return
 
+		invoice = self.instance
 		order_amounts = []
 		for form in self.forms:
 			if not form.cleaned_data or form.cleaned_data.get('DELETE'):
@@ -145,6 +145,14 @@ class InvoiceOrderLinkInlineFormSet(BaseInlineFormSet):
 			if order is None:
 				continue
 			order_amounts.append(order.total_amount)
+
+		if not invoice.pk and not order_amounts:
+			raise ValidationError(
+				'Debe vincular al menos una venta para crear la factura.'
+			)
+
+		if invoice.auto_amount or invoice.amount is None:
+			return
 
 		validate_invoice_orders_total_limit(invoice.amount, order_amounts)
 

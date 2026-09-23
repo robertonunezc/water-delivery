@@ -129,17 +129,29 @@ def list_invoices_admin(request):
 
 @staff_member_required
 def create_invoice_admin(request):
-    from invoice.forms import InvoiceForm
+    from invoice.forms import InvoiceCreateForm
+    from invoice.services import create_invoice_with_orders
     from django.contrib import messages
+    from django.core.exceptions import ValidationError
 
     if request.method == 'POST':
-        form = InvoiceForm(request.POST, request.FILES)
+        form = InvoiceCreateForm(request.POST, request.FILES)
         if form.is_valid():
-            invoice = form.save()
-            messages.success(request, f'Factura #{invoice.id} creada exitosamente. Ahora puede vincular ventas.')
-            return redirect('admin_edit_invoice', pk=invoice.pk)
+            try:
+                invoice = create_invoice_with_orders(
+                    invoice=form.save(commit=False),
+                    orders=list(form.cleaned_data['orders']),
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(
+                    request,
+                    f'Factura #{invoice.id} creada exitosamente con sus ventas vinculadas.',
+                )
+                return redirect('admin_edit_invoice', pk=invoice.pk)
     else:
-        form = InvoiceForm()
+        form = InvoiceCreateForm()
 
     context = {
         'form': form,
