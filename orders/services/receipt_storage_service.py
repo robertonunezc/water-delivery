@@ -61,8 +61,19 @@ class CloudflareR2ReceiptStorage:
             )
         return cls(config)
 
-    def upload_pdf(self, order_id: int, pdf_bytes: bytes) -> str:
-        key = self._object_key(order_id)
+    def upload_pdf(
+        self,
+        order_id: int,
+        pdf_bytes: bytes,
+        *,
+        tenant_id: int | None = None,
+        client_id: int | None = None,
+    ) -> str:
+        key = self._object_key(
+            tenant_id=tenant_id,
+            client_id=client_id,
+            order_id=order_id,
+        )
         self.client.put_object(
             Bucket=self.config.bucket_name,
             Key=key,
@@ -85,7 +96,17 @@ class CloudflareR2ReceiptStorage:
             ExpiresIn=self.config.signed_url_expires_seconds,
         )
 
-    def _object_key(self, order_id: int) -> str:
+    def _object_key(
+        self,
+        tenant_id: int | None,
+        client_id: int | None,
+        order_id: int,
+    ) -> str:
+        if tenant_id is not None and client_id is not None:
+            return (
+                f"{self.config.object_prefix}/tenants/{tenant_id}"
+                f"/clients/{client_id}/orders/{order_id}/receipt.pdf"
+            )
         return f"{self.config.object_prefix}/orders/{order_id}/receipt.pdf"
 
 

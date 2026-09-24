@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.db import IntegrityError
+from django.db import IntegrityError, connection
 
 from orders.models import Order, OrderReceipt, OrderStatus, ReceiptDeliveryMethod
 from orders.services.receipt_delivery_service import (
@@ -65,7 +65,12 @@ def create_signed_receipt(
             contact=contact,
             signature_data_url=str(cleaned_data["signature_data"]),
         )
-        pdf_url = get_receipt_storage().upload_pdf(order_id=order.pk, pdf_bytes=pdf_bytes)
+        pdf_url = get_receipt_storage().upload_pdf(
+            tenant_id=connection.tenant.pk,
+            client_id=order.client_id,
+            order_id=order.pk,
+            pdf_bytes=pdf_bytes,
+        )
     except (ReceiptPdfError, ReceiptStorageError) as exc:
         raise ReceiptCreationError(str(exc)) from exc
 
@@ -115,7 +120,12 @@ def create_signature_only_receipt(
             contact=None,
             signature_data_url=signature_data,
         )
-        pdf_url = get_receipt_storage().upload_pdf(order_id=order.pk, pdf_bytes=pdf_bytes)
+        pdf_url = get_receipt_storage().upload_pdf(
+            tenant_id=connection.tenant.pk,
+            client_id=order.client_id,
+            order_id=order.pk,
+            pdf_bytes=pdf_bytes,
+        )
     except (ReceiptPdfError, ReceiptStorageError) as exc:
         raise ReceiptCreationError(str(exc)) from exc
 
