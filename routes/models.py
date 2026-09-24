@@ -187,12 +187,18 @@ class RouteClient(TimeStampedModel):
     )
 
     objects = RouteClientManager()
-    
+
     class Meta:
-        unique_together = ('route', 'client')
         verbose_name = 'Cliente en Ruta'
         verbose_name_plural = 'Clientes en Rutas'
         ordering = ['sequence']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['route', 'client'],
+                condition=Q(deleted_at__isnull=True),
+                name='routes_routeclient_active_uniq',
+            ),
+        ]
         indexes = [
             models.Index(fields=['is_active'], name='routes_client_active_idx'),
             models.Index(fields=['interval_weeks'], name='routes_client_interval_idx'),

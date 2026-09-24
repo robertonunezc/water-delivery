@@ -231,6 +231,61 @@ class RouteClientFrequencyIntervalTest(FastTenantTestCase):
         self.assertEqual(due_second_week.count(), 1)
 
 
+class RouteClientSoftDeleteTest(FastTenantTestCase):
+    def setUp(self):
+        self.delivery_client = Client.objects.create(name='Reactivated Route Client')
+        Address.objects.create(
+            client=self.delivery_client,
+            type='delivery',
+            street='Calle Reactivada',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='RST-001',
+            model='Test Vehicle',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Route Monday',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+
+    def test_can_reassign_client_to_route_after_soft_delete(self):
+        route_client = RouteClient.objects.create(
+            route=self.route,
+            client=self.delivery_client,
+            sequence=1,
+            is_active=True,
+        )
+        route_client.delete()
+
+        new_route_client = RouteClient.objects.create(
+            route=self.route,
+            client=self.delivery_client,
+            sequence=2,
+            is_active=True,
+        )
+
+        self.assertEqual(new_route_client.route, self.route)
+        self.assertEqual(new_route_client.client, self.delivery_client)
+        self.assertEqual(
+            RouteClient.objects.filter(
+                route=self.route,
+                client=self.delivery_client,
+            ).count(),
+            1,
+        )
+        self.assertEqual(
+            RouteClient.all_objects.filter(
+                route=self.route,
+                client=self.delivery_client,
+            ).count(),
+            2,
+        )
+
+
 class RouteDashboardSummaryServiceTest(FastTenantTestCase):
     def setUp(self):
         self.transport = Transport.objects.create(
