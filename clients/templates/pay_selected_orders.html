@@ -64,6 +64,10 @@
             <div class="pg-field-help">Debe cubrir el total seleccionado. El excedente se agrega al saldo.</div>
           </div>
           <div class="pg-mb-3">
+            <label for="payment_date" class="pg-label">Fecha de pago</label>
+            <input id="payment_date" name="payment_date" type="date" value="{{ payment_date }}" class="pg-input" required>
+          </div>
+          <div class="pg-mb-3">
             <label for="payment_method" class="pg-label">Método de pago</label>
             <select id="payment_method" name="payment_method" class="pg-select" required>
               {% for value, label in payment_types %}

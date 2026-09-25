@@ -10,13 +10,14 @@ from django.db import connection
 from django.forms.models import inlineformset_factory
 from django.db.migrations.operations.base import Operation
 from django.db.migrations.state import ProjectState
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.utils import timezone
 
 from clients.models import Address, Client, InvoiceData
 from clients.forms import InvoiceScheduleForm
 from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceSchedule
+from invoice.forms import InvoiceForm
 from invoice.admin import InvoiceOrderLinkAdminForm, InvoiceOrderLinkAdmin
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.admin import (
@@ -38,6 +39,17 @@ class InvoiceTenantTestCase(FastTenantTestCase):
 		tenant.paid_until = timezone.now().date() + timedelta(days=30)
 		tenant.on_trial = False
 		return tenant
+
+
+class InvoiceFormRenderingTests(SimpleTestCase):
+	def test_emitted_date_uses_html_date_value_format(self) -> None:
+		invoice = Invoice(emmited_at=date(2026, 10, 15))
+
+		rendered_field = str(InvoiceForm(instance=invoice)['emmited_at'])
+
+		self.assertIn('type="date"', rendered_field)
+		self.assertIn('value="2026-10-15"', rendered_field)
+		self.assertNotIn('value="15/10/2026"', rendered_field)
 
 
 class InvoiceCancellationModelTests(InvoiceTenantTestCase):

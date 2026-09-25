@@ -16,7 +16,10 @@ class InvoiceForm(forms.ModelForm):
         model = Invoice
         fields = ['client', 'identifier', 'folio', 'amount', 'emmited_at', 'file', 'auto_amount']
         widgets = {
-            'emmited_at': forms.DateInput(attrs={'type': 'date', 'class': 'pg-input'}),
+            'emmited_at': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'type': 'date', 'class': 'pg-input'},
+            ),
             'client': forms.Select(attrs={'class': 'pg-select'}),
             'identifier': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'SER-XXX'}),
             'folio': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'FOL-XXX'}),

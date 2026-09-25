@@ -689,6 +689,108 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertEqual(self.branch.balance, Decimal('0.00'))
         self.assertTrue(order.payments.filter(method='balance', client=self.corporate).exists())
 
+    @patch('clients.views.timezone.localdate')
+    def test_selected_order_payment_defaults_payment_date_to_today(
+        self,
+        localdate_mock: MagicMock,
+    ) -> None:
+        localdate_mock.return_value = date(2026, 9, 25)
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+
+        response = self.client.get(
+            reverse('clients:pay_selected_orders', args=[self.branch.pk]),
+            {'orders': [str(order.pk)]},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="payment_date"')
+        self.assertContains(response, 'value="2026-09-25"')
+
+    def test_selected_credit_order_payment_uses_submitted_payment_date(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.branch.pk]),
+            {
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'payment_method': 'cash',
+                'payment_date': '2026-07-14',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        payment = order.payments.get(method='cash')
+        credit_transaction = CreditTransaction.objects.get(
+            reference_order=order,
+            transaction_type='payment',
+        )
+        self.assertEqual(timezone.localtime(payment.date).date(), date(2026, 7, 14))
+        self.assertEqual(credit_transaction.date, date(2026, 7, 14))
+
+    @patch('clients.views.timezone.localdate')
+    def test_selected_order_payment_preserves_date_after_payment_error(
+        self,
+        localdate_mock: MagicMock,
+    ) -> None:
+        localdate_mock.return_value = date(2026, 9, 25)
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.branch.pk]),
+            {
+                'orders': [str(order.pk)],
+                'amount': '50.00',
+                'payment_method': 'cash',
+                'payment_date': '2026-07-14',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-07-14"')
+
+    def test_selected_order_payment_requires_payment_date(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.branch.pk]),
+            {
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'payment_method': 'cash',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'La fecha de pago es obligatoria.')
+        self.assertFalse(order.payments.filter(method='cash').exists())
+
     def test_pay_credit_requires_selected_orders_for_payment(self) -> None:
         response = self.client.post(
             reverse('clients:pay_credit', args=[self.branch.pk]),

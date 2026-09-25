@@ -51,6 +51,7 @@ from .services.product_price_service import (
     update_client_product_prices,
 )
 from core.services.feature_flags import is_receipt_signature_enabled
+from core.utils import parse_date_input
 from orders.models import Order
 from orders.services.receipt_delivery_service import (
     ReceiptBundleDeliveryService,
@@ -758,6 +759,15 @@ def _parse_payment_amount(raw_amount: str) -> Decimal:
         raise payment_services.ClientOrderPaymentError('El monto de pago es inválido.')
 
 
+def _parse_payment_date(raw_payment_date: object) -> date:
+    payment_date = parse_date_input(raw_payment_date, field_name='Fecha de pago')
+    if payment_date is None:
+        raise payment_services.ClientOrderPaymentError(
+            'La fecha de pago es obligatoria.'
+        )
+    return payment_date
+
+
 def _receipt_bundle_error(message: str, status: int = 400) -> JsonResponse:
     return JsonResponse({'success': False, 'message': message}, status=status)
 
@@ -794,6 +804,7 @@ def _selected_order_payment_context(
     selected_orders: List[Order],
     *,
     amount: Decimal | None = None,
+    payment_date: str | None = None,
     error_message: str | None = None,
 ) -> dict[str, Any]:
     for order in selected_orders:
@@ -813,6 +824,7 @@ def _selected_order_payment_context(
         'selected_orders': selected_orders,
         'selected_total': selected_total,
         'payment_amount': amount if amount is not None else selected_total,
+        'payment_date': payment_date or timezone.localdate().isoformat(),
         'payment_types': payment_types,
         'error_message': error_message,
     }
@@ -833,18 +845,21 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
         submitted_amount = Decimal('0.00')
         try:
             submitted_amount = _parse_payment_amount(request.POST.get('amount', '0'))
+            payment_date = _parse_payment_date(request.POST.get('payment_date'))
             result = payment_services.pay_client_orders(
                 client=client,
                 orders=selected_orders,
                 payment_method=request.POST.get('payment_method', 'cash'),
                 amount=submitted_amount,
                 request_user=request.user,
+                payment_date=payment_date,
             )
         except (payment_services.ClientOrderPaymentError, ValueError) as exc:
             context = _selected_order_payment_context(
                 client,
                 selected_orders,
                 amount=submitted_amount,
+                payment_date=request.POST.get('payment_date'),
                 error_message=str(exc),
             )
             return render(request, 'pay_selected_orders.html', context)
