@@ -56,7 +56,9 @@ class OrderQuerySet(models.QuerySet):
         Returns:
             QuerySet of unbilled orders
         """
-        return self.filter(invoice_links__isnull=True).distinct()
+        return self.exclude(
+            invoice_links__invoice__status='ACTIVE',
+        ).distinct()
 
     def for_client(self, client):
         """
@@ -86,17 +88,16 @@ class OrderQuerySet(models.QuerySet):
         # Billable orders must be completed and not linked to another invoice.
         # When editing, keep the currently linked order selectable even if it no
         # longer matches the billable filters.
-        billable_filter = Q(
-            status=OrderStatus.COMPLETED.value,
-            invoice_links__isnull=True,
+        client_orders = self.for_client(client)
+        billable_ids = (
+            client_orders.filter(status=OrderStatus.COMPLETED.value)
+            .exclude(invoice_links__invoice__status='ACTIVE')
+            .values('pk')
         )
-
+        selection = Q(pk__in=billable_ids)
         if exclude_order_id:
-            qs = self.for_client(client).filter(
-                billable_filter | Q(pk=exclude_order_id)
-            )
-        else:
-            qs = self.for_client(client).filter(billable_filter)
+            selection |= Q(pk=exclude_order_id)
+        qs = client_orders.filter(selection)
 
         return qs.distinct().order_by('-order_date')
 
@@ -108,18 +109,17 @@ class OrderQuerySet(models.QuerySet):
         that belong to branches under that fiscal owner.
         """
         fiscal_owner_id = fiscal_owner.pk if hasattr(fiscal_owner, 'pk') else fiscal_owner
-        billable_filter = Q(
-            status=OrderStatus.COMPLETED.value,
-            invoice_links__isnull=True,
-        )
         owner_filter = Q(client_id=fiscal_owner_id) | Q(client__corporate_id=fiscal_owner_id)
-
+        owner_orders = self.filter(owner_filter)
+        billable_ids = (
+            owner_orders.filter(status=OrderStatus.COMPLETED.value)
+            .exclude(invoice_links__invoice__status='ACTIVE')
+            .values('pk')
+        )
+        selection = Q(pk__in=billable_ids)
         if exclude_order_id:
-            qs = self.filter(owner_filter).filter(
-                billable_filter | Q(pk=exclude_order_id)
-            )
-        else:
-            qs = self.filter(owner_filter).filter(billable_filter)
+            selection |= Q(pk=exclude_order_id)
+        qs = owner_orders.filter(selection)
 
         return qs.distinct().order_by('-order_date')
 

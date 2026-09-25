@@ -23,7 +23,10 @@ def _pending_invoice_count(client_invoices: Sequence[Any]) -> int:
     return sum(
         1
         for invoice in client_invoices
-        if getattr(invoice, "pending_amount", 0) > 0
+        if (
+            getattr(invoice, 'status', 'ACTIVE') == 'ACTIVE'
+            and getattr(invoice, "pending_amount", 0) > 0
+        )
     )
 
 

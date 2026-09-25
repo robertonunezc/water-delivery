@@ -1,269 +1,149 @@
 {% extends 'base.html' %}
 
-{% block extra_css %}
-{% endblock %}
-
 {% block content %}
 <div class="pg-container-fluid pg-mt-3">
-  <div class="pg-mb-3 pg-flex pg-justify-between pg-align-center">
-    <a href="{% url 'admin_invoices' %}" class="pg-text-decoration-none">← Regresar</a>
-    <span class="pg-badge pg-bg-secondary">Factura ID: #{{ invoice.id }}</span>
+  <div class="pg-flex pg-flex-wrap pg-justify-between pg-align-center pg-gap-3 pg-mb-4">
+    <div>
+      <a href="{% url 'admin_invoices' %}" class="pg-text-decoration-none">
+        <i class="fas fa-arrow-left"></i> Volver a facturas
+      </a>
+      <h1 class="pg-h3 pg-mb-1 pg-mt-2">Factura {{ invoice.identifier }}-{{ invoice.folio }}</h1>
+      <p class="pg-text-muted pg-mb-0">Registro #{{ invoice.id }}</p>
+    </div>
+    <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-center">
+      {% if invoice.status == 'ACTIVE' %}
+        <span class="pg-badge pg-bg-success">ACTIVA</span>
+        <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{% url 'admin_edit_invoice' invoice.id %}">
+          <button type="submit" class="pg-button pg-button-outline-danger">
+            <i class="fas fa-ban"></i> Cancelar factura
+          </button>
+        </form>
+      {% else %}
+        <span class="pg-badge pg-bg-danger">CANCELADA</span>
+      {% endif %}
+      <a href="{% url 'admin_create_invoice' %}" class="pg-button pg-button-primary">
+        <i class="fas fa-plus"></i> Nueva factura
+      </a>
+    </div>
   </div>
 
-  {% if messages %}
-    <div class="pg-row pg-mb-3">
-      <div class="pg-col-12">
-        {% for message in messages %}
-          <div class="pg-alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} pg-alert-dismissible pg-fade pg-show" role="alert">
-            {{ message }}
-            <button type="button" class="pg-modal-close" data-pg-dismiss="alert" aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      </div>
+  {% if invoice.status == 'CANCELLED' %}
+    <div class="pg-alert pg-alert-danger pg-mb-4" role="alert">
+      <strong>Factura cancelada.</strong>
+      No se incluye en reportes, saldos, cobranza ni fechas de vencimiento.
+      {% if invoice.cancelled_at %}
+        Cancelada el {{ invoice.cancelled_at|date:'d/m/Y H:i' }}.
+      {% endif %}
     </div>
   {% endif %}
 
-  <div class="pg-row pg-gap-4">
-    <!-- Left Column: Edit Form -->
-    <div class="pg-col-lg-5">
-      <div class="pg-card detail-card">
-        <div class="pg-card-header form-card-header detail-card-header">
-          <h2 class="pg-h5 pg-mb-0">  Detalles de la Factura</h2>
-          <p class="pg-text-white-muted pg-small pg-mb-0 pg-mt-1">Información general, archivos y modo de cálculo.</p>
+  <div class="pg-row pg-gap-4 pg-mb-4">
+    <section class="pg-col-lg-7">
+      <div class="pg-card dashboard-card pg-h-100">
+        <div class="pg-card-header">
+          <h2 class="pg-h5 pg-mb-0">Datos de la factura</h2>
         </div>
         <div class="pg-card-body pg-p-4">
-          <form method="post" enctype="multipart/form-data" novalidate>
-            {% csrf_token %}
-
-            <div class="pg-row pg-gap-3">
-              <!-- Client (Read-Only) -->
-              <div class="pg-col-md-12">
-                <label class="pg-label">Cliente</label>
-                <input class="pg-input" type="text" value="{{ invoice.client.name }}" disabled>
-                <div hidden>{{ form.client }}</div> <!-- Hidden field for form processing -->
-              </div>
-
-              <!-- Serie / Folio -->
-              <div class="pg-col-md-6">
-                <label for="{{ form.identifier.id_for_label }}" class="pg-label">Serie (Identificador) *</label>
-                {{ form.identifier }}
-              </div>
-              <div class="pg-col-md-6">
-                <label for="{{ form.folio.id_for_label }}" class="pg-label">Folio *</label>
-                {{ form.folio }}
-              </div>
-
-              <!-- Emit Date -->
-              <div class="pg-col-md-6">
-                <label for="{{ form.emmited_at.id_for_label }}" class="pg-label">Fecha Emision</label>
-                {{ form.emmited_at }}
-              </div>
-
-              <!-- Auto Amount Checkbox -->
-              {% comment %} <div class="pg-col-md-6">
-                <label class="pg-label">Modo de Calculo</label>
-                <div class="pg-card pg-p-2 pg-border pg-shadow-sm">
-                  <div class="pg-checkbox pg-switch pg-flex pg-align-center pg-gap-2">
-                    {{ form.auto_amount }}
-                    <label class="pg-checkbox-label pg-fw-bold" for="{{ form.auto_amount.id_for_label }}">
-                      Calculo Automatico
-                    </label>
-                  </div>
-                </div>
-              </div> {% endcomment %}
-
-              <!-- Amount -->
-              <div class="pg-col-md-12">
-                <label for="{{ form.amount.id_for_label }}" class="pg-label">Cantidad ($) *</label>
-                <div class="pg-input-group">
-                  <span class="pg-input-group-text">$</span>
-                  {{ form.amount }}
-                </div>
-                {% if invoice.auto_amount %}
-                  <div class="pg-field-help pg-text-info">
-                    El monto esta bloqueado al calculo automatico (suma de ventas vinculadas). Para ingresar un monto manualmente, desmarca "Calculo Automatico".
-                  </div>
-                {% endif %}
-              </div>
-
-              <!-- File Download / Upload -->
-              <div class="pg-col-md-12">
-                <div class="pg-card pg-p-3 pg-border pg-shadow-sm">
-                  <label for="{{ form.file.id_for_label }}" class="pg-label pg-fw-bold">Invoice PDF/XML File</label>
-                  {% if invoice.file %}
-                    <div class="pg-mb-2 pg-p-2 pg-bg-light pg-rounded pg-flex pg-justify-between pg-align-center pg-border">
-                      <span class="text-truncate pg-small">📄 {{ invoice.file.name|slice:"14:" }}</span>
-                      <a href="{{ invoice.file.url }}" class="pg-button pg-button-sm pg-button-outline-primary" target="_blank">Download</a>
-                    </div>
-                  {% endif %}
-                  {{ form.file }}
-                  <small class="pg-text-muted pg-mt-2">Subir un nuevo documento para reemplazar/adjuntar la prueba digital.</small>
-                </div>
-              </div>
+          <div class="pg-row pg-gap-3">
+            <div class="pg-col-md-6">
+              <div class="pg-text-muted pg-small">Cliente fiscal</div>
+              <div class="pg-fw-bold">{{ invoice.client.name }}</div>
             </div>
-
-            <div class="pg-flex pg-justify-end pg-gap-2 pg-mt-4">
-              <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
-              <button type="submit" class="pg-button pg-button-primary">Guardar</button>
+            <div class="pg-col-md-3">
+              <div class="pg-text-muted pg-small">Serie</div>
+              <code>{{ invoice.identifier }}</code>
             </div>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right Column: Linked Orders / Sales -->
-    <div class="pg-col-lg-7">
-      <div class="pg-card detail-card pg-h-100">
-        <div class="pg-card-header form-card-header linked-orders-header">
-          <h2 class="pg-h5 pg-mb-0">Ventas Vinculadas</h2>
-          <p class="pg-text-white-muted pg-small pg-mb-0 pg-mt-1">Asociar o disociar ventas completadas de esta factura.</p>
-        </div>
-        <div class="pg-card-body pg-p-4 pg-flex pg-flex-column pg-justify-between">
-          <div>
-            <!-- Linked Orders List -->
-            <h6 class="pg-fw-bold pg-mb-3">Lista de Ventas Vinculadas</h6>
-            {% if linked_orders %}
-              <div class="pg-mb-4">
-                {% for link in linked_orders %}
-                  <div class="order-item-card pg-flex pg-justify-between pg-align-center">
-                    <div>
-                      <div class="pg-fw-bold">Order #{{ link.order.id }}</div>
-                      <small class="pg-text-muted">
-                        Creada el: {{ link.order.order_date|date:'d/m/Y H:i' }} | Estado: <span class="pg-badge pg-bg-success">{{ link.order.get_status_display }}</span>
-                      </small>
-                    </div>
-                    <div class="pg-flex pg-align-center pg-gap-3">
-                      <strong class="pg-text-success">${{ link.order.total_amount|floatformat:2 }}</strong>
-                      <form method="post" action="{% url 'admin_remove_invoice_order_link' invoice.id link.id %}" onsubmit="return confirm('¿Está seguro de que desea desacoplar la Orden #{{ link.order.id }} de esta factura?');">
-                        {% csrf_token %}
-                        <button type="submit" class="pg-button pg-button-sm pg-button-outline-danger">Desvincular</button>
-                      </form>
-                      <a href="{% url 'orders:split_order' link.order.id %}" class="pg-button pg-button-sm pg-button-outline-success">Dividir</a>
-                    </div>
-                  </div>
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="pg-alert pg-alert-warning pg-py-3 pg-text-center pg-mb-4">
-                No hay ordenes vinculadas a esta factura. Suma de ventas: <strong>$0.00</strong>
-              </div>
-            {% endif %}
-          </div>
-
-          <!-- Add Order Form -->
-          <div class="pg-card pg-p-3 pg-border pg-shadow-sm pg-bg-light pg-mt-auto">
-            <h6 class="pg-fw-bold pg-mb-2">Vincular Nueva Venta </h6>
-            {% if billable_orders %}
-              <form method="post" id="add-order-link-form">
-                {% csrf_token %}
-                <input type="hidden" name="add_order_link" value="true">
-                
-                <div class="pg-row pg-gap-2 pg-align-end">
-                  <div class="pg-col-md-9">
-                    <label class="pg-label" for="{{ link_form.order.id_for_label }}"> Seleccionar orden completada y sin facturar:</label>
-                    {{ link_form.order }}
-                  </div>
-                  <div class="pg-col-md-3 pg-grid">
-                    <button type="submit" class="pg-button pg-button-primary pg-fw-bold" id="submit-link-btn">
-                      Vincular Venta
-                    </button>
-                  </div>
-                </div>
-                
-                <!-- Dynamic feedback element -->
-                <div id="dynamic-js-feedback" class="pg-mt-2 pg-small pg-text-danger pg-fw-bold" hidden></div>
-              </form>
-            {% else %}
-              <div class="pg-text-muted pg-small pg-py-2">
-                No hay mas ordenes completadas y sin facturar para este cliente ({{ invoice.client.name }}) disponibles para vincular.
-              </div>
-            {% endif %}
+            <div class="pg-col-md-3">
+              <div class="pg-text-muted pg-small">Folio</div>
+              <code>{{ invoice.folio }}</code>
+            </div>
+            <div class="pg-col-md-6">
+              <div class="pg-text-muted pg-small">Fecha de emisión</div>
+              <div class="pg-fw-bold">{{ invoice.emmited_at|date:'d/m/Y'|default:'Sin fecha' }}</div>
+            </div>
+            <div class="pg-col-md-6">
+              <div class="pg-text-muted pg-small">Registrada</div>
+              <div class="pg-fw-bold">{{ invoice.date|date:'d/m/Y H:i' }}</div>
+            </div>
+            <div class="pg-col-12">
+              <div class="pg-text-muted pg-small">Archivo fiscal</div>
+              {% if invoice.file %}
+                <a href="{{ invoice.file.url }}" target="_blank" rel="noopener" class="pg-button pg-button-sm pg-button-outline-primary pg-mt-1">
+                  <i class="fas fa-download"></i> Descargar archivo
+                </a>
+              {% else %}
+                <span class="pg-text-muted">Sin archivo adjunto</span>
+              {% endif %}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section class="pg-col-lg-5">
+      <div class="pg-card dashboard-card pg-h-100">
+        <div class="pg-card-header">
+          <h2 class="pg-h5 pg-mb-0">Resumen financiero</h2>
+        </div>
+        <div class="pg-card-body pg-p-4">
+          <div class="pg-flex pg-justify-between pg-mb-3">
+            <span class="pg-text-muted">Importe</span>
+            <strong class="pg-h5 pg-mb-0">${{ invoice.amount|floatformat:2 }}</strong>
+          </div>
+          {% if invoice.status == 'ACTIVE' %}
+            <div class="pg-flex pg-justify-between pg-mb-3">
+              <span class="pg-text-muted">Pagado</span>
+              <strong class="pg-text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
+            </div>
+            <div class="pg-flex pg-justify-between">
+              <span class="pg-text-muted">Saldo pendiente</span>
+              <strong class="{% if invoice.pending_amount > 0 %}pg-text-danger{% else %}pg-text-success{% endif %}">
+                ${{ invoice.pending_amount|floatformat:2 }}
+              </strong>
+            </div>
+          {% else %}
+            <div class="pg-text-muted">Sin efecto financiero por cancelación.</div>
+          {% endif %}
+        </div>
+      </div>
+    </section>
   </div>
+
+  <section class="pg-card dashboard-card">
+    <div class="pg-card-header pg-flex pg-justify-between pg-align-center">
+      <h2 class="pg-h5 pg-mb-0">Ventas vinculadas</h2>
+      <span class="pg-badge pg-bg-secondary">{{ linked_orders|length }}</span>
+    </div>
+    {% if linked_orders %}
+      <div class="pg-table-responsive">
+        <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
+          <thead class="pg-table-light">
+            <tr>
+              <th>Venta</th>
+              <th>Fecha</th>
+              <th>Estado</th>
+              <th class="pg-text-end">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for link in linked_orders %}
+              <tr>
+                <td><strong>#{{ link.order.id }}</strong></td>
+                <td>{{ link.order.order_date|date:'d/m/Y H:i' }}</td>
+                <td><span class="pg-badge pg-bg-success">{{ link.order.get_status_display }}</span></td>
+                <td class="pg-text-end"><strong>${{ link.order.total_amount|floatformat:2 }}</strong></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="pg-card-body pg-p-4 pg-text-center pg-text-muted">
+        No hay ventas vinculadas a esta factura.
+      </div>
+    {% endif %}
+  </section>
 </div>
-
-{% block extra_js %}
-<script>
-  // OOP-style interactive Javascript manager for dynamic invoice & validation controls
-  class InvoiceEditManager {
-    constructor() {
-      // Configuration
-      this.invoiceAmount = parseFloat("{{ invoice.amount }}") || 0.0;
-      this.autoAmount = "{{ invoice.auto_amount }}" === "True";
-      this.currentSum = parseFloat("{% if linked_orders %}{{ invoice.amount }}{% else %}0.0{% endif %}") || 0.0;
-      
-      // Select orders array parsed from serialized context
-      this.billableOrders = JSON.parse('{{ billable_orders|safe|escapejs }}') || [];
-
-      // DOM Elements
-      this.orderSelector = document.getElementById('{{ link_form.order.id_for_label }}');
-      this.submitBtn = document.getElementById('submit-link-btn');
-      this.feedbackEl = document.getElementById('dynamic-js-feedback');
-
-      this.init();
-    }
-
-    init() {
-      if (this.orderSelector && this.submitBtn) {
-        this.orderSelector.addEventListener('change', () => this.validateSelection());
-        this.validateSelection();
-      }
-    }
-
-    validateSelection() {
-      const selectedValue = this.orderSelector.value;
-      if (!selectedValue) {
-        this.submitBtn.disabled = true;
-        this.hideFeedback();
-        return;
-      }
-
-      this.submitBtn.disabled = false;
-      this.hideFeedback();
-
-      // If invoice calculation is manual, validate adding this order won't exceed overall amount
-      if (!this.autoAmount) {
-        const orderId = parseInt(selectedValue);
-        const selectedOrder = this.billableOrders.find(o => o.id === orderId);
-
-        if (selectedOrder) {
-          const selectedAmount = parseFloat(selectedOrder.total_amount) || 0.0;
-          const newSum = this.currentSum + selectedAmount;
-
-          if (newSum > this.invoiceAmount) {
-            this.showFeedback(
-              `Warning: Adding this order (${selectedOrder.total_amount}) would bring the sum of linked sales to $${newSum.toFixed(2)}, which exceeds the invoice limit of $${this.invoiceAmount.toFixed(2)}. Please divide this order or increase the invoice limit.`
-            );
-            this.submitBtn.disabled = true;
-          }
-        }
-      }
-    }
-
-    showFeedback(message) {
-      if (this.feedbackEl) {
-        this.feedbackEl.textContent = message;
-        this.feedbackEl.hidden = false;
-        this.feedbackEl.classList.remove('pg-hidden');
-      }
-    }
-
-    hideFeedback() {
-      if (this.feedbackEl) {
-        this.feedbackEl.hidden = true;
-        this.feedbackEl.classList.add('pg-hidden');
-        this.feedbackEl.textContent = '';
-      }
-    }
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    new InvoiceEditManager();
-  });
-</script>
-{% endblock %}
-
 {% endblock %}

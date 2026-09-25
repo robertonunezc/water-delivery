@@ -46,10 +46,17 @@ def get_order_credit_due_date(
         order_date = _as_date(order.order_date)
         return _monthly_cutoff_date(order_date, credit_config.cutoff_day)
 
+    from invoice.models import InvoiceStatus
+
     emitted_dates = [
         link.invoice.emmited_at
         for link in order.invoice_links.all()
-        if link.invoice and link.invoice.emmited_at
+        if (
+            link.invoice
+            and getattr(link.invoice, 'status', InvoiceStatus.ACTIVE)
+            == InvoiceStatus.ACTIVE
+            and link.invoice.emmited_at
+        )
     ]
     if not emitted_dates:
         return None

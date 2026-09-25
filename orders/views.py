@@ -427,7 +427,7 @@ def _handle_orders_dashboard_bulk_action(request):
 
 def _handle_create_invoice_action(request, selected_orders, redirect_to):
     """Validate selected orders and create an invoice from them."""
-    from invoice.models import InvoiceOrderLink
+    from invoice.models import InvoiceOrderLink, InvoiceStatus
     from invoice.services import create_invoice_from_orders
 
     non_completed = [order for order in selected_orders if order.status != OrderStatus.COMPLETED.value]
@@ -454,7 +454,10 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
         return redirect(redirect_to)
 
     already_billed_ids = list(
-        InvoiceOrderLink.objects.filter(order__in=selected_orders).values_list('order_id', flat=True)
+        InvoiceOrderLink.objects.filter(
+            order__in=selected_orders,
+            invoice__status=InvoiceStatus.ACTIVE,
+        ).values_list('order_id', flat=True)
     )
     if already_billed_ids:
         ids = ', '.join(f'#{order_id}' for order_id in already_billed_ids)
@@ -479,11 +482,19 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
 
 def _build_orders_list_context(request, per_page: int = 15) -> dict:
     """Build context for order listing views with shared filters and pagination."""
+    from invoice.models import InvoiceOrderLink, InvoiceStatus
+
     # Base queryset with optimized queries
     orders = Order.objects.select_related('client', 'receipt').prefetch_related(
         Prefetch('items', queryset=OrderProduct.objects.select_related('product')),
         'client__contacts',
-        'client__addresses'
+        'client__addresses',
+        Prefetch(
+            'invoice_links',
+            queryset=InvoiceOrderLink.objects.filter(
+                invoice__status=InvoiceStatus.ACTIVE,
+            ).select_related('invoice'),
+        ),
     )
     
     # Apply filters

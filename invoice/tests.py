@@ -40,6 +40,99 @@ class InvoiceTenantTestCase(FastTenantTestCase):
 		return tenant
 
 
+class InvoiceCancellationModelTests(InvoiceTenantTestCase):
+    def setUp(self) -> None:
+        self.client_obj = Client.objects.create(
+            name='Invoice Cancellation Client',
+            type='corporate',
+        )
+        self.invoice = Invoice.objects.create(
+            client=self.client_obj,
+            amount=Decimal('125.00'),
+            identifier='CANCEL-TEST',
+            folio='1',
+        )
+
+    def test_new_invoice_is_active(self) -> None:
+        invoice = Invoice.objects.create(
+            client=self.client_obj,
+            amount=Decimal('125.00'),
+            identifier='ACTIVE-TEST',
+            folio='2',
+        )
+
+        self.assertEqual(getattr(invoice, 'status', None), 'ACTIVE')
+
+    def test_cancel_invoice_marks_status_and_timestamp(self) -> None:
+        from invoice import services
+
+        cancel_invoice = getattr(services, 'cancel_invoice', lambda invoice: None)
+
+        cancel_invoice(self.invoice)
+        self.invoice.refresh_from_db()
+
+        self.assertEqual(self.invoice.status, 'CANCELLED')
+        self.assertIsNotNone(self.invoice.cancelled_at)
+        self.assertEqual(self.invoice.pending_amount, 0)
+
+    def test_cancelled_invoice_releases_orders_for_new_invoice(self) -> None:
+        from invoice.services import cancel_invoice, get_invoiceable_orders_for_client
+
+        order = Order.objects.create(
+            client=self.client_obj,
+            total_amount=Decimal('125.00'),
+            status='COMPLETED',
+        )
+        InvoiceOrderLink.objects.create(invoice=self.invoice, order=order)
+
+        cancel_invoice(self.invoice)
+
+        invoiceable_orders = get_invoiceable_orders_for_client(self.client_obj)
+        self.assertIn(order, invoiceable_orders)
+
+    def test_order_from_cancelled_invoice_can_be_linked_to_new_invoice(self) -> None:
+        from invoice.services import cancel_invoice, create_invoice_with_orders
+
+        order = Order.objects.create(
+            client=self.client_obj,
+            total_amount=Decimal('125.00'),
+            status='COMPLETED',
+        )
+        InvoiceOrderLink.objects.create(invoice=self.invoice, order=order)
+        cancel_invoice(self.invoice)
+        new_invoice = Invoice(
+            client=self.client_obj,
+            amount=Decimal('125.00'),
+            identifier='NEW-AFTER-CANCEL',
+            folio='2',
+        )
+
+        try:
+            create_invoice_with_orders(invoice=new_invoice, orders=[order])
+        except ValidationError as exc:
+            self.fail(f'La factura cancelada todavía bloquea la venta: {exc}')
+
+        self.assertEqual(new_invoice.status, 'ACTIVE')
+        self.assertTrue(
+            InvoiceOrderLink.objects.filter(invoice=new_invoice, order=order).exists()
+        )
+
+    def test_issued_invoice_fields_cannot_be_changed(self) -> None:
+        self.invoice.amount = Decimal('999.00')
+
+        with self.assertRaisesMessage(ValidationError, 'no se puede editar'):
+            self.invoice.save()
+
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.amount, Decimal('125.00'))
+
+    def test_issued_invoice_cannot_be_deleted(self) -> None:
+        with self.assertRaisesMessage(ValidationError, 'debe cancelarse'):
+            self.invoice.delete()
+
+        self.assertTrue(Invoice.objects.filter(pk=self.invoice.pk).exists())
+
+
 class InvoiceScheduleRecurrenceModelTests(InvoiceTenantTestCase):
     def setUp(self):
         self.client = Client.objects.create(
@@ -871,6 +964,92 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 			status='COMPLETED',
 		)
 
+	def test_cancel_invoice_admin_view_marks_invoice_cancelled(self):
+		url = f'/administrador/facturas/{self.invoice.pk}/cancelar/'
+
+		response = self.client.post(url)
+
+		self.assertEqual(response.status_code, 302)
+		self.invoice.refresh_from_db()
+		self.assertEqual(self.invoice.status, 'CANCELLED')
+		self.assertIsNotNone(self.invoice.cancelled_at)
+
+	def test_invoice_detail_rejects_edits(self):
+		url = reverse('admin_edit_invoice', args=[self.invoice.pk])
+
+		response = self.client.post(url, {'amount': '999.00'})
+
+		self.assertEqual(response.status_code, 405)
+		self.invoice.refresh_from_db()
+		self.assertEqual(self.invoice.amount, Decimal('200.00'))
+
+	def test_invoice_detail_renders_read_only_state(self):
+		url = reverse('admin_edit_invoice', args=[self.invoice.pk])
+
+		response = self.client.get(url)
+
+		self.assertEqual(response.status_code, 200)
+		self.assertContains(response, 'ACTIVA')
+		self.assertNotContains(response, 'name="amount"')
+		self.assertNotContains(response, 'Vincular Nueva Venta')
+
+	def test_invoice_list_shows_status_and_cancel_action(self):
+		cancelled_invoice = Invoice.objects.create(
+			client=self.client_obj,
+			amount=Decimal('75.00'),
+			identifier='SER-CANCELLED',
+			folio='FOL-CANCELLED',
+			status='CANCELLED',
+			cancelled_at=timezone.now(),
+		)
+
+		response = self.client.get(reverse('admin_invoices'))
+
+		self.assertContains(response, 'ACTIVA')
+		self.assertContains(response, 'CANCELADA')
+		self.assertContains(
+			response,
+			reverse('admin_cancel_invoice', args=[self.invoice.pk]),
+		)
+		self.assertNotContains(
+			response,
+			reverse('admin_cancel_invoice', args=[cancelled_invoice.pk]),
+		)
+
+	def test_client_invoice_list_shows_status_and_cancel_action(self):
+		self.client_obj.requires_billing = True
+		self.client_obj.save(update_fields=['requires_billing'])
+		active_order = self._completed_order(self.client_obj, '200.00')
+		InvoiceOrderLink.objects.create(invoice=self.invoice, order=active_order)
+		cancelled_invoice = Invoice.objects.create(
+			client=self.client_obj,
+			amount=Decimal('75.00'),
+			identifier='CLIENT-CANCELLED',
+			folio='1',
+			status='CANCELLED',
+			cancelled_at=timezone.now(),
+		)
+		cancelled_order = self._completed_order(self.client_obj, '75.00')
+		InvoiceOrderLink.objects.create(
+			invoice=cancelled_invoice,
+			order=cancelled_order,
+		)
+
+		url = reverse('clients:detail', args=[self.client_obj.pk])
+		response = self.client.get(f'{url}?tab=invoices')
+
+		self.assertContains(response, 'ACTIVA')
+		self.assertContains(response, 'CANCELADA')
+		self.assertContains(response, '1 factura pendiente')
+		self.assertContains(
+			response,
+			reverse('admin_cancel_invoice', args=[self.invoice.pk]),
+		)
+		self.assertNotContains(
+			response,
+			reverse('admin_cancel_invoice', args=[cancelled_invoice.pk]),
+		)
+
 	def test_create_invoice_admin_view_requires_linked_orders(self):
 		url = reverse('admin_create_invoice')
 		data = {
@@ -933,8 +1112,7 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 		self.assertEqual(invoice.client, self.client_obj)
 		self.assertEqual(invoice.invoice_links.get().order, order)
 
-	def test_edit_invoice_admin_view_post_link_order(self):
-		# Create completed order
+	def test_invoice_detail_does_not_allow_linking_orders(self):
 		order = Order.objects.create(
 			client=self.client_obj,
 			total_amount=Decimal('50.00'),
@@ -947,8 +1125,13 @@ class CustomAdminInvoiceViewsTests(InvoiceTenantTestCase):
 			'order': order.id
 		}
 		response = self.client.post(url, data)
-		self.assertEqual(response.status_code, 302) # Redirect to edit page
-		self.assertTrue(InvoiceOrderLink.objects.filter(invoice=self.invoice, order=order).exists())
+		self.assertEqual(response.status_code, 405)
+		self.assertFalse(
+			InvoiceOrderLink.objects.filter(
+				invoice=self.invoice,
+				order=order,
+			).exists()
+		)
 
 
 class InvoiceAdminSaveModelTests(InvoiceTenantTestCase):
@@ -981,6 +1164,24 @@ class InvoiceAdminSaveModelTests(InvoiceTenantTestCase):
 
 		invoice.refresh_from_db()
 		self.assertEqual(invoice.client, self.corporate)
+
+	def test_admin_existing_invoice_is_read_only(self):
+		invoice = Invoice.objects.create(
+			client=self.corporate,
+			amount=Decimal('75.00'),
+			identifier='ADM-READONLY',
+			folio='1',
+		)
+		request = self.factory.get(f'/admin/billing/invoice/{invoice.pk}/change/')
+		request.user = self.superuser
+
+		self.assertFalse(
+			self.invoice_admin.has_change_permission(request, invoice)
+		)
+		self.assertEqual(
+			self.invoice_admin.get_inline_instances(request, invoice),
+			[],
+		)
 
 	def test_add_form_requires_at_least_one_order_inline(self):
 		formset_class = inlineformset_factory(
@@ -1075,6 +1276,14 @@ class InvoiceBalanceSnapshotServiceTests(InvoiceTenantTestCase):
 			amount=Decimal("300.00"),
 			method="cash",
 			status="completed",
+		)
+		Invoice.objects.create(
+			client=self.client_b,
+			amount=Decimal('900.00'),
+			identifier='BAL-CANCELLED',
+			folio='BAL-CANCELLED',
+			status='CANCELLED',
+			cancelled_at=timezone.now(),
 		)
 
 		snapshot = get_invoice_balance_snapshot()

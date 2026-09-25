@@ -1,11 +1,11 @@
 from calendar import monthrange
 from decimal import Decimal
 from datetime import date, timedelta
-from typing import Optional, List
+from typing import Any, Optional, List
 from django.db.models import DecimalField, ExpressionWrapper, F, OuterRef, Subquery, Sum, Value
 from django.db.models.functions import Coalesce
 from django.db import models
-from django.forms import ValidationError
+from django.core.exceptions import ValidationError
 
 from core.models import TimeStampedModel
 from core.utils import get_first_last_day_of_month
@@ -42,8 +42,20 @@ OCCURRENCE_CHOICES = [
     (-1, 'Último'),
 ]
 
+
+class InvoiceStatus(models.TextChoices):
+    ACTIVE = 'ACTIVE', 'Activa'
+    CANCELLED = 'CANCELLED', 'Cancelada'
+
+
 # Create your models here.
 class InvoiceQuerySet(models.QuerySet):
+    def active(self) -> 'InvoiceQuerySet':
+        return self.filter(status=InvoiceStatus.ACTIVE)
+
+    def cancelled(self) -> 'InvoiceQuerySet':
+        return self.filter(status=InvoiceStatus.CANCELLED)
+
     def with_balance_totals(self) -> 'InvoiceQuerySet':
         """Annotate invoice linked order totals, paid totals, and remaining amounts."""
         from payment.models import Payment
@@ -101,6 +113,18 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
 
 class Invoice(TimeStampedModel):
+    IMMUTABLE_FIELDS = (
+        'client_id',
+        'amount',
+        'identifier',
+        'folio',
+        'emmited_at',
+        'file',
+        'auto_amount',
+        'status',
+        'cancelled_at',
+    )
+
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='invoices', verbose_name='Cliente')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     identifier = models.CharField(max_length=100,  verbose_name="Serie")
@@ -113,7 +137,54 @@ class Invoice(TimeStampedModel):
         verbose_name="Monto automático",
         help_text="Si está activo, el monto se calcula automáticamente como la suma de los pedidos vinculados.",
     )
+    status = models.CharField(
+        max_length=10,
+        choices=InvoiceStatus.choices,
+        default=InvoiceStatus.ACTIVE,
+        db_index=True,
+        verbose_name='Estado',
+    )
+    cancelled_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name='Fecha de cancelación',
+    )
     objects = InvoiceManager()
+
+    def _changed_immutable_fields(self) -> list[str]:
+        if not self.pk:
+            return []
+
+        stored = type(self).all_objects.filter(pk=self.pk).values(
+            *self.IMMUTABLE_FIELDS
+        ).first()
+        if stored is None:
+            return []
+
+        changed_fields = []
+        for field_name in self.IMMUTABLE_FIELDS:
+            current_value = getattr(self, field_name)
+            if field_name == 'file':
+                current_value = current_value.name or ''
+            if current_value != stored[field_name]:
+                changed_fields.append(field_name)
+        return changed_fields
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self._changed_immutable_fields():
+            raise ValidationError(
+                'Una factura emitida no se puede editar; debe cancelarse.'
+            )
+        super().save(*args, **kwargs)
+
+    def delete(
+        self,
+        using: str | None = None,
+        keep_parents: bool = False,
+    ) -> None:
+        raise ValidationError(
+            'Una factura emitida no se puede eliminar; debe cancelarse.'
+        )
 
     def __str__(self):
         return f"Factura #{self.id} para {self.client.name} - {self.amount}"
@@ -148,6 +219,8 @@ class Invoice(TimeStampedModel):
         return payments or 0.00
     @property
     def pending_amount(self):
+        if self.status == InvoiceStatus.CANCELLED:
+            return 0.0
         return float(self.amount) - float(self.total_payments)
 
     @property

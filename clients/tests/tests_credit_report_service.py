@@ -161,6 +161,35 @@ class CreditReportServiceTests(FastTenantTestCase):
             [uninvoiced_order],
         )
 
+    def test_client_report_treats_cancelled_invoice_as_uninvoiced(self) -> None:
+        client = self._create_credit_client(
+            name='Factura cancelada',
+            current_debt=Decimal('100.00'),
+            credit_limit=Decimal('1000.00'),
+            payment_term_type='invoice_due',
+        )
+        order = self._create_credit_order(
+            client=client,
+            amount=Decimal('100.00'),
+            order_date=date(2026, 4, 1),
+        )
+        invoice = Invoice.objects.create(
+            client=client,
+            amount=Decimal('100.00'),
+            identifier='CANCELLED',
+            folio='1',
+            emmited_at=date(2026, 4, 30),
+            status='CANCELLED',
+            cancelled_at=timezone.now(),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        report = get_client_credit_report(client=client, as_of=date(2026, 7, 8))
+
+        self.assertEqual(report.invoice_items, [])
+        self.assertEqual(report.uninvoiced_orders[0].order, order)
+        self.assertIsNone(report.uninvoiced_orders[0].due_date)
+
     def test_corporate_report_includes_branch_orders_using_inherited_credit(self) -> None:
         corporate = self._create_credit_client(
             name="Corporativo con sucursal",

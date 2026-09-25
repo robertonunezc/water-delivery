@@ -431,6 +431,36 @@ class OrdersReportQueryTests(FastTenantTestCase):
         self.assertIn(active_order.id, order_ids)
         self.assertNotIn(cancelled_order.id, order_ids)
 
+    def test_billing_filter_ignores_cancelled_invoices(self) -> None:
+        order = self._create_order(total=Decimal('100.00'))
+        invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('100.00'),
+            identifier='CANCELLED-REPORT',
+            folio='1',
+            status='CANCELLED',
+            cancelled_at=timezone.now(),
+        )
+        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
+
+        billed_response = self.client.get(
+            reverse('report:orders_report'),
+            {'has_billing': 'yes'},
+        )
+        unbilled_response = self.client.get(
+            reverse('report:orders_report'),
+            {'has_billing': 'no'},
+        )
+
+        billed_ids = [
+            item.id for item in billed_response.context['orders'].object_list
+        ]
+        unbilled_ids = [
+            item.id for item in unbilled_response.context['orders'].object_list
+        ]
+        self.assertNotIn(order.id, billed_ids)
+        self.assertIn(order.id, unbilled_ids)
+
     def test_orders_report_export_url_preserves_active_filters(self) -> None:
         response = self.client.get(
             reverse("report:orders_report"),

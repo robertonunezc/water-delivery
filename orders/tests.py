@@ -2603,6 +2603,62 @@ class OrdersAdminInvoiceActionTestCase(FastTenantTestCase):
             {order_one.pk, order_two.pk},
         )
 
+    def test_admin_action_allows_order_from_cancelled_invoice(self) -> None:
+        order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('40.00'),
+        )
+        cancelled_invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('40.00'),
+            identifier='ADMIN-CANCELLED',
+            folio='1',
+            status='CANCELLED',
+            cancelled_at=timezone.now(),
+        )
+        InvoiceOrderLink.objects.create(
+            invoice=cancelled_invoice,
+            order=order,
+        )
+
+        self.order_admin.crear_factura(
+            self._request(),
+            Order.objects.filter(pk=order.pk),
+        )
+
+        active_invoices = Invoice.objects.active().filter(invoice_links__order=order)
+        self.assertEqual(active_invoices.count(), 1)
+
+    def test_dashboard_list_ignores_cancelled_invoice_links(self) -> None:
+        from orders.views import _build_orders_list_context
+
+        order = Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal('40.00'),
+        )
+        cancelled_invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal('40.00'),
+            identifier='DASHBOARD-CANCELLED',
+            folio='1',
+            status='CANCELLED',
+            cancelled_at=timezone.now(),
+        )
+        InvoiceOrderLink.objects.create(invoice=cancelled_invoice, order=order)
+
+        request = self.factory.get('/administrador/pedidos/')
+        request.user = self.user
+        context = _build_orders_list_context(request)
+        listed_order = next(
+            item for item in context['orders'].object_list if item.pk == order.pk
+        )
+
+        self.assertFalse(listed_order.invoice_links.all())
+
 
 class CalculateOrderTotalTestCase(FastTenantTestCase):
     """Tests for the calculate_order_total service function."""

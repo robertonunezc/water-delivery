@@ -46,8 +46,8 @@ urlpatterns = [
     path('administrador/rutas/<int:pk>/editar/', route_views.update_admin, name='admin_update_route'),
     path('administrador/facturas/', invoice_views.list_invoices_admin, name='admin_invoices'),
     path('administrador/facturas/crear/', invoice_views.create_invoice_admin, name='admin_create_invoice'),
+    path('administrador/facturas/<int:pk>/cancelar/', invoice_views.cancel_invoice_admin, name='admin_cancel_invoice'),
     path('administrador/facturas/<int:pk>/editar/', invoice_views.edit_invoice_admin, name='admin_edit_invoice'),
-    path('administrador/facturas/<int:pk>/eliminar-pedido/<int:link_pk>/', invoice_views.remove_order_link_admin, name='admin_remove_invoice_order_link'),
     path(
         'admin/invoice/invoiceschedule/add/',
         RedirectView.as_view(pattern_name='admin:billing_invoiceschedule_add', permanent=False, query_string=True),

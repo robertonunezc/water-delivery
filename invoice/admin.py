@@ -7,6 +7,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator, EmptyPage
 from django.templatetags.static import static
 from collections import Counter
+from typing import Any
 
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
@@ -161,13 +162,38 @@ InvoiceOrderLinkInlineAdmin.form = InvoiceOrderLinkAdminForm
 InvoiceOrderLinkInlineAdmin.formset = InvoiceOrderLinkInlineFormSet
 
 class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
-	list_display = ('id', 'identifier', 'client', 'amount', 'date')
-	list_filter = ('date', 'client')
+	list_display = ('id', 'identifier', 'client', 'amount', 'status', 'date')
+	list_filter = ('status', 'date', 'client')
 	search_fields = ('client__name', 'description', 'identifier')
 	autocomplete_fields = ('client',)
 	exclude = ('deleted_at',)
 	ordering = ('-date',)
 	inlines = [InvoiceOrderLinkInlineAdmin]
+
+	def has_change_permission(
+		self,
+		request: Any,
+		obj: Invoice | None = None,
+	) -> bool:
+		if obj is not None:
+			return False
+		return super().has_change_permission(request, obj)
+
+	def has_delete_permission(
+		self,
+		request: Any,
+		obj: Invoice | None = None,
+	) -> bool:
+		return False
+
+	def get_inline_instances(
+		self,
+		request: Any,
+		obj: Invoice | None = None,
+	) -> list[Any]:
+		if obj is not None:
+			return []
+		return super().get_inline_instances(request, obj)
 	
 
 	def get_readonly_fields(self, request, obj=None):

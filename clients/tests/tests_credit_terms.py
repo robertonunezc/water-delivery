@@ -52,6 +52,22 @@ class CreditPaymentTermDateTests(SimpleTestCase):
 
         self.assertIsNone(get_order_credit_due_date(order, config))
 
+    def test_invoice_due_date_ignores_cancelled_invoice(self) -> None:
+        invoice = SimpleNamespace(
+            emmited_at=date(2026, 6, 10),
+            status='CANCELLED',
+        )
+        link = SimpleNamespace(invoice=invoice)
+        order = SimpleNamespace(invoice_links=SimpleNamespace(all=lambda: [link]))
+        config = SimpleNamespace(
+            payment_term_type='invoice_due',
+            max_payment_days=30,
+        )
+
+        due_date = get_order_credit_due_date(order, config)
+
+        self.assertIsNone(due_date)
+
     @override_settings(USE_TZ=False)
     def test_monthly_cutoff_accepts_naive_order_datetime(self) -> None:
         order = SimpleNamespace(order_date=datetime(2026, 6, 21, 14, 30))

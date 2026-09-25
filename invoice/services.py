@@ -13,6 +13,7 @@ from decimal import Decimal
 from django.db import transaction
 from django.db.models import Count, Sum, Q, Prefetch
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 from calendar import monthrange
 
 from invoice.models import InvoiceSchedule
@@ -104,8 +105,8 @@ def get_invoice_balance_snapshot() -> dict[str, Decimal | int]:
     """Return invoice unpaid-balance and available-capacity counts and totals."""
     from invoice.models import Invoice
 
-    available_capacity = Invoice.objects.with_available_capacity()
-    unpaid_balance = Invoice.objects.with_unpaid_balance()
+    available_capacity = Invoice.objects.active().with_available_capacity()
+    unpaid_balance = Invoice.objects.active().with_unpaid_balance()
     available_summary = available_capacity.aggregate(
         count=Count('id'),
         total=Sum('available_capacity'),
@@ -120,6 +121,33 @@ def get_invoice_balance_snapshot() -> dict[str, Decimal | int]:
         'unpaid_balance_count': unpaid_summary['count'] or 0,
         'unpaid_balance_total': unpaid_summary['total'] or Decimal('0.00'),
     }
+
+
+def cancel_invoice(
+    invoice: 'invoice.models.Invoice',
+) -> 'invoice.models.Invoice':
+    """Cancel an issued invoice while preserving it as historical data."""
+    from invoice.models import Invoice, InvoiceStatus
+
+    if not invoice.pk:
+        raise ValidationError('La factura debe existir antes de cancelarla.')
+
+    with transaction.atomic():
+        locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked_invoice.status == InvoiceStatus.CANCELLED:
+            invoice.status = locked_invoice.status
+            invoice.cancelled_at = locked_invoice.cancelled_at
+            return invoice
+
+        cancelled_at = timezone.now()
+        Invoice.objects.filter(pk=locked_invoice.pk).update(
+            status=InvoiceStatus.CANCELLED,
+            cancelled_at=cancelled_at,
+        )
+
+    invoice.status = InvoiceStatus.CANCELLED
+    invoice.cancelled_at = cancelled_at
+    return invoice
 
 
 
@@ -367,7 +395,7 @@ def validate_order_can_link_to_invoice(
     exclude_invoice_order_link_id: Optional[int] = None,
 ) -> None:
     """Validate that an order is eligible to be linked to an invoice."""
-    from invoice.models import InvoiceOrderLink
+    from invoice.models import InvoiceOrderLink, InvoiceStatus
     from orders.models import OrderStatus
 
     current_link = None
@@ -378,7 +406,10 @@ def validate_order_can_link_to_invoice(
             order=order,
         ).first()
 
-    existing_links = InvoiceOrderLink.objects.filter(order=order)
+    existing_links = InvoiceOrderLink.objects.filter(
+        order=order,
+        invoice__status=InvoiceStatus.ACTIVE,
+    )
     if exclude_invoice_order_link_id:
         existing_links = existing_links.exclude(pk=exclude_invoice_order_link_id)
     if existing_links.exists():

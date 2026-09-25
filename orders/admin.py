@@ -51,11 +51,13 @@ class BillingAttachedFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value() == 'yes':
-            # Orders that have at least one InvoiceOrderLink
-            return queryset.filter(invoice_links__isnull=False).distinct()
+            return queryset.filter(
+                invoice_links__invoice__status='ACTIVE',
+            ).distinct()
         elif self.value() == 'no':
-            # Orders without any InvoiceOrderLink
-            return queryset.filter(invoice_links__isnull=True)
+            return queryset.exclude(
+                invoice_links__invoice__status='ACTIVE',
+            ).distinct()
 
 
 class OrderProductInline(TabularInline):
@@ -352,7 +354,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         """Display billing status and associated invoices"""
         try:
             from invoice.models import InvoiceOrderLink
-            invoice_links = InvoiceOrderLink.objects.filter(order=obj).select_related('invoice')
+            invoice_links = InvoiceOrderLink.objects.filter(
+                order=obj,
+                invoice__status='ACTIVE',
+            ).select_related('invoice')
             
             if not invoice_links.exists():
                 return format_html('<span class="pg-text-muted">-</span>')
@@ -589,7 +594,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def crear_factura(self, request, queryset):
         """Create an invoice from selected completed, unbilled orders."""
         from invoice.services import create_invoice_from_orders
-        from invoice.models import InvoiceOrderLink
+        from invoice.models import InvoiceOrderLink, InvoiceStatus
 
         orders = list(queryset)
 
@@ -604,7 +609,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             return
 
         already_billed_ids = list(
-            InvoiceOrderLink.objects.filter(order__in=orders).values_list('order_id', flat=True)
+            InvoiceOrderLink.objects.filter(
+                order__in=orders,
+                invoice__status=InvoiceStatus.ACTIVE,
+            ).values_list('order_id', flat=True)
         )
         if already_billed_ids:
             ids = ', '.join(f'#{oid}' for oid in already_billed_ids)

@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from clients.models import Client, ClientCreditConfig, CreditTransaction
 from clients.services.pending_payment_service import get_order_credit_due_date
-from invoice.models import Invoice
+from invoice.models import Invoice, InvoiceStatus
 from orders.models import Order
 
 
@@ -146,10 +146,14 @@ def _get_open_credit_orders_for_clients(client_ids: list[int]) -> list[Order]:
 
 
 def _get_order_invoice(order: Order) -> Invoice | None:
-    links = list(order.invoice_links.all())
-    if not links:
-        return None
-    return links[0].invoice
+    return next(
+        (
+            link.invoice
+            for link in order.invoice_links.all()
+            if link.invoice.status == InvoiceStatus.ACTIVE
+        ),
+        None,
+    )
 
 
 def _get_credit_config(client: Client) -> ClientCreditConfig | None:

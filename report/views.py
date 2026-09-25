@@ -19,6 +19,7 @@ from clients.services.credit_report_service import (
     get_global_credit_report,
 )
 from core.services.feature_flags import is_receipt_signature_enabled
+from invoice.models import InvoiceOrderLink, InvoiceStatus
 from orders.models import Order, ORDER_STATUS_CHOICES, OrderStatus
 from payment.models import PAYMENT_METHOD_CHOICES, Payment
 
@@ -34,6 +35,15 @@ def _report_payments_prefetch() -> Prefetch:
         'payments',
         queryset=Payment.objects.not_reversed(),
         to_attr=REPORT_PAYMENTS_ATTR,
+    )
+
+
+def _report_invoice_links_prefetch() -> Prefetch:
+    return Prefetch(
+        'invoice_links',
+        queryset=InvoiceOrderLink.objects.filter(
+            invoice__status=InvoiceStatus.ACTIVE,
+        ).select_related('invoice'),
     )
 
 
@@ -426,7 +436,7 @@ def orders_report(request):
         'items__product',
         'client__contacts',
         _report_payments_prefetch(),
-        'invoice_links__invoice',
+        _report_invoice_links_prefetch(),
     )
     
     # Apply search filter
@@ -445,11 +455,15 @@ def orders_report(request):
             pk__in=_get_payment_method_order_ids(payment_method)
         )
 
-    # Apply billing attached filter: 'yes' => has invoice_links, 'no' => no invoice_links
+    # A cancelled invoice is historical and does not make an order billed.
     if has_billing == 'yes':
-        orders_queryset = orders_queryset.filter(invoice_links__isnull=False).distinct()
+        orders_queryset = orders_queryset.filter(
+            invoice_links__invoice__status=InvoiceStatus.ACTIVE,
+        ).distinct()
     elif has_billing == 'no':
-        orders_queryset = orders_queryset.filter(invoice_links__isnull=True)
+        orders_queryset = orders_queryset.exclude(
+            invoice_links__invoice__status=InvoiceStatus.ACTIVE,
+        ).distinct()
 
     # Apply status filter
     if status_filter and status_filter != 'all':
@@ -604,7 +618,7 @@ def orders_report_csv(request):
         'items__product',
         'client__contacts',
         _report_payments_prefetch(),
-        'invoice_links__invoice',
+        _report_invoice_links_prefetch(),
     )
 
     if search_query:
@@ -619,9 +633,13 @@ def orders_report_csv(request):
             pk__in=_get_payment_method_order_ids(payment_method)
         )
     if has_billing == 'yes':
-        orders_queryset = orders_queryset.filter(invoice_links__isnull=False).distinct()
+        orders_queryset = orders_queryset.filter(
+            invoice_links__invoice__status=InvoiceStatus.ACTIVE,
+        ).distinct()
     elif has_billing == 'no':
-        orders_queryset = orders_queryset.filter(invoice_links__isnull=True)
+        orders_queryset = orders_queryset.exclude(
+            invoice_links__invoice__status=InvoiceStatus.ACTIVE,
+        ).distinct()
     if status_filter and status_filter != 'all':
         orders_queryset = orders_queryset.filter(status=status_filter)
     today = timezone.localdate()

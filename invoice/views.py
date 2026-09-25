@@ -5,10 +5,11 @@ from clients.models import Client
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db import transaction
 from django.db.models import Count, Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_GET, require_POST
 from invoice.models import Invoice
 
 # Existing API Views
@@ -59,6 +60,7 @@ def list_invoices_admin(request):
     client_filter = request.GET.get('client', '')
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
+    status_filter = request.GET.get('status', '')
     search_query = request.GET.get('search', '').strip()
 
     if client_filter:
@@ -91,6 +93,9 @@ def list_invoices_admin(request):
             Q(client__name__icontains=search_query)
         ).distinct()
 
+    if status_filter in {'ACTIVE', 'CANCELLED'}:
+        invoices = invoices.filter(status=status_filter)
+
     invoices = invoices.order_by('-date', '-id')
 
     # KPI stats
@@ -105,8 +110,18 @@ def list_invoices_admin(request):
     invoices_page = paginator.get_page(page_number)
     page_stats = {
         'total_amount': sum(
-            (invoice.amount for invoice in invoices_page),
+            (
+                invoice.amount
+                for invoice in invoices_page
+                if invoice.status == 'ACTIVE'
+            ),
             Decimal('0.00'),
+        ),
+        'active_count': sum(
+            1 for invoice in invoices_page if invoice.status == 'ACTIVE'
+        ),
+        'cancelled_count': sum(
+            1 for invoice in invoices_page if invoice.status == 'CANCELLED'
         ),
     }
 
@@ -118,9 +133,16 @@ def list_invoices_admin(request):
             'client': client_filter,
             'date_from': date_from,
             'date_to': date_to,
+            'status': status_filter,
             'search': search_query,
         },
-        'has_filters': any([client_filter, date_from, date_to, search_query]),
+        'has_filters': any([
+            client_filter,
+            date_from,
+            date_to,
+            status_filter,
+            search_query,
+        ]),
         'total_invoices': total_invoices,
         'today': date.today(),
     }
@@ -161,87 +183,38 @@ def create_invoice_admin(request):
 
 
 @staff_member_required
-@transaction.atomic
-def edit_invoice_admin(request, pk):
-    from invoice.models import Invoice, InvoiceOrderLink
-    from invoice.forms import InvoiceForm, InvoiceOrderLinkForm
-    from invoice.services import get_invoiceable_orders_for_client, add_order_to_invoice, sync_invoice_amount
+@require_POST
+def cancel_invoice_admin(request, pk):
     from django.contrib import messages
-    from django.core.exceptions import ValidationError
+    from invoice.services import cancel_invoice
 
     invoice = get_object_or_404(Invoice, pk=pk)
+    was_cancelled = invoice.status == 'CANCELLED'
+    cancel_invoice(invoice)
 
-    if request.method == 'POST':
-        # Check if the post action is adding an order link
-        if 'add_order_link' in request.POST:
-            link_form = InvoiceOrderLinkForm(
-                request.POST,
-                client=invoice.client,
-                scope='fiscal_owner',
-            )
-            if link_form.is_valid():
-                order = link_form.cleaned_data['order']
-                try:
-                    add_order_to_invoice(invoice=invoice, order=order)
-                    if invoice.auto_amount:
-                        sync_invoice_amount(invoice)
-                    messages.success(request, f'Pedido #{order.id} vinculado correctamente a la factura.')
-                except ValidationError as e:
-                    messages.error(request, f'Error al vincular el pedido: {str(e)}')
-            else:
-                messages.error(request, 'Formulario de pedido no válido o pedido ya vinculado.')
-            return redirect('admin_edit_invoice', pk=invoice.pk)
-
-        # Basic invoice form save
-        form = InvoiceForm(request.POST, request.FILES, instance=invoice)
-        if form.is_valid():
-            invoice = form.save()
-            if invoice.auto_amount:
-                sync_invoice_amount(invoice)
-            messages.success(request, 'Datos de la factura actualizados correctamente.')
-            return redirect('admin_edit_invoice', pk=invoice.pk)
+    if was_cancelled:
+        messages.info(request, f'La factura #{invoice.id} ya estaba cancelada.')
     else:
-        form = InvoiceForm(instance=invoice)
+        messages.success(request, f'Factura #{invoice.id} cancelada correctamente.')
 
-    # Prepare linked orders and available orders to link
-    linked_orders = invoice.invoice_links.select_related('order').all()
-    
-    # Form to add a new link
-    link_form = InvoiceOrderLinkForm(client=invoice.client, scope='fiscal_owner')
-    
-    # Get raw billable orders as well for dynamic JS loading
-    billable_orders = get_invoiceable_orders_for_client(
-        client=invoice.client,
-        scope='fiscal_owner',
-        as_dict=True,
-    )
-
-    context = {
-        'invoice': invoice,
-        'form': form,
-        'link_form': link_form,
-        'linked_orders': linked_orders,
-        'billable_orders': billable_orders,
-        'is_create': False,
-    }
-    return render(request, 'billing/admin/invoice_edit.html', context)
+    next_url = request.POST.get('next', '')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
+    return redirect('admin_invoices')
 
 
 @staff_member_required
-@transaction.atomic
-def remove_order_link_admin(request, pk, link_pk):
-    from invoice.models import Invoice, InvoiceOrderLink
-    from invoice.services import sync_invoice_amount
-    from django.contrib import messages
-
+@require_GET
+def edit_invoice_admin(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk)
-    link = get_object_or_404(InvoiceOrderLink, pk=link_pk, invoice=invoice)
+    linked_orders = invoice.invoice_links.select_related('order').all()
 
-    order_id = link.order.id
-    link.delete()
-
-    if invoice.auto_amount:
-        sync_invoice_amount(invoice)
-
-    messages.success(request, f'Pedido #{order_id} desvinculado correctamente de la factura.')
-    return redirect('admin_edit_invoice', pk=invoice.pk)
+    context = {
+        'invoice': invoice,
+        'linked_orders': linked_orders,
+    }
+    return render(request, 'billing/admin/invoice_edit.html', context)
