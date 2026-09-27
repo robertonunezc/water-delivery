@@ -879,6 +879,40 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, 'pay_selected_orders.html', context)
 
 
+@user_passes_test(_is_admin_user)
+@require_POST
+def create_invoice_from_selected_orders(
+    request: HttpRequest,
+    pk: int,
+) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk)
+    order_ids = [order_id for order_id in dict.fromkeys(_parse_order_ids(request))]
+    redirect_to = (
+        f"{reverse('clients:detail', args=[client.pk])}?tab=sales#sales-tab-pane"
+    )
+
+    if not order_ids:
+        messages.error(request, 'Selecciona al menos un pedido.')
+        return redirect(redirect_to)
+
+    selected_orders = [
+        order
+        for order in Order.objects.filter(pk__in=order_ids, client=client)
+        .select_related('client')
+        .prefetch_related('items', 'payments')
+    ]
+    if len(selected_orders) != len(order_ids):
+        messages.error(
+            request,
+            'Uno o más pedidos seleccionados no pertenecen al cliente.',
+        )
+        return redirect(redirect_to)
+
+    from orders.views import _handle_create_invoice_action
+
+    return _handle_create_invoice_action(request, selected_orders, redirect_to)
+
+
 @login_required
 @require_POST
 def send_selected_order_receipts(request: HttpRequest, pk: int) -> JsonResponse:

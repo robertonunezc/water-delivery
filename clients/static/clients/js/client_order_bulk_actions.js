@@ -3,6 +3,7 @@
 
   function initializeClientOrderBulkActions() {
     const paymentForm = document.getElementById("selected-orders-payment-form");
+    const invoiceForm = document.getElementById("selected-orders-invoice-form");
     const actionSelect = document.getElementById("client-order-bulk-action");
     const applyButton = document.getElementById("apply-client-order-bulk-action");
     const selectAll = document.getElementById("select-all-client-orders");
@@ -15,6 +16,25 @@
     }
 
     const selectedOrders = () => orderCheckboxes.filter((checkbox) => checkbox.checked);
+
+    function submitInvoiceForm() {
+      if (!invoiceForm) {
+        return;
+      }
+
+      invoiceForm.querySelectorAll('[data-selected-order-id]').forEach((input) => {
+        input.remove();
+      });
+      selectedOrders().forEach((checkbox) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = "orders";
+        input.value = checkbox.value;
+        input.dataset.selectedOrderId = "true";
+        invoiceForm.appendChild(input);
+      });
+      invoiceForm.requestSubmit();
+    }
 
     function updateControls() {
       const selectedCount = selectedOrders().length;
@@ -44,6 +64,10 @@
     applyButton.addEventListener("click", function () {
       if (actionSelect.value === "pay") {
         paymentForm.requestSubmit();
+        return;
+      }
+      if (actionSelect.value === "create_invoice") {
+        submitInvoiceForm();
         return;
       }
       if (actionSelect.value === "send_receipts" && receiptModal) {

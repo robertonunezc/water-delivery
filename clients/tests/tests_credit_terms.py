@@ -6,6 +6,7 @@ from django.test import SimpleTestCase, override_settings
 from clients.services.pending_payment_service import (
     _monthly_cutoff_date,
     get_order_credit_due_date,
+    is_order_overdue,
 )
 
 
@@ -29,6 +30,12 @@ class CreditPaymentTermDateTests(SimpleTestCase):
         due_date = _monthly_cutoff_date(date(2027, 2, 10), '30')
 
         self.assertEqual(due_date, date(2027, 2, 28))
+
+    def test_order_is_overdue_only_after_due_date(self) -> None:
+        due_date = date(2026, 7, 10)
+
+        self.assertFalse(is_order_overdue(date(2026, 7, 10), due_date))
+        self.assertTrue(is_order_overdue(date(2026, 7, 11), due_date))
 
     def test_invoice_due_date_uses_invoice_emission_date(self) -> None:
         invoice = SimpleNamespace(emmited_at=date(2026, 6, 10))

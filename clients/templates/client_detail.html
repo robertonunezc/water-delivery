@@ -56,6 +56,11 @@
   </section>
 
   <form id="selected-orders-payment-form" method="get" action="{% url 'clients:pay_selected_orders' client.pk %}"></form>
+  {% if request.user.is_staff %}
+    <form id="selected-orders-invoice-form" method="post" action="{% url 'clients:create_invoice_from_selected_orders' client.pk %}">
+      {% csrf_token %}
+    </form>
+  {% endif %}
 
   {% if has_financial_risk %}
     <section class="pg-alert pg-alert-danger client-risk-alert pg-mb-3" role="alert">
@@ -188,6 +193,9 @@
                 <select class="pg-select" id="client-order-bulk-action">
                   <option value="">Acciones masivas</option>
                   <option value="pay">Pagar seleccionados</option>
+                  {% if request.user.is_staff %}
+                    <option value="create_invoice">Crear factura</option>
+                  {% endif %}
                   {% if receipt_signature_enabled %}
                     <option value="send_receipts">Enviar recibos</option>
                   {% endif %}

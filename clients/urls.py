@@ -8,6 +8,11 @@ urlpatterns = [
     path('<int:pk>/branches/', views.corporate_branches, name='corporate_branches'),
     path('<int:pk>/orders/pay/', views.pay_selected_orders, name='pay_selected_orders'),
     path(
+        '<int:pk>/orders/invoices/create/',
+        views.create_invoice_from_selected_orders,
+        name='create_invoice_from_selected_orders',
+    ),
+    path(
         '<int:pk>/orders/receipts/send/',
         views.send_selected_order_receipts,
         name='send_selected_order_receipts',

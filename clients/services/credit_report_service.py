@@ -8,7 +8,10 @@ from django.db.models import Q
 from django.utils import timezone
 
 from clients.models import Client, ClientCreditConfig, CreditTransaction
-from clients.services.pending_payment_service import get_order_credit_due_date
+from clients.services.pending_payment_service import (
+    get_order_credit_due_date,
+    is_order_overdue,
+)
 from invoice.models import Invoice, InvoiceStatus
 from orders.models import Order
 
@@ -179,7 +182,11 @@ def _build_order_item(order: Order, *, as_of: date) -> CreditOrderReportItem:
     total_amount = _money(order.total_amount)
     remaining_amount = max(total_amount - paid_amount, ZERO)
     due_date = _get_order_due_date(order)
-    is_overdue = bool(due_date and as_of > due_date and remaining_amount > ZERO)
+    is_overdue = bool(
+        due_date
+        and is_order_overdue(as_of, due_date)
+        and remaining_amount > ZERO
+    )
     days_overdue = (as_of - due_date).days if due_date and is_overdue else 0
     return CreditOrderReportItem(
         order=order,

@@ -24,6 +24,10 @@ def _current_date() -> date:
     return _as_date(timezone.now())
 
 
+def is_order_overdue(current_date: date, due_date: date) -> bool:
+    return current_date > due_date
+
+
 def _monthly_cutoff_date(reference_date: date, cutoff_day: str) -> date:
     last_day = monthrange(reference_date.year, reference_date.month)[1]
     day = last_day if cutoff_day == 'last_day' else min(int(cutoff_day), last_day)
@@ -78,7 +82,7 @@ def _overdue_order_data(
             continue
 
         due_date = get_order_credit_due_date(order, credit_config)
-        if due_date is None or current_date <= due_date:
+        if due_date is None or not is_order_overdue(current_date, due_date):
             continue
 
         days_overdue = (current_date - due_date).days
@@ -143,7 +147,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         'overdue_orders': overdue_orders,
         'nearest_due_date': nearest_due_date,
         'nearest_due_is_overdue': bool(
-            nearest_due_date and nearest_due_date < current_date
+            nearest_due_date and is_order_overdue(current_date, nearest_due_date)
         ),
         'awaiting_invoice': awaiting_invoice,
     }

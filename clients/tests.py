@@ -791,6 +791,33 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
         self.assertContains(response, 'La fecha de pago es obligatoria.')
         self.assertFalse(order.payments.filter(method='cash').exists())
 
+    def test_selected_order_payment_rejects_malformed_payment_date(self) -> None:
+        order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now(),
+            credit_account=self.corporate,
+        )
+        self.corporate.current_debt = Decimal('100.00')
+        self.corporate.save(update_fields=['current_debt', 'updated_at'])
+
+        response = self.client.post(
+            reverse('clients:pay_selected_orders', args=[self.branch.pk]),
+            {
+                'orders': [str(order.pk)],
+                'amount': '100.00',
+                'payment_method': 'cash',
+                'payment_date': '14/07/2026',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'Fecha de pago inválida. Use el formato AAAA-MM-DD.',
+        )
+        self.assertFalse(order.payments.filter(method='cash').exists())
+
     def test_pay_credit_requires_selected_orders_for_payment(self) -> None:
         response = self.client.post(
             reverse('clients:pay_credit', args=[self.branch.pk]),
@@ -1162,6 +1189,79 @@ class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
                 reference_order=second,
             ).exists(),
         )
+
+
+class ClientSelectedOrderInvoiceActionTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='selected-invoice-user',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.client.force_login(self.user)
+        self.customer = Client.objects.create(
+            name='Cliente facturacion seleccionada',
+            type='corporate',
+            active=True,
+        )
+        InvoiceData.objects.create(
+            client=self.customer,
+            rfc='CFS010101AAA',
+            razon_social='Cliente Facturacion Seleccionada SA de CV',
+        )
+        Address.objects.create(
+            client=self.customer,
+            type='billing',
+            street='Fiscal 123',
+            locality='Centro',
+            municipality='Queretaro',
+            state='Queretaro',
+            zip_code='76000',
+            country='Mexico',
+        )
+
+    def _order(self, amount: Decimal) -> Order:
+        return Order.objects.create(
+            client=self.customer,
+            owner=self.user,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=amount,
+        )
+
+    def test_staff_can_create_invoice_from_selected_client_orders(self) -> None:
+        first_order = self._order(Decimal('100.00'))
+        second_order = self._order(Decimal('80.00'))
+
+        response = self.client.post(
+            f'/clients/{self.customer.pk}/orders/invoices/create/',
+            {'orders': [first_order.pk, second_order.pk]},
+        )
+
+        invoice = Invoice.objects.get(client=self.customer)
+        self.assertRedirects(
+            response,
+            reverse('admin_edit_invoice', args=[invoice.pk]),
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(invoice.amount, Decimal('180.00'))
+        self.assertSetEqual(
+            set(invoice.invoice_links.values_list('order_id', flat=True)),
+            {first_order.pk, second_order.pk},
+        )
+
+    def test_client_detail_shows_invoice_bulk_action_for_staff(self) -> None:
+        self._order(Decimal('100.00'))
+
+        response = self.client.get(
+            reverse('clients:detail', args=[self.customer.pk]),
+        )
+
+        self.assertContains(response, 'value="create_invoice"')
+        self.assertContains(
+            response,
+            f'/clients/{self.customer.pk}/orders/invoices/create/',
+        )
+
 
 class ClientReceiptBundleViewTests(FastTenantTestCase):
     def setUp(self) -> None:
