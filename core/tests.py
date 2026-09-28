@@ -1,6 +1,11 @@
 from datetime import date
+import json
+from types import SimpleNamespace
+from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import RequestFactory, SimpleTestCase
+
+from core import views
 
 
 class DashboardDateRangeTests(SimpleTestCase):
@@ -44,3 +49,56 @@ class DashboardDateRangeTests(SimpleTestCase):
         self.assertEqual(selected_range.start_date, date(2026, 6, 5))
         self.assertEqual(selected_range.end_date, date(2026, 6, 12))
         self.assertEqual(selected_range.label, "Personalizado")
+
+
+class HealthCheckViewTests(SimpleTestCase):
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+
+    def _request(self, path: str = "/health/ready/"):
+        request = self.factory.get(path, HTTP_HOST="testserver")
+        request.tenant = SimpleNamespace(schema_name="tenant1")
+        return request
+
+    def test_live_health_check_returns_ok(self) -> None:
+        response = views.health_live(self._request("/health/live/"))
+
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload, {"status": "ok", "check": "live"})
+
+    @patch("core.views._check_redis", return_value={"redis": "ok"})
+    @patch("core.views._check_database", return_value={"database": "ok", "schema_name": "tenant1"})
+    def test_ready_health_check_returns_ok_when_dependencies_pass(
+        self,
+        _database_check,
+        _redis_check,
+    ) -> None:
+        response = views.health_ready(self._request())
+
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["check"], "ready")
+        self.assertEqual(payload["tenant"]["schema_name"], "tenant1")
+        self.assertEqual(
+            payload["dependencies"],
+            {"database": "ok", "schema_name": "tenant1", "redis": "ok"},
+        )
+
+    @patch("core.views._check_redis", return_value={"redis": "ok"})
+    @patch("core.views._check_database", return_value={"database": "ok", "schema_name": "public"})
+    @patch("core.views.logger")
+    def test_ready_health_check_fails_when_tenant_schema_mismatches(
+        self,
+        logger,
+        _database_check,
+        _redis_check,
+    ) -> None:
+        response = views.health_ready(self._request())
+
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 500)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["dependency"], "tenant")
+        logger.error.assert_called_once()
