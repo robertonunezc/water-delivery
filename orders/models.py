@@ -30,6 +30,8 @@ ORDER_TYPE_CHOICES = (
     # Agrega más tipos según sea necesario
 )
 
+RESERVING_INVOICE_STATUSES = ('DRAFT', 'ACTIVE')
+
 class OrderQuerySet(models.QuerySet):
     """Custom queryset for Order model with common filters"""
 
@@ -57,7 +59,7 @@ class OrderQuerySet(models.QuerySet):
             QuerySet of unbilled orders
         """
         return self.exclude(
-            invoice_links__invoice__status='ACTIVE',
+            invoice_links__invoice__status__in=RESERVING_INVOICE_STATUSES,
         ).distinct()
 
     def for_client(self, client):
@@ -91,7 +93,9 @@ class OrderQuerySet(models.QuerySet):
         client_orders = self.for_client(client)
         billable_ids = (
             client_orders.filter(status=OrderStatus.COMPLETED.value)
-            .exclude(invoice_links__invoice__status='ACTIVE')
+            .exclude(
+                invoice_links__invoice__status__in=RESERVING_INVOICE_STATUSES
+            )
             .values('pk')
         )
         selection = Q(pk__in=billable_ids)
@@ -113,7 +117,9 @@ class OrderQuerySet(models.QuerySet):
         owner_orders = self.filter(owner_filter)
         billable_ids = (
             owner_orders.filter(status=OrderStatus.COMPLETED.value)
-            .exclude(invoice_links__invoice__status='ACTIVE')
+            .exclude(
+                invoice_links__invoice__status__in=RESERVING_INVOICE_STATUSES
+            )
             .values('pk')
         )
         selection = Q(pk__in=billable_ids)

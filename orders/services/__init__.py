@@ -355,7 +355,9 @@ def _cancel_order_in_transaction(
             'message': f'Pedido #{locked_order.id} ya estaba cancelado.',
         }
 
-    if locked_order.invoice_links.filter(invoice__status='ACTIVE').exists():
+    if locked_order.invoice_links.filter(
+        invoice__status__in=('DRAFT', 'ACTIVE'),
+    ).exists():
         return _mark_cancellation_review_required(
             order=locked_order,
             reason='El pedido ya está vinculado a una factura y requiere revisión.',

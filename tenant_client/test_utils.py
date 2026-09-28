@@ -36,7 +36,7 @@ class TenantTestMixin:
             def setUp(self):
                 self.tenant, self.domain = self.setup_test_tenant()
 
-            def test_something(self):
+            def example_something(self):
                 # Test runs in context of test tenant
                 pass
     """
@@ -122,7 +122,7 @@ class FastTenantTestCase(DjangoTenantsFastTenantTestCase):
                 # Add test data to tenant
                 return tenant
 
-            def test_client_creation(self):
+            def example_client_creation(self):
                 # Test runs in tenant schema context
                 pass
     """

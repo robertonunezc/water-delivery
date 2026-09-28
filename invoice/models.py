@@ -44,12 +44,22 @@ OCCURRENCE_CHOICES = [
 
 
 class InvoiceStatus(models.TextChoices):
+    DRAFT = 'DRAFT', 'Borrador'
     ACTIVE = 'ACTIVE', 'Activa'
     CANCELLED = 'CANCELLED', 'Cancelada'
 
 
+RESERVING_INVOICE_STATUSES = (
+    InvoiceStatus.DRAFT,
+    InvoiceStatus.ACTIVE,
+)
+
+
 # Create your models here.
 class InvoiceQuerySet(models.QuerySet):
+    def drafts(self) -> 'InvoiceQuerySet':
+        return self.filter(status=InvoiceStatus.DRAFT)
+
     def active(self) -> 'InvoiceQuerySet':
         return self.filter(status=InvoiceStatus.ACTIVE)
 
@@ -161,6 +171,9 @@ class Invoice(TimeStampedModel):
         if stored is None:
             return []
 
+        if stored['status'] == InvoiceStatus.DRAFT:
+            return []
+
         changed_fields = []
         for field_name in self.IMMUTABLE_FIELDS:
             current_value = getattr(self, field_name)
@@ -219,7 +232,7 @@ class Invoice(TimeStampedModel):
         return payments or 0.00
     @property
     def pending_amount(self):
-        if self.status == InvoiceStatus.CANCELLED:
+        if self.status != InvoiceStatus.ACTIVE:
             return 0.0
         return float(self.amount) - float(self.total_payments)
 

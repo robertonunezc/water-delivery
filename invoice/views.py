@@ -6,11 +6,11 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
-from django.http import JsonResponse
+from django.http import HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_GET, require_POST
-from invoice.models import Invoice
+from django.views.decorators.http import require_http_methods, require_POST
+from invoice.models import Invoice, InvoiceStatus
 
 # Existing API Views
 
@@ -93,7 +93,7 @@ def list_invoices_admin(request):
             Q(client__name__icontains=search_query)
         ).distinct()
 
-    if status_filter in {'ACTIVE', 'CANCELLED'}:
+    if status_filter in {'DRAFT', 'ACTIVE', 'CANCELLED'}:
         invoices = invoices.filter(status=status_filter)
 
     invoices = invoices.order_by('-date', '-id')
@@ -119,6 +119,9 @@ def list_invoices_admin(request):
         ),
         'active_count': sum(
             1 for invoice in invoices_page if invoice.status == 'ACTIVE'
+        ),
+        'draft_count': sum(
+            1 for invoice in invoices_page if invoice.status == 'DRAFT'
         ),
         'cancelled_count': sum(
             1 for invoice in invoices_page if invoice.status == 'CANCELLED'
@@ -208,9 +211,54 @@ def cancel_invoice_admin(request, pk):
 
 
 @staff_member_required
-@require_GET
+@require_http_methods(['GET', 'POST'])
 def edit_invoice_admin(request, pk):
+    from django.contrib import messages
+    from django.core.exceptions import ValidationError
+    from invoice.forms import InvoiceDraftEditForm
+    from invoice.services import issue_draft_invoice
+
     invoice = get_object_or_404(Invoice, pk=pk)
+    is_editable_draft = invoice.status == InvoiceStatus.DRAFT
+
+    if request.method == 'POST':
+        if not is_editable_draft:
+            return HttpResponseNotAllowed(['GET'])
+
+        form = InvoiceDraftEditForm(
+            request.POST,
+            request.FILES,
+            instance=invoice,
+        )
+        if form.is_valid():
+            try:
+                invoice = issue_draft_invoice(
+                    invoice=form.save(commit=False),
+                    orders=list(form.cleaned_data['orders']),
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+            else:
+                messages.success(
+                    request,
+                    f'Factura #{invoice.id} emitida correctamente.',
+                )
+                return redirect('admin_edit_invoice', pk=invoice.pk)
+    else:
+        form = InvoiceDraftEditForm(instance=invoice) if is_editable_draft else None
+
+    if is_editable_draft:
+        return render(
+            request,
+            'billing/admin/invoice_create.html',
+            {
+                'form': form,
+                'invoice': invoice,
+                'is_create': False,
+                'is_draft_edit': True,
+            },
+        )
+
     linked_orders = invoice.invoice_links.select_related('order').all()
 
     context = {

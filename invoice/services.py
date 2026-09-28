@@ -19,7 +19,7 @@ from calendar import monthrange
 from invoice.models import InvoiceSchedule
 from clients.models import Client, InvoiceData
 from core.utils import get_first_last_day_of_month
-from orders.models import Order
+from orders.models import Order, OrderStatus
 
 
 def get_invoice_fiscal_owner(client: Client) -> Client:
@@ -395,21 +395,22 @@ def validate_order_can_link_to_invoice(
     exclude_invoice_order_link_id: Optional[int] = None,
 ) -> None:
     """Validate that an order is eligible to be linked to an invoice."""
-    from invoice.models import InvoiceOrderLink, InvoiceStatus
+    from invoice.models import InvoiceOrderLink, RESERVING_INVOICE_STATUSES
     from orders.models import OrderStatus
 
     current_link = None
-    if exclude_invoice_order_link_id:
+    if invoice.pk:
         current_link = InvoiceOrderLink.objects.filter(
-            pk=exclude_invoice_order_link_id,
             invoice=invoice,
             order=order,
         ).first()
 
     existing_links = InvoiceOrderLink.objects.filter(
         order=order,
-        invoice__status=InvoiceStatus.ACTIVE,
+        invoice__status__in=RESERVING_INVOICE_STATUSES,
     )
+    if invoice.pk:
+        existing_links = existing_links.exclude(invoice=invoice)
     if exclude_invoice_order_link_id:
         existing_links = existing_links.exclude(pk=exclude_invoice_order_link_id)
     if existing_links.exists():
@@ -515,6 +516,24 @@ def get_invoiceable_orders_for_client(
     ]
 
 
+def get_editable_orders_for_invoice(
+    invoice: 'invoice.models.Invoice',
+) -> 'django.db.models.QuerySet':
+    """Return fully paid completed orders available to an invoice draft."""
+    current_order_ids = invoice.invoice_links.values_list('order_id', flat=True)
+    available_orders = get_invoiceable_orders_for_client(
+        client=invoice.client,
+        scope='fiscal_owner',
+        as_dict=False,
+    )
+    return Order.objects.filter(
+        Q(pk__in=available_orders.values('pk'))
+        | Q(pk__in=current_order_ids)
+    ).filter(
+        status=OrderStatus.COMPLETED.value,
+    ).paid().distinct().order_by('-order_date')
+
+
 # Date Range Utilities
 
 
@@ -598,7 +617,10 @@ def disable_billing_for_client(client_id: int) -> None:
     delete_billing_frequency_for_client(client_id)
 
 
-def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.Invoice':
+def create_invoice_from_orders(
+    orders: Sequence[Order],
+    client: Client,
+) -> 'invoice.models.Invoice':
     """
     Create an Invoice from a list of Order instances.
 
@@ -618,7 +640,12 @@ def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.
     """
     import uuid
     from django.db import transaction
-    from invoice.models import Invoice, InvoiceOrderLink
+    from invoice.models import (
+        Invoice,
+        InvoiceOrderLink,
+        InvoiceStatus,
+        RESERVING_INVOICE_STATUSES,
+    )
 
     if not orders:
         raise ValidationError("Debe seleccionar al menos un pedido.")
@@ -634,21 +661,109 @@ def create_invoice_from_orders(orders: List, client: Client) -> 'invoice.models.
     for order in orders:
         validate_client_invoice_generation_requirements(order.client)
 
-    total = sum(o.total_amount for o in orders)
     short_id = uuid.uuid4().hex[:8].upper()
+    order_ids = [order.pk for order in orders]
 
     with transaction.atomic():
+        locked_orders = list(
+            Order.objects.select_for_update()
+            .select_related('client')
+            .filter(pk__in=order_ids)
+        )
+        if len(locked_orders) != len(set(order_ids)):
+            raise ValidationError('Una o más ventas seleccionadas ya no existen.')
+
+        reserved_order_id = (
+            InvoiceOrderLink.objects.select_for_update()
+            .filter(
+                order_id__in=order_ids,
+                invoice__status__in=RESERVING_INVOICE_STATUSES,
+            )
+            .values_list('order_id', flat=True)
+            .first()
+        )
+        if reserved_order_id is not None:
+            raise ValidationError(
+                f'El pedido #{reserved_order_id} ya esta vinculado a otra factura.'
+            )
+
         invoice = Invoice.objects.create(
             client=fiscal_owner,
-            amount=total,
+            amount=sum(
+                (order.total_amount for order in locked_orders),
+                Decimal('0'),
+            ),
             auto_amount=True,
             identifier=f'BORRADOR-{short_id}',
             folio=f'BORRADOR-{short_id}',
+            status=InvoiceStatus.DRAFT,
         )
-        for order in orders:
+        for order in locked_orders:
+            validate_order_can_link_to_invoice(invoice=invoice, order=order)
             InvoiceOrderLink.objects.create(invoice=invoice, order=order)
 
     return invoice
+
+
+def issue_draft_invoice(
+    *,
+    invoice: 'invoice.models.Invoice',
+    orders: Sequence[Order],
+) -> 'invoice.models.Invoice':
+    """Apply the single allowed draft edit, replace its orders, and issue it."""
+    from invoice.models import Invoice, InvoiceOrderLink, InvoiceStatus
+
+    if not invoice.pk:
+        raise ValidationError('La factura en borrador debe existir antes de emitirse.')
+
+    order_ids = [order.pk for order in orders]
+    if not order_ids:
+        raise ValidationError('Debe vincular al menos una venta para emitir la factura.')
+
+    with transaction.atomic():
+        locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if locked_invoice.status != InvoiceStatus.DRAFT:
+            raise ValidationError('Solo las facturas en borrador se pueden modificar.')
+
+        locked_orders = list(
+            Order.objects.select_for_update()
+            .select_related('client')
+            .filter(pk__in=order_ids)
+        )
+        if len(locked_orders) != len(set(order_ids)):
+            raise ValidationError('Una o más ventas seleccionadas ya no existen.')
+
+        for order in locked_orders:
+            validate_order_can_link_to_invoice(invoice=locked_invoice, order=order)
+
+        selected_order_ids = {order.pk for order in locked_orders}
+        existing_links = list(
+            InvoiceOrderLink.objects.select_for_update().filter(
+                invoice=locked_invoice,
+            )
+        )
+        existing_order_ids = {link.order_id for link in existing_links}
+
+        for link in existing_links:
+            if link.order_id not in selected_order_ids:
+                link.delete()
+        for order in locked_orders:
+            if order.pk not in existing_order_ids:
+                InvoiceOrderLink.objects.create(invoice=locked_invoice, order=order)
+
+        locked_invoice.identifier = invoice.identifier
+        locked_invoice.folio = invoice.folio
+        locked_invoice.emmited_at = invoice.emmited_at
+        locked_invoice.file = invoice.file
+        locked_invoice.amount = sum(
+            (order.total_amount for order in locked_orders),
+            Decimal('0'),
+        )
+        locked_invoice.auto_amount = True
+        locked_invoice.status = InvoiceStatus.ACTIVE
+        locked_invoice.save()
+
+    return locked_invoice
 
 
 def sync_invoice_amount(invoice: 'invoice.models.Invoice') -> None:

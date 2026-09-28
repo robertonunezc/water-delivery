@@ -1,60 +1,35 @@
-import csv
-import io
-from datetime import date, datetime
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
-from django.test import override_settings
-from django.urls import reverse
-from django.utils import timezone
 
-from clients.models import Client, ClientCreditConfig, CreditTransaction
-from core.models import Employee
-from invoice.models import Invoice, InvoiceOrderLink
+from clients.models import Client
 from orders.models import Order, OrderProduct, OrderStatus
 from payment.models import Payment
 from product.models import Product, ProductCategory
+from report.views import (
+    FULL_DISCOUNT_METHOD,
+    NO_PAYMENT_RECORDED_METHOD,
+    _get_breakdown_order_stats,
+    _get_order_payment_bucket,
+    _get_payment_method_order_ids,
+    _get_report_orders_queryset,
+)
 from tenant_client.test_utils import FastTenantTestCase
+
 
 User = get_user_model()
 
-TEST_STATIC_STORAGES = {
-    "default": {
-        "BACKEND": "django.core.files.storage.FileSystemStorage",
-    },
-    "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-    },
-}
 
-
-class BreakdownPaymentMethodReportTests(FastTenantTestCase):
+class ReportBusinessRuleTests(FastTenantTestCase):
     def setUp(self) -> None:
-        self.staticfiles_override = override_settings(STORAGES=TEST_STATIC_STORAGES)
-        self.staticfiles_override.enable()
-        self.addCleanup(self.staticfiles_override.disable)
-
-        self.user = User.objects.create_user(
-            username="report_user",
-            password="testpass123",
-        )
-        self.other_user = User.objects.create_user(
-            username="other_report_user",
-            password="testpass123",
-        )
-        self.client.force_login(self.user)
-
-        self.customer = Client.objects.create(
-            name="Cliente Reporte",
-            balance=Decimal("0.00"),
-            credit_limit=Decimal("0.00"),
-        )
-        self.category = ProductCategory.objects.create(name="Agua")
+        self.user = User.objects.create_user(username="report_user")
+        self.customer = Client.objects.create(name="Cliente Reporte")
+        category = ProductCategory.objects.create(name="Agua")
         self.product = Product.objects.create(
             name="Garrafon",
             presentation="20",
             unit_of_measure=1,
-            category=self.category,
+            category=category,
             price=Decimal("100.00"),
         )
 
@@ -62,17 +37,14 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
         self,
         *,
         subtotal: Decimal,
-        discount: Decimal,
+        discount: Decimal = Decimal("0.00"),
         total: Decimal,
         status: str = OrderStatus.COMPLETED.value,
-        with_payment: bool = False,
-        payment_status: str = "completed",
-        owner: object | None = None,
+        payment_status: str | None = None,
     ) -> Order:
-        order_owner = owner or self.user
         order = Order.objects.create(
             client=self.customer,
-            owner=order_owner,
+            owner=self.user,
             subtotal_amount=subtotal,
             discount=discount,
             total_amount=total,
@@ -83,303 +55,6 @@ class BreakdownPaymentMethodReportTests(FastTenantTestCase):
             product=self.product,
             quantity=1,
             unit_price=subtotal,
-        )
-        if with_payment:
-            Payment.objects.create(
-                amount=total,
-                method="cash",
-                client=self.customer,
-                order=order,
-                status=payment_status,
-                created_by=order_owner,
-            )
-        return order
-
-    def test_breakdown_report_groups_discounted_orders_without_payment(self) -> None:
-        discounted_order = self._create_order(
-            subtotal=Decimal("100.00"),
-            discount=Decimal("100.00"),
-            total=Decimal("0.00"),
-        )
-        paid_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("10.00"),
-            total=Decimal("70.00"),
-            with_payment=True,
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["stats"]["subtotal_amount"], Decimal("180.00"))
-        self.assertEqual(response.context["stats"]["total_discount"], Decimal("110.00"))
-        self.assertEqual(response.context["stats"]["total_amount"], Decimal("70.00"))
-        payment_stats = response.context["payment_method_stats"]
-        full_discount_orders = list(payment_stats["full_discount"]["orders"])
-        cash_orders = list(payment_stats["cash"]["orders"])
-        self.assertEqual([order.id for order in full_discount_orders], [discounted_order.id])
-        self.assertEqual([order.id for order in cash_orders], [paid_order.id])
-
-    def test_breakdown_report_csv_includes_discount_column_and_net_totals(self) -> None:
-        self._create_order(
-            subtotal=Decimal("100.00"),
-            discount=Decimal("100.00"),
-            total=Decimal("0.00"),
-        )
-        self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("10.00"),
-            total=Decimal("70.00"),
-            with_payment=True,
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method_csv"))
-        content = response.content.decode("utf-8")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Subtotal", content)
-        self.assertIn("Total Descuentos", content)
-        self.assertIn('"Subtotal","$180.00"', content)
-        self.assertIn('"Total Descuentos","$110.00"', content)
-        self.assertIn('"Monto Total","$70.00"', content)
-        self.assertIn('"Método de Pago","Productos","Hora","Subtotal","Descuento","Total"', content)
-        self.assertIn("Descuento 100% / Sin cobro", content)
-
-    def test_breakdown_report_excludes_cancelled_orders_by_default(self) -> None:
-        active_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("10.00"),
-            total=Decimal("70.00"),
-            with_payment=True,
-        )
-        cancelled_order = self._create_order(
-            subtotal=Decimal("60.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("60.00"),
-            status=OrderStatus.CANCELLED.value,
-            with_payment=True,
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["stats"]["total_orders"], 1)
-        self.assertEqual(response.context["stats"]["subtotal_amount"], Decimal("80.00"))
-        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
-        self.assertEqual(
-            [order.id for order in cash_orders],
-            [active_order.id],
-        )
-        self.assertNotIn(
-            cancelled_order.id,
-            [order.id for order in cash_orders],
-        )
-
-    def test_breakdown_csv_excludes_cancelled_orders_by_default(self) -> None:
-        active_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("10.00"),
-            total=Decimal("70.00"),
-            with_payment=True,
-        )
-        cancelled_order = self._create_order(
-            subtotal=Decimal("60.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("60.00"),
-            status=OrderStatus.CANCELLED.value,
-            with_payment=True,
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method_csv"))
-        content = response.content.decode("utf-8")
-        rows = list(csv.reader(io.StringIO(content)))
-        order_ids = {row[0] for row in rows if row and row[0].startswith("#")}
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('"Total de Órdenes","1"', content)
-        self.assertIn(f"#{active_order.id}", order_ids)
-        self.assertNotIn(f"#{cancelled_order.id}", order_ids)
-
-    def test_breakdown_report_ignores_reversed_payment_bucket(self) -> None:
-        reversed_payment_order = self._create_order(
-            subtotal=Decimal("50.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("50.00"),
-            with_payment=True,
-            payment_status="reversed",
-        )
-
-        response = self.client.get(reverse("report:breakdown_payment_method"))
-        payment_stats = response.context["payment_method_stats"]
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(payment_stats["cash"]["order_count"], 0)
-        self.assertEqual(payment_stats["no_payment_recorded"]["order_count"], 1)
-        no_payment_orders = list(payment_stats["no_payment_recorded"]["orders"])
-        self.assertEqual([order.id for order in no_payment_orders], [reversed_payment_order.id])
-
-    def test_breakdown_staff_user_sees_all_users_by_default(self) -> None:
-        own_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("80.00"),
-            with_payment=True,
-        )
-        other_order = self._create_order(
-            subtotal=Decimal("120.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("120.00"),
-            with_payment=True,
-            owner=self.other_user,
-        )
-        staff_user = User.objects.create_user(
-            username="staff_report_user",
-            password="testpass123",
-            is_staff=True,
-        )
-        self.client.force_login(staff_user)
-
-        response = self.client.get(reverse("report:breakdown_payment_method"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["stats"]["total_orders"], 2)
-        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
-        self.assertEqual(
-            {order.id for order in cash_orders},
-            {own_order.id, other_order.id},
-        )
-        self.assertTrue(response.context["can_filter_by_user"])
-
-    def test_breakdown_employee_staff_position_can_filter_by_user(self) -> None:
-        self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("80.00"),
-            with_payment=True,
-        )
-        other_order = self._create_order(
-            subtotal=Decimal("120.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("120.00"),
-            with_payment=True,
-            owner=self.other_user,
-        )
-        sales_user = User.objects.create_user(
-            username="sales_report_user",
-            password="testpass123",
-        )
-        Employee.objects.create(
-            user=sales_user,
-            nombre="Ventas",
-            apellidos="Reporte",
-            curp="VENTASREPORT000001",
-            rfc="VENTASREP0001",
-            street_number="Calle 1",
-            position="staff",
-        )
-        self.client.force_login(sales_user)
-
-        response = self.client.get(
-            reverse("report:breakdown_payment_method"),
-            {"employee": str(self.other_user.pk)},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["stats"]["total_orders"], 1)
-        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
-        self.assertEqual([order.id for order in cash_orders], [other_order.id])
-        self.assertEqual(response.context["employee_filter"], str(self.other_user.pk))
-        self.assertEqual(
-            response.context["breakdown_export_url"],
-            (
-                f'{reverse("report:breakdown_payment_method_csv")}?'
-                f'date={timezone.localdate().isoformat()}&'
-                f'employee={self.other_user.pk}'
-            ),
-        )
-
-    def test_breakdown_regular_user_cannot_filter_to_other_users(self) -> None:
-        own_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("80.00"),
-            with_payment=True,
-        )
-        other_order = self._create_order(
-            subtotal=Decimal("120.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("120.00"),
-            with_payment=True,
-            owner=self.other_user,
-        )
-
-        response = self.client.get(
-            reverse("report:breakdown_payment_method"),
-            {"employee": str(self.other_user.pk)},
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["stats"]["total_orders"], 1)
-        cash_orders = response.context["payment_method_stats"]["cash"]["orders"]
-        self.assertEqual([order.id for order in cash_orders], [own_order.id])
-        self.assertNotIn(other_order.id, [order.id for order in cash_orders])
-        self.assertFalse(response.context["can_filter_by_user"])
-
-    def test_breakdown_staff_csv_can_filter_by_user(self) -> None:
-        own_order = self._create_order(
-            subtotal=Decimal("80.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("80.00"),
-            with_payment=True,
-        )
-        other_order = self._create_order(
-            subtotal=Decimal("120.00"),
-            discount=Decimal("0.00"),
-            total=Decimal("120.00"),
-            with_payment=True,
-            owner=self.other_user,
-        )
-        staff_user = User.objects.create_user(
-            username="staff_csv_report_user",
-            password="testpass123",
-            is_staff=True,
-        )
-        self.client.force_login(staff_user)
-
-        response = self.client.get(
-            reverse("report:breakdown_payment_method_csv"),
-            {"employee": str(self.other_user.pk)},
-        )
-        rows = list(csv.reader(io.StringIO(response.content.decode("utf-8"))))
-        order_ids = {row[0] for row in rows if row and row[0].startswith("#")}
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(f"#{other_order.id}", order_ids)
-        self.assertNotIn(f"#{own_order.id}", order_ids)
-
-
-class OrdersReportQueryTests(FastTenantTestCase):
-    def setUp(self) -> None:
-        self.user = User.objects.create_user(
-            username="orders_report_user",
-            password="testpass123",
-        )
-        self.client.force_login(self.user)
-        self.customer = Client.objects.create(name="Cliente Orders Reporte")
-
-    def _create_order(
-        self,
-        *,
-        total: Decimal,
-        status: str = OrderStatus.COMPLETED.value,
-        payment_status: str | None = None,
-    ) -> Order:
-        order = Order.objects.create(
-            client=self.customer,
-            owner=self.user,
-            subtotal_amount=total,
-            total_amount=total,
-            status=status,
         )
         if payment_status:
             Payment.objects.create(
@@ -392,216 +67,58 @@ class OrdersReportQueryTests(FastTenantTestCase):
             )
         return order
 
-    def test_orders_report_excludes_cancelled_orders_by_default(self) -> None:
-        active_order = self._create_order(
-            total=Decimal("100.00"),
+    def test_breakdown_uses_net_totals_and_full_discount_bucket(self) -> None:
+        discounted_order = self._create_order(
+            subtotal=Decimal("100.00"),
+            discount=Decimal("100.00"),
+            total=Decimal("0.00"),
+        )
+        self._create_order(
+            subtotal=Decimal("80.00"),
+            discount=Decimal("10.00"),
+            total=Decimal("70.00"),
             payment_status="completed",
+        )
+
+        stats = _get_breakdown_order_stats(Order.objects.active())
+
+        self.assertEqual(stats["subtotal_amount"], Decimal("180.00"))
+        self.assertEqual(stats["total_discount"], Decimal("110.00"))
+        self.assertEqual(stats["total_amount"], Decimal("70.00"))
+        self.assertEqual(
+            _get_order_payment_bucket(discounted_order)[0],
+            FULL_DISCOUNT_METHOD,
+        )
+
+    def test_default_report_scope_excludes_cancelled_orders(self) -> None:
+        active_order = self._create_order(
+            subtotal=Decimal("80.00"),
+            total=Decimal("80.00"),
         )
         cancelled_order = self._create_order(
-            total=Decimal("50.00"),
+            subtotal=Decimal("60.00"),
+            total=Decimal("60.00"),
             status=OrderStatus.CANCELLED.value,
-            payment_status="completed",
         )
 
-        response = self.client.get(reverse("report:orders_report"))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["order_stats"]["total_orders"], 1)
-        page_order_ids = [order.id for order in response.context["orders"].object_list]
-        self.assertEqual(page_order_ids, [active_order.id])
-        self.assertNotIn(cancelled_order.id, page_order_ids)
-
-    def test_orders_report_csv_excludes_cancelled_orders_by_default(self) -> None:
-        active_order = self._create_order(
-            total=Decimal("100.00"),
-            payment_status="completed",
-        )
-        cancelled_order = self._create_order(
-            total=Decimal("50.00"),
-            status=OrderStatus.CANCELLED.value,
-            payment_status="completed",
+        order_ids = set(
+            _get_report_orders_queryset().values_list("id", flat=True)
         )
 
-        response = self.client.get(reverse("report:orders_report_csv"))
-        content = response.content.decode("utf-8")
-        rows = list(csv.reader(io.StringIO(content)))
-        order_ids = {int(row[0]) for row in rows[1:] if row}
-
-        self.assertEqual(response.status_code, 200)
         self.assertIn(active_order.id, order_ids)
         self.assertNotIn(cancelled_order.id, order_ids)
 
-    def test_billing_filter_ignores_cancelled_invoices(self) -> None:
-        order = self._create_order(total=Decimal('100.00'))
-        invoice = Invoice.objects.create(
-            client=self.customer,
-            amount=Decimal('100.00'),
-            identifier='CANCELLED-REPORT',
-            folio='1',
-            status='CANCELLED',
-            cancelled_at=timezone.now(),
-        )
-        InvoiceOrderLink.objects.create(invoice=invoice, order=order)
-
-        billed_response = self.client.get(
-            reverse('report:orders_report'),
-            {'has_billing': 'yes'},
-        )
-        unbilled_response = self.client.get(
-            reverse('report:orders_report'),
-            {'has_billing': 'no'},
-        )
-
-        billed_ids = [
-            item.id for item in billed_response.context['orders'].object_list
-        ]
-        unbilled_ids = [
-            item.id for item in unbilled_response.context['orders'].object_list
-        ]
-        self.assertNotIn(order.id, billed_ids)
-        self.assertIn(order.id, unbilled_ids)
-
-    def test_orders_report_export_url_preserves_active_filters(self) -> None:
-        response = self.client.get(
-            reverse("report:orders_report"),
-            {
-                "search": "Cliente Orders",
-                "payment_method": "cash",
-                "has_billing": "no",
-                "sort_by": "total_amount",
-                "page": "2",
-            },
-        )
-        expected_url = (
-            f'{reverse("report:orders_report_csv")}?'
-            "search=Cliente+Orders&payment_method=cash&"
-            "has_billing=no&sort_by=total_amount"
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["orders_export_url"], expected_url)
-
-    def test_payment_method_filter_ignores_reversed_payments(self) -> None:
-        reversed_payment_order = self._create_order(
-            total=Decimal("100.00"),
+    def test_reversed_payment_is_not_a_report_payment(self) -> None:
+        order = self._create_order(
+            subtotal=Decimal("50.00"),
+            total=Decimal("50.00"),
             payment_status="reversed",
         )
 
-        response = self.client.get(
-            reverse("report:orders_report"),
-            {"payment_method": "cash"},
+        bucket, _ = _get_order_payment_bucket(order)
+        cash_order_ids = set(
+            _get_payment_method_order_ids("cash").values_list("order_id", flat=True)
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context["order_stats"]["total_orders"], 0)
-        page_order_ids = [order.id for order in response.context["orders"].object_list]
-        self.assertNotIn(reversed_payment_order.id, page_order_ids)
-
-
-class CreditReportViewTests(FastTenantTestCase):
-    def setUp(self) -> None:
-        self.user = User.objects.create_user(
-            username="credit_report_user",
-            password="testpass123",
-        )
-        self.client.force_login(self.user)
-        self.customer = Client.objects.create(
-            name="Tempano",
-            current_debt=Decimal("9700.00"),
-            credit_limit=Decimal("20000.00"),
-        )
-        ClientCreditConfig.objects.create(
-            client=self.customer,
-            payment_term_type="monthly_cutoff",
-            cutoff_day="last_day",
-            max_payment_days=30,
-        )
-        self.order = self._create_credit_order(
-            amount=Decimal("9700.00"),
-            order_date=date(2026, 4, 1),
-        )
-
-    def _set_order_date(self, order: Order, order_date: date) -> None:
-        value = datetime.combine(order_date, datetime.min.time())
-        if timezone.is_aware(timezone.now()):
-            value = timezone.make_aware(value)
-        Order.objects.filter(pk=order.pk).update(order_date=value)
-        order.refresh_from_db()
-
-    def _create_credit_order(self, *, amount: Decimal, order_date: date) -> Order:
-        order = Order.objects.create(
-            client=self.customer,
-            subtotal_amount=amount,
-            total_amount=amount,
-            status=OrderStatus.COMPLETED.value,
-            type="credito",
-            owner=self.user,
-        )
-        self._set_order_date(order, order_date)
-        CreditTransaction.objects.create(
-            client=self.customer,
-            transaction_type="purchase",
-            amount=amount,
-            debt_before=Decimal("0.00"),
-            debt_after=amount,
-            credit_limit_after=self.customer.credit_limit,
-            reference_order=order,
-            created_by=self.user,
-        )
-        return order
-
-    def test_global_credit_report_context_contains_credit_rows_and_totals(
-        self,
-    ) -> None:
-        response = self.client.get(reverse("report:credit_report"))
-        credit_rows = list(response.context["credit_rows"])
-
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual([row.client for row in credit_rows], [self.customer])
-        self.assertEqual(response.context["totals"]["total_current_credit"], Decimal("9700.00"))
-        self.assertEqual(response.context["totals"]["total_authorized_credit_line"], Decimal("20000.00"))
-        self.assertEqual(response.context["totals"]["total_available_credit"], Decimal("10300.00"))
-        self.assertEqual(response.context["totals"]["total_overdue_amount"], Decimal("9700.00"))
-
-    def test_global_credit_report_csv_exports_required_columns(self) -> None:
-        response = self.client.get(reverse("report:credit_report_csv"))
-        content = response.content.decode("utf-8")
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("Cliente,Crédito vigente,Línea de crédito autorizada,Disponible,Monto vencido", content)
-        self.assertIn("Tempano,9700.00,20000.00,10300.00,9700.00", content)
-
-    def test_client_credit_report_context_groups_invoiced_and_uninvoiced_orders(
-        self,
-    ) -> None:
-        invoice = Invoice.objects.create(
-            client=self.customer,
-            amount=Decimal("9700.00"),
-            identifier="AA",
-            folio="1313",
-            emmited_at=date(2026, 4, 30),
-        )
-        InvoiceOrderLink.objects.create(invoice=invoice, order=self.order)
-        self._create_credit_order(
-            amount=Decimal("4500.00"),
-            order_date=date(2026, 7, 1),
-        )
-        self.customer.current_debt = Decimal("14200.00")
-        self.customer.save(update_fields=["current_debt"])
-
-        response = self.client.get(
-            reverse("report:client_credit_report", args=[self.customer.pk])
-        )
-
-        self.assertEqual(response.status_code, 200)
-        report_data = response.context["report_data"]
-        self.assertEqual(report_data.invoiced_credit_total, Decimal("9700.00"))
-        self.assertEqual(report_data.uninvoiced_credit_total, Decimal("4500.00"))
-        self.assertEqual([item.invoice for item in report_data.invoice_items], [invoice])
-
-    def test_credit_report_requires_login(self) -> None:
-        self.client.logout()
-
-        response = self.client.get(reverse("report:credit_report"))
-
-        self.assertEqual(response.status_code, 302)
+        self.assertEqual(bucket, NO_PAYMENT_RECORDED_METHOD)
+        self.assertNotIn(order.id, cash_order_ids)

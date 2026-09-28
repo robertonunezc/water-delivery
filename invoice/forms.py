@@ -4,12 +4,42 @@ from typing import Any
 
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.services import (
+    get_editable_orders_for_invoice,
     get_invoice_fiscal_owner,
     get_invoiceable_orders_for_client,
     validate_invoice_orders_total_limit,
 )
 from clients.models import Client
 from orders.models import Order
+
+
+class OrderAmountSelectMultiple(forms.SelectMultiple):
+    """Expose each order total to draft-form JavaScript."""
+
+    def create_option(
+        self,
+        name: str,
+        value: Any,
+        label: str,
+        selected: bool,
+        index: int,
+        subindex: int | None = None,
+        attrs: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        option = super().create_option(
+            name,
+            value,
+            label,
+            selected,
+            index,
+            subindex=subindex,
+            attrs=attrs,
+        )
+        order = getattr(value, 'instance', None)
+        if order is not None:
+            option['attrs']['data-amount'] = format(order.total_amount, '.2f')
+        return option
+
 
 class InvoiceForm(forms.ModelForm):
     class Meta:
@@ -103,6 +133,44 @@ class InvoiceCreateForm(InvoiceForm):
                 self.add_error('orders', exc)
 
         return cleaned_data
+
+
+class InvoiceDraftEditForm(forms.ModelForm):
+    orders = forms.ModelMultipleChoiceField(
+        queryset=Order.objects.none(),
+        required=True,
+        label='Ventas vinculadas',
+        error_messages={
+            'required': 'Debe vincular al menos una venta para emitir la factura.',
+        },
+        widget=OrderAmountSelectMultiple(
+            attrs={'class': 'pg-select', 'size': 10},
+        ),
+    )
+
+    class Meta:
+        model = Invoice
+        fields = ['identifier', 'folio', 'emmited_at', 'file', 'orders']
+        widgets = {
+            'identifier': forms.TextInput(attrs={'class': 'pg-input'}),
+            'folio': forms.TextInput(attrs={'class': 'pg-input'}),
+            'emmited_at': forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'type': 'date', 'class': 'pg-input'},
+            ),
+            'file': forms.ClearableFileInput(attrs={'class': 'pg-input'}),
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields['orders'].queryset = get_editable_orders_for_invoice(
+            self.instance,
+        )
+        if not self.is_bound:
+            self.initial['orders'] = self.instance.invoice_links.values_list(
+                'order_id',
+                flat=True,
+            )
 
 
 class InvoiceOrderLinkForm(forms.ModelForm):

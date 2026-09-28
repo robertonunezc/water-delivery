@@ -700,6 +700,8 @@
                         <td>
                           {% if invoice.status == 'ACTIVE' %}
                             <span class="pg-badge pg-bg-success">ACTIVA</span>
+                          {% elif invoice.status == 'DRAFT' %}
+                            <span class="pg-badge pg-bg-warning">BORRADOR</span>
                           {% else %}
                             <span class="pg-badge pg-bg-danger">CANCELADA</span>
                           {% endif %}
@@ -713,10 +715,10 @@
                         </td>
                         <td>
                           <div class="pg-flex pg-gap-2">
-                            <a href="{% url 'admin_edit_invoice' invoice.id %}" class="pg-button pg-button-sm pg-button-outline-dark" title="Ver factura" aria-label="Ver factura">
-                              <i class="fas fa-eye"></i>
+                            <a href="{% url 'admin_edit_invoice' invoice.id %}" class="pg-button pg-button-sm pg-button-outline-dark" title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}" aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
+                              <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}"></i>
                             </a>
-                            {% if request.user.is_staff and invoice.status == 'ACTIVE' %}
+                            {% if request.user.is_staff and invoice.status != 'CANCELLED' %}
                               <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
                                 {% csrf_token %}
                                 <input type="hidden" name="next" value="{{ request.get_full_path }}">

@@ -52,11 +52,11 @@ class BillingAttachedFilter(admin.SimpleListFilter):
     def queryset(self, request, queryset):
         if self.value() == 'yes':
             return queryset.filter(
-                invoice_links__invoice__status='ACTIVE',
+                invoice_links__invoice__status__in=('DRAFT', 'ACTIVE'),
             ).distinct()
         elif self.value() == 'no':
             return queryset.exclude(
-                invoice_links__invoice__status='ACTIVE',
+                invoice_links__invoice__status__in=('DRAFT', 'ACTIVE'),
             ).distinct()
 
 
@@ -356,7 +356,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             from invoice.models import InvoiceOrderLink
             invoice_links = InvoiceOrderLink.objects.filter(
                 order=obj,
-                invoice__status='ACTIVE',
+                invoice__status__in=('DRAFT', 'ACTIVE'),
             ).select_related('invoice')
             
             if not invoice_links.exists():
@@ -365,7 +365,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             billing_info = []
             for invoice_link in invoice_links:
                 identifier = invoice_link.invoice.identifier
-                url = reverse('admin:billing_invoice_change', args=[invoice_link.invoice.id])
+                url = reverse('admin_edit_invoice', args=[invoice_link.invoice.id])
                 
                 if invoice_link.is_paid:
                     status_icon = '✓'
@@ -594,7 +594,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def crear_factura(self, request, queryset):
         """Create an invoice from selected completed, unbilled orders."""
         from invoice.services import create_invoice_from_orders
-        from invoice.models import InvoiceOrderLink, InvoiceStatus
+        from invoice.models import InvoiceOrderLink, RESERVING_INVOICE_STATUSES
 
         orders = list(queryset)
 
@@ -611,7 +611,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         already_billed_ids = list(
             InvoiceOrderLink.objects.filter(
                 order__in=orders,
-                invoice__status=InvoiceStatus.ACTIVE,
+                invoice__status__in=RESERVING_INVOICE_STATUSES,
             ).values_list('order_id', flat=True)
         )
         if already_billed_ids:
@@ -632,10 +632,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
         self.message_user(
             request,
-            f'Factura #{invoice.id} creada para {invoice.client.name} por ${invoice.amount}. '
+            f'Borrador #{invoice.id} creado para {invoice.client.name} por ${invoice.amount}. '
             f'Actualiza el identificador y folio antes de emitirla.',
         )
-        url = reverse('admin:billing_invoice_change', args=[invoice.id])
+        url = reverse('admin_edit_invoice', args=[invoice.id])
         return redirect(url)
 
     crear_factura.short_description = 'Crear factura'

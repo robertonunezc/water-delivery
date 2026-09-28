@@ -11,8 +11,16 @@
 
   <div class="pg-card form-card">
     <div class="pg-card-header form-card-header">
-      <h2 class="pg-h5 pg-mb-0">Crear nueva factura</h2>
-      <p class="pg-text-white-muted pg-small pg-mb-0 pg-mt-1">Especifica los datos del cliente, la serie/folio y el tipo de cálculo.</p>
+      <h2 class="pg-h5 pg-mb-0">
+        {% if is_draft_edit %}Completar factura{% else %}Crear nueva factura{% endif %}
+      </h2>
+      <p class="pg-text-white-muted pg-small pg-mb-0 pg-mt-1">
+        {% if is_draft_edit %}
+          Actualiza los datos fiscales y las ventas antes de emitirla.
+        {% else %}
+          Especifica los datos del cliente, la serie/folio y el tipo de cálculo.
+        {% endif %}
+      </p>
     </div>
     <div class="pg-card-body pg-p-4">
       <form method="post" enctype="multipart/form-data" id="invoice-create-form" novalidate>
@@ -34,10 +42,15 @@
         <div class="pg-row pg-gap-3">
           <!-- Client Selection -->
           <div class="pg-col-md-12">
-            <label for="{{ form.client.id_for_label }}" class="pg-label">Cliente *</label>
-            {{ form.client }}
-            {% if form.client.help_text %}
-              <div class="pg-field-help">{{ form.client.help_text }}</div>
+            {% if is_draft_edit %}
+              <label class="pg-label" for="draft-client">Cliente *</label>
+              <input id="draft-client" class="pg-input" value="{{ invoice.client.name }}" disabled>
+            {% else %}
+              <label for="{{ form.client.id_for_label }}" class="pg-label">Cliente *</label>
+              {{ form.client }}
+              {% if form.client.help_text %}
+                <div class="pg-field-help">{{ form.client.help_text }}</div>
+              {% endif %}
             {% endif %}
           </div>
 
@@ -45,7 +58,11 @@
             <label for="{{ form.orders.id_for_label }}" class="pg-label">Ventas vinculadas *</label>
             {{ form.orders }}
             <div class="pg-field-help">
-              Selecciona una o más ventas completadas y pendientes de facturar.
+              {% if is_draft_edit %}
+                Selecciona una o más ventas completadas, pagadas y pendientes de facturar.
+              {% else %}
+                Selecciona una o más ventas completadas y pendientes de facturar.
+              {% endif %}
             </div>
           </div>
 
@@ -61,8 +78,14 @@
 
           <!-- Calculation Mode / Amount -->
           <div class="pg-col-md-6">
-            <label for="{{ form.amount.id_for_label }}" class="pg-label">Importe ($)</label>
-            {{ form.amount }}
+            {% if is_draft_edit %}
+              <label class="pg-label">Importe ($)</label>
+              <input id="draft-invoice-amount" class="pg-input" value="{{ invoice.amount|floatformat:2 }}" disabled>
+              <div class="pg-field-help">Se recalcula con las ventas seleccionadas.</div>
+            {% else %}
+              <label for="{{ form.amount.id_for_label }}" class="pg-label">Importe ($)</label>
+              {{ form.amount }}
+            {% endif %}
           </div>
           <div class="pg-col-md-6">
             <label for="{{ form.emmited_at.id_for_label }}" class="pg-label">Fecha de emisión</label>
@@ -97,8 +120,12 @@
         </div>
 
         <div class="pg-flex pg-justify-end pg-gap-2 pg-mt-4">
-          <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
-          <button type="submit" class="pg-button pg-button-primary">Crear factura y continuar</button>
+          <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-outline-secondary">
+            {% if is_draft_edit %}Volver{% else %}Cancelar{% endif %}
+          </a>
+          <button type="submit" class="pg-button pg-button-primary">
+            {% if is_draft_edit %}Guardar y emitir{% else %}Crear factura y continuar{% endif %}
+          </button>
         </div>
       </form>
     </div>
@@ -106,6 +133,42 @@
 </div>
 
 {% block extra_js %}
+{% if is_draft_edit %}
+<script>
+  class InvoiceDraftAmountManager {
+    constructor() {
+      this.ordersSelect = document.getElementById('{{ form.orders.id_for_label }}');
+      this.amountInput = document.getElementById('draft-invoice-amount');
+      this.init();
+    }
+
+    init() {
+      if (!this.ordersSelect || !this.amountInput) {
+        return;
+      }
+      this.ordersSelect.addEventListener('change', () => this.updateAmount());
+      this.updateAmount();
+    }
+
+    updateAmount() {
+      const totalCents = Array.from(this.ordersSelect.selectedOptions).reduce(
+        (total, option) => {
+          const amount = Number.parseFloat(option.dataset.amount);
+          return Number.isFinite(amount)
+            ? total + Math.round(amount * 100)
+            : total;
+        },
+        0,
+      );
+      this.amountInput.value = (totalCents / 100).toFixed(2);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    new InvoiceDraftAmountManager();
+  });
+</script>
+{% else %}
 <script>
   // OOP-style Javascript manager for Invoice Creation interactivity
   class InvoiceCreateManager {
@@ -195,6 +258,7 @@
     new InvoiceCreateManager();
   });
 </script>
+{% endif %}
 {% endblock %}
 
 {% endblock %}
