@@ -3,6 +3,8 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Iterable
 
+from django.db.models import Q
+
 from clients.models import Client, CreditTransaction
 from orders.models import Order
 from payment import services as payment_services
@@ -20,7 +22,8 @@ def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
     )
     if client.type == 'corporate':
         credit_transactions = credit_transactions.filter(
-            reference_order__client__corporate=client,
+            Q(reference_order__client=client)
+            | Q(reference_order__client__corporate=client),
         )
     else:
         credit_transactions = credit_transactions.filter(

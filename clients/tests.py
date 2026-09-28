@@ -515,6 +515,28 @@ class ClientCreditManagementOrderScopeTests(FastTenantTestCase):
 
         self.assertEqual([order.pk for order in orders], [override_order.pk, inherited_order.pk])
 
+    def test_corporate_scope_lists_direct_and_branch_credit_orders_newest_first(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+
+        branch_order = self._credit_order(
+            self.branch,
+            Decimal('100.00'),
+            order_date=timezone.now() - timedelta(days=2),
+            credit_account=self.corporate,
+        )
+        corporate_order = self._credit_order(
+            self.corporate,
+            Decimal('160.00'),
+            order_date=timezone.now() - timedelta(days=1),
+            credit_account=self.corporate,
+        )
+
+        orders = get_open_credit_orders_for_credit_management(self.corporate)
+
+        self.assertEqual([order.pk for order in orders], [corporate_order.pk, branch_order.pk])
+
     def test_scope_excludes_paid_cancelled_and_out_of_scope_orders(self) -> None:
         from clients.services.credit_payment_service import (
             get_open_credit_orders_for_credit_management,
