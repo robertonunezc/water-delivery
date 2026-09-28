@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
+from django.urls import reverse
 from django.utils import timezone
 from clients.models import Address, Client
 from core.models import Employee, Transport
@@ -284,3 +285,206 @@ class ReminderServiceActionTests(FastTenantTestCase):
         reminder = Reminder.all_objects.get(pk=reminder.pk)
         self.assertIsNotNone(reminder.deleted_at)
         self.assertFalse(Reminder.objects.filter(pk=reminder.pk).exists())
+
+
+class ReminderViewTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="view_owner", password="testpass")
+        self.other_user = User.objects.create_user(username="view_other", password="testpass")
+        self.today = timezone.localdate()
+        self.client_record = self._create_client("Maria")
+        self.other_client = self._create_client("Jose")
+
+    def _create_client(self, name: str) -> Client:
+        client = Client.objects.create(name=name)
+        Address.objects.create(client=client, type="delivery", street=f"Calle {name}")
+        return client
+
+    def _reminder(self, title: str, **kwargs) -> Reminder:
+        defaults = {"created_by": self.user}
+        defaults.update(kwargs)
+        return Reminder.objects.create(title=title, **defaults)
+
+    def test_create_requires_authentication(self) -> None:
+        response = self.client.get(reverse("reminders:create"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("core:login"), response.url)
+
+    def test_create_sets_created_by_and_redirects_home(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("reminders:create"),
+            {
+                "title": "Vender 3 garrafones",
+                "description": "En la proxima visita",
+                "client": self.client_record.pk,
+                "reminder_date": (self.today + timedelta(days=2)).isoformat(),
+                "urgent": "on",
+            },
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        reminder = Reminder.objects.get(title="Vender 3 garrafones")
+        self.assertEqual(reminder.created_by, self.user)
+        self.assertEqual(reminder.client, self.client_record)
+        self.assertTrue(reminder.urgent)
+
+    def test_create_with_client_query_preselects_client(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('reminders:create')}?client={self.client_record.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["form"]["client"].value(), self.client_record.pk)
+
+    def test_create_with_invalid_client_query_does_not_fail(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(f"{reverse('reminders:create')}?client=999999")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["form"]["client"].value())
+
+    def test_list_default_shows_active_future_and_no_date_only(self) -> None:
+        self.client.force_login(self.user)
+        no_date = self._reminder("Sin fecha")
+        future = self._reminder("Futuro", reminder_date=self.today + timedelta(days=2))
+        self._reminder("Vencido", reminder_date=self.today - timedelta(days=1))
+        self._reminder("Listo", completed_at=timezone.now(), completed_by=self.user)
+        deleted = self._reminder("Eliminado")
+        deleted.delete()
+        Reminder.objects.create(title="Ajeno", created_by=self.other_user)
+
+        response = self.client.get(reverse("reminders:list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["reminders"]), [future, no_date])
+
+    def test_list_vencidos_filter_shows_past_incomplete(self) -> None:
+        self.client.force_login(self.user)
+        overdue = self._reminder("Vencido", reminder_date=self.today - timedelta(days=1))
+        self._reminder("Futuro", reminder_date=self.today + timedelta(days=1))
+        self._reminder(
+            "Vencido listo",
+            reminder_date=self.today - timedelta(days=1),
+            completed_at=timezone.now(),
+            completed_by=self.user,
+        )
+
+        response = self.client.get(f"{reverse('reminders:list')}?status=vencidos")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["reminders"]), [overdue])
+
+    def test_list_listos_filter_shows_completed_read_only(self) -> None:
+        self.client.force_login(self.user)
+        completed = self._reminder("Listo", completed_at=timezone.now(), completed_by=self.user)
+        self._reminder("Activo")
+
+        response = self.client.get(f"{reverse('reminders:list')}?status=listos")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["reminders"]), [completed])
+        self.assertNotContains(response, reverse("reminders:edit", kwargs={"pk": completed.pk}))
+
+    def test_search_filters_title_and_description(self) -> None:
+        self.client.force_login(self.user)
+        title_match = self._reminder("Recoger garrafones")
+        description_match = self._reminder("Llamar", description="Pedir envases")
+        self._reminder("Cobrar factura")
+
+        response = self.client.get(f"{reverse('reminders:list')}?q=garrafones")
+        self.assertEqual(list(response.context["reminders"]), [title_match])
+
+        response = self.client.get(f"{reverse('reminders:list')}?q=envases")
+        self.assertEqual(list(response.context["reminders"]), [description_match])
+
+    def test_client_filter_limits_results(self) -> None:
+        self.client.force_login(self.user)
+        maria_reminder = self._reminder("Maria", client=self.client_record)
+        self._reminder("Jose", client=self.other_client)
+
+        response = self.client.get(
+            f"{reverse('reminders:list')}?client={self.client_record.pk}"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context["reminders"]), [maria_reminder])
+
+    def test_edit_is_owner_only(self) -> None:
+        reminder = self._reminder("Original")
+        self.client.force_login(self.other_user)
+
+        response = self.client.post(
+            reverse("reminders:edit", kwargs={"pk": reminder.pk}),
+            {"title": "Cambiado"},
+        )
+
+        reminder.refresh_from_db()
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(reminder.title, "Original")
+
+    def test_completed_reminder_cannot_be_edited(self) -> None:
+        self.client.force_login(self.user)
+        reminder = self._reminder(
+            "Listo",
+            completed_at=timezone.now(),
+            completed_by=self.user,
+        )
+
+        response = self.client.post(
+            reverse("reminders:edit", kwargs={"pk": reminder.pk}),
+            {"title": "Cambiado"},
+        )
+
+        reminder.refresh_from_db()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(reminder.title, "Listo")
+
+    def test_complete_action_sets_completed_fields(self) -> None:
+        self.client.force_login(self.user)
+        reminder = self._reminder("Completar")
+
+        response = self.client.post(
+            reverse("reminders:complete", kwargs={"pk": reminder.pk}),
+            HTTP_REFERER=reverse("reminders:list"),
+        )
+
+        self.assertRedirects(response, reverse("reminders:list"), fetch_redirect_response=False)
+        reminder.refresh_from_db()
+        self.assertIsNotNone(reminder.completed_at)
+        self.assertEqual(reminder.completed_by, self.user)
+
+    def test_delete_action_soft_deletes(self) -> None:
+        self.client.force_login(self.user)
+        reminder = self._reminder("Eliminar")
+
+        response = self.client.post(
+            reverse("reminders:delete", kwargs={"pk": reminder.pk}),
+            HTTP_REFERER=reverse("reminders:list"),
+        )
+
+        self.assertRedirects(response, reverse("reminders:list"), fetch_redirect_response=False)
+        reminder = Reminder.all_objects.get(pk=reminder.pk)
+        self.assertIsNotNone(reminder.deleted_at)
+
+    def test_other_user_cannot_complete_or_delete(self) -> None:
+        reminder_to_complete = self._reminder("Completar ajeno")
+        reminder_to_delete = self._reminder("Eliminar ajeno")
+        self.client.force_login(self.other_user)
+
+        complete_response = self.client.post(
+            reverse("reminders:complete", kwargs={"pk": reminder_to_complete.pk})
+        )
+        delete_response = self.client.post(
+            reverse("reminders:delete", kwargs={"pk": reminder_to_delete.pk})
+        )
+
+        reminder_to_complete.refresh_from_db()
+        reminder_to_delete.refresh_from_db()
+        self.assertEqual(complete_response.status_code, 403)
+        self.assertEqual(delete_response.status_code, 403)
+        self.assertIsNone(reminder_to_complete.completed_at)
+        self.assertIsNone(reminder_to_delete.deleted_at)

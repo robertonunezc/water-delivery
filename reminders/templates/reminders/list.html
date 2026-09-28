@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Recordatorios</h1>
+{% for reminder in reminders %}
+  <article>
+    <h2>{{ reminder.title }}</h2>
+    {% if reminder.description %}<p>{{ reminder.description }}</p>{% endif %}
+    {% if reminder.completed_at %}
+      <span>Listo</span>
+    {% else %}
+      <a href="{% url 'reminders:edit' reminder.pk %}">Editar</a>
+    {% endif %}
+  </article>
+{% empty %}
+  <p>Sin recordatorios</p>
+{% endfor %}
+{% endblock %}
