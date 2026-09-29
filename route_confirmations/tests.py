@@ -13,6 +13,7 @@ from core.models import Transport
 from route_confirmations.models import VisitConfirmation
 from route_confirmations.senders import SendReceipt
 from route_confirmations.services import (
+    attach_confirmation_states,
     get_next_due_visit_date,
     override_confirmation,
     record_public_response,
@@ -91,6 +92,22 @@ class VisitConfirmationModelTests(FastTenantTestCase):
             VisitConfirmation.objects.filter(pk=confirmation.pk).exists()
         )
 
+    def test_route_client_deactivation_archives_related_confirmations(self) -> None:
+        confirmation = VisitConfirmation.objects.create(
+            route_client=self.route_client,
+            visit_date=date(2026, 2, 23),
+            token='deactivate-token',
+        )
+
+        self.route_client.is_active = False
+        self.route_client.save()
+        confirmation.refresh_from_db()
+
+        self.assertIsNotNone(confirmation.deleted_at)
+        self.assertFalse(
+            VisitConfirmation.objects.filter(pk=confirmation.pk).exists()
+        )
+
 
 class VisitConfirmationServiceTests(FastTenantTestCase):
     def setUp(self) -> None:
@@ -155,6 +172,17 @@ class VisitConfirmationServiceTests(FastTenantTestCase):
         )
 
         self.assertEqual(next_due, date(2026, 3, 9))
+
+    def test_next_due_visit_date_handles_future_anchor_date(self) -> None:
+        self.route_client.anchor_date = date(2026, 5, 4)
+        self.route_client.save()
+
+        next_due = get_next_due_visit_date(
+            self.route_client,
+            today=date(2026, 2, 23),
+        )
+
+        self.assertEqual(next_due, date(2026, 5, 4))
 
     def test_public_confirmar_response_records_confirmed_status(self) -> None:
         confirmation = self._create_confirmation(token='confirmar-token')
@@ -325,6 +353,27 @@ class VisitConfirmationSendServiceTests(FastTenantTestCase):
             [True, False],
         )
 
+    def test_all_recipient_failures_archive_unsent_confirmation(self) -> None:
+        Contact.objects.create(client=self.client, name='Uno', email='uno@example.com')
+        Contact.objects.create(client=self.client, name='Dos', email='dos@example.com')
+        fake_sender = FakeConfirmationSender(
+            failed_recipients={'uno@example.com', 'dos@example.com'}
+        )
+
+        result = self._send_with_fake(fake_sender)
+        archived_confirmation = VisitConfirmation.all_objects.get()
+        [self.route_client] = attach_confirmation_states(
+            [self.route_client],
+            today=date(2026, 2, 23),
+        )
+
+        self.assertFalse(result.success)
+        self.assertEqual(result.outcome, 'send_failed')
+        self.assertEqual(VisitConfirmation.objects.count(), 0)
+        self.assertIsNotNone(archived_confirmation.deleted_at)
+        self.assertEqual(len(archived_confirmation.receipt_log), 2)
+        self.assertTrue(self.route_client.visit_confirmation_state.can_send)
+
     def test_expired_resend_reuses_record_and_replaces_token_and_receipts(self) -> None:
         Contact.objects.create(client=self.client, name='Uno', email='uno@example.com')
         first_sender = FakeConfirmationSender()
@@ -363,3 +412,23 @@ class VisitConfirmationSendServiceTests(FastTenantTestCase):
         self.assertEqual(second_result.outcome, 'pending')
         self.assertEqual(second_sender.recipients, [])
         self.assertEqual(first_result.confirmation.token, original_token)
+
+    def test_successful_expired_resend_blocks_immediate_second_resend(self) -> None:
+        Contact.objects.create(client=self.client, name='Uno', email='uno@example.com')
+        first_result = self._send_with_fake(FakeConfirmationSender())
+        VisitConfirmation.objects.filter(pk=first_result.confirmation.pk).update(
+            expires_at=timezone.now() - timedelta(minutes=1),
+        )
+        expired_sender = FakeConfirmationSender()
+        expired_result = self._send_with_fake(expired_sender)
+        token_after_expired_resend = expired_result.confirmation.token
+
+        second_sender = FakeConfirmationSender()
+        second_result = self._send_with_fake(second_sender)
+        expired_result.confirmation.refresh_from_db()
+
+        self.assertTrue(expired_result.success)
+        self.assertFalse(second_result.success)
+        self.assertEqual(second_result.outcome, 'pending')
+        self.assertEqual(second_sender.recipients, [])
+        self.assertEqual(expired_result.confirmation.token, token_after_expired_resend)

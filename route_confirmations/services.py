@@ -11,7 +11,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
-from routes.models import RouteClient
+from routes.models import WEEKDAY_TO_INDEX, RouteClient
 
 from .models import VisitConfirmation
 from .senders import ConfirmationMessage, ConfirmationSenderFactory, SendReceipt
@@ -60,14 +60,26 @@ SPANISH_MONTHS = {
 
 def get_next_due_visit_date(route_client: RouteClient, today: date | None = None) -> date:
     current_date = today or timezone.localdate()
-    max_days_to_scan = max(route_client.interval_weeks, 1) * 7 + 7
+    if not route_client.route_id or not route_client.is_active:
+        raise ValidationError('No se pudo calcular la siguiente visita del cliente.')
 
-    for day_offset in range(max_days_to_scan + 1):
-        candidate = current_date + timedelta(days=day_offset)
-        if route_client.is_due_on(candidate):
-            return candidate
+    anchor_date = _aligned_anchor_date(route_client)
+    if current_date <= anchor_date:
+        return anchor_date
 
-    raise ValidationError('No se pudo calcular la siguiente visita del cliente.')
+    period_days = max(route_client.interval_weeks, 1) * 7
+    days_since_anchor = (current_date - anchor_date).days
+    periods_since_anchor = (days_since_anchor + period_days - 1) // period_days
+    return anchor_date + timedelta(days=periods_since_anchor * period_days)
+
+
+def _aligned_anchor_date(route_client: RouteClient) -> date:
+    route_weekday_index = WEEKDAY_TO_INDEX.get(route_client.route.weekday)
+    if route_weekday_index is None:
+        raise ValidationError('No se pudo calcular la siguiente visita del cliente.')
+
+    weekday_delta = (route_client.anchor_date.weekday() - route_weekday_index) % 7
+    return route_client.anchor_date - timedelta(days=weekday_delta)
 
 
 def get_or_create_confirmation(
@@ -97,77 +109,83 @@ def send_visit_confirmation(
         return SendResult(success=False, outcome='no_recipients')
 
     visit_date = get_next_due_visit_date(route_client, today=today)
-    confirmation = get_or_create_confirmation(route_client, visit_date)
-    if _is_answered(confirmation):
-        return SendResult(
-            success=False,
-            outcome='final',
-            confirmation=confirmation,
-        )
-
-    if confirmation.sent_at is not None and not confirmation.can_resend():
-        return SendResult(
-            success=False,
-            outcome='pending',
-            confirmation=confirmation,
-        )
-
-    if confirmation.sent_at is not None:
-        confirmation.reset_token()
-
-    sender = ConfirmationSenderFactory.get_sender(channel)
-    receipts = tuple(
-        sender.send(
-            _build_confirmation_message(
+    with transaction.atomic():
+        confirmation = _get_or_create_confirmation_for_update(route_client, visit_date)
+        if _is_answered(confirmation):
+            return SendResult(
+                success=False,
+                outcome='final',
                 confirmation=confirmation,
-                recipient=recipient,
-                request=request,
             )
-        )
-        for recipient in recipients
-    )
-    receipt_log = [receipt.as_dict() for receipt in receipts]
-    successful_receipts = [receipt for receipt in receipts if receipt.success]
-    warning_messages = tuple(
-        f'{receipt.recipient}: {receipt.error}'
-        for receipt in receipts
-        if not receipt.success
-    )
 
-    confirmation.receipt_log = receipt_log
-    if successful_receipts:
-        send_time = timezone.now()
-        confirmation.sent_at = send_time
-        confirmation.expires_at = send_time + timedelta(hours=24)
-        confirmation.sent_by = sent_by
-        confirmation.status = VisitConfirmation.Status.SENT
+        if confirmation.sent_at is not None and not confirmation.can_resend():
+            return SendResult(
+                success=False,
+                outcome='pending',
+                confirmation=confirmation,
+            )
+
+        if confirmation.sent_at is not None:
+            confirmation.reset_token()
+        if confirmation.pk is None:
+            confirmation.save()
+
+        sender = ConfirmationSenderFactory.get_sender(channel)
+        receipts = tuple(
+            sender.send(
+                _build_confirmation_message(
+                    confirmation=confirmation,
+                    recipient=recipient,
+                    request=request,
+                )
+            )
+            for recipient in recipients
+        )
+        receipt_log = [receipt.as_dict() for receipt in receipts]
+        successful_receipts = [receipt for receipt in receipts if receipt.success]
+        warning_messages = tuple(
+            f'{receipt.recipient}: {receipt.error}'
+            for receipt in receipts
+            if not receipt.success
+        )
+
+        confirmation.receipt_log = receipt_log
+        if successful_receipts:
+            send_time = timezone.now()
+            confirmation.sent_at = send_time
+            confirmation.expires_at = send_time + timedelta(hours=24)
+            confirmation.sent_by = sent_by
+            confirmation.status = VisitConfirmation.Status.SENT
+            confirmation.save(
+                update_fields=[
+                    'token',
+                    'status',
+                    'sent_at',
+                    'expires_at',
+                    'sent_by',
+                    'receipt_log',
+                    'updated_at',
+                ]
+            )
+            return SendResult(
+                success=True,
+                outcome='sent',
+                confirmation=confirmation,
+                receipts=receipts,
+                warning_messages=warning_messages,
+            )
+
+        confirmation.deleted_at = timezone.now()
         confirmation.save(
-            update_fields=[
-                'token',
-                'status',
-                'sent_at',
-                'expires_at',
-                'sent_by',
-                'receipt_log',
-                'updated_at',
-            ]
+            update_fields=['token', 'receipt_log', 'deleted_at', 'updated_at']
         )
         return SendResult(
-            success=True,
-            outcome='sent',
+            success=False,
+            outcome='send_failed',
             confirmation=confirmation,
             receipts=receipts,
             warning_messages=warning_messages,
         )
-
-    confirmation.save(update_fields=['token', 'receipt_log', 'updated_at'])
-    return SendResult(
-        success=False,
-        outcome='send_failed',
-        confirmation=confirmation,
-        receipts=receipts,
-        warning_messages=warning_messages,
-    )
 
 
 def record_public_response(
@@ -260,6 +278,26 @@ def _is_answered(confirmation: VisitConfirmation) -> bool:
     return (
         confirmation.responded_at is not None
         or confirmation.status != VisitConfirmation.Status.SENT
+    )
+
+
+def _get_or_create_confirmation_for_update(
+    route_client: RouteClient,
+    visit_date: date,
+) -> VisitConfirmation:
+    confirmation = (
+        VisitConfirmation.objects.select_for_update()
+        .filter(route_client=route_client, visit_date=visit_date)
+        .first()
+    )
+    if confirmation is not None:
+        return confirmation
+
+    return VisitConfirmation(
+        route_client=route_client,
+        visit_date=visit_date,
+        status=VisitConfirmation.Status.SENT,
+        token=VisitConfirmation.generate_token(),
     )
 
 
