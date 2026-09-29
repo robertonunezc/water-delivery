@@ -248,3 +248,9 @@ class RouteClient(TimeStampedModel):
         self._align_anchor_date_to_route_weekday()
         self._validate_client_delivery_address()
         return super().save(*args, **kwargs)
+
+    def delete(self, using=None, keep_parents=False):
+        from route_confirmations.models import VisitConfirmation
+
+        VisitConfirmation.objects.filter(route_client=self).update(deleted_at=timezone.now())
+        return super().delete(using=using, keep_parents=keep_parents)

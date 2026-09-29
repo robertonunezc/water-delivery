@@ -122,6 +122,7 @@ TENANT_APPS = (
     'product',
     'report',
     'routes',
+    'route_confirmations',
     'orders',
     'invoice.apps.InvoiceConfig',
     'notification',
