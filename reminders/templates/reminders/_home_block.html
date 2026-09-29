@@ -1,0 +1,34 @@
+{% if today_reminders or route_context_reminders %}
+<section class="reminders-home-block pg-mb-4" aria-labelledby="home-reminders-title">
+  <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
+    <div>
+      <h2 id="home-reminders-title" class="pg-h4 pg-mb-1">Recordatorios Para Hoy</h2>
+      <div class="pg-small pg-text-muted">{{ today_reminders|length }} activos para atender</div>
+    </div>
+    <a href="{% url 'reminders:create' %}" class="pg-button pg-button-primary pg-button-sm">
+      <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
+    </a>
+  </div>
+
+  {% if today_reminders %}
+    <div class="pg-flex pg-flex-column pg-gap-2 pg-mb-3">
+      {% for reminder in today_reminders %}
+        {% include "reminders/_reminder_row.html" with reminder=reminder compact=True %}
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="pg-alert pg-alert-info pg-py-2">Sin recordatorios para hoy.</div>
+  {% endif %}
+
+  {% if route_context_reminders %}
+    <div class="pg-mt-3">
+      <h3 class="pg-h5 pg-mb-2">Recordatorios De Clientes En Ruta</h3>
+      <div class="pg-flex pg-flex-column pg-gap-2">
+        {% for reminder in route_context_reminders %}
+          {% include "reminders/_reminder_row.html" with reminder=reminder compact=True %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+</section>
+{% endif %}

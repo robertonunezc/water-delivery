@@ -11,6 +11,7 @@ from core.services.dashboard_service import (
     get_employee_position,
     get_manager_dashboard_context,
 )
+from reminders.services import get_home_reminder_context
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,8 @@ def home(request):
             else 0
         ),
     }
+    if request.user.is_authenticated:
+        context.update(get_home_reminder_context(user=request.user))
     return render(request, 'home.html', context)
 
 def _tenant_context(request) -> dict[str, str | None]:

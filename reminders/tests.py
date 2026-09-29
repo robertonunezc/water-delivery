@@ -488,3 +488,110 @@ class ReminderViewTests(FastTenantTestCase):
         self.assertEqual(delete_response.status_code, 403)
         self.assertIsNone(reminder_to_complete.completed_at)
         self.assertIsNone(reminder_to_delete.deleted_at)
+
+
+class ReminderTemplateIntegrationTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username="template_owner", password="testpass")
+        self.client_record = self._create_client("Maria Plantilla")
+
+    def _create_client(self, name: str) -> Client:
+        client = Client.objects.create(name=name)
+        Address.objects.create(client=client, type="delivery", street=f"Calle {name}")
+        return client
+
+    def _create_employee(self, user, position: str) -> Employee:
+        return Employee.objects.create(
+            user=user,
+            nombre="Empleado",
+            apellidos=position,
+            curp=f"CURP{user.pk:014d}",
+            rfc=f"RFC{user.pk:010d}",
+            street_number="Calle Panel 1",
+            position=position,
+        )
+
+    def _reminder(self, title: str, **kwargs) -> Reminder:
+        defaults = {"created_by": self.user}
+        defaults.update(kwargs)
+        return Reminder.objects.create(title=title, **defaults)
+
+    def test_base_navigation_contains_recordatorios_links_for_authenticated_user(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("reminders:list"))
+
+        self.assertContains(response, 'href="/recordatorios/"')
+        self.assertContains(response, "Recordatorios")
+        self.assertContains(response, 'href="/recordatorios/nuevo/"')
+        self.assertContains(response, "NUEVO RECORDATORIO")
+
+    def test_home_renders_reminder_block_above_dashboard_actions(self) -> None:
+        self.client.force_login(self.user)
+        self._reminder("Recoger garrafones")
+
+        response = self.client.get(reverse("core:home"))
+        content = response.content.decode()
+
+        self.assertContains(response, "Recordatorios Para Hoy")
+        self.assertContains(response, "Recoger garrafones")
+        self.assertLess(content.index("Recordatorios Para Hoy"), content.index("Nuevo Pedido"))
+
+    def test_delivery_dashboard_renders_reminder_block(self) -> None:
+        self._create_employee(self.user, "driver")
+        self.client.force_login(self.user)
+        self._reminder("Vender garrafones en ruta")
+
+        response = self.client.get(reverse("core:home"))
+
+        self.assertContains(response, "Recordatorios Para Hoy")
+        self.assertContains(response, "Vender garrafones en ruta")
+
+    def test_manager_dashboard_renders_reminder_block(self) -> None:
+        manager = User.objects.create_user(
+            username="template_manager",
+            password="testpass",
+            is_staff=True,
+        )
+        self._create_employee(manager, "manager")
+        Reminder.objects.create(title="Revisar cobranza", created_by=manager)
+        self.client.force_login(manager)
+
+        response = self.client.get(reverse("core:home"))
+
+        self.assertContains(response, "Recordatorios Para Hoy")
+        self.assertContains(response, "Revisar cobranza")
+
+    def test_client_detail_has_new_reminder_link_with_client_query(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("clients:detail", kwargs={"pk": self.client_record.pk}))
+
+        self.assertContains(response, "NUEVO RECORDATORIO")
+        self.assertContains(
+            response,
+            f'{reverse("reminders:create")}?client={self.client_record.pk}',
+        )
+
+    def test_urgent_reminder_renders_urgent_badge(self) -> None:
+        self.client.force_login(self.user)
+        self._reminder("Urgente visible", urgent=True)
+
+        response = self.client.get(reverse("reminders:list"))
+
+        self.assertContains(response, "Urgente visible")
+        self.assertContains(response, "Urgente")
+
+    def test_completed_list_rows_do_not_show_edit_link(self) -> None:
+        self.client.force_login(self.user)
+        completed = self._reminder(
+            "Recordatorio listo",
+            completed_at=timezone.now(),
+            completed_by=self.user,
+        )
+
+        response = self.client.get(f"{reverse('reminders:list')}?status=listos")
+
+        self.assertContains(response, "Recordatorio listo")
+        self.assertContains(response, "Solo lectura")
+        self.assertNotContains(response, reverse("reminders:edit", kwargs={"pk": completed.pk}))

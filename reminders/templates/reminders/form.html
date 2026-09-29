@@ -1,10 +1,56 @@
 {% extends "base.html" %}
 
+{% block title %}{% if is_create %}Nuevo Recordatorio{% else %}Editar Recordatorio{% endif %}{% endblock %}
+
 {% block content %}
-<h1>{% if is_create %}Nuevo Recordatorio{% else %}Editar Recordatorio{% endif %}</h1>
-<form method="post">
-  {% csrf_token %}
-  {{ form.as_p }}
-  <button type="submit">Guardar</button>
-</form>
+<div class="pg-container pg-mt-4">
+  <div class="pg-flex pg-justify-between pg-align-center pg-gap-3 pg-mb-4">
+    <div>
+      <h1 class="pg-h3 pg-mb-1">{% if is_create %}Nuevo Recordatorio{% else %}Editar Recordatorio{% endif %}</h1>
+      <p class="pg-text-muted pg-mb-0">Titulo requerido; cliente y fecha son opcionales.</p>
+    </div>
+    <a href="{% url 'reminders:list' %}" class="pg-button pg-button-outline-secondary">
+      <i class="fas fa-arrow-left pg-me-1"></i>Recordatorios
+    </a>
+  </div>
+
+  <form method="post" class="pg-card">
+    <div class="pg-card-body">
+      {% csrf_token %}
+      <div class="pg-mb-3">
+        <label for="{{ form.title.id_for_label }}" class="pg-label">{{ form.title.label }}</label>
+        {{ form.title }}
+        {{ form.title.errors }}
+      </div>
+      <div class="pg-mb-3">
+        <label for="{{ form.description.id_for_label }}" class="pg-label">{{ form.description.label }}</label>
+        {{ form.description }}
+        {{ form.description.errors }}
+      </div>
+      <div class="pg-row pg-gap-3">
+        <div class="pg-col-md-6">
+          <label for="{{ form.client.id_for_label }}" class="pg-label">{{ form.client.label }}</label>
+          {{ form.client }}
+          {{ form.client.errors }}
+        </div>
+        <div class="pg-col-md-6">
+          <label for="{{ form.reminder_date.id_for_label }}" class="pg-label">{{ form.reminder_date.label }}</label>
+          {{ form.reminder_date }}
+          {{ form.reminder_date.errors }}
+        </div>
+      </div>
+      <label class="pg-flex pg-align-center pg-gap-2 pg-mt-3">
+        {{ form.urgent }}
+        <span>{{ form.urgent.label }}</span>
+      </label>
+      {{ form.non_field_errors }}
+    </div>
+    <div class="pg-card-footer pg-flex pg-justify-end pg-gap-2">
+      <a href="{% url 'reminders:list' %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
+      <button type="submit" class="pg-button pg-button-primary">
+        <i class="fas fa-save pg-me-1"></i>Guardar
+      </button>
+    </div>
+  </form>
+</div>
 {% endblock %}
