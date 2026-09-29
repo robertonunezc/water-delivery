@@ -6,17 +6,45 @@ from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.http import HttpRequest
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from routes.models import RouteClient
 
 from .models import VisitConfirmation
+from .senders import ConfirmationMessage, ConfirmationSenderFactory, SendReceipt
 
 
 @dataclass(frozen=True)
 class ResponseResult:
     outcome: str
     confirmation: VisitConfirmation | None = None
+
+
+@dataclass(frozen=True)
+class SendResult:
+    success: bool
+    outcome: str
+    confirmation: VisitConfirmation | None = None
+    receipts: tuple[SendReceipt, ...] = ()
+    warning_messages: tuple[str, ...] = ()
+
+
+SPANISH_MONTHS = {
+    1: 'Enero',
+    2: 'Febrero',
+    3: 'Marzo',
+    4: 'Abril',
+    5: 'Mayo',
+    6: 'Junio',
+    7: 'Julio',
+    8: 'Agosto',
+    9: 'Septiembre',
+    10: 'Octubre',
+    11: 'Noviembre',
+    12: 'Diciembre',
+}
 
 
 def get_next_due_visit_date(route_client: RouteClient, today: date | None = None) -> date:
@@ -44,6 +72,91 @@ def get_or_create_confirmation(
         },
     )
     return confirmation
+
+
+def send_visit_confirmation(
+    route_client: RouteClient,
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str = 'email',
+    today: date | None = None,
+) -> SendResult:
+    recipients = _get_contact_email_recipients(route_client)
+    if not recipients:
+        return SendResult(success=False, outcome='no_recipients')
+
+    visit_date = get_next_due_visit_date(route_client, today=today)
+    confirmation = get_or_create_confirmation(route_client, visit_date)
+    if _is_answered(confirmation):
+        return SendResult(
+            success=False,
+            outcome='final',
+            confirmation=confirmation,
+        )
+
+    if confirmation.sent_at is not None and not confirmation.can_resend():
+        return SendResult(
+            success=False,
+            outcome='pending',
+            confirmation=confirmation,
+        )
+
+    if confirmation.sent_at is not None:
+        confirmation.reset_token()
+
+    sender = ConfirmationSenderFactory.get_sender(channel)
+    receipts = tuple(
+        sender.send(
+            _build_confirmation_message(
+                confirmation=confirmation,
+                recipient=recipient,
+                request=request,
+            )
+        )
+        for recipient in recipients
+    )
+    receipt_log = [receipt.as_dict() for receipt in receipts]
+    successful_receipts = [receipt for receipt in receipts if receipt.success]
+    warning_messages = tuple(
+        f'{receipt.recipient}: {receipt.error}'
+        for receipt in receipts
+        if not receipt.success
+    )
+
+    confirmation.receipt_log = receipt_log
+    if successful_receipts:
+        send_time = timezone.now()
+        confirmation.sent_at = send_time
+        confirmation.expires_at = send_time + timedelta(hours=24)
+        confirmation.sent_by = sent_by
+        confirmation.status = VisitConfirmation.Status.SENT
+        confirmation.save(
+            update_fields=[
+                'token',
+                'status',
+                'sent_at',
+                'expires_at',
+                'sent_by',
+                'receipt_log',
+                'updated_at',
+            ]
+        )
+        return SendResult(
+            success=True,
+            outcome='sent',
+            confirmation=confirmation,
+            receipts=receipts,
+            warning_messages=warning_messages,
+        )
+
+    confirmation.save(update_fields=['token', 'receipt_log', 'updated_at'])
+    return SendResult(
+        success=False,
+        outcome='send_failed',
+        confirmation=confirmation,
+        receipts=receipts,
+        warning_messages=warning_messages,
+    )
 
 
 def record_public_response(
@@ -137,3 +250,59 @@ def _is_answered(confirmation: VisitConfirmation) -> bool:
         confirmation.responded_at is not None
         or confirmation.status != VisitConfirmation.Status.SENT
     )
+
+
+def _get_contact_email_recipients(route_client: RouteClient) -> list[str]:
+    return list(
+        route_client.client.contacts.exclude(email__isnull=True)
+        .exclude(email='')
+        .order_by('id')
+        .values_list('email', flat=True)
+    )
+
+
+def _build_confirmation_message(
+    *,
+    confirmation: VisitConfirmation,
+    recipient: str,
+    request: HttpRequest,
+) -> ConfirmationMessage:
+    visit_date = format_visit_date(confirmation.visit_date)
+    confirm_url = _build_public_action_url(
+        request,
+        confirmation.token,
+        VisitConfirmation.PublicAction.CONFIRM,
+    )
+    do_not_visit_url = _build_public_action_url(
+        request,
+        confirmation.token,
+        VisitConfirmation.PublicAction.DO_NOT_VISIT,
+    )
+    subject = f'Confirma tu visita de {visit_date} de entrega de garrafones de agua'
+    body = render_to_string(
+        'route_confirmations/email/visit_confirmation.txt',
+        {
+            'client_name': confirmation.route_client.client.name,
+            'visit_date': visit_date,
+            'confirm_url': confirm_url,
+            'do_not_visit_url': do_not_visit_url,
+        },
+    )
+    return ConfirmationMessage(
+        recipient=recipient,
+        subject=subject,
+        body=body,
+        client_name=confirmation.route_client.client.name,
+        visit_date=visit_date,
+        confirm_url=confirm_url,
+        do_not_visit_url=do_not_visit_url,
+    )
+
+
+def _build_public_action_url(request: HttpRequest, token: str, action: str) -> str:
+    path = f'/confirmaciones/visita/{token}/{action}/'
+    return request.build_absolute_uri(path)
+
+
+def format_visit_date(visit_date: date) -> str:
+    return f'{visit_date.day} {SPANISH_MONTHS[visit_date.month]} {visit_date.year}'
