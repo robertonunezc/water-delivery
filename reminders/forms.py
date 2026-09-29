@@ -28,7 +28,7 @@ class ReminderForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["client"].queryset = Client.objects.filter(active=True).order_by("name")
+        self.fields["client"].queryset = Client.objects.order_by("name")
         self.fields["client"].required = False
         self.fields["client"].empty_label = "Sin cliente"
         self.fields["reminder_date"].input_formats = ["%Y-%m-%d"]

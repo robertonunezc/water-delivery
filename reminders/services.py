@@ -22,7 +22,11 @@ def get_user_route_client_ids(user: Any, target_date: date | None = None) -> set
     if transportation is None:
         return set()
 
-    today_route = Route.get_today_routes(transportation=transportation).first()
+    today_route = Route.objects.filter(
+        transportation=transportation,
+        weekday=current_date.strftime("%A").lower(),
+        is_active=True,
+    ).first()
     if today_route is None:
         return set()
 

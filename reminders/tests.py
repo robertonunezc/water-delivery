@@ -249,6 +249,28 @@ class ReminderHomeServiceTests(FastTenantTestCase):
         self.assertEqual(get_user_route_client_ids(no_transport_user, self.today), set())
         self.assertEqual(get_user_route_client_ids(no_route_user, self.today), set())
 
+    def test_route_lookup_uses_target_date_for_route_weekday(self) -> None:
+        target_date = date.today() + timedelta(days=2)
+        target_client = self._create_client("Cliente fecha objetivo")
+        target_route = Route.objects.create(
+            name="Ruta fecha objetivo",
+            transportation=self.transport,
+            weekday=target_date.strftime("%A").lower(),
+            is_active=True,
+        )
+        RouteClient.objects.create(
+            route=target_route,
+            client=target_client,
+            sequence=2,
+            interval_weeks=1,
+            anchor_date=target_date,
+            is_active=True,
+        )
+
+        route_client_ids = get_user_route_client_ids(self.user, target_date)
+
+        self.assertIn(target_client.id, route_client_ids)
+
 
 class ReminderServiceActionTests(FastTenantTestCase):
     def setUp(self) -> None:
@@ -347,6 +369,26 @@ class ReminderViewTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIsNone(response.context["form"]["client"].value())
 
+    def test_create_allows_inactive_non_deleted_client(self) -> None:
+        inactive_client = self._create_client("Cliente inactivo")
+        inactive_client.active = False
+        inactive_client.save(update_fields=["active"])
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("reminders:create"),
+            {
+                "title": "Visitar cliente inactivo",
+                "description": "",
+                "client": inactive_client.pk,
+                "reminder_date": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        reminder = Reminder.objects.get(title="Visitar cliente inactivo")
+        self.assertEqual(reminder.client, inactive_client)
+
     def test_list_default_shows_active_future_and_no_date_only(self) -> None:
         self.client.force_login(self.user)
         no_date = self._reminder("Sin fecha")
@@ -443,6 +485,28 @@ class ReminderViewTests(FastTenantTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertEqual(reminder.title, "Listo")
 
+    def test_edit_allows_existing_inactive_non_deleted_client(self) -> None:
+        inactive_client = self._create_client("Cliente inactivo en edicion")
+        inactive_client.active = False
+        inactive_client.save(update_fields=["active"])
+        reminder = self._reminder("Original inactivo", client=inactive_client)
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("reminders:edit", kwargs={"pk": reminder.pk}),
+            {
+                "title": "Actualizado inactivo",
+                "description": "",
+                "client": inactive_client.pk,
+                "reminder_date": "",
+            },
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        reminder.refresh_from_db()
+        self.assertEqual(reminder.title, "Actualizado inactivo")
+        self.assertEqual(reminder.client, inactive_client)
+
     def test_complete_action_sets_completed_fields(self) -> None:
         self.client.force_login(self.user)
         reminder = self._reminder("Completar")
@@ -456,6 +520,17 @@ class ReminderViewTests(FastTenantTestCase):
         reminder.refresh_from_db()
         self.assertIsNotNone(reminder.completed_at)
         self.assertEqual(reminder.completed_by, self.user)
+
+    def test_complete_action_rejects_external_referer_redirect(self) -> None:
+        self.client.force_login(self.user)
+        reminder = self._reminder("Completar seguro")
+
+        response = self.client.post(
+            reverse("reminders:complete", kwargs={"pk": reminder.pk}),
+            HTTP_REFERER="https://example.invalid/steal",
+        )
+
+        self.assertRedirects(response, reverse("reminders:list"), fetch_redirect_response=False)
 
     def test_delete_action_soft_deletes(self) -> None:
         self.client.force_login(self.user)

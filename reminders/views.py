@@ -8,6 +8,7 @@ from django.db.models import Q, QuerySet
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from clients.models import Client
 
@@ -33,7 +34,7 @@ def list(request):
         "status": status,
         "q": request.GET.get("q", "").strip(),
         "selected_client_id": request.GET.get("client", "").strip(),
-        "clients": Client.objects.filter(active=True).order_by("name"),
+        "clients": Client.objects.order_by("name"),
     }
     return render(request, "reminders/list.html", context)
 
@@ -141,4 +142,14 @@ def _create_initial_data(client_id: str | None) -> dict[str, Client]:
 
 
 def _next_url(request) -> str:
-    return request.META.get("HTTP_REFERER") or reverse("reminders:list")
+    fallback_url = reverse("reminders:list")
+    next_url = request.META.get("HTTP_REFERER")
+    if not next_url:
+        return fallback_url
+    if url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return fallback_url
