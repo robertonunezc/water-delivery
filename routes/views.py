@@ -13,6 +13,7 @@ from datetime import date, datetime
 from .models import Route, RouteClient, RouteClientOrder
 from .forms import RouteClientInlineForm, RouteForm
 from .services import get_route_detail_payload
+from route_confirmations.services import attach_confirmation_states
 from core.models import Employee, Transport
 from clients.models import Client
 
@@ -262,9 +263,14 @@ def today_route(request):
     ).select_related('client', 'order').order_by('sequence')
     
     # Get regular clients for this route (for manual order creation)
-    regular_clients = RouteClient.objects.due_on(date.today()).filter(
-        route=today_route
-    ).select_related('client').order_by('sequence')
+    regular_clients = attach_confirmation_states(
+        list(
+            RouteClient.objects.due_on(date.today()).filter(
+                route=today_route
+            ).select_related('client').order_by('sequence')
+        ),
+        today=date.today(),
+    )
     
     context = {
         'route': today_route,

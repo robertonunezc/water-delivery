@@ -30,7 +30,7 @@
                                     <div class="pg-flex pg-align-center">
                                         <i class="fas fa-users pg-me-1"></i>
                                         <span class="pg-badge pg-bg-secondary">
-                                            {% if route_clients %}{{ route_clients.count }}{% elif regular_clients %}{{ regular_clients.count }}{% else %}0{% endif %} clients
+                                            {% if route_clients %}{{ route_clients|length }}{% elif regular_clients %}{{ regular_clients|length }}{% else %}0{% endif %} clients
                                         </span>
                                     </div>
                                 {% endif %}
@@ -106,6 +106,7 @@
                                         <th>Último Pedido</th>
                                         <th>Saldo/Crédito</th>
                                         <th>Productos y Precio</th>
+                                        <th>Confirmación</th>
                                         <th>Acciones</th>
                                     </tr>
                                 </thead>
@@ -165,6 +166,25 @@
                                             {% else %}
                                                 <span class="pg-text-muted">Sin productos asignados</span>
                                             {% endif %}
+                                        </td>
+                                        <td class="route-client-confirmation-cell" data-label="Confirmación">
+                                            {% with state=route_client.visit_confirmation_state %}
+                                                <div class="pg-mb-1">
+                                                    <span class="pg-badge {{ state.badge_class }}">{{ state.display_status }}</span>
+                                                </div>
+                                                <small class="pg-text-muted">Visita: {{ state.visit_date|date:"d/m/Y" }}</small>
+                                                <form method="post" action="{% url 'route_confirmations:send' route_client.id %}" class="pg-mt-1">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                                    <button
+                                                        type="submit"
+                                                        class="pg-button pg-button-sm {% if state.can_send %}pg-button-outline-primary{% else %}pg-button-outline-secondary{% endif %}"
+                                                        {% if not state.can_send %}disabled{% endif %}
+                                                    >
+                                                        {{ state.action_label }}
+                                                    </button>
+                                                </form>
+                                            {% endwith %}
                                         </td>
                                         <td class="route-client-actions-cell" data-label="Acciones">
                                             <div class="pg-button-group route-client-actions-primary" role="group">

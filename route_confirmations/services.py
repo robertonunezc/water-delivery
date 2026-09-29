@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import HttpRequest
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 
 from routes.models import RouteClient
@@ -29,6 +30,16 @@ class SendResult:
     confirmation: VisitConfirmation | None = None
     receipts: tuple[SendReceipt, ...] = ()
     warning_messages: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RouteClientConfirmationState:
+    visit_date: date
+    confirmation: VisitConfirmation | None
+    display_status: str
+    badge_class: str
+    action_label: str
+    can_send: bool
 
 
 SPANISH_MONTHS = {
@@ -271,12 +282,12 @@ def _build_confirmation_message(
     confirm_url = _build_public_action_url(
         request,
         confirmation.token,
-        VisitConfirmation.PublicAction.CONFIRM,
+        VisitConfirmation.PublicAction.CONFIRM.value,
     )
     do_not_visit_url = _build_public_action_url(
         request,
         confirmation.token,
-        VisitConfirmation.PublicAction.DO_NOT_VISIT,
+        VisitConfirmation.PublicAction.DO_NOT_VISIT.value,
     )
     subject = f'Confirma tu visita de {visit_date} de entrega de garrafones de agua'
     body = render_to_string(
@@ -300,9 +311,74 @@ def _build_confirmation_message(
 
 
 def _build_public_action_url(request: HttpRequest, token: str, action: str) -> str:
-    path = f'/confirmaciones/visita/{token}/{action}/'
+    path = reverse(
+        'route_confirmations:respond',
+        kwargs={'token': token, 'action': action},
+    )
     return request.build_absolute_uri(path)
 
 
 def format_visit_date(visit_date: date) -> str:
     return f'{visit_date.day} {SPANISH_MONTHS[visit_date.month]} {visit_date.year}'
+
+
+def attach_confirmation_states(
+    route_clients: list[RouteClient],
+    today: date | None = None,
+) -> list[RouteClient]:
+    for route_client in route_clients:
+        visit_date = get_next_due_visit_date(route_client, today=today)
+        confirmation = VisitConfirmation.objects.filter(
+            route_client=route_client,
+            visit_date=visit_date,
+        ).first()
+        route_client.visit_confirmation_state = _build_route_client_state(
+            visit_date,
+            confirmation,
+        )
+    return route_clients
+
+
+def _build_route_client_state(
+    visit_date: date,
+    confirmation: VisitConfirmation | None,
+) -> RouteClientConfirmationState:
+    if confirmation is None:
+        return RouteClientConfirmationState(
+            visit_date=visit_date,
+            confirmation=None,
+            display_status='Sin enviar',
+            badge_class='pg-bg-secondary',
+            action_label='Enviar confirmación',
+            can_send=True,
+        )
+
+    display_status = confirmation.display_status()
+    if display_status == 'Expirada':
+        return RouteClientConfirmationState(
+            visit_date=visit_date,
+            confirmation=confirmation,
+            display_status=display_status,
+            badge_class='pg-bg-warning',
+            action_label='Enviar de nuevo',
+            can_send=True,
+        )
+
+    badge_class = {
+        VisitConfirmation.Status.SENT: 'pg-bg-info',
+        VisitConfirmation.Status.CONFIRMED: 'pg-bg-success',
+        VisitConfirmation.Status.DO_NOT_VISIT: 'pg-bg-danger',
+    }.get(confirmation.status, 'pg-bg-secondary')
+    action_label = (
+        'Enviar de nuevo'
+        if confirmation.status == VisitConfirmation.Status.SENT
+        else display_status
+    )
+    return RouteClientConfirmationState(
+        visit_date=visit_date,
+        confirmation=confirmation,
+        display_status=display_status,
+        badge_class=badge_class,
+        action_label=action_label,
+        can_send=False,
+    )
