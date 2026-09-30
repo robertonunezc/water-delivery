@@ -125,6 +125,13 @@
     </section>
   {% endif %}
 
+  {% if credit_reconciliation_warning %}
+    <section class="pg-alert pg-alert-warning pg-mb-3" role="alert">
+      <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
+      <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+    </section>
+  {% endif %}
+
   <section class="pg-card-grid pg-mb-4 client-snapshot-grid">
     {% for card in snapshot_cards %}
       <div class="pg-card client-snapshot-card pg-h-100 pg-border-{{ card.tone }}{% if card.action_label %} client-snapshot-card-actionable{% endif %}">

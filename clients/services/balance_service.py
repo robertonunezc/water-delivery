@@ -302,6 +302,14 @@ def pay_debt(
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
+    is_global_debt_decrease = reference_order is None and reference_payment is None
+    if is_global_debt_decrease:
+        from clients.services.credit_reconciliation_service import (
+            validate_global_debt_decrease_allowed,
+        )
+
+        validate_global_debt_decrease_allowed(client)
+
     credit_account = client.get_credit_account()
     locked_client = Client.objects.select_for_update().get(pk=credit_account.pk)
     payment_amount = min(amount, locked_client.current_debt)

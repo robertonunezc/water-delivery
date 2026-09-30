@@ -30,6 +30,13 @@
         <div class="pg-alert pg-alert-danger">{{ error_message }}</div>
     {% endif %}
 
+    {% if credit_reconciliation_warning %}
+        <div class="pg-alert pg-alert-warning" role="alert">
+            <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
+            <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+        </div>
+    {% endif %}
+
     {% if credit_account.current_debt > 0 or credit_orders %}
         <div class="pg-card dashboard-card pg-mb-4">
             <div class="pg-card-body pg-p-4">
