@@ -241,7 +241,7 @@ jobs:
             docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py collectstatic --noinput
             
             echo "Running database migrations..."
-            docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py migrate --noinput
+            docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T web python manage.py migrate_schemas --noinput
             
             # Optional: show running image
             docker-compose --env-file .env.production -f docker-compose.prod.yml ps
