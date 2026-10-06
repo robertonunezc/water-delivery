@@ -259,7 +259,7 @@ def edit_invoice_admin(request, pk):
             },
         )
 
-    linked_orders = invoice.invoice_links.select_related('order').all()
+    linked_orders = invoice.invoice_links.select_related('order__client').all()
 
     context = {
         'invoice': invoice,
