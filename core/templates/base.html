@@ -32,6 +32,9 @@
                         <li>
                             <a class="pg-nav-link" href="{% url 'routes:list' %}">Rutas</a>
                         </li>
+                        <li>
+                            <a class="pg-nav-link" href="{% url 'reminders:list' %}">Recordatorios</a>
+                        </li>
                         <li class="pg-dropdown">
                             <button class="pg-dropdown-trigger" type="button" id="reportsDropdown" data-pg-toggle="dropdown">
                                 Reportes
@@ -65,6 +68,11 @@
                 </ul>
                 <ul class="pg-action-list">
                     {% if user.is_authenticated %}
+                        <li>
+                            <a class="pg-button pg-button-primary pg-button-sm" href="{% url 'reminders:create' %}">
+                                <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
+                            </a>
+                        </li>
                         <li class="pg-dropdown">
                             <button class="pg-dropdown-trigger" type="button" id="navbarDropdown" data-pg-toggle="dropdown">
                                 <i class="fas fa-user"></i> {{ user.get_full_name|default:user.username }}

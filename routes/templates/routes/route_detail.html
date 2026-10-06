@@ -116,6 +116,14 @@
                                             <div class="route-client-mobile-heading">
                                                 <span class="route-client-sequence-pill">#{{ route_client.sequence }}</span>
                                                 <strong>{{ route_client.client.name }}</strong>
+                                                {% if route_client.active_reminders_count %}
+                                                    <a href="{% url 'reminders:list' %}?status=activos&client={{ route_client.client.id }}"
+                                                       class="pg-badge pg-bg-warning pg-text-dark pg-text-decoration-none pg-ms-2"
+                                                       title="Ver recordatorios activos"
+                                                       aria-label="{{ route_client.active_reminders_count }} recordatorios activos">
+                                                        <i class="fas fa-bell pg-me-1" aria-hidden="true"></i>{{ route_client.active_reminders_count }}
+                                                    </a>
+                                                {% endif %}
                                             </div>
                                             {% if not route_client.client.active %}
                                                 <span class="pg-badge pg-badge-warning">Inactivo</span>

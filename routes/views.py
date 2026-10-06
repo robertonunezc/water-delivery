@@ -12,7 +12,7 @@ from django.utils import timezone
 from datetime import date, datetime
 from .models import Route, RouteClient, RouteClientOrder
 from .forms import RouteClientInlineForm, RouteForm
-from .services import get_route_detail_payload
+from .services import get_route_detail_payload, with_active_reminder_counts
 from core.models import Employee, Transport
 from clients.models import Client
 
@@ -254,17 +254,23 @@ def today_route(request):
     
     # For now, assume one route per transportation per day
     today_route = today_routes.first()
+    today = date.today()
     
     # Get today's scheduled client orders
     today_orders = RouteClientOrder.objects.filter(
         route=today_route,
-        visit_date=date.today()
+        visit_date=today
     ).select_related('client', 'order').order_by('sequence')
     
     # Get regular clients for this route (for manual order creation)
-    regular_clients = RouteClient.objects.due_on(date.today()).filter(
+    regular_clients = RouteClient.objects.due_on(today).filter(
         route=today_route
     ).select_related('client').order_by('sequence')
+    regular_clients = with_active_reminder_counts(
+        regular_clients,
+        user=request.user,
+        today=today,
+    )
     
     context = {
         'route': today_route,
@@ -273,7 +279,7 @@ def today_route(request):
         'today_orders': today_orders,
         'route_clients': regular_clients,
         'regular_clients': regular_clients,
-        'today': date.today(),
+        'today': today,
         'is_today_view': True,
     }
     
@@ -285,7 +291,11 @@ def route_detail(request, route_id):
     """Detailed view of a specific route"""
     route = get_object_or_404(Route, id=route_id, is_active=True)
     search_query = request.GET.get('q', '').strip()
-    payload = get_route_detail_payload(route=route, search_query=search_query)
+    payload = get_route_detail_payload(
+        route=route,
+        search_query=search_query,
+        user=request.user,
+    )
     
     context = {
         'route': route,
