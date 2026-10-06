@@ -1,0 +1,53 @@
+<article class="pg-card {% if reminder.urgent %}pg-border-danger{% endif %}">
+  <div class="pg-card-body">
+    <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-gap-3">
+      <div>
+        <div class="pg-flex pg-flex-wrap pg-align-center pg-gap-2 pg-mb-1">
+          <h3 class="{% if compact %}pg-h6{% else %}pg-h5{% endif %} pg-mb-0">{{ reminder.title }}</h3>
+          {% if reminder.urgent %}
+            <span class="pg-badge pg-bg-danger">Urgente</span>
+          {% endif %}
+          {% if reminder.completed_at %}
+            <span class="pg-badge pg-bg-secondary">Listo</span>
+            <span class="pg-badge pg-bg-light pg-text-dark">Solo lectura</span>
+          {% endif %}
+        </div>
+        {% if reminder.description %}
+          <p class="pg-text-muted pg-mb-2">{{ reminder.description }}</p>
+        {% endif %}
+        <div class="pg-flex pg-flex-wrap pg-gap-2 pg-small pg-text-muted">
+          {% if reminder.client %}
+            <a href="{% url 'clients:detail' reminder.client.pk %}">
+              <i class="fas fa-user pg-me-1"></i>{{ reminder.client.name }}
+            </a>
+          {% endif %}
+          {% if reminder.reminder_date %}
+            <span><i class="fas fa-calendar-day pg-me-1"></i>{{ reminder.reminder_date|date:"d/m/Y" }}</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-start pg-justify-lg-end">
+        {% if reminder.completed_at %}
+          <span class="pg-button pg-button-outline-secondary pg-button-sm pg-disabled">Solo lectura</span>
+        {% else %}
+          <form method="post" action="{% url 'reminders:complete' reminder.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="pg-button pg-button-success pg-button-sm">
+              <i class="fas fa-check pg-me-1"></i>LISTO
+            </button>
+          </form>
+          <a href="{% url 'reminders:edit' reminder.pk %}" class="pg-button pg-button-outline-secondary pg-button-sm" title="Editar">
+            <i class="fas fa-edit"></i>
+          </a>
+          <form method="post" action="{% url 'reminders:delete' reminder.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="pg-button pg-button-outline-danger pg-button-sm" title="Eliminar">
+              <i class="fas fa-trash"></i>
+            </button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</article>

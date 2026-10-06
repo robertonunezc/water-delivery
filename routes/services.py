@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 
-from django.db.models import QuerySet
+from django.db.models import Count, Q, QuerySet
 from django.utils import timezone
 
 from clients.models import Client
@@ -17,7 +18,11 @@ class RouteDetailPayload:
     is_today_view: bool = False
 
 
-def get_route_detail_payload(route: Route, search_query: str) -> RouteDetailPayload:
+def get_route_detail_payload(
+    route: Route,
+    search_query: str,
+    user: Any | None = None,
+) -> RouteDetailPayload:
     route_clients = (
         RouteClient.objects.for_route(route)
         .search_by_client(search_query)
@@ -26,6 +31,8 @@ def get_route_detail_payload(route: Route, search_query: str) -> RouteDetailPayl
         .with_recent_client_orders()
         .ordered_for_detail()
     )
+    if user is not None:
+        route_clients = with_active_reminder_counts(route_clients, user=user)
 
     recent_orders = (
         RouteClientOrder.objects.filter(
@@ -41,6 +48,32 @@ def get_route_detail_payload(route: Route, search_query: str) -> RouteDetailPayl
         recent_orders=recent_orders,
         search_query=search_query,
         today=date.today(),
+    )
+
+
+def with_active_reminder_counts(
+    route_clients: QuerySet[RouteClient],
+    *,
+    user: Any,
+    today: date | None = None,
+) -> QuerySet[RouteClient]:
+    """Annotate route clients with the user's active, non-overdue reminder count."""
+    current_date = today or timezone.localdate()
+    active_reminder_filter = (
+        Q(client__reminders__created_by=user)
+        & Q(client__reminders__completed_at__isnull=True)
+        & Q(client__reminders__deleted_at__isnull=True)
+        & (
+            Q(client__reminders__reminder_date__isnull=True)
+            | Q(client__reminders__reminder_date__gte=current_date)
+        )
+    )
+    return route_clients.annotate(
+        active_reminders_count=Count(
+            'client__reminders',
+            filter=active_reminder_filter,
+            distinct=True,
+        )
     )
 
 

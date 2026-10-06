@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Recordatorios{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-mt-4">
+  <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-end pg-gap-3 pg-mb-4">
+    <div>
+      <h1 class="pg-h3 pg-mb-1">Recordatorios</h1>
+      <p class="pg-text-muted pg-mb-0">Seguimiento personal de pendientes por fecha y cliente.</p>
+    </div>
+    <a href="{% url 'reminders:create' %}" class="pg-button pg-button-primary">
+      <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
+    </a>
+  </div>
+
+  <form method="get" class="pg-card pg-mb-4">
+    <div class="pg-card-body">
+      <div class="pg-flex pg-flex-column pg-flex-lg-row pg-gap-3 pg-align-lg-end">
+        <div class="pg-flex-1">
+          <label for="q" class="pg-label">Buscar</label>
+          <input id="q" type="search" name="q" value="{{ q }}" class="pg-input" placeholder="Titulo o descripcion">
+        </div>
+        <div>
+          <label for="client" class="pg-label">Cliente</label>
+          <select id="client" name="client" class="pg-select">
+            <option value="">Todos</option>
+            {% for client in clients %}
+              <option value="{{ client.pk }}" {% if selected_client_id == client.pk|stringformat:"s" %}selected{% endif %}>
+                {{ client.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <button type="submit" class="pg-button pg-button-secondary">
+            <i class="fas fa-search pg-me-1"></i>Filtrar
+          </button>
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="pg-flex pg-flex-wrap pg-gap-2 pg-mb-3">
+    <a class="pg-button {% if status == 'activos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=activos">Activos</a>
+    <a class="pg-button {% if status == 'vencidos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=vencidos">Vencidos</a>
+    <a class="pg-button {% if status == 'listos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=listos">Listos</a>
+  </div>
+
+  <div class="pg-flex pg-flex-column pg-gap-3">
+    {% for reminder in reminders %}
+      {% include "reminders/_reminder_row.html" with reminder=reminder %}
+    {% empty %}
+      <div class="pg-alert pg-alert-info">Sin recordatorios</div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

@@ -268,12 +268,15 @@ def get_delivery_dashboard_context(
     # if get_employee_position(user) == 'staff':
     #     dashboard_actions = _get_staff_dashboard_actions(current_date)
     dashboard_actions = _get_driver_dashboard_actions(current_date)
+    from reminders.services import get_home_reminder_context
+
     return {
         'is_authenticated': True,
         'user': user,
         'today': current_date,
         'dashboard_title': 'Panel del repartidor',
         'dashboard_actions': dashboard_actions,
+        **get_home_reminder_context(user=user, today=current_date),
     }
 
 
@@ -472,6 +475,7 @@ def get_manager_dashboard_context(
 
     from invoice import services as invoice_services
     from orders import services as order_services
+    from reminders.services import get_home_reminder_context
     from routes import services as route_services
 
     today = timezone.localdate()
@@ -504,4 +508,5 @@ def get_manager_dashboard_context(
         #     today=today,
         # ),
         'links': _get_dashboard_links(user=user, selected_range=selected_range),
+        **get_home_reminder_context(user=user, today=today),
     }
