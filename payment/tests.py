@@ -302,6 +302,80 @@ class CreditOrderSettlementTests(FastTenantTestCase):
 			).exists()
 		)
 
+	def test_branch_settlement_uses_purchase_credit_account_after_override_enabled(self):
+		corporate = Client.objects.create(
+			name='Corporativo deuda histórica',
+			type='corporate',
+			credit_limit=Decimal('1000.00'),
+			current_debt=Decimal('500.00'),
+			can_pay_with_credit=True,
+		)
+		branch = Client.objects.create(
+			name='Sucursal ahora crédito propio',
+			type='branch',
+			corporate=corporate,
+			credit_override_enabled=False,
+		)
+		order = Order.objects.create(
+			client=branch,
+			total_amount=Decimal('500.00'),
+			type='credito',
+		)
+		pending_credit = Payment(
+			amount=Decimal('500.00'),
+			method='pending_credit',
+			status='pending',
+			client=branch,
+			order=order,
+			created_by=self.user,
+		)
+		pending_credit.save(apply_accounting=False)
+		CreditTransaction.objects.create(
+			client=corporate,
+			transaction_type='purchase',
+			amount=Decimal('500.00'),
+			debt_before=Decimal('0.00'),
+			debt_after=Decimal('500.00'),
+			credit_limit_before=Decimal('1000.00'),
+			credit_limit_after=Decimal('1000.00'),
+			reference_order=order,
+			reference_payment=pending_credit,
+		)
+		branch.credit_override_enabled = True
+		branch.credit_limit = Decimal('800.00')
+		branch.current_debt = Decimal('0.00')
+		branch.save(update_fields=[
+			'credit_override_enabled',
+			'credit_limit',
+			'current_debt',
+			'updated_at',
+		])
+
+		payment, error = services.settle_credit_order_payment(
+			order=order,
+			payment_method='cash',
+			amount=Decimal('500.00'),
+			request_user=self.user,
+		)
+
+		self.assertIsNone(error)
+		self.assertEqual(payment.client, branch)
+		corporate.refresh_from_db()
+		branch.refresh_from_db()
+		pending_credit.refresh_from_db()
+		self.assertEqual(corporate.current_debt, Decimal('0.00'))
+		self.assertEqual(branch.current_debt, Decimal('0.00'))
+		self.assertEqual(pending_credit.status, 'completed')
+		self.assertTrue(
+			CreditTransaction.objects.filter(
+				client=corporate,
+				reference_order=order,
+				reference_payment=payment,
+				transaction_type='payment',
+				amount=Decimal('500.00'),
+			).exists()
+		)
+
 class CreditOrderRegistrationRuleTests(FastTenantTestCase):
 	def setUp(self):
 		self.user = User.objects.create_user(
