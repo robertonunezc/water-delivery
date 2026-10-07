@@ -419,3 +419,7 @@ class OrderReceipt(TimeStampedModel):
             raise ValidationError(
                 {"contact_email": "El correo es requerido para enviar el recibo."}
             )
+        if self.method == ReceiptDeliveryMethod.WHATSAPP and not self.contact_phone:
+            raise ValidationError(
+                {"contact_phone": "El teléfono es requerido para enviar el recibo."}
+            )

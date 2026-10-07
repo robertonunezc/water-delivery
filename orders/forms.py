@@ -139,12 +139,14 @@ class OrderForm(forms.ModelForm):
 class OrderReceiptSignForm(forms.Form):
     contact_id = forms.ChoiceField(required=False, label="Contacto")
     method = forms.ChoiceField(
-        choices=((ReceiptDeliveryMethod.EMAIL, "Email"),),
-        initial=ReceiptDeliveryMethod.EMAIL,
+        choices=(
+            (ReceiptDeliveryMethod.EMAIL, "Email"),
+            (ReceiptDeliveryMethod.WHATSAPP, "WhatsApp"),
+        ),
         widget=forms.HiddenInput(),
     )
     contact_name = forms.CharField(max_length=100, label="Nombre")
-    contact_email = forms.EmailField(label="Correo electronico")
+    contact_email = forms.EmailField(required=False, label="Correo electronico")
     contact_phone = forms.CharField(max_length=20, required=False, label="Telefono")
     contact_position = forms.CharField(max_length=100, required=False, label="Puesto")
     signature_data = forms.CharField(widget=forms.HiddenInput())
@@ -152,6 +154,11 @@ class OrderReceiptSignForm(forms.Form):
     def __init__(self, *args, client: Client, **kwargs) -> None:
         self.client = client
         super().__init__(*args, **kwargs)
+        self.fields["method"].initial = getattr(
+            client,
+            "confirmation_delivery_method",
+            ReceiptDeliveryMethod.WHATSAPP,
+        )
         contacts = list(client.contacts.all().order_by("name", "id"))
         self.fields["contact_id"].choices = [
             (contact.pk, self._contact_label(contact))
@@ -174,6 +181,16 @@ class OrderReceiptSignForm(forms.Form):
             raise forms.ValidationError("Capture la firma antes de enviar el recibo.")
         return value
 
+    def clean(self) -> dict:
+        cleaned_data = super().clean()
+        email = str(cleaned_data.get("contact_email") or "").strip()
+        phone = str(cleaned_data.get("contact_phone") or "").strip()
+        if not email and not phone:
+            raise forms.ValidationError(
+                "Capture correo electrónico o teléfono para enviar el recibo."
+            )
+        return cleaned_data
+
     def _apply_contact_initial(self, contact: Contact) -> None:
         self.fields["contact_id"].initial = contact.pk
         self.fields["contact_name"].initial = contact.name
@@ -182,8 +199,8 @@ class OrderReceiptSignForm(forms.Form):
         self.fields["contact_position"].initial = contact.position or ""
 
     def _contact_label(self, contact: Contact) -> str:
-        email = contact.email or "sin correo"
-        return f"{contact.name} - {email}"
+        contact_info = contact.email or contact.phone or "sin correo/teléfono"
+        return f"{contact.name} - {contact_info}"
 
 
 class OrderReceiptSignOnlyForm(forms.Form):

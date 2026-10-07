@@ -214,6 +214,8 @@ def sign_receipt(request: HttpRequest, order_id: int) -> HttpResponse:
                     messages.success(request, "Recibo firmado y guardado correctamente.")
                 elif result.delivery_succeeded:
                     messages.success(request, "Recibo firmado y enviado correctamente.")
+                    if result.delivery_url:
+                        return redirect(result.delivery_url)
                 else:
                     messages.warning(
                         request,
@@ -256,6 +258,8 @@ def resend_receipt_view(request: HttpRequest, order_id: int) -> HttpResponse:
     result = resend_receipt(receipt)
     if result.delivery_succeeded:
         messages.success(request, "Recibo reenviado correctamente.")
+        if result.delivery_url:
+            return redirect(result.delivery_url)
     else:
         messages.warning(request, "No se pudo reenviar el recibo. Intente nuevamente.")
     return redirect(_get_safe_next_url(request, "orders:list"))

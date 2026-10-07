@@ -10,6 +10,7 @@ from orders.models import Order, OrderReceipt, OrderStatus, ReceiptDeliveryMetho
 from orders.services.receipt_delivery_service import (
     ReceiptDeliveryError,
     ReceiptDeliveryService,
+    normalize_whatsapp_phone,
 )
 from orders.services.receipt_pdf_service import (
     ReceiptContactSnapshot,
@@ -31,6 +32,7 @@ class ReceiptCreationResult:
     created: bool
     delivery_succeeded: bool
     delivery_error: str
+    delivery_url: str = ""
 
 
 def create_signed_receipt(
@@ -56,8 +58,11 @@ def create_signed_receipt(
         phone=str(cleaned_data.get("contact_phone") or ""),
         position=str(cleaned_data.get("contact_position") or ""),
     )
-    if str(cleaned_data.get("method") or "email") == "email" and not contact.email:
-        raise ReceiptCreationError("El correo de contacto es requerido para enviar el recibo.")
+    method = _resolve_receipt_delivery_method(order.client, contact)
+    if not method:
+        raise ReceiptCreationError(
+            "El contacto requiere correo electrónico o teléfono para enviar el recibo."
+        )
 
     try:
         pdf_bytes = generate_receipt_pdf(
@@ -77,7 +82,7 @@ def create_signed_receipt(
     try:
         receipt = OrderReceipt.objects.create(
             order=order,
-            method=str(cleaned_data.get("method") or "email"),
+            method=method,
             pdf_url=pdf_url,
             contact_name=contact.name,
             contact_email=contact.email,
@@ -177,8 +182,42 @@ def _send_receipt(receipt: OrderReceipt, created: bool) -> ReceiptCreationResult
             delivery_error=str(exc),
         )
     return ReceiptCreationResult(
-        receipt=sent,
+        receipt=sent.receipt,
         created=created,
         delivery_succeeded=True,
         delivery_error="",
+        delivery_url=sent.delivery_url,
     )
+
+
+def _resolve_receipt_delivery_method(
+    client: Any,
+    contact: ReceiptContactSnapshot,
+) -> str:
+    for method in _receipt_delivery_method_order(client):
+        if method == ReceiptDeliveryMethod.WHATSAPP and normalize_whatsapp_phone(
+            contact.phone
+        ):
+            return ReceiptDeliveryMethod.WHATSAPP
+        if method == ReceiptDeliveryMethod.EMAIL and contact.email:
+            return ReceiptDeliveryMethod.EMAIL
+    return ""
+
+
+def _receipt_delivery_method_order(client: Any) -> tuple[str, str]:
+    preferred_method = getattr(
+        client,
+        "confirmation_delivery_method",
+        ReceiptDeliveryMethod.WHATSAPP,
+    )
+    if preferred_method not in {
+        ReceiptDeliveryMethod.EMAIL,
+        ReceiptDeliveryMethod.WHATSAPP,
+    }:
+        preferred_method = ReceiptDeliveryMethod.WHATSAPP
+    fallback_method = (
+        ReceiptDeliveryMethod.EMAIL
+        if preferred_method == ReceiptDeliveryMethod.WHATSAPP
+        else ReceiptDeliveryMethod.WHATSAPP
+    )
+    return preferred_method, fallback_method

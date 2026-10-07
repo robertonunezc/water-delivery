@@ -13,7 +13,7 @@
     <a href="{% url 'orders:list' %}" class="pg-button pg-button-outline-secondary">Volver</a>
   </div>
 
-  <form method="post" id="receipt-sign-form" class="pg-card pg-shadow-sm">
+  <form method="post" id="receipt-sign-form" class="pg-card pg-shadow-sm"{% if not signature_only %} target="_blank"{% endif %}>
     {% csrf_token %}
     {% if signature_only %}
       <input type="hidden" name="mode" value="sign_only">
@@ -35,7 +35,14 @@
                 data-email="{{ contact.email|default_if_none:'' }}"
                 data-phone="{{ contact.phone|default_if_none:'' }}"
                 data-position="{{ contact.position|default_if_none:'' }}">
-                {{ contact.name }} - {{ contact.email|default:"sin correo" }}
+                {{ contact.name }} -
+                {% if contact.email %}
+                  {{ contact.email }}
+                {% elif contact.phone %}
+                  {{ contact.phone }}
+                {% else %}
+                  sin correo/teléfono
+                {% endif %}
               </option>
             {% endfor %}
           </select>

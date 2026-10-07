@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Protocol
+from urllib.parse import quote
 
 from django.conf import settings
 from django.utils import timezone
@@ -21,13 +23,24 @@ class ReceiptBundleDeliveryResult:
     missing_order_ids: tuple[int, ...]
 
 
+@dataclass(frozen=True)
+class ReceiptDeliveryOutcome:
+    delivery_url: str = ""
+
+
+@dataclass(frozen=True)
+class ReceiptDeliveryResult:
+    receipt: OrderReceipt
+    delivery_url: str = ""
+
+
 class ReceiptSender(Protocol):
-    def send(self, receipt: OrderReceipt) -> None:
+    def send(self, receipt: OrderReceipt) -> ReceiptDeliveryOutcome:
         ...
 
 
 class EmailReceiptSender:
-    def send(self, receipt: OrderReceipt) -> None:
+    def send(self, receipt: OrderReceipt) -> ReceiptDeliveryOutcome:
         pdf_bytes = get_receipt_storage().download_pdf(receipt.pdf_url)
         attachment = EmailAttachment(
             filename=f"recibo-pedido-{receipt.order_id}.pdf",
@@ -49,12 +62,33 @@ class EmailReceiptSender:
             attachments=[attachment],
         )
         sender.send_email()
+        return ReceiptDeliveryOutcome()
+
+
+class WhatsAppReceiptSender:
+    def send(self, receipt: OrderReceipt) -> ReceiptDeliveryOutcome:
+        phone = normalize_whatsapp_phone(receipt.contact_phone or "")
+        if not phone:
+            raise ReceiptDeliveryError("El teléfono de contacto no es válido.")
+
+        signed_url = get_receipt_storage().generate_signed_url(receipt.pdf_url)
+        greeting = f"Hola {receipt.contact_name}," if receipt.contact_name else "Hola,"
+        body = (
+            f"{greeting}\n\n"
+            f"Te compartimos el recibo firmado del pedido #{receipt.order_id}:\n"
+            f"{signed_url}\n\n"
+            "El enlace estará disponible por 24 horas."
+        )
+        return ReceiptDeliveryOutcome(
+            delivery_url=build_whatsapp_url(phone, body),
+        )
 
 
 class ReceiptSenderFactory:
     def __init__(self) -> None:
         self._senders: dict[str, ReceiptSender] = {
             ReceiptDeliveryMethod.EMAIL: EmailReceiptSender(),
+            ReceiptDeliveryMethod.WHATSAPP: WhatsAppReceiptSender(),
         }
 
     def get_sender(self, method: str) -> ReceiptSender:
@@ -68,15 +102,34 @@ class ReceiptDeliveryService:
     def __init__(self, factory: ReceiptSenderFactory | None = None) -> None:
         self.factory = factory or ReceiptSenderFactory()
 
-    def send(self, receipt: OrderReceipt) -> OrderReceipt:
+    def send(self, receipt: OrderReceipt) -> ReceiptDeliveryResult:
         try:
-            self.factory.get_sender(receipt.method).send(receipt)
+            outcome = self.factory.get_sender(receipt.method).send(receipt)
         except Exception as exc:
             raise ReceiptDeliveryError(str(exc)) from exc
 
         receipt.sent_at = timezone.now()
         receipt.save(update_fields=["sent_at", "updated_at"])
-        return receipt
+        return ReceiptDeliveryResult(
+            receipt=receipt,
+            delivery_url=outcome.delivery_url,
+        )
+
+
+def normalize_whatsapp_phone(phone: str) -> str:
+    digits = re.sub(r"\D", "", phone)
+    if digits.startswith("00"):
+        digits = digits[2:]
+    if len(digits) < 10:
+        return ""
+    if len(digits) == 10:
+        return f"52{digits}"
+    return digits
+
+
+def build_whatsapp_url(phone: str, message: str) -> str:
+    encoded_message = quote(message.strip(), safe="")
+    return f"https://wa.me/{phone}?text={encoded_message}"
 
 
 class ReceiptBundleDeliveryService:
