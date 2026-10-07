@@ -116,13 +116,28 @@ def send_confirmation(request, route_client_id: int):
         RouteClient.objects.select_related('route', 'client'),
         pk=route_client_id,
     )
-    result = send_visit_confirmation(route_client, sent_by=request.user, request=request)
+    result = send_visit_confirmation(
+        route_client,
+        sent_by=request.user,
+        request=request,
+    )
     if result.success:
-        messages.success(request, f'Confirmación enviada a {len(result.receipts)} contacto(s).')
+        message = f'Confirmación enviada a {len(result.receipts)} contacto(s).'
+        if result.delivery_url:
+            message = (
+                'Confirmación lista para WhatsApp con '
+                f'{len(result.receipts)} contacto(s).'
+            )
+        messages.success(request, message)
         for warning in result.warning_messages:
             messages.warning(request, f'No se pudo enviar a {warning}')
+        if result.delivery_url:
+            return redirect(result.delivery_url)
     elif result.outcome == 'no_recipients':
-        messages.warning(request, 'El cliente no tiene contactos con correo electrónico.')
+        messages.warning(
+            request,
+            'El cliente no tiene contactos con teléfono ni correo electrónico.',
+        )
     elif result.outcome == 'pending':
         messages.info(request, 'La confirmación ya fue enviada y todavía no expira.')
     elif result.outcome == 'final':

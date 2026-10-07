@@ -181,7 +181,7 @@
                                                     <span class="pg-badge {{ state.badge_class }}">{{ state.display_status }}</span>
                                                 </div>
                                                 <small class="pg-text-muted">Visita: {{ state.visit_date|date:"d/m/Y" }}</small>
-                                                <form method="post" action="{% url 'route_confirmations:send' route_client.id %}" class="pg-mt-1">
+                                                <form method="post" action="{% url 'route_confirmations:send' route_client.id %}" class="pg-mt-1" target="_blank">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="next" value="{{ request.get_full_path }}">
                                                     <button

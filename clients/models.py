@@ -13,6 +13,10 @@ CLIENT_TYPE_CHOICES = [
     ('corporate', 'Corporativo'),
     ('branch', 'Sucursal'),
 ]
+CONFIRMATION_DELIVERY_METHOD_CHOICES = [
+    ('whatsapp', 'WhatsApp'),
+    ('email', 'Email'),
+]
 PAYMENT_METHOD_CHOICES = [
     ('cash', 'Efectivo'),
     ('credit_card', 'Tarjeta de Crédito'),
@@ -116,6 +120,13 @@ class Client(TimeStampedModel):
     can_pay_with_credit = models.BooleanField(default=True, verbose_name="Puede pagar con crédito", help_text="Si está deshabilitado, el cliente no podrá usar crédito para pagos cuando su saldo disponible sea 0")
     address_link = models.CharField(max_length=255, blank=True, null=True, verbose_name="Enlace de dirección", help_text="Enlace a Google Maps u otro servicio de mapas")
     requires_billing = models.BooleanField(default=False, verbose_name="Requiere facturación", help_text="Indica si el cliente necesita facturación formal")
+    confirmation_delivery_method = models.CharField(
+        max_length=20,
+        choices=CONFIRMATION_DELIVERY_METHOD_CHOICES,
+        default='whatsapp',
+        verbose_name="Canal de confirmación",
+        help_text="Canal preferido para enviar confirmaciones de pedido",
+    )
     external_id = models.CharField(max_length=100, blank=True, null=True, verbose_name="ID externo", help_text="ID del cliente en sistemas externos (ERP, CRM, etc.)")
     credit_override_enabled = models.BooleanField(
         default=False,

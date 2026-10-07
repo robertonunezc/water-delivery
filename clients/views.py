@@ -1087,6 +1087,8 @@ def send_next_route_confirmation(request: HttpRequest, pk: int) -> HttpResponse:
         request=request,
     )
     _flash_route_confirmation_action_result(request, result)
+    if result.success and result.send_result and result.send_result.delivery_url:
+        return redirect(result.send_result.delivery_url)
     return redirect(
         _get_safe_next_url(request, reverse('clients:detail', args=[client.pk]))
     )
@@ -1137,7 +1139,7 @@ def _flash_route_confirmation_action_result(
     elif result.outcome == 'no_recipients':
         messages.warning(
             request,
-            f'{client_name} no tiene contactos con correo electrónico.',
+            f'{client_name} no tiene contactos con teléfono ni correo electrónico.',
         )
     elif result.outcome == 'pending':
         messages.info(

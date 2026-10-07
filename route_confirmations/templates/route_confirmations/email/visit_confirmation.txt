@@ -1,9 +1,9 @@
 Hola,
 
-Por favor confirma la visita de entrega de garrafones de agua para {{ client_name }} el {{ visit_date }}.
+Por favor confirma el pedido de entrega de garrafones de agua para {{ client_name }} el {{ visit_date }}.
 
-Confirmar visita:
+Confirmar pedido:
 {{ confirm_url }}
 
-No visitar:
+No confirmar pedido:
 {{ do_not_visit_url }}

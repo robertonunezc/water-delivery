@@ -148,7 +148,7 @@
 										<li><a class="pg-dropdown-item" href="{% url 'orders:create_order' client.pk %}">Pedido</a></li>
 										{% if request.user.is_staff and client.active %}
 											<li>
-												<form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}">
+												<form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}" target="_blank">
 													{% csrf_token %}
 													<input type="hidden" name="next" value="{{ request.get_full_path }}">
 													<button type="submit" class="pg-dropdown-item">Enviar confirmación</button>

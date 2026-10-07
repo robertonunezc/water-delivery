@@ -469,6 +469,7 @@ class ClientCoreForm(forms.ModelForm):
             'corporate',
             'note',
             'address_link',
+            'confirmation_delivery_method',
             'requires_billing',
             'credit_override_enabled',
         ]
@@ -479,15 +480,18 @@ class ClientCoreForm(forms.ModelForm):
             'corporate': forms.Select(attrs={'class': 'pg-select'}),
             'note': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
             'address_link': forms.URLInput(attrs={'class': 'pg-input'}),
+            'confirmation_delivery_method': forms.Select(attrs={'class': 'pg-select'}),
             'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
             'requires_billing': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
             'credit_override_enabled': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
         labels = {
+            'confirmation_delivery_method': 'Enviar confirmaciones por',
             'requires_billing': 'Requiere facturación recurrente',
             'credit_override_enabled': 'Usar datos propios de crédito',
         }
         help_texts = {
+            'confirmation_delivery_method': 'Si falta ese dato de contacto, se usará el otro canal disponible.',
             'requires_billing': 'Activa la frecuencia de facturación automática o recurrente para este cliente.',
             'credit_override_enabled': 'Permite que esta sucursal edite su límite, bloqueo y condiciones de crédito.',
         }

@@ -15,7 +15,12 @@ from clients.models import Client
 from routes.models import WEEKDAY_TO_INDEX, RouteClient
 
 from .models import VisitConfirmation
-from .senders import ConfirmationMessage, ConfirmationSenderFactory, SendReceipt
+from .senders import (
+    ConfirmationMessage,
+    ConfirmationSenderFactory,
+    SendReceipt,
+    normalize_whatsapp_phone,
+)
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,13 @@ class SendResult:
     confirmation: VisitConfirmation | None = None
     receipts: tuple[SendReceipt, ...] = ()
     warning_messages: tuple[str, ...] = ()
+
+    @property
+    def delivery_url(self) -> str:
+        for receipt in self.receipts:
+            if receipt.success and receipt.delivery_url:
+                return receipt.delivery_url
+        return ''
 
 
 @dataclass(frozen=True)
@@ -115,10 +127,13 @@ def send_visit_confirmation(
     route_client: RouteClient,
     sent_by: Any,
     request: HttpRequest,
-    channel: str = 'email',
+    channel: str | None = None,
     today: date | None = None,
 ) -> SendResult:
-    recipients = _get_client_email_recipients(route_client.client)
+    delivery_channel, recipients = _get_client_delivery_recipients(
+        route_client.client,
+        channel,
+    )
     if not recipients:
         return SendResult(success=False, outcome='no_recipients')
 
@@ -130,7 +145,7 @@ def send_visit_confirmation(
             recipients=recipients,
             sent_by=sent_by,
             request=request,
-            channel=channel,
+            channel=delivery_channel,
         )
 
 
@@ -140,7 +155,7 @@ def send_confirmation_for_clients(
     visit_date: date,
     sent_by: Any,
     request: HttpRequest,
-    channel: str = 'email',
+    channel: str | None = None,
 ) -> tuple[ClientConfirmationSendResult, ...]:
     return tuple(
         send_confirmation_for_client_visit(
@@ -160,7 +175,7 @@ def send_confirmation_for_client_visit(
     visit_date: date,
     sent_by: Any,
     request: HttpRequest,
-    channel: str = 'email',
+    channel: str | None = None,
 ) -> ClientConfirmationSendResult:
     send_result = send_manual_visit_confirmation(
         client,
@@ -188,9 +203,9 @@ def send_manual_visit_confirmation(
     visit_date: date,
     sent_by: Any,
     request: HttpRequest,
-    channel: str = 'email',
+    channel: str | None = None,
 ) -> SendResult:
-    recipients = _get_client_email_recipients(client)
+    delivery_channel, recipients = _get_client_delivery_recipients(client, channel)
     if not recipients:
         return SendResult(success=False, outcome='no_recipients')
 
@@ -204,7 +219,7 @@ def send_manual_visit_confirmation(
             recipients=recipients,
             sent_by=sent_by,
             request=request,
-            channel=channel,
+            channel=delivery_channel,
         )
 
 
@@ -213,7 +228,7 @@ def send_next_confirmation_for_client(
     *,
     sent_by: Any,
     request: HttpRequest,
-    channel: str = 'email',
+    channel: str | None = None,
     today: date | None = None,
 ) -> ClientConfirmationSendResult:
     next_visit = get_next_route_client_visit_for_client(client, today=today)
@@ -516,6 +531,53 @@ def _get_client_email_recipients(client: Client) -> list[str]:
     )
 
 
+def _get_client_delivery_recipients(
+    client: Client,
+    channel: str | None,
+) -> tuple[str, list[str]]:
+    for delivery_channel in _get_delivery_channel_order(client, channel):
+        recipients = _get_client_channel_recipients(client, delivery_channel)
+        if recipients:
+            return delivery_channel, recipients
+    return _get_preferred_delivery_channel(client, channel), []
+
+
+def _get_delivery_channel_order(client: Client, channel: str | None) -> tuple[str, str]:
+    preferred_channel = _get_preferred_delivery_channel(client, channel)
+    fallback_channel = 'email' if preferred_channel == 'whatsapp' else 'whatsapp'
+    return preferred_channel, fallback_channel
+
+
+def _get_preferred_delivery_channel(client: Client, channel: str | None) -> str:
+    delivery_channel = channel or getattr(
+        client,
+        'confirmation_delivery_method',
+        'whatsapp',
+    )
+    if delivery_channel in {'email', 'whatsapp'}:
+        return delivery_channel
+    return 'whatsapp'
+
+
+def _get_client_channel_recipients(client: Client, channel: str) -> list[str]:
+    if channel == 'whatsapp':
+        return _get_client_whatsapp_recipients(client)
+    return _get_client_email_recipients(client)
+
+
+def _get_client_whatsapp_recipients(client: Client) -> list[str]:
+    for phone in (
+        client.contacts.exclude(phone__isnull=True)
+        .exclude(phone='')
+        .order_by('id')
+        .values_list('phone', flat=True)
+    ):
+        normalized_phone = normalize_whatsapp_phone(str(phone))
+        if normalized_phone:
+            return [normalized_phone]
+    return []
+
+
 def _build_confirmation_message(
     *,
     confirmation: VisitConfirmation,
@@ -533,7 +595,7 @@ def _build_confirmation_message(
         confirmation.token,
         VisitConfirmation.PublicAction.DO_NOT_VISIT.value,
     )
-    subject = f'Confirma tu visita de {visit_date} de entrega de garrafones de agua'
+    subject = f'Confirma tu pedido de entrega de garrafones de agua para {visit_date}'
     body = render_to_string(
         'route_confirmations/email/visit_confirmation.txt',
         {
@@ -610,7 +672,7 @@ def _build_route_client_state(
             confirmation=confirmation,
             display_status=display_status,
             badge_class='pg-bg-warning',
-            action_label='Enviar de nuevo',
+            action_label='Reenviar confirmación',
             can_send=True,
         )
 
@@ -620,7 +682,7 @@ def _build_route_client_state(
         VisitConfirmation.Status.DO_NOT_VISIT: 'pg-bg-danger',
     }.get(confirmation.status, 'pg-bg-secondary')
     action_label = (
-        'Enviar de nuevo'
+        'Reenviar confirmación'
         if confirmation.status == VisitConfirmation.Status.SENT
         else display_status
     )
