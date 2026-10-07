@@ -72,8 +72,14 @@
                 <tbody>
                     {% for confirmation in confirmations %}
                         <tr>
-                            <td>{{ confirmation.route_client.client.name }}</td>
-                            <td>{{ confirmation.route_client.route.name }}</td>
+                            <td>{{ confirmation.client.name }}</td>
+                            <td>
+                                {% if confirmation.route_client %}
+                                    {{ confirmation.route_client.route.name }}
+                                {% else %}
+                                    <span class="pg-text-muted">Manual</span>
+                                {% endif %}
+                            </td>
                             <td>{{ confirmation.visit_date|date:'d/m/Y' }}</td>
                             <td>
                                 {% with display_status=confirmation.display_status %}

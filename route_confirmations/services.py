@@ -118,87 +118,19 @@ def send_visit_confirmation(
     channel: str = 'email',
     today: date | None = None,
 ) -> SendResult:
-    recipients = _get_contact_email_recipients(route_client)
+    recipients = _get_client_email_recipients(route_client.client)
     if not recipients:
         return SendResult(success=False, outcome='no_recipients')
 
     visit_date = get_next_due_visit_date(route_client, today=today)
     with transaction.atomic():
         confirmation = _get_or_create_confirmation_for_update(route_client, visit_date)
-        if _is_answered(confirmation):
-            return SendResult(
-                success=False,
-                outcome='final',
-                confirmation=confirmation,
-            )
-
-        if confirmation.sent_at is not None and not confirmation.can_resend():
-            return SendResult(
-                success=False,
-                outcome='pending',
-                confirmation=confirmation,
-            )
-
-        if confirmation.sent_at is not None:
-            confirmation.reset_token()
-        if confirmation.pk is None:
-            confirmation.save()
-
-        sender = ConfirmationSenderFactory.get_sender(channel)
-        receipts = tuple(
-            sender.send(
-                _build_confirmation_message(
-                    confirmation=confirmation,
-                    recipient=recipient,
-                    request=request,
-                )
-            )
-            for recipient in recipients
-        )
-        receipt_log = [receipt.as_dict() for receipt in receipts]
-        successful_receipts = [receipt for receipt in receipts if receipt.success]
-        warning_messages = tuple(
-            f'{receipt.recipient}: {receipt.error}'
-            for receipt in receipts
-            if not receipt.success
-        )
-
-        confirmation.receipt_log = receipt_log
-        if successful_receipts:
-            send_time = timezone.now()
-            confirmation.sent_at = send_time
-            confirmation.expires_at = send_time + timedelta(hours=24)
-            confirmation.sent_by = sent_by
-            confirmation.status = VisitConfirmation.Status.SENT
-            confirmation.save(
-                update_fields=[
-                    'token',
-                    'status',
-                    'sent_at',
-                    'expires_at',
-                    'sent_by',
-                    'receipt_log',
-                    'updated_at',
-                ]
-            )
-            return SendResult(
-                success=True,
-                outcome='sent',
-                confirmation=confirmation,
-                receipts=receipts,
-                warning_messages=warning_messages,
-            )
-
-        confirmation.deleted_at = timezone.now()
-        confirmation.save(
-            update_fields=['token', 'receipt_log', 'deleted_at', 'updated_at']
-        )
-        return SendResult(
-            success=False,
-            outcome='send_failed',
+        return _send_confirmation(
             confirmation=confirmation,
-            receipts=receipts,
-            warning_messages=warning_messages,
+            recipients=recipients,
+            sent_by=sent_by,
+            request=request,
+            channel=channel,
         )
 
 
@@ -230,28 +162,50 @@ def send_confirmation_for_client_visit(
     request: HttpRequest,
     channel: str = 'email',
 ) -> ClientConfirmationSendResult:
-    route_client = get_due_route_client_for_client(client, visit_date)
-    if route_client is None:
-        return ClientConfirmationSendResult(
-            client=client,
-            outcome='no_route_client',
-            visit_date=visit_date,
-        )
-
-    send_result = send_visit_confirmation(
-        route_client,
+    send_result = send_manual_visit_confirmation(
+        client,
+        visit_date=visit_date,
         sent_by=sent_by,
         request=request,
         channel=channel,
-        today=visit_date,
     )
     return ClientConfirmationSendResult(
         client=client,
         outcome=send_result.outcome,
-        route_client=route_client,
+        route_client=(
+            send_result.confirmation.route_client
+            if send_result.confirmation
+            else None
+        ),
         visit_date=visit_date,
         send_result=send_result,
     )
+
+
+def send_manual_visit_confirmation(
+    client: Client,
+    *,
+    visit_date: date,
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str = 'email',
+) -> SendResult:
+    recipients = _get_client_email_recipients(client)
+    if not recipients:
+        return SendResult(success=False, outcome='no_recipients')
+
+    with transaction.atomic():
+        confirmation = _get_or_create_manual_confirmation_for_update(
+            client,
+            visit_date,
+        )
+        return _send_confirmation(
+            confirmation=confirmation,
+            recipients=recipients,
+            sent_by=sent_by,
+            request=request,
+            channel=channel,
+        )
 
 
 def send_next_confirmation_for_client(
@@ -437,15 +391,125 @@ def _get_or_create_confirmation_for_update(
 
     return VisitConfirmation(
         route_client=route_client,
+        client=route_client.client,
         visit_date=visit_date,
         status=VisitConfirmation.Status.SENT,
         token=VisitConfirmation.generate_token(),
     )
 
 
-def _get_contact_email_recipients(route_client: RouteClient) -> list[str]:
+def _get_or_create_manual_confirmation_for_update(
+    client: Client,
+    visit_date: date,
+) -> VisitConfirmation:
+    confirmation = (
+        VisitConfirmation.objects.select_for_update()
+        .filter(
+            client=client,
+            route_client__isnull=True,
+            visit_date=visit_date,
+        )
+        .first()
+    )
+    if confirmation is not None:
+        return confirmation
+
+    return VisitConfirmation(
+        client=client,
+        visit_date=visit_date,
+        status=VisitConfirmation.Status.SENT,
+        token=VisitConfirmation.generate_token(),
+    )
+
+
+def _send_confirmation(
+    *,
+    confirmation: VisitConfirmation,
+    recipients: list[str],
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str,
+) -> SendResult:
+    if _is_answered(confirmation):
+        return SendResult(
+            success=False,
+            outcome='final',
+            confirmation=confirmation,
+        )
+
+    if confirmation.sent_at is not None and not confirmation.can_resend():
+        return SendResult(
+            success=False,
+            outcome='pending',
+            confirmation=confirmation,
+        )
+
+    if confirmation.sent_at is not None:
+        confirmation.reset_token()
+    if confirmation.pk is None:
+        confirmation.save()
+
+    sender = ConfirmationSenderFactory.get_sender(channel)
+    receipts = tuple(
+        sender.send(
+            _build_confirmation_message(
+                confirmation=confirmation,
+                recipient=recipient,
+                request=request,
+            )
+        )
+        for recipient in recipients
+    )
+    receipt_log = [receipt.as_dict() for receipt in receipts]
+    successful_receipts = [receipt for receipt in receipts if receipt.success]
+    warning_messages = tuple(
+        f'{receipt.recipient}: {receipt.error}'
+        for receipt in receipts
+        if not receipt.success
+    )
+
+    confirmation.receipt_log = receipt_log
+    if successful_receipts:
+        send_time = timezone.now()
+        confirmation.sent_at = send_time
+        confirmation.expires_at = send_time + timedelta(hours=24)
+        confirmation.sent_by = sent_by
+        confirmation.status = VisitConfirmation.Status.SENT
+        confirmation.save(
+            update_fields=[
+                'token',
+                'status',
+                'sent_at',
+                'expires_at',
+                'sent_by',
+                'receipt_log',
+                'updated_at',
+            ]
+        )
+        return SendResult(
+            success=True,
+            outcome='sent',
+            confirmation=confirmation,
+            receipts=receipts,
+            warning_messages=warning_messages,
+        )
+
+    confirmation.deleted_at = timezone.now()
+    confirmation.save(
+        update_fields=['token', 'receipt_log', 'deleted_at', 'updated_at']
+    )
+    return SendResult(
+        success=False,
+        outcome='send_failed',
+        confirmation=confirmation,
+        receipts=receipts,
+        warning_messages=warning_messages,
+    )
+
+
+def _get_client_email_recipients(client: Client) -> list[str]:
     return list(
-        route_client.client.contacts.exclude(email__isnull=True)
+        client.contacts.exclude(email__isnull=True)
         .exclude(email='')
         .order_by('id')
         .values_list('email', flat=True)
@@ -473,7 +537,7 @@ def _build_confirmation_message(
     body = render_to_string(
         'route_confirmations/email/visit_confirmation.txt',
         {
-            'client_name': confirmation.route_client.client.name,
+            'client_name': confirmation.client.name,
             'visit_date': visit_date,
             'confirm_url': confirm_url,
             'do_not_visit_url': do_not_visit_url,
@@ -483,7 +547,7 @@ def _build_confirmation_message(
         recipient=recipient,
         subject=subject,
         body=body,
-        client_name=confirmation.route_client.client.name,
+        client_name=confirmation.client.name,
         visit_date=visit_date,
         confirm_url=confirm_url,
         do_not_visit_url=do_not_visit_url,

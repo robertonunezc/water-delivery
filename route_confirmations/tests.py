@@ -528,18 +528,19 @@ class ManualVisitConfirmationTests(FastTenantTestCase):
         self.assertEqual(fake_sender.recipients, ['uno@example.com', 'dos@example.com'])
         self.assertEqual(
             list(
-                VisitConfirmation.objects.order_by('route_client__sequence').values_list(
+                VisitConfirmation.objects.order_by('client__name').values_list(
+                    'client',
                     'route_client',
                     'visit_date',
                 )
             ),
             [
-                (first_route_client.pk, date(2026, 2, 23)),
-                (second_route_client.pk, date(2026, 2, 23)),
+                (second_route_client.client_id, None, date(2026, 2, 23)),
+                (first_route_client.client_id, None, date(2026, 2, 23)),
             ],
         )
 
-    def test_manual_send_skips_client_without_route_due_that_date(self) -> None:
+    def test_manual_send_does_not_require_route_due_that_date(self) -> None:
         route_client = self._create_route_client(
             client_name='Cliente Martes',
             email='martes@example.com',
@@ -560,10 +561,43 @@ class ManualVisitConfirmationTests(FastTenantTestCase):
                 request=self.request,
             )
 
-        self.assertEqual(result.outcome, 'no_route_client')
+        confirmation = VisitConfirmation.objects.get()
+
+        self.assertEqual(result.outcome, 'sent')
+        self.assertTrue(result.success)
         self.assertIsNone(result.route_client)
-        self.assertEqual(fake_sender.recipients, [])
-        self.assertEqual(VisitConfirmation.objects.count(), 0)
+        self.assertIsNone(confirmation.route_client)
+        self.assertEqual(confirmation.client, route_client.client)
+        self.assertEqual(confirmation.visit_date, date(2026, 2, 23))
+        self.assertEqual(fake_sender.recipients, ['martes@example.com'])
+
+    def test_manual_send_allows_client_without_any_route(self) -> None:
+        client = Client.objects.create(name='Cliente Sin Ruta')
+        Contact.objects.create(
+            client=client,
+            name='Contacto Sin Ruta',
+            email='sin-ruta@example.com',
+        )
+        fake_sender = FakeConfirmationSender()
+
+        with patch(
+            'route_confirmations.services.ConfirmationSenderFactory.get_sender',
+            return_value=fake_sender,
+        ):
+            result = send_confirmation_for_client_visit(
+                client,
+                visit_date=date(2026, 2, 23),
+                sent_by=self.user,
+                request=self.request,
+            )
+
+        confirmation = VisitConfirmation.objects.get()
+
+        self.assertEqual(result.outcome, 'sent')
+        self.assertTrue(result.success)
+        self.assertIsNone(confirmation.route_client)
+        self.assertEqual(confirmation.client, client)
+        self.assertEqual(fake_sender.recipients, ['sin-ruta@example.com'])
 
     def test_send_next_confirmation_for_client_uses_next_route_day(self) -> None:
         route_client = self._create_route_client(
@@ -622,6 +656,34 @@ class ManualVisitConfirmationTests(FastTenantTestCase):
             fake_sender.recipients,
             ['vista-uno@example.com', 'vista-dos@example.com'],
         )
+
+    def test_create_confirmation_view_sends_client_without_route(self) -> None:
+        client = Client.objects.create(name='Cliente Manual Sin Ruta')
+        Contact.objects.create(
+            client=client,
+            name='Contacto Manual Sin Ruta',
+            email='manual-sin-ruta@example.com',
+        )
+        fake_sender = FakeConfirmationSender()
+
+        with patch(
+            'route_confirmations.services.ConfirmationSenderFactory.get_sender',
+            return_value=fake_sender,
+        ):
+            response = self.client.post(
+                reverse('route_confirmations:create'),
+                {
+                    'clients': [str(client.pk)],
+                    'visit_date': '2026-02-23',
+                },
+            )
+
+        confirmation = VisitConfirmation.objects.get()
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(confirmation.client, client)
+        self.assertIsNone(confirmation.route_client)
+        self.assertEqual(fake_sender.recipients, ['manual-sin-ruta@example.com'])
 
     def test_create_confirmation_view_renders_manual_form(self) -> None:
         response = self.client.get(reverse('route_confirmations:create'))

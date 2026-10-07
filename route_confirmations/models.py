@@ -27,7 +27,15 @@ class VisitConfirmation(TimeStampedModel):
         'routes.RouteClient',
         related_name='visit_confirmations',
         on_delete=models.CASCADE,
+        blank=True,
+        null=True,
         verbose_name='Cliente en ruta',
+    )
+    client = models.ForeignKey(
+        'clients.Client',
+        related_name='visit_confirmations',
+        on_delete=models.CASCADE,
+        verbose_name='Cliente',
     )
     visit_date = models.DateField(verbose_name='Fecha de visita')
     status = models.CharField(
@@ -82,16 +90,33 @@ class VisitConfirmation(TimeStampedModel):
                 condition=Q(deleted_at__isnull=True),
                 name='route_confirm_active_visit_uniq',
             ),
+            models.UniqueConstraint(
+                fields=['client', 'visit_date'],
+                condition=Q(
+                    deleted_at__isnull=True,
+                    route_client__isnull=True,
+                ),
+                name='route_confirm_manual_uniq',
+            ),
         ]
         indexes = [
-            models.Index(fields=['route_client', 'visit_date'], name='route_confirm_client_date_idx'),
+            models.Index(
+                fields=['route_client', 'visit_date'],
+                name='route_confirm_client_date_idx',
+            ),
+            models.Index(fields=['client', 'visit_date'], name='route_confirm_client_visit_idx'),
             models.Index(fields=['visit_date'], name='route_confirm_visit_date_idx'),
             models.Index(fields=['status'], name='route_confirm_status_idx'),
             models.Index(fields=['expires_at'], name='route_confirm_expires_idx'),
         ]
 
     def __str__(self) -> str:
-        return f'{self.route_client.client} - {self.visit_date} - {self.display_status()}'
+        return f'{self.client} - {self.visit_date} - {self.display_status()}'
+
+    def save(self, *args, **kwargs) -> None:
+        if self.client_id is None and self.route_client_id is not None:
+            self.client = self.route_client.client
+        super().save(*args, **kwargs)
 
     @staticmethod
     def generate_token() -> str:

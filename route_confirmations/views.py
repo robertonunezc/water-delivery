@@ -32,6 +32,7 @@ def _is_staff_user(user) -> bool:
 def list_confirmations(request):
     confirmations_queryset = (
         VisitConfirmation.objects.select_related(
+            'client',
             'route_client__route',
             'route_client__client',
             'sent_by',
@@ -46,7 +47,7 @@ def list_confirmations(request):
 
     if search_query:
         confirmations_queryset = confirmations_queryset.filter(
-            Q(route_client__client__name__icontains=search_query)
+            Q(client__name__icontains=search_query)
             | Q(route_client__route__name__icontains=search_query)
         )
 
@@ -160,7 +161,7 @@ def respond_to_confirmation(request, token: str, action: str):
     context = {
         'outcome': result.outcome,
         'confirmation': confirmation,
-        'client_name': confirmation.route_client.client.name if confirmation else '',
+        'client_name': confirmation.client.name if confirmation else '',
         'visit_date': format_visit_date(confirmation.visit_date) if confirmation else '',
         'decision': confirmation.display_status() if confirmation else '',
         'expired_message': (
