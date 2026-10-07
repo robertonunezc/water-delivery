@@ -269,12 +269,14 @@ def get_delivery_dashboard_context(
     #     dashboard_actions = _get_staff_dashboard_actions(current_date)
     dashboard_actions = _get_driver_dashboard_actions(current_date)
     from reminders.services import get_home_reminder_context
-
+    from route_confirmations.services import get_confirmations_no_route
+    from routes import services as route_services
     return {
         'is_authenticated': True,
         'user': user,
         'today': current_date,
         'dashboard_title': 'Panel del repartidor',
+        'confirmations_no_route': get_confirmations_no_route(date=current_date),
         'dashboard_actions': dashboard_actions,
         **get_home_reminder_context(user=user, today=current_date),
     }
@@ -477,7 +479,7 @@ def get_manager_dashboard_context(
     from orders import services as order_services
     from reminders.services import get_home_reminder_context
     from routes import services as route_services
-
+    from route_confirmations.services import get_confirmations_no_route
     today = timezone.localdate()
     return {
         'is_authenticated': True,
@@ -501,6 +503,7 @@ def get_manager_dashboard_context(
             'count': route_services.get_route_clients_due_count(today),
             'date': today,
         },
+        'confirmations_no_route': get_confirmations_no_route(date=today),
         # Manager navigation proposal is intentionally hidden in favor of the
         # dashboard snapshot until approved.
         # 'dashboard_actions': _get_manager_dashboard_actions(

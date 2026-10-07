@@ -583,6 +583,12 @@ def attach_confirmation_states(
     return route_clients
 
 
+def get_confirmations_no_route(date: date | None = None) -> Iterable[VisitConfirmation]:
+    query = VisitConfirmation.objects.filter(route_client__isnull=True).select_related('client').order_by('visit_date', 'client__name')
+    if date is not None:
+        query = query.filter(visit_date=date)
+    return query
+
 def _build_route_client_state(
     visit_date: date,
     confirmation: VisitConfirmation | None,

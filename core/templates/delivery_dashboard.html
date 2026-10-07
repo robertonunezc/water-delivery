@@ -7,18 +7,9 @@
 
 {% block content %}
 <div class="delivery-shell pg-mx-auto">
-  <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-end pg-gap-2 pg-mb-4">
-    <div>
-      <h1 class="pg-h3 pg-mb-1">{{ dashboard_title }}</h1>
-      <p class="pg-text-muted pg-mb-0">{{ today|date:"d/m/Y" }}</p>
-    </div>
-    <a href="{% url 'core:home' %}" class="pg-button pg-button-outline-secondary pg-button-sm">
-      <i class="fas fa-sync-alt pg-me-1"></i>Actualizar
-    </a>
-  </div>
 
   {% include "reminders/_home_block.html" %}
-
+  {% include "includes/confirmations_no_route.html" %}
   <div class="pg-row pg-gap-3">
     {% for action in dashboard_actions %}
       <div class="pg-col-12 pg-col-md-6 pg-col-xl-4">
