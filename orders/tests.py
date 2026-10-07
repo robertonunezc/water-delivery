@@ -1,7 +1,11 @@
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
 
+from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.test import RequestFactory
+from django.urls import reverse
 from django.utils import timezone
 
 from tenant_client.test_utils import FastTenantTestCase
@@ -15,6 +19,7 @@ from orders import services
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from invoice.models import Invoice, InvoiceOrderLink
+from orders.admin import BillingAttachedFilter, OrderAdmin
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -175,6 +180,162 @@ class OrderCancellationQuerySetTestCase(FastTenantTestCase):
             [self.review_order],
             transform=lambda order: order,
         )
+
+
+class OrderBillingStatusTestCase(FastTenantTestCase):
+    """Tests for distinguishing draft reservations from billed orders."""
+
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+        self.user = User.objects.create_user(username="billing_status_user")
+        self.admin = OrderAdmin(Order, AdminSite())
+        self.customer = Client.objects.create(name="Cliente Facturacion")
+        self.draft_order = self._completed_order("40.00")
+        self.active_order = self._completed_order("60.00")
+        self.draft_invoice = self._invoice(
+            amount="40.00",
+            identifier="DRAFT-BILLING-STATUS",
+            status="DRAFT",
+        )
+        self.active_invoice = self._invoice(
+            amount="60.00",
+            identifier="ACTIVE-BILLING-STATUS",
+            status="ACTIVE",
+        )
+        InvoiceOrderLink.objects.create(
+            invoice=self.draft_invoice,
+            order=self.draft_order,
+        )
+        InvoiceOrderLink.objects.create(
+            invoice=self.active_invoice,
+            order=self.active_order,
+        )
+
+    def _completed_order(self, amount: str) -> Order:
+        return Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal(amount),
+        )
+
+    def _invoice(
+        self,
+        *,
+        amount: str,
+        identifier: str,
+        status: str,
+    ) -> Invoice:
+        return Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal(amount),
+            identifier=identifier,
+            folio=identifier,
+            status=status,
+        )
+
+    def test_admin_billing_status_only_treats_active_invoice_as_billed(self) -> None:
+        draft_html = str(self.admin.billing_status(self.draft_order))
+        active_html = str(self.admin.billing_status(self.active_order))
+
+        self.assertIn("pg-text-muted", draft_html)
+        self.assertNotIn(self.draft_invoice.identifier, draft_html)
+        self.assertIn(self.active_invoice.identifier, active_html)
+
+    def test_admin_billing_filter_only_matches_active_invoices(self) -> None:
+        request = self.factory.get("/admin/orders/order/", {"has_billing": "yes"})
+        request.user = self.user
+        filter_obj = BillingAttachedFilter(
+            request,
+            request.GET.copy(),
+            Order,
+            self.admin,
+        )
+
+        filtered_orders = filter_obj.queryset(request, Order.objects.all())
+
+        self.assertNotIn(self.draft_order, filtered_orders)
+        self.assertIn(self.active_order, filtered_orders)
+
+    def test_orders_dashboard_only_prefetches_active_invoice_links_as_billed(self) -> None:
+        from orders.views import _build_orders_list_context
+
+        request = self.factory.get("/administrador/pedidos/")
+        request.user = self.user
+
+        context = _build_orders_list_context(request)
+        orders = list(context["orders"])
+        draft_order = next(
+            order for order in orders if order.pk == self.draft_order.pk
+        )
+        active_order = next(
+            order for order in orders if order.pk == self.active_order.pk
+        )
+
+        self.assertEqual(list(draft_order.invoice_links.all()), [])
+        self.assertEqual(
+            [link.invoice.identifier for link in active_order.invoice_links.all()],
+            [self.active_invoice.identifier],
+        )
+
+
+class OrderInvoiceConflictMessageTestCase(FastTenantTestCase):
+    """Tests for duplicate invoice conflict messages."""
+
+    def setUp(self) -> None:
+        self.factory = RequestFactory()
+        self.user = User.objects.create_user(username="invoice_conflict_user")
+        self.admin = OrderAdmin(Order, AdminSite())
+        self.customer = Client.objects.create(name="Cliente Conflicto Factura")
+        self.order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=Decimal("124.00"),
+        )
+        self.invoice = Invoice.objects.create(
+            client=self.customer,
+            amount=Decimal("124.00"),
+            identifier="BORRADOR-CONFLICTO",
+            folio="124",
+            status="DRAFT",
+        )
+        InvoiceOrderLink.objects.create(invoice=self.invoice, order=self.order)
+
+    def _request_with_messages(self):
+        request = self.factory.post("/administrador/pedidos/")
+        request.user = self.user
+        request.session = {}
+        setattr(request, "_messages", FallbackStorage(request))
+        return request
+
+    def _message_texts(self, request) -> list[str]:
+        return [str(message) for message in request._messages]
+
+    def test_admin_create_invoice_conflict_message_links_invoice_detail(self) -> None:
+        request = self._request_with_messages()
+
+        self.admin.crear_factura(
+            request,
+            Order.objects.filter(pk=self.order.pk),
+        )
+
+        messages = self._message_texts(request)
+        invoice_url = reverse("admin_edit_invoice", args=[self.invoice.pk])
+        self.assertTrue(any(invoice_url in message for message in messages))
+
+    def test_dashboard_create_invoice_conflict_message_links_invoice_detail(self) -> None:
+        from orders.views import _handle_create_invoice_action
+
+        request = self._request_with_messages()
+
+        _handle_create_invoice_action(
+            request,
+            [self.order],
+            reverse("admin_orders"),
+        )
+
+        messages = self._message_texts(request)
+        invoice_url = reverse("admin_edit_invoice", args=[self.invoice.pk])
+        self.assertTrue(any(invoice_url in message for message in messages))
 
 
 class OrderCancellationFinancialReversalTestCase(FastTenantTestCase):

@@ -1,7 +1,9 @@
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from io import StringIO
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db.models import Sum
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
@@ -847,6 +849,98 @@ class ClientSelectedOrderPaymentServiceTests(FastTenantTestCase):
                 reference_order=second,
             ).exists(),
         )
+
+
+class ClientCreditReconciliationServiceTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(
+            username='credit-reconciliation-user',
+            password='testpass123',
+        )
+        self.customer = Client.objects.create(
+            name='Cliente conciliacion credito',
+            active=True,
+            credit_limit=Decimal('1000.00'),
+            current_debt=Decimal('50.00'),
+            can_pay_with_credit=True,
+        )
+
+    def _credit_order(self, amount: Decimal) -> Order:
+        order = Order.objects.create(
+            client=self.customer,
+            status=OrderStatus.COMPLETED.value,
+            total_amount=amount,
+            type='credito',
+        )
+        pending_credit = Payment.objects.create(
+            client=self.customer,
+            order=order,
+            amount=amount,
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=self.customer,
+            transaction_type='purchase',
+            amount=amount,
+            debt_before=Decimal('0.00'),
+            debt_after=amount,
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            reference_payment=pending_credit,
+            created_by=self.user,
+        )
+        return order
+
+    def test_reconciliation_summary_compares_ledger_to_open_credit_orders(self) -> None:
+        from clients.services.credit_reconciliation_service import (
+            get_credit_reconciliation_summary,
+        )
+
+        self._credit_order(Decimal('100.00'))
+
+        summary = get_credit_reconciliation_summary(self.customer)
+
+        self.assertEqual(summary.ledger_debt, Decimal('50.00'))
+        self.assertEqual(summary.open_credit_total, Decimal('100.00'))
+        self.assertEqual(summary.difference, Decimal('-50.00'))
+        self.assertFalse(summary.is_balanced)
+
+    def test_global_debt_decrease_is_blocked_when_open_credit_orders_exist(self) -> None:
+        from clients.services import balance_service
+
+        self._credit_order(Decimal('100.00'))
+
+        with self.assertRaisesRegex(ValueError, 'Selecciona pedidos a crédito'):
+            balance_service.pay_debt(
+                client=self.customer,
+                amount=Decimal('10.00'),
+                transaction_type='correction',
+                user=self.user,
+                notes='Correccion global no permitida',
+            )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal('50.00'))
+        self.assertFalse(
+            CreditTransaction.objects.filter(
+                client=self.customer,
+                transaction_type='correction',
+            ).exists(),
+        )
+
+    def test_audit_command_reports_credit_reconciliation_mismatches(self) -> None:
+        self._credit_order(Decimal('100.00'))
+        output = StringIO()
+
+        call_command('audit_credit_reconciliation', stdout=output)
+
+        report = output.getvalue()
+        self.assertIn('Cliente conciliacion credito', report)
+        self.assertIn('ledger=50.00', report)
+        self.assertIn('open_orders=100.00', report)
 
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):

@@ -427,8 +427,11 @@ def _handle_orders_dashboard_bulk_action(request):
 
 def _handle_create_invoice_action(request, selected_orders, redirect_to):
     """Validate selected orders and create an invoice from them."""
-    from invoice.models import InvoiceOrderLink, RESERVING_INVOICE_STATUSES
     from invoice.services import create_invoice_from_orders
+    from orders.invoice_conflicts import (
+        build_reserved_invoice_conflict_message,
+        get_reserved_invoice_links_for_orders,
+    )
 
     non_completed = [order for order in selected_orders if order.status != OrderStatus.COMPLETED.value]
     if non_completed:
@@ -453,15 +456,14 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
         messages.error(request, 'Todos los pedidos seleccionados deben pertenecer al mismo cliente corporativo.')
         return redirect(redirect_to)
 
-    already_billed_ids = list(
-        InvoiceOrderLink.objects.filter(
-            order__in=selected_orders,
-            invoice__status__in=RESERVING_INVOICE_STATUSES,
-        ).values_list('order_id', flat=True)
+    reserved_links = get_reserved_invoice_links_for_orders(
+        order.pk for order in selected_orders
     )
-    if already_billed_ids:
-        ids = ', '.join(f'#{order_id}' for order_id in already_billed_ids)
-        messages.error(request, f'Los siguientes pedidos ya están facturados: {ids}')
+    if reserved_links:
+        messages.error(
+            request,
+            build_reserved_invoice_conflict_message(reserved_links),
+        )
         return redirect(redirect_to)
 
     client = selected_orders[0].client
@@ -482,7 +484,7 @@ def _handle_create_invoice_action(request, selected_orders, redirect_to):
 
 def _build_orders_list_context(request, per_page: int = 15) -> dict:
     """Build context for order listing views with shared filters and pagination."""
-    from invoice.models import InvoiceOrderLink, RESERVING_INVOICE_STATUSES
+    from invoice.models import InvoiceOrderLink, InvoiceStatus
 
     # Base queryset with optimized queries
     orders = Order.objects.select_related('client', 'receipt').prefetch_related(
@@ -492,7 +494,7 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
         Prefetch(
             'invoice_links',
             queryset=InvoiceOrderLink.objects.filter(
-                invoice__status__in=RESERVING_INVOICE_STATUSES,
+                invoice__status=InvoiceStatus.ACTIVE,
             ).select_related('invoice'),
         ),
     )

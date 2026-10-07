@@ -61,6 +61,7 @@ urlpatterns = [
     path('', include('route_confirmations.urls')),
     path('orders/', include('orders.urls')),
     path('notifications/', include('notification.urls')),
+    path('recordatorios/', include('reminders.urls')),
     path('', include('core.urls')),
 ]
 

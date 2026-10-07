@@ -1,10 +1,17 @@
-from datetime import date
+from datetime import date, timedelta
+
+from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
 
 from clients.models import Address, Client
-from core.models import Transport
+from core.models import Employee, Transport
+from reminders.models import Reminder
 from tenant_client.test_utils import FastTenantTestCase
 
 from .models import Route, RouteClient
+
+User = get_user_model()
 
 
 class RouteClientFrequencyIntervalTest(FastTenantTestCase):
@@ -183,3 +190,143 @@ class RouteDashboardSummaryServiceTest(FastTenantTestCase):
         count = get_route_clients_due_count(date(2026, 3, 9))
 
         self.assertEqual(count, 1)
+
+
+class RouteReminderBadgeTest(FastTenantTestCase):
+    def setUp(self):
+        self.today = date.today()
+        self.user = User.objects.create_user(
+            username='route-badge-user',
+            password='testpass123',
+        )
+        self.other_user = User.objects.create_user(
+            username='route-badge-other-user',
+            password='testpass123',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='RMD-001',
+            model='Reminder Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Reminder Route',
+            transportation=self.transport,
+            weekday=self.today.strftime('%A').lower(),
+            is_active=True,
+        )
+
+    def _create_route_client(self, *, name: str, sequence: int) -> RouteClient:
+        client = Client.objects.create(name=name)
+        Address.objects.create(client=client, type='delivery', street=f'Calle {name}')
+        return RouteClient.objects.create(
+            route=self.route,
+            client=client,
+            sequence=sequence,
+            anchor_date=self.today,
+            is_active=True,
+        )
+
+    def _create_employee_for_user(self) -> Employee:
+        return Employee.objects.create(
+            user=self.user,
+            nombre='Ruta',
+            apellidos='Recordatorios',
+            curp='RUTAREMINDERS0012',
+            rfc='RUTAREM0012',
+            street_number='Calle 1',
+            position='driver',
+        )
+
+    def test_route_clients_include_logged_user_active_reminder_counts(self):
+        from routes.services import with_active_reminder_counts
+
+        maria_route_client = self._create_route_client(name='Maria', sequence=1)
+        jose_route_client = self._create_route_client(name='Jose', sequence=2)
+
+        Reminder.objects.create(
+            title='Recoger garrafones',
+            client=maria_route_client.client,
+            created_by=self.user,
+        )
+        Reminder.objects.create(
+            title='Vender 3 garrafones',
+            client=maria_route_client.client,
+            reminder_date=self.today + timedelta(days=1),
+            created_by=self.user,
+        )
+        Reminder.objects.create(
+            title='Vencido no aparece',
+            client=maria_route_client.client,
+            reminder_date=self.today - timedelta(days=1),
+            created_by=self.user,
+        )
+        Reminder.objects.create(
+            title='Listo no aparece',
+            client=maria_route_client.client,
+            completed_at=timezone.now(),
+            completed_by=self.user,
+            created_by=self.user,
+        )
+        Reminder.objects.create(
+            title='De otro usuario no aparece',
+            client=maria_route_client.client,
+            created_by=self.other_user,
+        )
+
+        route_clients = with_active_reminder_counts(
+            RouteClient.objects.for_route(self.route).order_by('sequence'),
+            user=self.user,
+            today=self.today,
+        )
+
+        counts_by_client = {
+            route_client.client_id: route_client.active_reminders_count
+            for route_client in route_clients
+        }
+        self.assertEqual(counts_by_client[maria_route_client.client_id], 2)
+        self.assertEqual(counts_by_client[jose_route_client.client_id], 0)
+
+    def test_route_detail_links_badge_to_active_reminders_filtered_by_client(self):
+        maria_route_client = self._create_route_client(name='Maria', sequence=1)
+        jose_route_client = self._create_route_client(name='Jose', sequence=2)
+        Reminder.objects.create(
+            title='Recoger garrafones',
+            client=maria_route_client.client,
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('routes:detail', kwargs={'route_id': self.route.pk})
+        )
+
+        self.assertContains(response, 'aria-label="1 recordatorios activos"')
+        self.assertContains(
+            response,
+            f'/recordatorios/?status=activos&client={maria_route_client.client_id}',
+        )
+        self.assertNotContains(
+            response,
+            f'/recordatorios/?status=activos&client={jose_route_client.client_id}',
+        )
+
+    def test_today_route_links_badge_to_active_reminders_filtered_by_client(self):
+        employee = self._create_employee_for_user()
+        self.transport.assigned_driver = employee
+        self.transport.save(update_fields=['assigned_driver'])
+        maria_route_client = self._create_route_client(name='Maria', sequence=1)
+        Reminder.objects.create(
+            title='Recoger garrafones',
+            client=maria_route_client.client,
+            created_by=self.user,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('routes:today'))
+
+        self.assertContains(response, 'aria-label="1 recordatorios activos"')
+        self.assertContains(
+            response,
+            f'/recordatorios/?status=activos&client={maria_route_client.client_id}',
+        )

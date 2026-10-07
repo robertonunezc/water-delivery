@@ -47,6 +47,7 @@ urlpatterns = [
     path('routes/', include('routes.urls')),
     path('', include('route_confirmations.urls')),
     path('notifications/', include('notification.urls')),
+    path('recordatorios/', include('reminders.urls')),
     path('reports/', include('report.urls')),
     path('', include('core.urls')),
 ]

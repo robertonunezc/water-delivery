@@ -31,6 +31,9 @@
         <a href="{% url 'orders:create_order' client.pk %}" class="pg-button client-header-action">
           <i class="fas fa-plus pg-me-1"></i>Nuevo Pedido
         </a>
+        <a href="{% url 'reminders:create' %}?client={{ client.pk }}" class="pg-button client-header-action">
+          <i class="fas fa-bell pg-me-1"></i>NUEVO RECORDATORIO
+        </a>
         <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button client-header-action">
           <i class="fas fa-credit-card pg-me-1"></i>Reporte de crédito
         </a>
@@ -122,6 +125,13 @@
           </table>
         </div>
       {% endif %}
+    </section>
+  {% endif %}
+
+  {% if credit_reconciliation_warning %}
+    <section class="pg-alert pg-alert-warning pg-mb-3" role="alert">
+      <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
+      <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
     </section>
   {% endif %}
 

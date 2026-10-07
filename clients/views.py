@@ -46,6 +46,7 @@ from .services.credit_payment_service import (
     get_selected_credit_orders_for_credit_management,
     get_selected_credit_orders_total,
 )
+from .services.credit_reconciliation_service import get_credit_reconciliation_warning
 from .services.product_price_service import (
     build_client_product_price_initial,
     update_client_product_prices,
@@ -1053,6 +1054,7 @@ def detail(request, pk):
         'client_invoices': client_invoices_list,
         'debt_percentage': debt_percentage,
         'credit_account': credit_account,
+        'credit_reconciliation_warning': get_credit_reconciliation_warning(client),
         'effective_credit_config': effective_credit_config,
         'credit_is_inherited': credit_account.pk != client.pk,
         'stats': {
@@ -1308,6 +1310,7 @@ def _credit_payment_context(
         'form': form,
         'client': client,
         'credit_account': client.get_credit_account(),
+        'credit_reconciliation_warning': get_credit_reconciliation_warning(client),
         'credit_orders': credit_orders,
         'selected_order_ids': selected_ids,
         'selected_total': selected_total,

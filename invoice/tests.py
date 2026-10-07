@@ -1,13 +1,17 @@
 from decimal import Decimal
 from datetime import date, timedelta
 
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Address, Client, InvoiceData
 from orders.models import Order
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceSchedule
 from tenant_client.test_utils import FastTenantTestCase
+
+User = get_user_model()
 
 
 class InvoiceTenantTestCase(FastTenantTestCase):
@@ -17,7 +21,6 @@ class InvoiceTenantTestCase(FastTenantTestCase):
 		tenant.paid_until = timezone.now().date() + timedelta(days=30)
 		tenant.on_trial = False
 		return tenant
-
 
 class InvoiceCancellationModelTests(InvoiceTenantTestCase):
     def setUp(self) -> None:

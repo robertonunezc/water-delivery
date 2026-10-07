@@ -373,6 +373,24 @@ def _parse_payment_rows(payments_data: list) -> list[dict[str, object]]:
     return parsed_rows
 
 
+def _get_order_credit_account(order: Order) -> "Client":
+    """Return the credit ledger owner recorded when the order debt was created."""
+    from clients.models import CreditTransaction
+
+    purchase = (
+        CreditTransaction.objects.filter(
+            reference_order=order,
+            transaction_type='purchase',
+        )
+        .select_related('client')
+        .order_by('created_at', 'pk')
+        .first()
+    )
+    if purchase:
+        return purchase.client
+    return order.client.get_credit_account()
+
+
 @transaction.atomic
 def settle_credit_order_payment(
     order: Order,
@@ -418,8 +436,9 @@ def settle_credit_order_payment(
     if error:
         return None, error
 
+    credit_account = _get_order_credit_account(order)
     paid_amount = balance_service.pay_debt(
-        client=order.client,
+        client=credit_account,
         amount=amount,
         transaction_type=_credit_payment_transaction_type(payment_method),
         transaction_date=payment_date,
@@ -442,7 +461,7 @@ def _reconcile_unapplied_credit_payment(
     payment_date: date | None = None,
 ) -> Optional[Payment]:
     """Apply a previously recorded payment that did not reduce credit debt."""
-    credit_account = order.client.get_credit_account()
+    credit_account = _get_order_credit_account(order)
     accounted_payment_ids = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type__in=['payment', 'payment_from_balance'],
@@ -467,7 +486,7 @@ def _reconcile_unapplied_credit_payment(
         )
 
     paid_amount = balance_service.pay_debt(
-        client=order.client,
+        client=credit_account,
         amount=payment.amount,
         transaction_type=_credit_payment_transaction_type(payment.method),
         transaction_date=payment_date,
@@ -959,6 +978,7 @@ def _settle_pending_credit_order(
         }, 400
 
     created_payments = []
+    credit_account = _get_order_credit_account(order)
     for payment_item in payments_data:
         amount = Decimal(str(payment_item['amount']))
         if amount <= 0:
@@ -975,7 +995,7 @@ def _settle_pending_credit_order(
             return error, 400
 
         paid_amount = balance_service.pay_debt(
-            client=order.client,
+            client=credit_account,
             amount=amount,
             transaction_type='payment',
             transaction_date=payment_date,

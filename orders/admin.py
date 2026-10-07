@@ -40,23 +40,25 @@ class OrderAmountFilter(admin.SimpleListFilter):
 
 class BillingAttachedFilter(admin.SimpleListFilter):
     """Filter orders by presence of related billing records (BillingOrder)."""
-    title = 'Tiene facturación'
+    title = 'Tiene factura emitida'
     parameter_name = 'has_billing'
 
     def lookups(self, request, model_admin):
         return (
-            ('yes', 'Con Facturación'),
-            ('no', 'Sin Facturación'),
+            ('yes', 'Con factura emitida'),
+            ('no', 'Sin factura emitida'),
         )
 
     def queryset(self, request, queryset):
+        from invoice.models import InvoiceStatus
+
         if self.value() == 'yes':
             return queryset.filter(
-                invoice_links__invoice__status__in=('DRAFT', 'ACTIVE'),
+                invoice_links__invoice__status=InvoiceStatus.ACTIVE,
             ).distinct()
         elif self.value() == 'no':
             return queryset.exclude(
-                invoice_links__invoice__status__in=('DRAFT', 'ACTIVE'),
+                invoice_links__invoice__status=InvoiceStatus.ACTIVE,
             ).distinct()
 
 
@@ -353,10 +355,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def billing_status(self, obj):
         """Display billing status and associated invoices"""
         try:
-            from invoice.models import InvoiceOrderLink
+            from invoice.models import InvoiceOrderLink, InvoiceStatus
             invoice_links = InvoiceOrderLink.objects.filter(
                 order=obj,
-                invoice__status__in=('DRAFT', 'ACTIVE'),
+                invoice__status=InvoiceStatus.ACTIVE,
             ).select_related('invoice')
             
             if not invoice_links.exists():
@@ -594,7 +596,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
     def crear_factura(self, request, queryset):
         """Create an invoice from selected completed, unbilled orders."""
         from invoice.services import create_invoice_from_orders
-        from invoice.models import InvoiceOrderLink, RESERVING_INVOICE_STATUSES
+        from orders.invoice_conflicts import (
+            build_reserved_invoice_conflict_message,
+            get_reserved_invoice_links_for_orders,
+        )
 
         orders = list(queryset)
 
@@ -608,17 +613,13 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             )
             return
 
-        already_billed_ids = list(
-            InvoiceOrderLink.objects.filter(
-                order__in=orders,
-                invoice__status__in=RESERVING_INVOICE_STATUSES,
-            ).values_list('order_id', flat=True)
+        reserved_links = get_reserved_invoice_links_for_orders(
+            order.pk for order in orders
         )
-        if already_billed_ids:
-            ids = ', '.join(f'#{oid}' for oid in already_billed_ids)
+        if reserved_links:
             self.message_user(
                 request,
-                f'Los siguientes pedidos ya están facturados: {ids}',
+                build_reserved_invoice_conflict_message(reserved_links),
                 level='error',
             )
             return

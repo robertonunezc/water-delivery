@@ -110,7 +110,6 @@
             <th>Estado</th>
             <!-- <th>Estado de Pago</th> -->
             <!-- <th>Calculation</th> -->
-            <th>Archivos</th>
             <th>Total</th>
             <th>Total Pagado</th>
             <th>Saldo pendiente</th>
@@ -161,15 +160,6 @@
                 {% endif %}
               </td> -->
               <td>
-                {% if invoice.file %}
-                  <a href="{{ invoice.file.url }}" class="status-pill status-has-file pg-text-decoration-none" target="_blank">
-                    📄 Descargar
-                  </a>
-                {% else %}
-                  <span class="status-pill status-no-file">No</span>
-                {% endif %}
-              </td>
-              <td>
                 <strong class="pg-text-success">${{ invoice.amount|floatformat:2 }}</strong>
               </td>
               <td>
@@ -209,7 +199,7 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="11" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron facturas.</td>
+              <td colspan="10" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron facturas.</td>
             </tr>
           {% endfor %}
         </tbody>
