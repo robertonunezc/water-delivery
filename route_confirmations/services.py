@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
-from typing import Any
+from typing import Any, Iterable
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -11,6 +11,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 
+from clients.models import Client
 from routes.models import WEEKDAY_TO_INDEX, RouteClient
 
 from .models import VisitConfirmation
@@ -40,6 +41,19 @@ class RouteClientConfirmationState:
     badge_class: str
     action_label: str
     can_send: bool
+
+
+@dataclass(frozen=True)
+class ClientConfirmationSendResult:
+    client: Client
+    outcome: str
+    route_client: RouteClient | None = None
+    visit_date: date | None = None
+    send_result: SendResult | None = None
+
+    @property
+    def success(self) -> bool:
+        return bool(self.send_result and self.send_result.success)
 
 
 SPANISH_MONTHS = {
@@ -186,6 +200,134 @@ def send_visit_confirmation(
             receipts=receipts,
             warning_messages=warning_messages,
         )
+
+
+def send_confirmation_for_clients(
+    clients: Iterable[Client],
+    *,
+    visit_date: date,
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str = 'email',
+) -> tuple[ClientConfirmationSendResult, ...]:
+    return tuple(
+        send_confirmation_for_client_visit(
+            client,
+            visit_date=visit_date,
+            sent_by=sent_by,
+            request=request,
+            channel=channel,
+        )
+        for client in clients
+    )
+
+
+def send_confirmation_for_client_visit(
+    client: Client,
+    *,
+    visit_date: date,
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str = 'email',
+) -> ClientConfirmationSendResult:
+    route_client = get_due_route_client_for_client(client, visit_date)
+    if route_client is None:
+        return ClientConfirmationSendResult(
+            client=client,
+            outcome='no_route_client',
+            visit_date=visit_date,
+        )
+
+    send_result = send_visit_confirmation(
+        route_client,
+        sent_by=sent_by,
+        request=request,
+        channel=channel,
+        today=visit_date,
+    )
+    return ClientConfirmationSendResult(
+        client=client,
+        outcome=send_result.outcome,
+        route_client=route_client,
+        visit_date=visit_date,
+        send_result=send_result,
+    )
+
+
+def send_next_confirmation_for_client(
+    client: Client,
+    *,
+    sent_by: Any,
+    request: HttpRequest,
+    channel: str = 'email',
+    today: date | None = None,
+) -> ClientConfirmationSendResult:
+    next_visit = get_next_route_client_visit_for_client(client, today=today)
+    if next_visit is None:
+        return ClientConfirmationSendResult(client=client, outcome='no_route_client')
+
+    route_client, visit_date = next_visit
+    send_result = send_visit_confirmation(
+        route_client,
+        sent_by=sent_by,
+        request=request,
+        channel=channel,
+        today=visit_date,
+    )
+    return ClientConfirmationSendResult(
+        client=client,
+        outcome=send_result.outcome,
+        route_client=route_client,
+        visit_date=visit_date,
+        send_result=send_result,
+    )
+
+
+def get_due_route_client_for_client(
+    client: Client,
+    visit_date: date,
+) -> RouteClient | None:
+    return (
+        RouteClient.objects.filter(client=client, route__is_active=True)
+        .due_on(visit_date)
+        .select_related('route', 'client')
+        .order_by('sequence', 'route_id', 'id')
+        .first()
+    )
+
+
+def get_next_route_client_visit_for_client(
+    client: Client,
+    today: date | None = None,
+) -> tuple[RouteClient, date] | None:
+    route_clients = (
+        RouteClient.objects.filter(
+            client=client,
+            is_active=True,
+            route__is_active=True,
+        )
+        .select_related('route', 'client')
+        .order_by('sequence', 'route_id', 'id')
+    )
+    best_visit: tuple[date, int, int, int, RouteClient] | None = None
+    for route_client in route_clients:
+        try:
+            visit_date = get_next_due_visit_date(route_client, today=today)
+        except ValidationError:
+            continue
+        candidate = (
+            visit_date,
+            route_client.sequence,
+            route_client.route_id or 0,
+            route_client.pk or 0,
+            route_client,
+        )
+        if best_visit is None or candidate[:4] < best_visit[:4]:
+            best_visit = candidate
+
+    if best_visit is None:
+        return None
+    return best_visit[4], best_visit[0]
 
 
 def record_public_response(

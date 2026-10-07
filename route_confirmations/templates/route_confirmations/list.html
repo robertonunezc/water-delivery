@@ -9,6 +9,9 @@
             <h1 class="pg-h3 pg-mb-1">Confirmaciones</h1>
             <p class="pg-text-muted pg-mb-0">Seguimiento de confirmaciones enviadas para visitas en ruta.</p>
         </div>
+        {% if user.is_staff %}
+            <a href="{% url 'route_confirmations:create' %}" class="pg-button pg-button-primary">Crear confirmación</a>
+        {% endif %}
     </div>
 
     <div class="pg-card dashboard-card pg-mb-3">

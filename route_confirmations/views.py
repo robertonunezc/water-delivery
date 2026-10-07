@@ -1,21 +1,25 @@
 from datetime import datetime
+from typing import Iterable
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from routes.models import Route, RouteClient
 
-from .forms import ConfirmationOverrideForm
+from .forms import ConfirmationOverrideForm, ManualConfirmationSendForm
 from .models import VisitConfirmation
 from .services import (
+    ClientConfirmationSendResult,
     format_visit_date,
     override_confirmation,
     record_public_response,
+    send_confirmation_for_clients,
     send_visit_confirmation,
 )
 
@@ -81,6 +85,29 @@ def list_confirmations(request):
     )
 
 
+@user_passes_test(_is_staff_user)
+def create_confirmation(request: HttpRequest) -> HttpResponse:
+    if request.method == 'POST':
+        form = ManualConfirmationSendForm(request.POST)
+        if form.is_valid():
+            results = send_confirmation_for_clients(
+                form.cleaned_data['clients'],
+                visit_date=form.cleaned_data['visit_date'],
+                sent_by=request.user,
+                request=request,
+            )
+            _flash_confirmation_results(request, results)
+            return redirect('route_confirmations:list')
+    else:
+        form = ManualConfirmationSendForm()
+
+    return render(
+        request,
+        'route_confirmations/form.html',
+        {'form': form},
+    )
+
+
 @login_required
 @require_POST
 def send_confirmation(request, route_client_id: int):
@@ -102,7 +129,10 @@ def send_confirmation(request, route_client_id: int):
     else:
         messages.error(request, 'No se pudo enviar la confirmación.')
 
-    return redirect(request.POST.get('next') or reverse('routes:detail', kwargs={'route_id': route_client.route_id}))
+    return redirect(
+        request.POST.get('next')
+        or reverse('routes:detail', kwargs={'route_id': route_client.route_id})
+    )
 
 
 @user_passes_test(_is_staff_user)
@@ -133,7 +163,10 @@ def respond_to_confirmation(request, token: str, action: str):
         'client_name': confirmation.route_client.client.name if confirmation else '',
         'visit_date': format_visit_date(confirmation.visit_date) if confirmation else '',
         'decision': confirmation.display_status() if confirmation else '',
-        'expired_message': 'Este enlace expiró. Por favor comunícate con nosotros para confirmar tu visita.',
+        'expired_message': (
+            'Este enlace expiró. Por favor comunícate con nosotros para '
+            'confirmar tu visita.'
+        ),
     }
     return render(request, 'route_confirmations/confirmation_result.html', context)
 
@@ -153,3 +186,72 @@ def _filter_by_display_status(queryset, status_filter: str):
     if status_filter in VisitConfirmation.Status.values:
         return queryset.filter(status=status_filter)
     return queryset
+
+
+def _flash_confirmation_results(
+    request: HttpRequest,
+    results: Iterable[ClientConfirmationSendResult],
+) -> None:
+    result_list = tuple(results)
+    sent_count = sum(1 for result in result_list if result.success)
+    if sent_count:
+        messages.success(
+            request,
+            f'Se enviaron {sent_count} confirmación(es).',
+        )
+
+    for result in result_list:
+        if result.success:
+            _flash_confirmation_warnings(request, result)
+            continue
+        _flash_confirmation_failure(request, result)
+
+
+def _flash_confirmation_warnings(
+    request: HttpRequest,
+    result: ClientConfirmationSendResult,
+) -> None:
+    if result.send_result is None:
+        return
+    for warning in result.send_result.warning_messages:
+        messages.warning(
+            request,
+            f'{result.client.name}: no se pudo enviar a {warning}',
+        )
+
+
+def _flash_confirmation_failure(
+    request: HttpRequest,
+    result: ClientConfirmationSendResult,
+) -> None:
+    client_name = result.client.name
+    if result.outcome == 'no_route_client':
+        visit_date = (
+            format_visit_date(result.visit_date)
+            if result.visit_date is not None
+            else 'la próxima visita'
+        )
+        messages.warning(
+            request,
+            f'{client_name} no tiene ruta activa programada para {visit_date}.',
+        )
+    elif result.outcome == 'no_recipients':
+        messages.warning(
+            request,
+            f'{client_name} no tiene contactos con correo electrónico.',
+        )
+    elif result.outcome == 'pending':
+        messages.info(
+            request,
+            (
+                f'La confirmación de {client_name} ya fue enviada y '
+                'todavía no expira.'
+            ),
+        )
+    elif result.outcome == 'final':
+        messages.info(
+            request,
+            f'La visita de {client_name} ya tiene una respuesta final.',
+        )
+    else:
+        messages.error(request, f'No se pudo enviar la confirmación de {client_name}.')

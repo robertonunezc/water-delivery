@@ -34,6 +34,15 @@
         <a href="{% url 'reminders:create' %}?client={{ client.pk }}" class="pg-button client-header-action">
           <i class="fas fa-bell pg-me-1"></i>NUEVO RECORDATORIO
         </a>
+        {% if request.user.is_staff and client.active %}
+          <form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}" class="pg-mb-0">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <button type="submit" class="pg-button client-header-action">
+              <i class="fas fa-envelope pg-me-1"></i>Enviar confirmación
+            </button>
+          </form>
+        {% endif %}
         <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button client-header-action">
           <i class="fas fa-credit-card pg-me-1"></i>Reporte de crédito
         </a>
