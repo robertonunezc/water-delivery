@@ -245,6 +245,25 @@ class RouteClient(TimeStampedModel):
         self._validate_client_delivery_address()
 
     def save(self, *args, **kwargs):
+        was_active = None
+        if self.pk:
+            was_active = (
+                type(self).all_objects.filter(pk=self.pk)
+                .values_list('is_active', flat=True)
+                .first()
+            )
+
         self._align_anchor_date_to_route_weekday()
         self._validate_client_delivery_address()
-        return super().save(*args, **kwargs)
+        result = super().save(*args, **kwargs)
+        if was_active is True and not self.is_active:
+            self._archive_visit_confirmations()
+        return result
+
+    def delete(self, using=None, keep_parents=False):
+        self._archive_visit_confirmations()
+        return super().delete(using=using, keep_parents=keep_parents)
+
+    def _archive_visit_confirmations(self):
+        from route_confirmations.models import VisitConfirmation
+        VisitConfirmation.objects.filter(route_client=self).update(deleted_at=timezone.now())

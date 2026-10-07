@@ -9,6 +9,7 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 from decimal import Decimal, InvalidOperation
@@ -61,6 +62,11 @@ from orders.services.receipt_delivery_service import (
 from payment import services as payment_services
 from payment.models import PAYMENT_METHOD_CHOICES
 from product.services import ensure_client_product_prices
+from route_confirmations.services import (
+    ClientConfirmationSendResult,
+    format_visit_date,
+    send_next_confirmation_for_client,
+)
 from routes.forms import ClientRouteAssignmentForm
 from routes.models import RouteClient
 
@@ -1069,6 +1075,88 @@ def detail(request, pk):
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@user_passes_test(_is_admin_user)
+@require_POST
+def send_next_route_confirmation(request: HttpRequest, pk: int) -> HttpResponse:
+    client = get_object_or_404(Client, pk=pk, active=True)
+    result = send_next_confirmation_for_client(
+        client,
+        sent_by=request.user,
+        request=request,
+    )
+    _flash_route_confirmation_action_result(request, result)
+    return redirect(
+        _get_safe_next_url(request, reverse('clients:detail', args=[client.pk]))
+    )
+
+
+def _get_safe_next_url(request: HttpRequest, fallback_url: str) -> str:
+    next_url = request.POST.get('next')
+    if next_url and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return next_url
+    return fallback_url
+
+
+def _flash_route_confirmation_action_result(
+    request: HttpRequest,
+    result: ClientConfirmationSendResult,
+) -> None:
+    client_name = result.client.name
+    if result.success:
+        visit_date = (
+            format_visit_date(result.visit_date)
+            if result.visit_date is not None
+            else 'la próxima visita'
+        )
+        receipt_count = (
+            len(result.send_result.receipts)
+            if result.send_result is not None
+            else 0
+        )
+        messages.success(
+            request,
+            (
+                f'Confirmación de {client_name} enviada para {visit_date} '
+                f'a {receipt_count} contacto(s).'
+            ),
+        )
+        if result.send_result is not None:
+            for warning in result.send_result.warning_messages:
+                messages.warning(request, f'No se pudo enviar a {warning}')
+    elif result.outcome == 'no_route_client':
+        messages.warning(
+            request,
+            f'{client_name} no tiene una ruta activa para confirmar.',
+        )
+    elif result.outcome == 'no_recipients':
+        messages.warning(
+            request,
+            f'{client_name} no tiene contactos con correo electrónico.',
+        )
+    elif result.outcome == 'pending':
+        messages.info(
+            request,
+            (
+                f'La confirmación de {client_name} ya fue enviada y '
+                'todavía no expira.'
+            ),
+        )
+    elif result.outcome == 'final':
+        messages.info(
+            request,
+            f'La visita de {client_name} ya tiene una respuesta final.',
+        )
+    else:
+        messages.error(
+            request,
+            f'No se pudo enviar la confirmación de {client_name}.',
+        )
 
 
 @user_passes_test(_is_admin_user)

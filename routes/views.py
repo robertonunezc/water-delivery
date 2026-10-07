@@ -13,6 +13,7 @@ from datetime import date, datetime
 from .models import Route, RouteClient, RouteClientOrder
 from .forms import RouteClientInlineForm, RouteForm
 from .services import get_route_detail_payload, with_active_reminder_counts
+from route_confirmations.services import attach_confirmation_states
 from core.models import Employee, Transport
 from clients.models import Client
 
@@ -269,6 +270,10 @@ def today_route(request):
     regular_clients = with_active_reminder_counts(
         regular_clients,
         user=request.user,
+        today=today,
+    )
+    regular_clients = attach_confirmation_states(
+        list(regular_clients),
         today=today,
     )
     

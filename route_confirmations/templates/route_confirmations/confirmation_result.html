@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmación de visita{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-mt-4">
+    <div class="pg-card dashboard-card">
+        <div class="pg-card-body pg-text-center">
+            {% if outcome == 'recorded' %}
+                <h1 class="pg-h3 pg-mb-2">Gracias por confirmar</h1>
+                <p class="pg-mb-1"><strong>{{ client_name }}</strong></p>
+                <p class="pg-text-muted pg-mb-2">Visita: {{ visit_date }}</p>
+                <span class="pg-badge {% if decision == 'Confirmada' %}pg-bg-success{% else %}pg-bg-danger{% endif %}">
+                    {{ decision }}
+                </span>
+            {% elif outcome == 'already_answered' %}
+                <h1 class="pg-h3 pg-mb-2">Esta visita ya fue respondida</h1>
+                <p class="pg-mb-1"><strong>{{ client_name }}</strong></p>
+                <p class="pg-text-muted pg-mb-2">Visita: {{ visit_date }}</p>
+                <span class="pg-badge {% if decision == 'Confirmada' %}pg-bg-success{% else %}pg-bg-danger{% endif %}">
+                    {{ decision }}
+                </span>
+            {% elif outcome == 'expired' %}
+                <h1 class="pg-h3 pg-mb-2">Enlace expirado</h1>
+                <p class="pg-text-muted pg-mb-0">{{ expired_message }}</p>
+            {% else %}
+                <h1 class="pg-h3 pg-mb-2">Enlace inválido</h1>
+                <p class="pg-text-muted pg-mb-0">No pudimos procesar esta confirmación.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+
+{% block title %}Confirmaciones{% endblock %}
+
+{% block content %}
+<div class="pg-container-fluid pg-mt-3">
+    <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
+        <div>
+            <h1 class="pg-h3 pg-mb-1">Confirmaciones</h1>
+            <p class="pg-text-muted pg-mb-0">Seguimiento de confirmaciones enviadas para visitas en ruta.</p>
+        </div>
+        {% if user.is_staff %}
+            <a href="{% url 'route_confirmations:create' %}" class="pg-button pg-button-primary">Crear confirmación</a>
+        {% endif %}
+    </div>
+
+    <div class="pg-card dashboard-card pg-mb-3">
+        <div class="pg-card-body">
+            <form method="get" class="pg-row pg-gap-2 pg-align-end" action="{% url 'route_confirmations:list' %}">
+                <div class="pg-col-md-3">
+                    <label class="pg-label" for="search">Buscar</label>
+                    <input id="search" name="search" value="{{ search_query }}" class="pg-input" placeholder="Cliente o ruta">
+                </div>
+                <div class="pg-col-md-3">
+                    <label class="pg-label" for="route">Ruta</label>
+                    <select id="route" name="route" class="pg-select">
+                        <option value="">Todas</option>
+                        {% for route in routes %}
+                            <option value="{{ route.id }}" {% if selected_route == route.id|stringformat:'s' %}selected{% endif %}>
+                                {{ route.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pg-col-md-2">
+                    <label class="pg-label" for="status">Estatus</label>
+                    <select id="status" name="status" class="pg-select">
+                        <option value="">Todos</option>
+                        {% for status in statuses %}
+                            <option value="{{ status }}" {% if selected_status == status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="pg-col-md-2">
+                    <label class="pg-label" for="visit_date">Fecha</label>
+                    <input id="visit_date" name="visit_date" value="{{ visit_date_filter }}" type="date" class="pg-input">
+                </div>
+                <div class="pg-col-md-2 pg-grid">
+                    <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
+                </div>
+            </form>
+            <div class="pg-mt-2">
+                <a href="{% url 'route_confirmations:list' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="pg-card dashboard-card">
+        <div class="pg-table-responsive">
+            <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
+                <thead class="pg-table-light">
+                    <tr>
+                        <th>Cliente</th>
+                        <th>Ruta</th>
+                        <th>Fecha visita</th>
+                        <th>Estatus</th>
+                        <th>Enviado</th>
+                        <th>Respondido</th>
+                        {% if user.is_staff %}<th>Ajuste</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for confirmation in confirmations %}
+                        <tr>
+                            <td>{{ confirmation.client.name }}</td>
+                            <td>
+                                {% if confirmation.route_client %}
+                                    {{ confirmation.route_client.route.name }}
+                                {% else %}
+                                    <span class="pg-text-muted">Manual</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ confirmation.visit_date|date:'d/m/Y' }}</td>
+                            <td>
+                                {% with display_status=confirmation.display_status %}
+                                    <span class="pg-badge {% if display_status == 'Confirmada' %}pg-bg-success{% elif display_status == 'NO visitar' %}pg-bg-danger{% elif display_status == 'Expirada' %}pg-bg-warning{% else %}pg-bg-info{% endif %}">
+                                        {{ display_status }}
+                                    </span>
+                                {% endwith %}
+                            </td>
+                            <td>
+                                {% if confirmation.sent_at %}
+                                    {{ confirmation.sent_at|date:'d/m/Y H:i' }}
+                                {% else %}
+                                    <span class="pg-text-muted">Sin envío</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if confirmation.responded_at %}
+                                    {{ confirmation.responded_at|date:'d/m/Y H:i' }}
+                                {% else %}
+                                    <span class="pg-text-muted">Pendiente</span>
+                                {% endif %}
+                            </td>
+                            {% if user.is_staff %}
+                                <td>
+                                    <form method="post" action="{% url 'route_confirmations:override' confirmation.pk %}" class="pg-row pg-gap-1 pg-align-end">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <div class="pg-col-12">
+                                            <select name="status" class="pg-select">
+                                                {% for value, label in override_form.fields.status.choices %}
+                                                    <option value="{{ value }}" {% if confirmation.status == value %}selected{% endif %}>{{ label }}</option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="pg-col-12">
+                                            <textarea name="note" class="pg-input" rows="2" placeholder="Nota requerida"></textarea>
+                                        </div>
+                                        <div class="pg-col-12">
+                                            <button type="submit" class="pg-button pg-button-sm pg-button-outline-primary">Guardar</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            {% endif %}
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="{% if user.is_staff %}7{% else %}6{% endif %}" class="pg-text-center pg-py-4 pg-text-muted">
+                                No hay confirmaciones para mostrar.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if confirmations.has_other_pages %}
+            <div class="pg-card-footer pg-bg-white">
+                <nav>
+                    <ul class="pg-pagination pg-justify-center pg-mb-0">
+                        {% if confirmations.has_previous %}
+                            <li class="pg-page-item">
+                                <a class="pg-page-link" href="?search={{ search_query|urlencode }}&route={{ selected_route|urlencode }}&status={{ selected_status|urlencode }}&visit_date={{ visit_date_filter|urlencode }}&page={{ confirmations.previous_page_number }}">Anterior</a>
+                            </li>
+                        {% else %}
+                            <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
+                        {% endif %}
+                        <li class="pg-page-item pg-disabled"><span class="pg-page-link">Página {{ confirmations.number }} de {{ confirmations.paginator.num_pages }}</span></li>
+                        {% if confirmations.has_next %}
+                            <li class="pg-page-item">
+                                <a class="pg-page-link" href="?search={{ search_query|urlencode }}&route={{ selected_route|urlencode }}&status={{ selected_status|urlencode }}&visit_date={{ visit_date_filter|urlencode }}&page={{ confirmations.next_page_number }}">Siguiente</a>
+                            </li>
+                        {% else %}
+                            <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

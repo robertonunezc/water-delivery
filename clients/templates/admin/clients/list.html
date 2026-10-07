@@ -146,6 +146,15 @@
 										<li><a class="pg-dropdown-item" href="{% url 'clients:detail' client.pk %}">Ver</a></li>
 										<li><a class="pg-dropdown-item" href="{% url 'admin_edit_client' client.pk %}">Editar</a></li>
 										<li><a class="pg-dropdown-item" href="{% url 'orders:create_order' client.pk %}">Pedido</a></li>
+										{% if request.user.is_staff and client.active %}
+											<li>
+												<form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}">
+													{% csrf_token %}
+													<input type="hidden" name="next" value="{{ request.get_full_path }}">
+													<button type="submit" class="pg-dropdown-item">Enviar confirmación</button>
+												</form>
+											</li>
+										{% endif %}
 										<li><a class="pg-dropdown-item" href="{% url 'admin_add_balance' client.pk %}">Gestionar saldo</a></li>
 										<li><a class="pg-dropdown-item" href="{% url 'clients:pay_credit' client.pk%}">Pago de deuda</a></li>
 									</ul>

@@ -5,9 +5,9 @@
       <h2 id="home-reminders-title" class="pg-h4 pg-mb-1">Recordatorios Para Hoy</h2>
       <div class="pg-small pg-text-muted">{{ today_reminders|length }} activos para atender</div>
     </div>
-    <a href="{% url 'reminders:create' %}" class="pg-button pg-button-primary pg-button-sm">
+    {% comment %} <a href="{% url 'reminders:create' %}" class="pg-button pg-button-primary pg-button-sm">
       <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
-    </a>
+    </a> {% endcomment %}
   </div>
 
   {% if today_reminders %}

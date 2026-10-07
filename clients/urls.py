@@ -17,7 +17,16 @@ urlpatterns = [
         views.send_selected_order_receipts,
         name='send_selected_order_receipts',
     ),
-    path('<int:pk>/product-prices/update/', views.update_product_prices, name='update_product_prices'),
+    path(
+        '<int:pk>/product-prices/update/',
+        views.update_product_prices,
+        name='update_product_prices',
+    ),
+    path(
+        '<int:pk>/confirmations/send-next/',
+        views.send_next_route_confirmation,
+        name='send_next_route_confirmation',
+    ),
     path('<int:pk>/', views.detail, name='detail'),
     path('<int:pk>/editar/', views.edit_v2, name='edit_v2'),
     path('<int:pk>/update/', views.update_client, name='update'),

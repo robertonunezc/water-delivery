@@ -1,0 +1,9 @@
+Hola,
+
+Por favor confirma la visita de entrega de garrafones de agua para {{ client_name }} el {{ visit_date }}.
+
+Confirmar visita:
+{{ confirm_url }}
+
+No visitar:
+{{ do_not_visit_url }}

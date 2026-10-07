@@ -7,11 +7,12 @@ from django.utils import timezone
 
 from clients.models import Client
 from .models import Route, RouteClient, RouteClientOrder
+from route_confirmations.services import attach_confirmation_states
 
 
 @dataclass(frozen=True)
 class RouteDetailPayload:
-    route_clients: QuerySet[RouteClient]
+    route_clients: list[RouteClient]
     recent_orders: QuerySet[RouteClientOrder]
     search_query: str
     today: date
@@ -23,7 +24,7 @@ def get_route_detail_payload(
     search_query: str,
     user: Any | None = None,
 ) -> RouteDetailPayload:
-    route_clients = (
+    route_clients_queryset = (
         RouteClient.objects.for_route(route)
         .search_by_client(search_query)
         .with_client_details()
@@ -32,7 +33,11 @@ def get_route_detail_payload(
         .ordered_for_detail()
     )
     if user is not None:
-        route_clients = with_active_reminder_counts(route_clients, user=user)
+        route_clients_queryset = with_active_reminder_counts(
+            route_clients_queryset,
+            user=user,
+        )
+    route_clients = attach_confirmation_states(list(route_clients_queryset))
 
     recent_orders = (
         RouteClientOrder.objects.filter(

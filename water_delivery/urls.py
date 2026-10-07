@@ -58,6 +58,7 @@ urlpatterns = [
     path('payments/', include('payment.urls')),
     path('reports/', include('report.urls')),
     path('routes/', include('routes.urls')),
+    path('', include('route_confirmations.urls')),
     path('orders/', include('orders.urls')),
     path('notifications/', include('notification.urls')),
     path('recordatorios/', include('reminders.urls')),
