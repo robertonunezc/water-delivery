@@ -1,0 +1,10 @@
+.puri-cubic-logo {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.puri-cubic-logo:hover,
+.puri-cubic-logo:focus {
+  color: #ffffff;
+  text-decoration: none;
+}
