@@ -594,14 +594,23 @@ def edit_v2(request, pk):
     context['is_create'] = False
     return render(request, 'clients/client_form_v2.html', context)
 @login_required
-def list_admin(request):
-    context = get_clients(request)
+def list_admin(request: HttpRequest) -> HttpResponse:
+    context = get_clients(request, list_url_name='admin_clients')
+    context.update({
+        'page_subtitle': 'Vista administrativa con búsqueda y paginador.',
+        'client_actions_variant': 'full',
+        'client_create_url': reverse('admin_create_client'),
+    })
     return render(request, 'admin/clients/list.html', context)
 
 @login_required
-def list(request):
-    # Get search query from request
+def list(request: HttpRequest) -> HttpResponse:
     context = get_clients(request)
+    if request.user.is_staff:
+        context.update({
+            'client_actions_variant': 'full',
+            'client_create_url': reverse('admin_create_client'),
+        })
     return render(request, 'list_clients.html', context)
 
 
@@ -1295,7 +1304,7 @@ def update_client(request, pk):
             status=500
         )
 
-def get_clients(request):
+def get_clients(request: HttpRequest, *, list_url_name: str = 'clients:list') -> dict[str, Any]:
     search_query = request.GET.get('search', '').strip()
     client_list_mode = request.GET.get('mode', '').strip()
     if client_list_mode not in {'outside_route_sales', 'credits'}:
@@ -1357,7 +1366,8 @@ def get_clients(request):
 
     mode_query = urlencode({'mode': client_list_mode}) if client_list_mode else ''
     pagination_query = urlencode(preserved_query)
-    clear_url = reverse('clients:list')
+    list_url = reverse(list_url_name)
+    clear_url = list_url
     if mode_query:
         clear_url = f'{clear_url}?{mode_query}'
     
@@ -1367,8 +1377,11 @@ def get_clients(request):
         'total_clients': paginator.count,
         'has_search': bool(search_query),
         'client_list_mode': client_list_mode,
+        'client_list_form_action': list_url,
         'page_title': page_title,
         'page_subtitle': page_subtitle,
+        'client_actions_variant': 'basic',
+        'client_create_url': '',
         'mode_query': mode_query,
         'pagination_query': pagination_query,
         'client_list_clear_url': clear_url,
