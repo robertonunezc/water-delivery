@@ -362,7 +362,14 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         )
         self._create_sales_fixture()
 
-    def _create_order(self, *, quantity: int, owner=None) -> Order:
+    def _create_order(
+        self,
+        *,
+        quantity: int,
+        owner=None,
+        product: Product | None = None,
+    ) -> Order:
+        product = product or self.product
         order = Order.objects.create(
             client=self.client_record,
             owner=owner,
@@ -382,7 +389,7 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         )
         OrderProduct.objects.create(
             order=order,
-            product=self.product,
+            product=product,
             quantity=quantity,
             unit_price=Decimal('50.00'),
         )
@@ -435,6 +442,30 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
 
         self.assertEqual(self.line.reported_sales, 3)
         self.assertEqual(self.line.sales_difference, self.line.expected_sales - 3)
+
+    def test_sync_session_reported_sales_creates_lines_for_reported_products_without_counts(self):
+        from routes.services import sync_session_reported_sales
+
+        extra_product = Product.objects.create(
+            name='Botella',
+            presentation='1',
+            unit_of_measure=1,
+            price=15,
+        )
+        self._create_order(
+            quantity=4,
+            owner=self.driver_user,
+            product=extra_product,
+        )
+
+        sync_session_reported_sales(self.session)
+
+        extra_line = self.session.lines.get(product=extra_product)
+        self.assertEqual(extra_line.full_loaded, 0)
+        self.assertEqual(extra_line.full_returned, 0)
+        self.assertEqual(extra_line.empty_returned, 0)
+        self.assertEqual(extra_line.reported_sales, 4)
+        self.assertEqual(extra_line.sales_difference, -4)
 
 
 class RouteTruckInventoryViewTest(FastTenantTestCase):
@@ -515,6 +546,7 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
 
         self.assertContains(response, self.route.name)
         self.assertContains(response, self.transport.license_plate)
+        self.assertFalse(TruckInventorySession.objects.exists())
 
     def test_driver_cannot_post_inventory_for_other_truck(self):
         self.client.force_login(self.driver_user)
@@ -548,6 +580,47 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
                 service_date=self.today,
             ).exists()
         )
+
+    def test_invalid_line_submission_does_not_create_inventory_session(self):
+        self.client.force_login(self.staff_user)
+        payload = self._inventory_payload(
+            route=self.route,
+            transportation=self.transport,
+        )
+        payload['lines-0-full_loaded'] = '1'
+        payload['lines-0-full_returned'] = '2'
+
+        response = self.client.post(reverse('routes:truck_inventory'), payload)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            TruckInventorySession.objects.filter(
+                route=self.route,
+                transportation=self.transport,
+                service_date=self.today,
+            ).exists()
+        )
+
+    def test_closed_inventory_session_rejects_edits(self):
+        session = TruckInventorySession.objects.create(
+            route=self.route,
+            transportation=self.transport,
+            service_date=self.today,
+            status=TruckInventorySession.Status.CLOSED,
+            closed_at=timezone.now(),
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.route,
+                transportation=self.transport,
+            ),
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(session.lines.count(), 0)
 
     def test_zero_count_product_rows_do_not_create_inventory_lines(self):
         self.client.force_login(self.staff_user)

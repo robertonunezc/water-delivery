@@ -284,12 +284,28 @@ def _save_inventory_line_formset(formset) -> None:
         line.save()
 
 
-def _get_initial_inventory_session(
+def _get_existing_inventory_session(
+    route: Route,
+    transportation: Transport,
+    service_date: date,
+) -> TruckInventorySession | None:
+    return (
+        TruckInventorySession.objects.filter(
+            route=route,
+            transportation=transportation,
+            service_date=service_date,
+        )
+        .order_by('-created_at', '-id')
+        .first()
+    )
+
+
+def _get_initial_inventory_state(
     user,
     service_date: date,
     route_id: str | None = None,
     transportation_id: str | None = None,
-) -> TruckInventorySession | None:
+) -> tuple[TruckInventorySession | None, dict]:
     if route_id and transportation_id:
         route = Route.objects.filter(pk=route_id).first()
         transportation = Transport.objects.filter(pk=transportation_id).first()
@@ -299,11 +315,9 @@ def _get_initial_inventory_session(
             transportation,
             service_date,
         ):
-            return get_or_create_inventory_session(
-                route=route,
-                transportation=transportation,
-                service_date=service_date,
-                user=user,
+            return (
+                _get_existing_inventory_session(route, transportation, service_date),
+                {'route': route, 'transportation': transportation},
             )
 
     routes = get_inventory_routes_for_user(user, service_date)
@@ -313,12 +327,10 @@ def _get_initial_inventory_session(
         route = routes.first() if routes.count() == 1 else None
 
     if route is None or route.transportation is None:
-        return None
-    return get_or_create_inventory_session(
-        route=route,
-        transportation=route.transportation,
-        service_date=service_date,
-        user=user,
+        return None, {}
+    return (
+        _get_existing_inventory_session(route, route.transportation, service_date),
+        {'route': route, 'transportation': route.transportation},
     )
 
 
@@ -329,13 +341,16 @@ def _build_inventory_context(
     session: TruckInventorySession | None = None,
     session_form: TruckInventorySessionForm | None = None,
     line_formset=None,
+    initial: dict | None = None,
 ) -> dict:
     routes = get_inventory_routes_for_user(request.user, service_date)
+    form_initial = {'service_date': service_date}
+    form_initial.update(initial or {})
     session_form = session_form or TruckInventorySessionForm(
         user=request.user,
         service_date=service_date,
         instance=session,
-        initial={'service_date': service_date},
+        initial=form_initial,
     )
     line_formset = line_formset or TruckInventoryLineFormSet(
         instance=session,
@@ -369,27 +384,38 @@ def truck_inventory(request):
         ):
             return HttpResponseForbidden('No tienes permiso para capturar este inventario.')
 
+        existing_session = _get_existing_inventory_session(
+            route,
+            transportation,
+            posted_date,
+        )
+        if (
+            existing_session is not None
+            and existing_session.status == TruckInventorySession.Status.CLOSED
+        ):
+            return HttpResponseForbidden('El inventario cerrado no se puede modificar.')
+
         session_form = TruckInventorySessionForm(
             request.POST,
             user=request.user,
             service_date=posted_date,
+            instance=existing_session,
         )
+        session = existing_session
+        line_formset = None
         if session_form.is_valid():
-            with transaction.atomic():
-                session = get_or_create_inventory_session(
-                    route=session_form.cleaned_data['route'],
-                    transportation=session_form.cleaned_data['transportation'],
-                    service_date=session_form.cleaned_data['service_date'],
-                    user=request.user,
-                )
-                session.notes = session_form.cleaned_data.get('notes')
-                session.save(update_fields=['notes', 'updated_at'])
-                line_formset = TruckInventoryLineFormSet(
-                    request.POST,
-                    instance=session,
-                    prefix='lines',
-                )
-                if line_formset.is_valid():
+            session = session_form.save(commit=False)
+            session.opened_by = session.opened_by or request.user
+            line_formset = TruckInventoryLineFormSet(
+                request.POST,
+                instance=session,
+                prefix='lines',
+            )
+            if line_formset.is_valid():
+                with transaction.atomic():
+                    session.notes = session_form.cleaned_data.get('notes')
+                    session.save()
+                    line_formset.instance = session
                     _save_inventory_line_formset(line_formset)
                     if request.POST.get('action') == 'close':
                         sync_session_reported_sales(session)
@@ -397,21 +423,20 @@ def truck_inventory(request):
                         messages.success(request, 'Inventario de camioneta cerrado correctamente.')
                     else:
                         messages.success(request, 'Inventario de camioneta guardado correctamente.')
-                    return redirect('routes:truck_inventory')
+                return redirect('routes:truck_inventory')
         else:
-            session = None
             line_formset = TruckInventoryLineFormSet(request.POST, prefix='lines')
 
         context = _build_inventory_context(
             request=request,
             service_date=posted_date,
-            session=session if 'session' in locals() else None,
+            session=session,
             session_form=session_form,
-            line_formset=line_formset if 'line_formset' in locals() else None,
+            line_formset=line_formset,
         )
         return render(request, 'routes/truck_inventory_form.html', context)
 
-    session = _get_initial_inventory_session(
+    session, initial = _get_initial_inventory_state(
         request.user,
         service_date,
         route_id=request.GET.get('route'),
@@ -421,6 +446,7 @@ def truck_inventory(request):
         request=request,
         service_date=service_date,
         session=session,
+        initial=initial,
     )
     return render(request, 'routes/truck_inventory_form.html', context)
 

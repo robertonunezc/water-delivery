@@ -232,6 +232,17 @@ def sync_session_reported_sales(session: TruckInventorySession) -> None:
             ]
         )
 
+    existing_product_ids = set(lines.values_list('product_id', flat=True))
+    missing_product_ids = set(reported_sales) - existing_product_ids
+    for product_id in missing_product_ids:
+        line = TruckInventoryLine(
+            session=session,
+            product_id=product_id,
+            reported_sales=reported_sales[product_id],
+        )
+        line.recalculate()
+        line.save()
+
 
 def get_daily_inventory_summaries(selected_date: date) -> list[dict[str, Any]]:
     """Return truck inventory reconciliation summaries for the daily report."""
