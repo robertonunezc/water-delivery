@@ -3,8 +3,12 @@ from typing import Any
 
 from django import forms
 from django.db.models import Q
+from django.forms import inlineformset_factory
 
-from .models import Route, RouteClient
+from core.models import Transport
+from product.models import Product
+from .models import Route, RouteClient, TruckInventoryLine, TruckInventorySession
+from .services import get_driver_transportation, get_inventory_routes_for_user
 
 
 class RouteClientForm(forms.ModelForm):
@@ -121,3 +125,105 @@ class RouteForm(forms.ModelForm):
         transportation = cleaned_data.get('transportation')
         weekday = cleaned_data.get('weekday')
         return cleaned_data
+
+
+class TruckInventorySessionForm(forms.ModelForm):
+    service_date = forms.DateField(
+        label='Fecha',
+        widget=forms.DateInput(
+            format='%Y-%m-%d',
+            attrs={'type': 'date', 'class': 'pg-input'},
+        ),
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
+    )
+
+    class Meta:
+        model = TruckInventorySession
+        fields = ['service_date', 'route', 'transportation', 'notes']
+        widgets = {
+            'route': forms.Select(attrs={'class': 'pg-select'}),
+            'transportation': forms.Select(attrs={'class': 'pg-select'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+        }
+
+    def __init__(
+        self,
+        *args: Any,
+        user: Any,
+        service_date: datetime.date | None = None,
+        **kwargs: Any,
+    ) -> None:
+        self.user = user
+        super().__init__(*args, **kwargs)
+        current_date = self._resolve_service_date(service_date)
+        self.fields['service_date'].initial = current_date
+        self._limit_route_choices(current_date)
+        self._limit_transportation_choices()
+
+    def _resolve_service_date(
+        self,
+        service_date: datetime.date | None,
+    ) -> datetime.date:
+        if service_date is not None:
+            return service_date
+
+        if self.is_bound:
+            raw_date = self.data.get(self.add_prefix('service_date'), '')
+            try:
+                return datetime.date.fromisoformat(raw_date)
+            except ValueError:
+                return datetime.date.today()
+
+        return datetime.date.today()
+
+    def _limit_route_choices(self, service_date: datetime.date) -> None:
+        if getattr(self.user, 'is_staff', False):
+            queryset = Route.objects.filter(is_active=True).order_by('weekday', 'name')
+        else:
+            queryset = get_inventory_routes_for_user(self.user, service_date)
+        self.fields['route'].queryset = queryset
+
+    def _limit_transportation_choices(self) -> None:
+        if getattr(self.user, 'is_staff', False):
+            queryset = Transport.objects.filter(is_active=True).order_by('license_plate')
+        else:
+            transportation = get_driver_transportation(self.user)
+            queryset = Transport.objects.none()
+            if transportation is not None:
+                queryset = Transport.objects.filter(pk=transportation.pk)
+        self.fields['transportation'].queryset = queryset
+
+    def clean(self):
+        cleaned_data = super().clean()
+        route = cleaned_data.get('route')
+        transportation = cleaned_data.get('transportation')
+        if route and transportation and route.transportation_id != transportation.pk:
+            raise forms.ValidationError('La ruta no corresponde a la camioneta seleccionada.')
+        return cleaned_data
+
+
+class TruckInventoryLineForm(forms.ModelForm):
+    class Meta:
+        model = TruckInventoryLine
+        fields = ['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes']
+        widgets = {
+            'product': forms.Select(attrs={'class': 'pg-select'}),
+            'full_loaded': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'full_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'empty_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 1}),
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields['product'].queryset = Product.objects.ordered_for_clients()
+
+
+TruckInventoryLineFormSet = inlineformset_factory(
+    TruckInventorySession,
+    TruckInventoryLine,
+    form=TruckInventoryLineForm,
+    fields=['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes'],
+    extra=3,
+    can_delete=True,
+)

@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventario de camioneta{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-mt-4">
+  <div class="pg-row pg-mb-3">
+    <div class="pg-col-12">
+      <div class="pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-2">
+        <div>
+          <h1 class="pg-h3 pg-mb-1">
+            <i class="fas fa-boxes-stacked pg-me-2"></i>Inventario de camioneta
+          </h1>
+          <p class="pg-text-muted pg-mb-0">Conteo de salida y regreso por ruta.</p>
+        </div>
+        {% if session %}
+          <span class="pg-badge {% if session.status == 'Cerrada' %}pg-bg-success{% else %}pg-bg-info{% endif %}">
+            {{ session.status }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if not has_available_routes %}
+    <div class="pg-alert pg-alert-info">
+      <h2 class="pg-h5 pg-mb-2">Sin ruta disponible</h2>
+      <p class="pg-mb-0">No hay una ruta activa disponible para capturar inventario en esta fecha.</p>
+    </div>
+  {% else %}
+    <form method="post" class="pg-card">
+      {% csrf_token %}
+      <div class="pg-card-body">
+        {% if session_form.non_field_errors %}
+          <div class="pg-alert pg-alert-danger">{{ session_form.non_field_errors }}</div>
+        {% endif %}
+        {% if line_formset.non_form_errors %}
+          <div class="pg-alert pg-alert-danger">{{ line_formset.non_form_errors }}</div>
+        {% endif %}
+
+        <div class="pg-row pg-gap-3 pg-mb-4">
+          <div class="pg-col-12 pg-col-md-3">
+            <label class="pg-label" for="{{ session_form.service_date.id_for_label }}">Fecha</label>
+            {{ session_form.service_date }}
+            {{ session_form.service_date.errors }}
+          </div>
+          <div class="pg-col-12 pg-col-md-4">
+            <label class="pg-label" for="{{ session_form.route.id_for_label }}">Ruta</label>
+            {{ session_form.route }}
+            {{ session_form.route.errors }}
+          </div>
+          <div class="pg-col-12 pg-col-md-4">
+            <label class="pg-label" for="{{ session_form.transportation.id_for_label }}">Camioneta</label>
+            {{ session_form.transportation }}
+            {{ session_form.transportation.errors }}
+          </div>
+          <div class="pg-col-12">
+            <label class="pg-label" for="{{ session_form.notes.id_for_label }}">Notas</label>
+            {{ session_form.notes }}
+            {{ session_form.notes.errors }}
+          </div>
+        </div>
+
+        {{ line_formset.management_form }}
+        <div class="pg-table-responsive">
+          <table class="pg-table pg-table-hover">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Llenos cargados</th>
+                <th>Llenos regresados</th>
+                <th>Vacíos regresados</th>
+                <th>Notas</th>
+                <th>Eliminar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for form in line_formset.forms %}
+                <tr>
+                  {% for hidden in form.hidden_fields %}
+                    {{ hidden }}
+                  {% endfor %}
+                  <td>
+                    {{ form.product }}
+                    {{ form.product.errors }}
+                  </td>
+                  <td>
+                    {{ form.full_loaded }}
+                    {{ form.full_loaded.errors }}
+                  </td>
+                  <td>
+                    {{ form.full_returned }}
+                    {{ form.full_returned.errors }}
+                  </td>
+                  <td>
+                    {{ form.empty_returned }}
+                    {{ form.empty_returned.errors }}
+                  </td>
+                  <td>
+                    {{ form.notes }}
+                    {{ form.notes.errors }}
+                  </td>
+                  <td>
+                    {% if form.DELETE %}
+                      {{ form.DELETE }}
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="pg-card-footer pg-flex pg-justify-end pg-gap-2 pg-flex-wrap">
+        <button type="submit" name="action" value="save" class="pg-button pg-button-primary">
+          <i class="fas fa-save pg-me-1"></i>Guardar
+        </button>
+        <button type="submit" name="action" value="close" class="pg-button pg-button-success" {% if not can_close %}disabled{% endif %}>
+          <i class="fas fa-check pg-me-1"></i>Cerrar inventario
+        </button>
+      </div>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

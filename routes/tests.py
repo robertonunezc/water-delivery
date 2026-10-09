@@ -437,6 +437,141 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         self.assertEqual(self.line.sales_difference, self.line.expected_sales - 3)
 
 
+class RouteTruckInventoryViewTest(FastTenantTestCase):
+    def setUp(self):
+        self.today = timezone.localdate()
+        self.driver_user = User.objects.create_user(
+            username='inventory-view-driver',
+            password='testpass123',
+        )
+        self.staff_user = User.objects.create_user(
+            username='inventory-view-staff',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.driver = Employee.objects.create(
+            user=self.driver_user,
+            nombre='Vista',
+            apellidos='Chofer',
+            curp='INVVIEWDRIVER0001',
+            rfc='INVVIEWDRV01',
+            street_number='Calle 1',
+            position='driver',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='INV-301',
+            model='Inventory View Truck',
+            capacity_liters=1000,
+            is_active=True,
+            assigned_driver=self.driver,
+        )
+        self.other_transport = Transport.objects.create(
+            license_plate='INV-302',
+            model='Other View Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        weekday = self.today.strftime('%A').lower()
+        self.route = Route.objects.create(
+            name='Inventory View Route',
+            transportation=self.transport,
+            weekday=weekday,
+            is_active=True,
+        )
+        self.other_route = Route.objects.create(
+            name='Other Inventory View Route',
+            transportation=self.other_transport,
+            weekday=weekday,
+            is_active=True,
+        )
+        self.product = Product.objects.create(
+            name='Garrafon Vista',
+            presentation='20',
+            unit_of_measure=5,
+            price=50,
+        )
+
+    def _inventory_payload(self, *, route: Route, transportation: Transport) -> dict[str, str]:
+        return {
+            'service_date': self.today.isoformat(),
+            'route': str(route.pk),
+            'transportation': str(transportation.pk),
+            'notes': 'Conteo operativo',
+            'lines-TOTAL_FORMS': '1',
+            'lines-INITIAL_FORMS': '0',
+            'lines-MIN_NUM_FORMS': '0',
+            'lines-MAX_NUM_FORMS': '1000',
+            'lines-0-product': str(self.product.pk),
+            'lines-0-full_loaded': '10',
+            'lines-0-full_returned': '2',
+            'lines-0-empty_returned': '6',
+            'lines-0-notes': '',
+        }
+
+    def test_driver_get_inventory_form_preselects_single_today_route(self):
+        self.client.force_login(self.driver_user)
+
+        response = self.client.get(reverse('routes:truck_inventory'))
+
+        self.assertContains(response, self.route.name)
+        self.assertContains(response, self.transport.license_plate)
+
+    def test_driver_cannot_post_inventory_for_other_truck(self):
+        self.client.force_login(self.driver_user)
+
+        response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.other_route,
+                transportation=self.other_transport,
+            ),
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_staff_can_create_inventory_session_from_form(self):
+        self.client.force_login(self.staff_user)
+
+        response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.route,
+                transportation=self.transport,
+            ),
+        )
+
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        self.assertTrue(
+            TruckInventorySession.objects.filter(
+                route=self.route,
+                transportation=self.transport,
+                service_date=self.today,
+            ).exists()
+        )
+
+    def test_zero_count_product_rows_do_not_create_inventory_lines(self):
+        self.client.force_login(self.staff_user)
+        payload = self._inventory_payload(
+            route=self.route,
+            transportation=self.transport,
+        )
+        payload.update({
+            'lines-0-full_loaded': '0',
+            'lines-0-full_returned': '0',
+            'lines-0-empty_returned': '0',
+        })
+
+        response = self.client.post(reverse('routes:truck_inventory'), payload)
+
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        session = TruckInventorySession.objects.get(
+            route=self.route,
+            transportation=self.transport,
+            service_date=self.today,
+        )
+        self.assertEqual(session.lines.count(), 0)
+
+
 class RouteReminderBadgeTest(FastTenantTestCase):
     def setUp(self):
         self.today = date.today()
