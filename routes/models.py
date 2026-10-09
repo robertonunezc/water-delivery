@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 
+from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Prefetch, Q
@@ -267,3 +268,141 @@ class RouteClient(TimeStampedModel):
     def _archive_visit_confirmations(self):
         from route_confirmations.models import VisitConfirmation
         VisitConfirmation.objects.filter(route_client=self).update(deleted_at=timezone.now())
+
+
+class TruckInventorySession(TimeStampedModel):
+    class Status(models.TextChoices):
+        OPEN = 'Abierta', 'Abierta'
+        CLOSED = 'Cerrada', 'Cerrada'
+
+    route = models.ForeignKey(
+        Route,
+        related_name='truck_inventory_sessions',
+        on_delete=models.CASCADE,
+        verbose_name='Ruta',
+    )
+    transportation = models.ForeignKey(
+        'core.Transport',
+        related_name='truck_inventory_sessions',
+        on_delete=models.PROTECT,
+        verbose_name='Vehículo',
+    )
+    service_date = models.DateField(verbose_name='Fecha de servicio')
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.OPEN,
+        verbose_name='Estado',
+    )
+    opened_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='opened_truck_inventory_sessions',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Abierto por',
+    )
+    closed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='closed_truck_inventory_sessions',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name='Cerrado por',
+    )
+    opened_at = models.DateTimeField(default=timezone.now, verbose_name='Abierto en')
+    closed_at = models.DateTimeField(null=True, blank=True, verbose_name='Cerrado en')
+    notes = models.TextField(blank=True, null=True, verbose_name='Notas')
+
+    class Meta:
+        verbose_name = 'Inventario de camioneta'
+        verbose_name_plural = 'Inventarios de camioneta'
+        ordering = ['-service_date', 'route__name']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['route', 'transportation', 'service_date'],
+                condition=Q(deleted_at__isnull=True),
+                name='routes_truck_inv_active_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['service_date'], name='routes_truck_inv_date_idx'),
+            models.Index(fields=['status'], name='routes_truck_inv_status_idx'),
+            models.Index(
+                fields=['transportation', 'service_date'],
+                name='routes_truck_inv_vehicle_idx',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.route} - {self.transportation} - {self.service_date}'
+
+    def close(self, user=None) -> None:
+        for line in self.lines.filter(deleted_at__isnull=True):
+            line.recalculate()
+            line.save(
+                update_fields=[
+                    'expected_sales',
+                    'sales_difference',
+                    'missing_containers',
+                    'updated_at',
+                ]
+            )
+
+        self.status = self.Status.CLOSED
+        self.closed_by = user
+        self.closed_at = timezone.now()
+        self.save(update_fields=['status', 'closed_by', 'closed_at', 'updated_at'])
+
+
+class TruckInventoryLine(TimeStampedModel):
+    session = models.ForeignKey(
+        TruckInventorySession,
+        related_name='lines',
+        on_delete=models.CASCADE,
+        verbose_name='Inventario',
+    )
+    product = models.ForeignKey(
+        'product.Product',
+        related_name='truck_inventory_lines',
+        on_delete=models.PROTECT,
+        verbose_name='Producto',
+    )
+    full_loaded = models.PositiveIntegerField(default=0, verbose_name='Llenos cargados')
+    full_returned = models.PositiveIntegerField(default=0, verbose_name='Llenos regresados')
+    empty_returned = models.PositiveIntegerField(default=0, verbose_name='Envases vacíos regresados')
+    expected_sales = models.PositiveIntegerField(default=0, verbose_name='Ventas esperadas')
+    reported_sales = models.PositiveIntegerField(default=0, verbose_name='Ventas reportadas')
+    sales_difference = models.IntegerField(default=0, verbose_name='Diferencia de ventas')
+    missing_containers = models.IntegerField(default=0, verbose_name='Envases no recuperados')
+    notes = models.TextField(blank=True, null=True, verbose_name='Notas')
+
+    class Meta:
+        verbose_name = 'Línea de inventario de camioneta'
+        verbose_name_plural = 'Líneas de inventario de camioneta'
+        ordering = ['product__name', 'product__presentation', 'id']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['session', 'product'],
+                condition=Q(deleted_at__isnull=True),
+                name='routes_truck_line_active_uniq',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['session', 'product'], name='routes_truck_line_prod_idx'),
+        ]
+
+    def __str__(self):
+        return f'{self.product} - {self.session}'
+
+    def clean(self):
+        super().clean()
+        if self.full_returned > self.full_loaded:
+            raise ValidationError({
+                'full_returned': 'Los llenos regresados no pueden exceder los llenos cargados.'
+            })
+
+    def recalculate(self) -> None:
+        self.expected_sales = self.full_loaded - self.full_returned
+        self.sales_difference = self.expected_sales - self.reported_sales
+        self.missing_containers = self.expected_sales - self.empty_returned

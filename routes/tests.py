@@ -1,15 +1,18 @@
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Address, Client
 from core.models import Employee, Transport
+from product.models import Product
 from reminders.models import Reminder
 from tenant_client.test_utils import FastTenantTestCase
 
-from .models import Route, RouteClient
+from .models import Route, RouteClient, TruckInventoryLine, TruckInventorySession
 
 User = get_user_model()
 
@@ -190,6 +193,98 @@ class RouteDashboardSummaryServiceTest(FastTenantTestCase):
         count = get_route_clients_due_count(date(2026, 3, 9))
 
         self.assertEqual(count, 1)
+
+
+class RouteTruckInventoryModelTest(FastTenantTestCase):
+    def setUp(self):
+        self.transport = Transport.objects.create(
+            license_plate='INV-001',
+            model='Inventory Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Inventory Monday',
+            transportation=self.transport,
+            weekday='monday',
+            is_active=True,
+        )
+        self.product = Product.objects.create(
+            name='Garrafon',
+            presentation='20',
+            unit_of_measure=5,
+            price=50,
+        )
+
+    def _create_session(self) -> TruckInventorySession:
+        return TruckInventorySession.objects.create(
+            route=self.route,
+            transportation=self.transport,
+            service_date=date(2026, 10, 9),
+        )
+
+    def test_inventory_line_recalculates_expected_sales_difference_and_missing_containers(self):
+        line = TruckInventoryLine(
+            full_loaded=50,
+            full_returned=10,
+            empty_returned=20,
+            reported_sales=35,
+        )
+
+        line.recalculate()
+
+        self.assertEqual(line.expected_sales, 40)
+        self.assertEqual(line.sales_difference, 5)
+        self.assertEqual(line.missing_containers, 20)
+
+    def test_inventory_line_rejects_negative_counts(self):
+        line = TruckInventoryLine(
+            session=self._create_session(),
+            product=self.product,
+            full_loaded=-1,
+            full_returned=0,
+            empty_returned=0,
+        )
+
+        with self.assertRaises(ValidationError):
+            line.full_clean()
+
+    def test_inventory_line_rejects_full_returned_greater_than_loaded(self):
+        line = TruckInventoryLine(
+            session=self._create_session(),
+            product=self.product,
+            full_loaded=10,
+            full_returned=11,
+            empty_returned=0,
+        )
+
+        with self.assertRaises(ValidationError):
+            line.full_clean()
+
+    def test_only_one_active_inventory_session_per_route_truck_date(self):
+        self._create_session()
+
+        with self.assertRaises(IntegrityError):
+            self._create_session()
+
+    def test_close_recalculates_and_persists_line_results(self):
+        session = self._create_session()
+        line = TruckInventoryLine.objects.create(
+            session=session,
+            product=self.product,
+            full_loaded=50,
+            full_returned=10,
+            empty_returned=20,
+            reported_sales=35,
+        )
+
+        session.close()
+        line.refresh_from_db()
+
+        self.assertEqual(session.status, TruckInventorySession.Status.CLOSED)
+        self.assertEqual(line.expected_sales, 40)
+        self.assertEqual(line.sales_difference, 5)
+        self.assertEqual(line.missing_containers, 20)
 
 
 class RouteReminderBadgeTest(FastTenantTestCase):
