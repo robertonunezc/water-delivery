@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+from decimal import Decimal
+from datetime import date, datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -8,11 +9,18 @@ from django.utils import timezone
 
 from clients.models import Address, Client
 from core.models import Employee, Transport
+from orders.models import Order, OrderProduct, OrderStatus
 from product.models import Product
 from reminders.models import Reminder
 from tenant_client.test_utils import FastTenantTestCase
 
-from .models import Route, RouteClient, TruckInventoryLine, TruckInventorySession
+from .models import (
+    Route,
+    RouteClient,
+    RouteClientOrder,
+    TruckInventoryLine,
+    TruckInventorySession,
+)
 
 User = get_user_model()
 
@@ -285,6 +293,148 @@ class RouteTruckInventoryModelTest(FastTenantTestCase):
         self.assertEqual(line.expected_sales, 40)
         self.assertEqual(line.sales_difference, 5)
         self.assertEqual(line.missing_containers, 20)
+
+
+class RouteTruckInventoryServiceTest(FastTenantTestCase):
+    def setUp(self):
+        self.today = date(2026, 10, 9)
+        self.driver_user = User.objects.create_user(
+            username='inventory-driver',
+            password='testpass123',
+        )
+        self.staff_user = User.objects.create_user(
+            username='inventory-staff',
+            password='testpass123',
+            is_staff=True,
+        )
+        self.driver = Employee.objects.create(
+            user=self.driver_user,
+            nombre='Inventario',
+            apellidos='Chofer',
+            curp='INVDRIVER000000001',
+            rfc='INVDRIVER001',
+            street_number='Calle 1',
+            position='driver',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='INV-201',
+            model='Inventory Truck',
+            capacity_liters=1000,
+            is_active=True,
+            assigned_driver=self.driver,
+        )
+        self.other_transport = Transport.objects.create(
+            license_plate='INV-202',
+            model='Other Truck',
+            capacity_liters=1000,
+            is_active=True,
+        )
+        self.route = Route.objects.create(
+            name='Inventory Friday',
+            transportation=self.transport,
+            weekday='friday',
+            is_active=True,
+        )
+        self.other_route = Route.objects.create(
+            name='Other Friday',
+            transportation=self.other_transport,
+            weekday='friday',
+            is_active=True,
+        )
+        self.client_record = Client.objects.create(name='Inventory Client')
+        self.product = Product.objects.create(
+            name='Garrafon',
+            presentation='20',
+            unit_of_measure=5,
+            price=50,
+        )
+        self.session = TruckInventorySession.objects.create(
+            route=self.route,
+            transportation=self.transport,
+            service_date=self.today,
+        )
+        self.line = TruckInventoryLine.objects.create(
+            session=self.session,
+            product=self.product,
+            full_loaded=10,
+            full_returned=2,
+            empty_returned=6,
+        )
+        self._create_sales_fixture()
+
+    def _create_order(self, *, quantity: int, owner=None) -> Order:
+        order = Order.objects.create(
+            client=self.client_record,
+            owner=owner,
+            status=OrderStatus.COMPLETED.value,
+            subtotal_amount=Decimal('0.00'),
+            total_amount=Decimal(str(quantity * 50)),
+        )
+        Order.objects.filter(pk=order.pk).update(
+            order_date=datetime(
+                self.today.year,
+                self.today.month,
+                self.today.day,
+                10,
+                0,
+                tzinfo=timezone.get_current_timezone(),
+            )
+        )
+        OrderProduct.objects.create(
+            order=order,
+            product=self.product,
+            quantity=quantity,
+            unit_price=Decimal('50.00'),
+        )
+        return order
+
+    def _create_sales_fixture(self):
+        linked_driver_order = self._create_order(quantity=2, owner=self.driver_user)
+        RouteClientOrder.objects.create(
+            route=self.route,
+            client=self.client_record,
+            order=linked_driver_order,
+            sequence=1,
+            visit_date=self.today,
+        )
+        self._create_order(quantity=1, owner=self.driver_user)
+        cancelled_order = self._create_order(quantity=5, owner=self.driver_user)
+        cancelled_order.status = OrderStatus.CANCELLED.value
+        cancelled_order.save(update_fields=['status'])
+
+    def test_driver_inventory_routes_are_limited_to_assigned_truck(self):
+        from routes.services import get_inventory_routes_for_user
+
+        routes = get_inventory_routes_for_user(self.driver_user, self.today)
+
+        self.assertEqual(list(routes), [self.route])
+
+    def test_staff_inventory_routes_include_active_routes_for_date(self):
+        from routes.services import get_inventory_routes_for_user
+
+        routes = get_inventory_routes_for_user(self.staff_user, self.today)
+
+        self.assertIn(self.route, routes)
+
+    def test_reported_sales_counts_route_linked_and_driver_orders_once(self):
+        from routes.services import get_reported_sales_by_product
+
+        sales = get_reported_sales_by_product(
+            self.route,
+            self.transport,
+            self.today,
+        )
+
+        self.assertEqual(sales[self.product.pk], 3)
+
+    def test_sync_session_reported_sales_updates_line_results(self):
+        from routes.services import sync_session_reported_sales
+
+        sync_session_reported_sales(self.session)
+        self.line.refresh_from_db()
+
+        self.assertEqual(self.line.reported_sales, 3)
+        self.assertEqual(self.line.sales_difference, self.line.expected_sales - 3)
 
 
 class RouteReminderBadgeTest(FastTenantTestCase):
