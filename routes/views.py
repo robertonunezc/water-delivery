@@ -23,6 +23,7 @@ from .services import (
     get_inventory_routes_for_user,
     get_or_create_inventory_session,
     get_route_detail_payload,
+    get_route_inventory_status,
     sync_session_reported_sales,
     with_active_reminder_counts,
 )
@@ -283,7 +284,28 @@ def _save_inventory_line_formset(formset) -> None:
         line.save()
 
 
-def _get_initial_inventory_session(user, service_date: date) -> TruckInventorySession | None:
+def _get_initial_inventory_session(
+    user,
+    service_date: date,
+    route_id: str | None = None,
+    transportation_id: str | None = None,
+) -> TruckInventorySession | None:
+    if route_id and transportation_id:
+        route = Route.objects.filter(pk=route_id).first()
+        transportation = Transport.objects.filter(pk=transportation_id).first()
+        if _user_can_access_inventory_selection(
+            user,
+            route,
+            transportation,
+            service_date,
+        ):
+            return get_or_create_inventory_session(
+                route=route,
+                transportation=transportation,
+                service_date=service_date,
+                user=user,
+            )
+
     routes = get_inventory_routes_for_user(user, service_date)
     if user.is_staff:
         route = routes.filter(pk__isnull=False).first() if routes.count() == 1 else None
@@ -389,7 +411,12 @@ def truck_inventory(request):
         )
         return render(request, 'routes/truck_inventory_form.html', context)
 
-    session = _get_initial_inventory_session(request.user, service_date)
+    session = _get_initial_inventory_session(
+        request.user,
+        service_date,
+        route_id=request.GET.get('route'),
+        transportation_id=request.GET.get('transportation'),
+    )
     context = _build_inventory_context(
         request=request,
         service_date=service_date,
@@ -484,6 +511,7 @@ def today_route(request):
         'regular_clients': regular_clients,
         'today': today,
         'is_today_view': True,
+        'inventory_status': get_route_inventory_status(today_route, today),
     }
     
     return render(request, 'routes/route_detail.html', context)
@@ -507,6 +535,7 @@ def route_detail(request, route_id):
         'today': payload.today,
         'is_today_view': payload.is_today_view,
         'search_query': payload.search_query,
+        'inventory_status': get_route_inventory_status(route, payload.today),
     }
     
     return render(request, 'routes/route_detail.html', context)

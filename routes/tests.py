@@ -572,6 +572,61 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
         self.assertEqual(session.lines.count(), 0)
 
 
+class RouteTruckInventoryIntegrationTest(FastTenantTestCase):
+    def setUp(self):
+        self.today = timezone.localdate()
+        self.driver_user = User.objects.create_user(
+            username='inventory-integration-driver',
+            password='testpass123',
+        )
+        self.driver = Employee.objects.create(
+            user=self.driver_user,
+            nombre='Integracion',
+            apellidos='Chofer',
+            curp='INVINTDRIVER00001',
+            rfc='INVINTDRV001',
+            street_number='Calle 1',
+            position='driver',
+        )
+        self.transport = Transport.objects.create(
+            license_plate='INV-401',
+            model='Inventory Integration Truck',
+            capacity_liters=1000,
+            is_active=True,
+            assigned_driver=self.driver,
+        )
+        self.route = Route.objects.create(
+            name='Inventory Integration Route',
+            transportation=self.transport,
+            weekday=self.today.strftime('%A').lower(),
+            is_active=True,
+        )
+
+    def test_delivery_dashboard_includes_truck_inventory_action(self):
+        from core.services.dashboard_service import get_delivery_dashboard_context
+
+        context = get_delivery_dashboard_context(
+            user=self.driver_user,
+            today=self.today,
+        )
+
+        self.assertTrue(
+            any(
+                action['key'] == 'truck_inventory'
+                for action in context['dashboard_actions']
+            )
+        )
+
+    def test_route_detail_includes_inventory_status_link(self):
+        self.client.force_login(self.driver_user)
+
+        response = self.client.get(
+            reverse('routes:detail', kwargs={'route_id': self.route.pk})
+        )
+
+        self.assertContains(response, 'Inventario de camioneta')
+
+
 class RouteReminderBadgeTest(FastTenantTestCase):
     def setUp(self):
         self.today = date.today()

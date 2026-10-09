@@ -133,6 +133,16 @@ def _get_clients_with_debt_count() -> int:
 def _get_driver_dashboard_actions(current_date: date) -> list[dict[str, Any]]:
     return [
         {
+            'key': 'truck_inventory',
+            'title': 'Inventario de camioneta',
+            'description': 'Capturar conteo de salida y regreso de la camioneta.',
+            'url': reverse('routes:truck_inventory'),
+            'icon': 'fa-boxes-stacked',
+            'variant': 'primary',
+            'badge_count': None,
+            'meta': 'Conteo de salida y regreso',
+        },
+        {
             'key': 'route',
             'title': 'Ruta del día',
             'description': 'Abrir la ruta programada para hoy e iniciar ventas.',

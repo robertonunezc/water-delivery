@@ -1,8 +1,11 @@
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.urls import reverse
+from django.utils import timezone
 
 from clients.models import Client
+from core.models import Transport
 from orders.models import Order, OrderProduct, OrderStatus
 from payment.models import Payment
 from product.models import Product, ProductCategory
@@ -14,6 +17,7 @@ from report.views import (
     _get_payment_method_order_ids,
     _get_report_orders_queryset,
 )
+from routes.models import Route, TruckInventoryLine, TruckInventorySession
 from tenant_client.test_utils import FastTenantTestCase
 
 
@@ -122,3 +126,52 @@ class ReportBusinessRuleTests(FastTenantTestCase):
 
         self.assertEqual(bucket, NO_PAYMENT_RECORDED_METHOD)
         self.assertNotIn(order.id, cash_order_ids)
+
+    def test_daily_report_includes_inventory_summary(self) -> None:
+        selected_date = timezone.localdate()
+        staff_user = User.objects.create_user(
+            username="inventory_report_staff",
+            is_staff=True,
+        )
+        transport = Transport.objects.create(
+            license_plate="INV-501",
+            model="Report Truck",
+            capacity_liters=1000,
+            is_active=True,
+        )
+        route = Route.objects.create(
+            name="Report Inventory Route",
+            transportation=transport,
+            weekday=selected_date.strftime("%A").lower(),
+            is_active=True,
+        )
+        session = TruckInventorySession.objects.create(
+            route=route,
+            transportation=transport,
+            service_date=selected_date,
+        )
+        TruckInventoryLine.objects.create(
+            session=session,
+            product=self.product,
+            full_loaded=10,
+            full_returned=2,
+            empty_returned=6,
+            expected_sales=8,
+            reported_sales=7,
+            sales_difference=1,
+            missing_containers=2,
+        )
+        self._create_order(
+            subtotal=Decimal("80.00"),
+            total=Decimal("80.00"),
+            payment_status="completed",
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.get(
+            reverse("report:breakdown_payment_method"),
+            {"date": selected_date.isoformat()},
+        )
+
+        self.assertContains(response, "Cuadre de camionetas")
+        self.assertContains(response, transport.license_plate)

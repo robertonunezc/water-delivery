@@ -22,6 +22,7 @@ from core.services.feature_flags import is_receipt_signature_enabled
 from invoice.models import InvoiceOrderLink, InvoiceStatus
 from orders.models import Order, ORDER_STATUS_CHOICES, OrderStatus
 from payment.models import PAYMENT_METHOD_CHOICES, Payment
+from routes import services as route_services
 
 
 NO_PAYMENT_RECORDED_METHOD = 'no_payment_recorded'
@@ -772,6 +773,7 @@ def breakdown_payment_method(request: HttpRequest) -> HttpResponse:
     return render(request, 'report/breakdown_payment_method.html', {
         'orders': orders,
         'payment_method_stats': payment_method_stats,
+        'inventory_summaries': route_services.get_daily_inventory_summaries(selected_date),
         'selected_date': selected_date,
         'stats': stats,
         'can_filter_by_user': can_filter_by_user,

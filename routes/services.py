@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from typing import Any
 
 from django.db.models import Count, Q, QuerySet, Sum
+from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client
@@ -261,6 +262,41 @@ def get_daily_inventory_summaries(selected_date: date) -> list[dict[str, Any]]:
             ),
         })
     return summaries
+
+
+def get_route_inventory_status(route: Route, service_date: date) -> dict[str, Any]:
+    """Return compact inventory status for a route/date header."""
+    session = (
+        TruckInventorySession.objects.filter(
+            route=route,
+            service_date=service_date,
+        )
+        .prefetch_related('lines')
+        .order_by('-created_at', '-id')
+        .first()
+    )
+    status = 'Sin captura'
+    has_differences = False
+    if session is not None:
+        totals = _build_inventory_totals([
+            line for line in session.lines.all() if line.deleted_at is None
+        ])
+        has_differences = (
+            totals['sales_difference'] != 0
+            or totals['missing_containers'] != 0
+        )
+        status = 'Con diferencias' if has_differences else session.status
+
+    query = f'?date={service_date.isoformat()}'
+    if route.transportation_id:
+        query = f'{query}&route={route.pk}&transportation={route.transportation_id}'
+
+    return {
+        'session': session,
+        'status': status,
+        'url': f"{reverse('routes:truck_inventory')}{query}",
+        'has_differences': has_differences,
+    }
 
 
 def _build_inventory_totals(lines: list[TruckInventoryLine]) -> dict[str, int]:
