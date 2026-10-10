@@ -1,0 +1,350 @@
+{% extends 'base.html' %}
+
+{% block title %}Inventarios de camioneta{% endblock %}
+
+{% block extra_css %}
+<style>
+  .inventory-list {
+    border: 1px solid var(--pg-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--pg-card);
+  }
+
+  .inventory-list-header,
+  .inventory-list-item {
+    display: grid;
+    grid-template-columns:
+      minmax(92px, .8fr)
+      minmax(160px, 1.4fr)
+      minmax(140px, 1.1fr)
+      minmax(130px, 1.1fr)
+      repeat(5, minmax(82px, .7fr))
+      minmax(98px, .8fr);
+    gap: 12px;
+    align-items: center;
+  }
+
+  .inventory-list-header {
+    padding: 12px 16px;
+    color: var(--pg-muted-foreground);
+    font-size: .82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: var(--pg-muted);
+  }
+
+  .inventory-list-item {
+    padding: 14px 16px;
+    border-top: 1px solid var(--pg-border);
+  }
+
+  .inventory-list-header + .inventory-list-item {
+    border-top: 0;
+  }
+
+  .inventory-cell {
+    min-width: 0;
+  }
+
+  .inventory-cell-value {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  .inventory-mobile-label {
+    display: none;
+    color: var(--pg-muted-foreground);
+    font-size: .78rem;
+    font-weight: 700;
+  }
+
+  .inventory-status-stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .inventory-subtext {
+    display: block;
+  }
+
+  .inventory-actions {
+    text-align: right;
+  }
+
+  @media (max-width: 991.98px) {
+    .inventory-list {
+      display: grid;
+      gap: 12px;
+      border: 0;
+      background: transparent;
+      overflow: visible;
+    }
+
+    .inventory-list-header {
+      display: none;
+    }
+
+    .inventory-list-item {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid var(--pg-border);
+      border-radius: 8px;
+      background: var(--pg-card);
+    }
+
+    .inventory-cell {
+      display: grid;
+      gap: 4px;
+    }
+
+    .inventory-cell-route,
+    .inventory-cell-vehicle,
+    .inventory-cell-status,
+    .inventory-actions {
+      grid-column: 1 / -1;
+    }
+
+    .inventory-mobile-label {
+      display: inline;
+    }
+
+    .inventory-actions {
+      text-align: left;
+    }
+
+    .inventory-actions .pg-button {
+      width: 100%;
+    }
+  }
+
+  @media (max-width: 575.98px) {
+    .inventory-list-item {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-mt-4">
+  <div class="pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-3 pg-mb-4">
+    <div>
+      <h1 class="pg-h3 pg-mb-1">
+        <i class="fas fa-boxes-stacked pg-me-2"></i>Inventarios de camioneta
+      </h1>
+      <p class="pg-text-muted pg-mb-0">Consulta y captura los conteos de salida y regreso por ruta.</p>
+    </div>
+    <a href="{{ create_url }}" class="pg-button pg-button-primary">
+      <i class="fas fa-plus pg-me-1"></i>Nueva captura
+    </a>
+  </div>
+
+  {% if quick_capture %}
+    <div class="pg-alert pg-alert-info pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-2">
+      <div>
+        <strong>Captura rápida de hoy:</strong>
+        {{ quick_capture.route.name }} · {{ quick_capture.transportation.license_plate }}
+        {% if quick_capture.session %}
+          <span class="pg-badge {% if quick_capture.session.status == 'Cerrada' %}pg-bg-success{% else %}pg-bg-info{% endif %} pg-ms-2">
+            {{ quick_capture.session.status }}
+          </span>
+        {% endif %}
+      </div>
+      <a href="{{ quick_capture.url }}" class="pg-button pg-button-sm pg-button-outline-primary">
+        <i class="fas fa-clipboard-list pg-me-1"></i>Abrir captura
+      </a>
+    </div>
+  {% endif %}
+
+  <form method="get" class="pg-card pg-mb-3">
+    <div class="pg-card-body">
+      <div class="pg-row pg-gap-3 pg-align-end">
+        <div class="pg-col-12 pg-col-md-4">
+          <label class="pg-label" for="inventory-q">Buscar</label>
+          <input
+            id="inventory-q"
+            type="search"
+            name="q"
+            value="{{ search_query }}"
+            class="pg-input"
+            placeholder="Ruta, placas o modelo"
+          >
+        </div>
+        <div class="pg-col-12 pg-col-md-3">
+          <label class="pg-label" for="inventory-date">Fecha</label>
+          <input
+            id="inventory-date"
+            type="date"
+            name="date"
+            value="{{ date_filter|date:'Y-m-d' }}"
+            class="pg-input"
+          >
+        </div>
+        <div class="pg-col-12 pg-col-md-3">
+          <label class="pg-label" for="inventory-status">Estado</label>
+          <select id="inventory-status" name="status" class="pg-select">
+            <option value="">Todos</option>
+            {% for value, label in status_choices %}
+              <option value="{{ value }}" {% if status_filter == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="pg-col-12 pg-col-md-2 pg-flex pg-gap-2">
+          <button type="submit" class="pg-button pg-button-primary pg-w-100">
+            <i class="fas fa-search pg-me-1"></i>Filtrar
+          </button>
+          {% if has_filters %}
+            <a href="{% url 'routes:truck_inventory' %}" class="pg-button pg-button-outline-secondary">
+              <i class="fas fa-times"></i>
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </form>
+
+  <div class="pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-2 pg-mb-2">
+    <div class="pg-text-muted">
+      {{ total_inventories }} inventario{{ total_inventories|pluralize }} registrado{{ total_inventories|pluralize }}
+    </div>
+  </div>
+
+  {% if inventory_rows %}
+    <div class="inventory-list">
+      <div class="inventory-list-header" aria-hidden="true">
+        <span>Fecha</span>
+        <span>Ruta</span>
+        <span>Camioneta</span>
+        <span>Estado</span>
+        <span>Llenos</span>
+        <span>Esperada</span>
+        <span>Reportada</span>
+        <span>Diferencia</span>
+        <span>Envases</span>
+        <span class="pg-text-end">Acciones</span>
+      </div>
+      {% for row in inventory_rows %}
+        <article class="inventory-list-item">
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Fecha</span>
+            <span class="inventory-cell-value">{{ row.session.service_date|date:"d/m/Y" }}</span>
+          </div>
+          <div class="inventory-cell inventory-cell-route">
+            <span class="inventory-mobile-label">Ruta</span>
+            <span class="inventory-cell-value">
+              <strong>{{ row.session.route.name }}</strong>
+              {% if row.session.notes %}
+                <span class="pg-small pg-text-muted inventory-subtext">{{ row.session.notes|truncatechars:60 }}</span>
+              {% endif %}
+            </span>
+          </div>
+          <div class="inventory-cell inventory-cell-vehicle">
+            <span class="inventory-mobile-label">Camioneta</span>
+            <span class="inventory-cell-value">
+              {{ row.session.transportation.license_plate }}
+              <span class="pg-small pg-text-muted inventory-subtext">{{ row.session.transportation.model }}</span>
+            </span>
+          </div>
+          <div class="inventory-cell inventory-cell-status">
+            <span class="inventory-mobile-label">Estado</span>
+            <span class="inventory-status-stack">
+              <span class="pg-badge {% if row.session.status == 'Cerrada' %}pg-bg-success{% else %}pg-bg-info{% endif %}">
+                {{ row.session.status }}
+              </span>
+              {% if row.has_differences %}
+                <span class="pg-badge pg-bg-danger">Diferencias</span>
+              {% endif %}
+            </span>
+          </div>
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Llenos</span>
+            <span class="inventory-cell-value">{{ row.totals.full_loaded }}</span>
+          </div>
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Venta esperada</span>
+            <span class="inventory-cell-value">{{ row.totals.expected_sales }}</span>
+          </div>
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Venta reportada</span>
+            <span class="inventory-cell-value">{{ row.totals.reported_sales }}</span>
+          </div>
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Diferencia</span>
+            <span class="inventory-cell-value {% if row.totals.sales_difference != 0 %}pg-text-danger{% endif %}">
+              {{ row.totals.sales_difference }}
+            </span>
+          </div>
+          <div class="inventory-cell">
+            <span class="inventory-mobile-label">Envases faltantes</span>
+            <span class="inventory-cell-value {% if row.totals.missing_containers != 0 %}pg-text-danger{% endif %}">
+              {{ row.totals.missing_containers }}
+            </span>
+          </div>
+          <div class="inventory-actions">
+            <a href="{{ row.url }}" class="pg-button pg-button-sm pg-button-outline-primary">
+              <i class="fas fa-eye pg-me-1"></i>Abrir
+            </a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+
+    {% if inventory_page.has_other_pages %}
+      <nav class="pg-mt-4" aria-label="Navegación de inventarios">
+        <ul class="pg-pagination pg-justify-center">
+          {% if inventory_page.has_previous %}
+            <li class="pg-page-item">
+              <a class="pg-page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page=1">
+                <i class="fas fa-angle-double-left"></i>
+              </a>
+            </li>
+            <li class="pg-page-item">
+              <a class="pg-page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ inventory_page.previous_page_number }}">
+                <i class="fas fa-angle-left"></i>
+              </a>
+            </li>
+          {% endif %}
+
+          {% for page_num in inventory_page.paginator.page_range %}
+            {% if page_num == inventory_page.number %}
+              <li class="pg-page-item pg-active">
+                <span class="pg-page-link">{{ page_num }}</span>
+              </li>
+            {% elif page_num > inventory_page.number|add:'-3' and page_num < inventory_page.number|add:'3' %}
+              <li class="pg-page-item">
+                <a class="pg-page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+              </li>
+            {% endif %}
+          {% endfor %}
+
+          {% if inventory_page.has_next %}
+            <li class="pg-page-item">
+              <a class="pg-page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ inventory_page.next_page_number }}">
+                <i class="fas fa-angle-right"></i>
+              </a>
+            </li>
+            <li class="pg-page-item">
+              <a class="pg-page-link" href="?{% if querystring %}{{ querystring }}&{% endif %}page={{ inventory_page.paginator.num_pages }}">
+                <i class="fas fa-angle-double-right"></i>
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    {% endif %}
+  {% else %}
+    <div class="pg-text-center pg-py-5">
+      <i class="fas fa-box-open fa-4x pg-text-muted pg-mb-3"></i>
+      <h2 class="pg-h4 pg-text-muted">No hay inventarios registrados</h2>
+      <p class="pg-text-muted">Cuando captures una camioneta, aparecerá en esta tabla.</p>
+      <a href="{{ create_url }}" class="pg-button pg-button-primary">
+        <i class="fas fa-plus pg-me-1"></i>Nueva captura
+      </a>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

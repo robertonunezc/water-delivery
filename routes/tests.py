@@ -467,6 +467,38 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         self.assertEqual(extra_line.reported_sales, 4)
         self.assertEqual(extra_line.sales_difference, -4)
 
+    def test_completed_route_sale_refreshes_open_inventory_reported_sales(self):
+        from routes.services import sync_open_inventory_sessions_for_order
+
+        route_client = Client.objects.create(name='Second Inventory Client')
+        route_order = self._create_order(quantity=4, owner=self.driver_user)
+        RouteClientOrder.objects.create(
+            route=self.route,
+            client=route_client,
+            order=route_order,
+            sequence=2,
+            visit_date=self.today,
+        )
+
+        updated_count = sync_open_inventory_sessions_for_order(route_order)
+
+        self.line.refresh_from_db()
+        self.assertEqual(updated_count, 1)
+        self.assertEqual(self.line.reported_sales, 7)
+        self.assertEqual(self.line.sales_difference, self.line.expected_sales - 7)
+
+    def test_completed_outside_route_sale_refreshes_open_inventory_reported_sales(self):
+        from routes.services import sync_open_inventory_sessions_for_order
+
+        outside_route_order = self._create_order(quantity=2, owner=self.driver_user)
+
+        updated_count = sync_open_inventory_sessions_for_order(outside_route_order)
+
+        self.line.refresh_from_db()
+        self.assertEqual(updated_count, 1)
+        self.assertEqual(self.line.reported_sales, 5)
+        self.assertEqual(self.line.sales_difference, self.line.expected_sales - 5)
+
 
 class RouteTruckInventoryViewTest(FastTenantTestCase):
     def setUp(self):

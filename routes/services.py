@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Any
+from typing import Any, Iterable
+from urllib.parse import urlencode
 
-from django.db.models import Count, Q, QuerySet, Sum
+from django.db.models import Count, Prefetch, Q, QuerySet, Sum
 from django.urls import reverse
 from django.utils import timezone
 
@@ -166,6 +167,67 @@ def get_or_create_inventory_session(
     return session
 
 
+def get_inventory_sessions_for_user(user: Any) -> QuerySet[TruckInventorySession]:
+    """Return truck inventory sessions visible to the user."""
+    sessions = (
+        TruckInventorySession.objects.select_related(
+            'route',
+            'transportation',
+            'opened_by',
+            'closed_by',
+        )
+        .prefetch_related(
+            Prefetch(
+                'lines',
+                queryset=TruckInventoryLine.objects.select_related('product'),
+                to_attr='active_lines',
+            )
+        )
+        .order_by(
+            '-service_date',
+            'route__name',
+            'transportation__license_plate',
+            '-id',
+        )
+    )
+    if getattr(user, 'is_staff', False):
+        return sessions
+
+    transportation = get_driver_transportation(user)
+    if transportation is None:
+        return sessions.none()
+    return sessions.filter(transportation=transportation)
+
+
+def build_inventory_session_rows(
+    sessions: Iterable[TruckInventorySession],
+) -> list[dict[str, Any]]:
+    """Build table rows with persisted reconciliation totals."""
+    rows: list[dict[str, Any]] = []
+    for session in sessions:
+        lines = getattr(session, 'active_lines', None)
+        if lines is None:
+            lines = list(session.lines.filter(deleted_at__isnull=True))
+        totals = _build_inventory_totals(list(lines))
+        has_differences = (
+            totals['sales_difference'] != 0
+            or totals['missing_containers'] != 0
+        )
+        query = urlencode({
+            'mode': 'form',
+            'date': session.service_date.isoformat(),
+            'route': session.route_id,
+            'transportation': session.transportation_id,
+        })
+        rows.append({
+            'session': session,
+            'totals': totals,
+            'has_differences': has_differences,
+            'url': f"{reverse('routes:truck_inventory')}?{query}",
+        })
+    return rows
+
+
 def get_reported_sales_by_product(
     route: Route,
     transportation: Transport,
@@ -244,6 +306,41 @@ def sync_session_reported_sales(session: TruckInventorySession) -> None:
         line.save()
 
 
+def sync_open_inventory_sessions_for_order(order: Order) -> int:
+    """Refresh open truck inventory sessions affected by a completed order."""
+    order_state = (
+        Order.objects.filter(pk=order.pk)
+        .values('status', 'order_date', 'owner_id')
+        .first()
+    )
+    if order_state is None or order_state['status'] != OrderStatus.COMPLETED.value:
+        return 0
+
+    service_date = timezone.localdate(order_state['order_date'])
+    session_filter = Q(
+        route__route_client_orders__order_id=order.pk,
+        route__route_client_orders__visit_date=service_date,
+    )
+    owner_id = order_state['owner_id']
+    if owner_id:
+        session_filter |= Q(
+            transportation__assigned_driver__user_id=owner_id,
+        )
+
+    sessions = list(
+        TruckInventorySession.objects.filter(
+            service_date=service_date,
+            status=TruckInventorySession.Status.OPEN,
+        )
+        .filter(session_filter)
+        .select_related('route', 'transportation')
+        .distinct()
+    )
+    for session in sessions:
+        sync_session_reported_sales(session)
+    return len(sessions)
+
+
 def get_daily_inventory_summaries(selected_date: date) -> list[dict[str, Any]]:
     """Return truck inventory reconciliation summaries for the daily report."""
     sessions = (
@@ -298,14 +395,20 @@ def get_route_inventory_status(route: Route, service_date: date) -> dict[str, An
         )
         status = 'Con diferencias' if has_differences else session.status
 
-    query = f'?date={service_date.isoformat()}'
+    query_data: dict[str, Any] = {
+        'mode': 'form',
+        'date': service_date.isoformat(),
+    }
     if route.transportation_id:
-        query = f'{query}&route={route.pk}&transportation={route.transportation_id}'
+        query_data.update({
+            'route': route.pk,
+            'transportation': route.transportation_id,
+        })
 
     return {
         'session': session,
         'status': status,
-        'url': f"{reverse('routes:truck_inventory')}{query}",
+        'url': f"{reverse('routes:truck_inventory')}?{urlencode(query_data)}",
         'has_differences': has_differences,
     }
 

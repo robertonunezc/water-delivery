@@ -135,12 +135,12 @@ def _get_driver_dashboard_actions(current_date: date) -> list[dict[str, Any]]:
         {
             'key': 'truck_inventory',
             'title': 'Inventario de camioneta',
-            'description': 'Capturar conteo de salida y regreso de la camioneta.',
+            'description': 'Consultar capturas y registrar conteos de salida y regreso.',
             'url': reverse('routes:truck_inventory'),
             'icon': 'fa-boxes-stacked',
             'variant': 'primary',
             'badge_count': None,
-            'meta': 'Conteo de salida y regreso',
+            'meta': 'Inventarios registrados y captura rápida',
         },
         {
             'key': 'route',

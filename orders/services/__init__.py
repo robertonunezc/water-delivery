@@ -591,6 +591,7 @@ def mark_orders_as_completed(queryset, user=None) -> Dict[str, int]:
     """
     updated = 0
     skipped = 0
+    from routes.services import sync_open_inventory_sessions_for_order
 
     for order in queryset:
         # Skip if already completed
@@ -602,6 +603,7 @@ def mark_orders_as_completed(queryset, user=None) -> Dict[str, int]:
         # Update status
         order.status = OrderStatus.COMPLETED.value
         order.save(update_fields=['status', 'updated_at'])
+        sync_open_inventory_sessions_for_order(order)
 
         logger.info(
             f"Order #{order.id} marked as COMPLETED by {user.username if user else 'system'}"
