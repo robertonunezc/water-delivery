@@ -368,10 +368,12 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         quantity: int,
         owner=None,
         product: Product | None = None,
+        client: Client | None = None,
     ) -> Order:
         product = product or self.product
+        client = client or self.client_record
         order = Order.objects.create(
-            client=self.client_record,
+            client=client,
             owner=owner,
             status=OrderStatus.COMPLETED.value,
             subtotal_amount=Decimal('0.00'),
@@ -433,6 +435,37 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         )
 
         self.assertEqual(sales[self.product.pk], 3)
+
+    def test_reported_sales_counts_due_route_client_orders_without_route_order_link(self):
+        from routes.services import get_reported_sales_by_product
+
+        route_client = Client.objects.create(name='Unlinked Route Client')
+        Address.objects.create(
+            client=route_client,
+            type='delivery',
+            street='Calle Ruta',
+        )
+        RouteClient.objects.create(
+            route=self.route,
+            client=route_client,
+            sequence=2,
+            interval_weeks=1,
+            anchor_date=self.today,
+            is_active=True,
+        )
+        self._create_order(
+            quantity=6,
+            owner=self.staff_user,
+            client=route_client,
+        )
+
+        sales = get_reported_sales_by_product(
+            self.route,
+            self.transport,
+            self.today,
+        )
+
+        self.assertEqual(sales[self.product.pk], 9)
 
     def test_sync_session_reported_sales_updates_line_results(self):
         from routes.services import sync_session_reported_sales
@@ -498,6 +531,36 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         self.assertEqual(updated_count, 1)
         self.assertEqual(self.line.reported_sales, 5)
         self.assertEqual(self.line.sales_difference, self.line.expected_sales - 5)
+
+    def test_completed_due_route_client_sale_refreshes_open_inventory_reported_sales(self):
+        from routes.services import sync_open_inventory_sessions_for_order
+
+        route_client = Client.objects.create(name='Live Unlinked Route Client')
+        Address.objects.create(
+            client=route_client,
+            type='delivery',
+            street='Calle Ruta Live',
+        )
+        RouteClient.objects.create(
+            route=self.route,
+            client=route_client,
+            sequence=2,
+            interval_weeks=1,
+            anchor_date=self.today,
+            is_active=True,
+        )
+        route_client_order = self._create_order(
+            quantity=6,
+            owner=self.staff_user,
+            client=route_client,
+        )
+
+        updated_count = sync_open_inventory_sessions_for_order(route_client_order)
+
+        self.line.refresh_from_db()
+        self.assertEqual(updated_count, 1)
+        self.assertEqual(self.line.reported_sales, 9)
+        self.assertEqual(self.line.sales_difference, self.line.expected_sales - 9)
 
 
 class RouteTruckInventoryViewTest(FastTenantTestCase):

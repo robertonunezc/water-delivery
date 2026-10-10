@@ -234,28 +234,14 @@ def get_reported_sales_by_product(
     service_date: date,
 ) -> dict[int, int]:
     """Aggregate completed reported sales for a route/truck service day."""
-    linked_order_ids = set(
-        RouteClientOrder.objects.filter(
-            route=route,
-            visit_date=service_date,
-            order__status=OrderStatus.COMPLETED.value,
-            order__order_date__date=service_date,
-        ).values_list('order_id', flat=True)
+    linked_order_ids = _get_route_client_order_ids(route, service_date)
+    due_client_order_ids = _get_due_route_client_order_ids(route, service_date)
+    driver_order_ids = _get_driver_outside_route_order_ids(
+        transportation,
+        service_date,
     )
 
-    driver_order_ids: set[int] = set()
-    driver = transportation.assigned_driver
-    if driver is not None and driver.user_id:
-        driver_order_ids = set(
-            Order.objects.filter(
-                owner_id=driver.user_id,
-                status=OrderStatus.COMPLETED.value,
-                order_date__date=service_date,
-                route_orders__isnull=True,
-            ).values_list('pk', flat=True)
-        )
-
-    order_ids = linked_order_ids | driver_order_ids
+    order_ids = linked_order_ids | due_client_order_ids | driver_order_ids
     if not order_ids:
         return {}
 
@@ -268,6 +254,52 @@ def get_reported_sales_by_product(
         row['product_id']: row['total_quantity'] or 0
         for row in rows
     }
+
+
+def _get_route_client_order_ids(route: Route, service_date: date) -> set[int]:
+    return set(
+        RouteClientOrder.objects.filter(
+            route=route,
+            visit_date=service_date,
+            order__status=OrderStatus.COMPLETED.value,
+            order__order_date__date=service_date,
+        ).values_list('order_id', flat=True)
+    )
+
+
+def _get_due_route_client_order_ids(route: Route, service_date: date) -> set[int]:
+    due_client_ids = RouteClient.objects.due_on(service_date).filter(
+        route=route,
+    ).values_list('client_id', flat=True)
+
+    return set(
+        Order.objects.filter(
+            client_id__in=due_client_ids,
+            status=OrderStatus.COMPLETED.value,
+            order_date__date=service_date,
+        )
+        .filter(Q(route_orders__isnull=True) | Q(route_orders__route=route))
+        .values_list('pk', flat=True)
+        .distinct()
+    )
+
+
+def _get_driver_outside_route_order_ids(
+    transportation: Transport,
+    service_date: date,
+) -> set[int]:
+    driver_order_ids: set[int] = set()
+    driver = transportation.assigned_driver
+    if driver is not None and driver.user_id:
+        driver_order_ids = set(
+            Order.objects.filter(
+                owner_id=driver.user_id,
+                status=OrderStatus.COMPLETED.value,
+                order_date__date=service_date,
+                route_orders__isnull=True,
+            ).values_list('pk', flat=True)
+        )
+    return driver_order_ids
 
 
 def sync_session_reported_sales(session: TruckInventorySession) -> None:
@@ -310,7 +342,7 @@ def sync_open_inventory_sessions_for_order(order: Order) -> int:
     """Refresh open truck inventory sessions affected by a completed order."""
     order_state = (
         Order.objects.filter(pk=order.pk)
-        .values('status', 'order_date', 'owner_id')
+        .values('status', 'order_date', 'owner_id', 'client_id')
         .first()
     )
     if order_state is None or order_state['status'] != OrderStatus.COMPLETED.value:
@@ -326,6 +358,13 @@ def sync_open_inventory_sessions_for_order(order: Order) -> int:
         session_filter |= Q(
             transportation__assigned_driver__user_id=owner_id,
         )
+    client_id = order_state['client_id']
+    has_route_order = RouteClientOrder.objects.filter(order_id=order.pk).exists()
+    if client_id and not has_route_order:
+        due_route_ids = RouteClient.objects.due_on(service_date).filter(
+            client_id=client_id,
+        ).values_list('route_id', flat=True)
+        session_filter |= Q(route_id__in=due_route_ids)
 
     sessions = list(
         TruckInventorySession.objects.filter(
