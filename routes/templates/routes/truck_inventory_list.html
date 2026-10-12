@@ -16,9 +16,8 @@
     display: grid;
     grid-template-columns:
       minmax(92px, .8fr)
-      minmax(160px, 1.4fr)
-      minmax(140px, 1.1fr)
-      minmax(130px, 1.1fr)
+      minmax(220px, 1.8fr)
+      minmax(130px, 1fr)
       repeat(5, minmax(82px, .7fr))
       minmax(98px, .8fr);
     gap: 12px;
@@ -101,8 +100,7 @@
       gap: 4px;
     }
 
-    .inventory-cell-route,
-    .inventory-cell-vehicle,
+    .inventory-cell-route-vehicle,
     .inventory-cell-status,
     .inventory-actions {
       grid-column: 1 / -1;
@@ -217,8 +215,7 @@
     <div class="inventory-list">
       <div class="inventory-list-header" aria-hidden="true">
         <span>Fecha</span>
-        <span>Ruta</span>
-        <span>Camioneta</span>
+        <span>Ruta / Camioneta</span>
         <span>Estado</span>
         <span>Llenos</span>
         <span>Esperada</span>
@@ -233,20 +230,16 @@
             <span class="inventory-mobile-label">Fecha</span>
             <span class="inventory-cell-value">{{ row.session.service_date|date:"d/m/Y" }}</span>
           </div>
-          <div class="inventory-cell inventory-cell-route">
-            <span class="inventory-mobile-label">Ruta</span>
+          <div class="inventory-cell inventory-cell-route-vehicle">
+            <span class="inventory-mobile-label">Ruta / Camioneta</span>
             <span class="inventory-cell-value">
               <strong>{{ row.session.route.name }}</strong>
+              <span class="pg-small pg-text-muted inventory-subtext">
+                {{ row.session.transportation.license_plate }} · {{ row.session.transportation.model }}
+              </span>
               {% if row.session.notes %}
                 <span class="pg-small pg-text-muted inventory-subtext">{{ row.session.notes|truncatechars:60 }}</span>
               {% endif %}
-            </span>
-          </div>
-          <div class="inventory-cell inventory-cell-vehicle">
-            <span class="inventory-mobile-label">Camioneta</span>
-            <span class="inventory-cell-value">
-              {{ row.session.transportation.license_plate }}
-              <span class="pg-small pg-text-muted inventory-subtext">{{ row.session.transportation.model }}</span>
             </span>
           </div>
           <div class="inventory-cell inventory-cell-status">
