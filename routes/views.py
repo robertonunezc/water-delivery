@@ -482,24 +482,11 @@ def truck_inventory(request):
         ):
             return HttpResponseForbidden('No tienes permiso para capturar este inventario.')
 
-        existing_session = _get_existing_inventory_session(
-            route,
-            transportation,
-            posted_date,
-        )
-        if (
-            existing_session is not None
-            and existing_session.status == TruckInventorySession.Status.CLOSED
-        ):
-            return HttpResponseForbidden('El inventario cerrado no se puede modificar.')
-
         session_form = TruckInventorySessionForm(
             request.POST,
             user=request.user,
             service_date=posted_date,
-            instance=existing_session,
         )
-        session = existing_session
         line_formset = None
         if session_form.is_valid():
             session = session_form.save(commit=False)
