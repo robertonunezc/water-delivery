@@ -3,7 +3,6 @@ from datetime import date, datetime, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import IntegrityError
 from django.urls import reverse
 from django.utils import timezone
 
@@ -269,11 +268,19 @@ class RouteTruckInventoryModelTest(FastTenantTestCase):
         with self.assertRaises(ValidationError):
             line.full_clean()
 
-    def test_only_one_active_inventory_session_per_route_truck_date(self):
-        self._create_session()
+    def test_can_create_multiple_inventory_sessions_per_route_truck_date(self):
+        first_session = self._create_session()
+        second_session = self._create_session()
 
-        with self.assertRaises(IntegrityError):
-            self._create_session()
+        self.assertNotEqual(first_session.pk, second_session.pk)
+        self.assertEqual(
+            TruckInventorySession.objects.filter(
+                route=self.route,
+                transportation=self.transport,
+                service_date=date(2026, 10, 9),
+            ).count(),
+            2,
+        )
 
     def test_close_recalculates_and_persists_line_results(self):
         session = self._create_session()
@@ -476,6 +483,13 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         self.assertEqual(self.line.reported_sales, 3)
         self.assertEqual(self.line.sales_difference, self.line.expected_sales - 3)
 
+    def test_inventory_session_row_url_targets_exact_session(self):
+        from routes.services import build_inventory_session_rows
+
+        row = build_inventory_session_rows([self.session])[0]
+
+        self.assertIn(f'session={self.session.pk}', row['url'])
+
     def test_sync_session_reported_sales_creates_lines_for_reported_products_without_counts(self):
         from routes.services import sync_session_reported_sales
 
@@ -676,6 +690,35 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             ).exists()
         )
 
+    def test_staff_can_create_multiple_inventory_sessions_for_same_route_and_date(self):
+        self.client.force_login(self.staff_user)
+
+        first_response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.route,
+                transportation=self.transport,
+            ),
+        )
+        second_response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.route,
+                transportation=self.transport,
+            ),
+        )
+
+        self.assertRedirects(first_response, reverse('routes:truck_inventory'))
+        self.assertRedirects(second_response, reverse('routes:truck_inventory'))
+        self.assertEqual(
+            TruckInventorySession.objects.filter(
+                route=self.route,
+                transportation=self.transport,
+                service_date=self.today,
+            ).count(),
+            2,
+        )
+
     def test_invalid_line_submission_does_not_create_inventory_session(self):
         self.client.force_login(self.staff_user)
         payload = self._inventory_payload(
@@ -696,8 +739,31 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             ).exists()
         )
 
-    def test_closed_inventory_session_rejects_edits(self):
+    def test_closed_inventory_session_rejects_explicit_edits(self):
         session = TruckInventorySession.objects.create(
+            route=self.route,
+            transportation=self.transport,
+            service_date=self.today,
+            status=TruckInventorySession.Status.CLOSED,
+            closed_at=timezone.now(),
+        )
+        self.client.force_login(self.staff_user)
+        payload = self._inventory_payload(
+            route=self.route,
+            transportation=self.transport,
+        )
+        payload['session'] = str(session.pk)
+
+        response = self.client.post(
+            f"{reverse('routes:truck_inventory')}?session={session.pk}",
+            payload,
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(session.lines.count(), 0)
+
+    def test_staff_can_create_inventory_session_when_same_day_session_is_closed(self):
+        TruckInventorySession.objects.create(
             route=self.route,
             transportation=self.transport,
             service_date=self.today,
@@ -714,8 +780,15 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             ),
         )
 
-        self.assertEqual(response.status_code, 403)
-        self.assertEqual(session.lines.count(), 0)
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        self.assertEqual(
+            TruckInventorySession.objects.filter(
+                route=self.route,
+                transportation=self.transport,
+                service_date=self.today,
+            ).count(),
+            2,
+        )
 
     def test_zero_count_product_rows_do_not_create_inventory_lines(self):
         self.client.force_login(self.staff_user)

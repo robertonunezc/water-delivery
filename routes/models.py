@@ -318,13 +318,6 @@ class TruckInventorySession(TimeStampedModel):
         verbose_name = 'Inventario de camioneta'
         verbose_name_plural = 'Inventarios de camioneta'
         ordering = ['-service_date', 'route__name']
-        constraints = [
-            models.UniqueConstraint(
-                fields=['route', 'transportation', 'service_date'],
-                condition=Q(deleted_at__isnull=True),
-                name='routes_truck_inv_active_uniq',
-            ),
-        ]
         indexes = [
             models.Index(fields=['service_date'], name='routes_truck_inv_date_idx'),
             models.Index(fields=['status'], name='routes_truck_inv_status_idx'),

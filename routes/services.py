@@ -154,15 +154,15 @@ def get_or_create_inventory_session(
     service_date: date,
     user: Any | None = None,
 ) -> TruckInventorySession:
-    """Get or create the route/truck inventory session for the service date."""
+    """Create a route/truck inventory session for the service date."""
     if route.transportation_id != transportation.pk:
         raise ValueError('La ruta no corresponde a la camioneta seleccionada.')
 
-    session, _created = TruckInventorySession.objects.get_or_create(
+    session = TruckInventorySession.objects.create(
         route=route,
         transportation=transportation,
         service_date=service_date,
-        defaults={'opened_by': user},
+        opened_by=user,
     )
     return session
 
@@ -218,6 +218,7 @@ def build_inventory_session_rows(
             'date': session.service_date.isoformat(),
             'route': session.route_id,
             'transportation': session.transportation_id,
+            'session': session.pk,
         })
         rows.append({
             'session': session,
@@ -443,6 +444,8 @@ def get_route_inventory_status(route: Route, service_date: date) -> dict[str, An
             'route': route.pk,
             'transportation': route.transportation_id,
         })
+    if session is not None:
+        query_data['session'] = session.pk
 
     return {
         'session': session,

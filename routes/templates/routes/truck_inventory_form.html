@@ -118,6 +118,9 @@
   {% else %}
     <form method="post" class="pg-card">
       {% csrf_token %}
+      {% if session %}
+        <input type="hidden" name="session" value="{{ session.pk }}">
+      {% endif %}
       <div class="pg-card-body">
         {% if session_form.non_field_errors %}
           <div class="pg-alert pg-alert-danger">{{ session_form.non_field_errors }}</div>
