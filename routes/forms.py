@@ -8,7 +8,7 @@ from django.forms import inlineformset_factory
 from core.models import Transport
 from product.models import Product
 from .models import Route, RouteClient, TruckInventoryLine, TruckInventorySession
-from .services import get_driver_transportation, get_inventory_routes_for_user
+from .services import get_inventory_routes
 
 
 class RouteClientForm(forms.ModelForm):
@@ -149,16 +149,16 @@ class TruckInventorySessionForm(forms.ModelForm):
     def __init__(
         self,
         *args: Any,
-        user: Any,
         service_date: datetime.date | None = None,
         **kwargs: Any,
     ) -> None:
-        self.user = user
         super().__init__(*args, **kwargs)
         current_date = self._resolve_service_date(service_date)
         self.fields['service_date'].initial = current_date
-        self._limit_route_choices(current_date)
-        self._limit_transportation_choices()
+        self.fields['route'].queryset = get_inventory_routes()
+        self.fields['transportation'].queryset = Transport.objects.filter(
+            is_active=True,
+        ).order_by('license_plate')
 
     def _resolve_service_date(
         self,
@@ -175,23 +175,6 @@ class TruckInventorySessionForm(forms.ModelForm):
                 return datetime.date.today()
 
         return datetime.date.today()
-
-    def _limit_route_choices(self, service_date: datetime.date) -> None:
-        if getattr(self.user, 'is_staff', False):
-            queryset = Route.objects.filter(is_active=True).order_by('weekday', 'name')
-        else:
-            queryset = get_inventory_routes_for_user(self.user, service_date)
-        self.fields['route'].queryset = queryset
-
-    def _limit_transportation_choices(self) -> None:
-        if getattr(self.user, 'is_staff', False):
-            queryset = Transport.objects.filter(is_active=True).order_by('license_plate')
-        else:
-            transportation = get_driver_transportation(self.user)
-            queryset = Transport.objects.none()
-            if transportation is not None:
-                queryset = Transport.objects.filter(pk=transportation.pk)
-        self.fields['transportation'].queryset = queryset
 
     def clean(self):
         cleaned_data = super().clean()

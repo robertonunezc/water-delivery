@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from clients.models import Client
-from core.models import Employee, Transport
+from core.models import Transport
 from orders.models import Order, OrderProduct, OrderStatus
 from .models import (
     Route,
@@ -115,37 +115,13 @@ def get_current_route_for_client(
     return route_client.route
 
 
-def get_driver_transportation(user: Any) -> Transport | None:
-    """Return the active truck assigned to the user's employee profile."""
-    try:
-        employee = user.employee
-    except Employee.DoesNotExist:
-        return None
-
-    return Transport.objects.filter(
-        assigned_driver=employee,
-        is_active=True,
-    ).first()
-
-
-def get_inventory_routes_for_user(
-    user: Any,
-    service_date: date,
-) -> QuerySet[Route]:
-    """Return active inventory routes the user can work with on the date."""
-    weekday = service_date.strftime('%A').lower()
-    routes = (
-        Route.objects.filter(is_active=True, weekday=weekday)
+def get_inventory_routes() -> QuerySet[Route]:
+    """Return active routes available for inventory capture."""
+    return (
+        Route.objects.filter(is_active=True)
         .select_related('transportation')
         .order_by('name', 'id')
     )
-    if getattr(user, 'is_staff', False):
-        return routes
-
-    transportation = get_driver_transportation(user)
-    if transportation is None:
-        return routes.none()
-    return routes.filter(transportation=transportation)
 
 
 def get_or_create_inventory_session(
@@ -167,9 +143,9 @@ def get_or_create_inventory_session(
     return session
 
 
-def get_inventory_sessions_for_user(user: Any) -> QuerySet[TruckInventorySession]:
-    """Return truck inventory sessions visible to the user."""
-    sessions = (
+def get_inventory_sessions() -> QuerySet[TruckInventorySession]:
+    """Return truck inventory sessions."""
+    return (
         TruckInventorySession.objects.select_related(
             'route',
             'transportation',
@@ -190,13 +166,6 @@ def get_inventory_sessions_for_user(user: Any) -> QuerySet[TruckInventorySession
             '-id',
         )
     )
-    if getattr(user, 'is_staff', False):
-        return sessions
-
-    transportation = get_driver_transportation(user)
-    if transportation is None:
-        return sessions.none()
-    return sessions.filter(transportation=transportation)
 
 
 def build_inventory_session_rows(

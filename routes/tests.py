@@ -418,19 +418,25 @@ class RouteTruckInventoryServiceTest(FastTenantTestCase):
         cancelled_order.status = OrderStatus.CANCELLED.value
         cancelled_order.save(update_fields=['status'])
 
-    def test_driver_inventory_routes_are_limited_to_assigned_truck(self):
-        from routes.services import get_inventory_routes_for_user
+    def test_inventory_routes_include_other_trucks_for_driver(self):
+        from routes.services import get_inventory_routes
 
-        routes = get_inventory_routes_for_user(self.driver_user, self.today)
+        routes = get_inventory_routes()
 
-        self.assertEqual(list(routes), [self.route])
+        self.assertEqual(list(routes), [self.route, self.other_route])
 
-    def test_staff_inventory_routes_include_active_routes_for_date(self):
-        from routes.services import get_inventory_routes_for_user
+    def test_inventory_routes_include_other_weekdays(self):
+        from routes.services import get_inventory_routes
 
-        routes = get_inventory_routes_for_user(self.staff_user, self.today)
+        saturday_route = Route.objects.create(
+            name='Saturday Inventory Route',
+            transportation=self.transport,
+            weekday='saturday',
+            is_active=True,
+        )
+        routes = get_inventory_routes()
 
-        self.assertIn(self.route, routes)
+        self.assertIn(saturday_route, routes)
 
     def test_reported_sales_counts_route_linked_and_driver_orders_once(self):
         from routes.services import get_reported_sales_by_product
@@ -648,16 +654,20 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             'lines-0-notes': '',
         }
 
-    def test_driver_get_inventory_form_preselects_single_today_route(self):
+    def test_driver_get_inventory_form_lists_all_routes_and_trucks(self):
         self.client.force_login(self.driver_user)
 
-        response = self.client.get(reverse('routes:truck_inventory'))
+        response = self.client.get(
+            f"{reverse('routes:truck_inventory')}?mode=form"
+        )
 
         self.assertContains(response, self.route.name)
+        self.assertContains(response, self.other_route.name)
         self.assertContains(response, self.transport.license_plate)
+        self.assertContains(response, self.other_transport.license_plate)
         self.assertFalse(TruckInventorySession.objects.exists())
 
-    def test_driver_cannot_post_inventory_for_other_truck(self):
+    def test_driver_can_post_inventory_for_other_truck(self):
         self.client.force_login(self.driver_user)
 
         response = self.client.post(
@@ -668,7 +678,62 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             ),
         )
 
-        self.assertEqual(response.status_code, 403)
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        self.assertTrue(
+            TruckInventorySession.objects.filter(
+                route=self.other_route,
+                transportation=self.other_transport,
+                service_date=self.today,
+            ).exists()
+        )
+
+    def test_user_without_employee_can_create_and_view_inventory(self):
+        user = User.objects.create_user(username='inventory-view-user')
+        self.client.force_login(user)
+
+        form_response = self.client.get(
+            f"{reverse('routes:truck_inventory')}?mode=form"
+        )
+        self.assertContains(form_response, self.route.name)
+        self.assertContains(form_response, self.other_route.name)
+
+        response = self.client.post(
+            reverse('routes:truck_inventory'),
+            self._inventory_payload(
+                route=self.other_route,
+                transportation=self.other_transport,
+            ),
+        )
+
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        session = TruckInventorySession.objects.get(route=self.other_route)
+        self.assertEqual(session.opened_by, user)
+        self.assertContains(
+            self.client.get(reverse('routes:truck_inventory')),
+            self.other_route.name,
+        )
+
+    def test_user_can_open_and_edit_inventory_for_other_truck(self):
+        session = TruckInventorySession.objects.create(
+            route=self.other_route,
+            transportation=self.other_transport,
+            service_date=self.today,
+        )
+        self.client.force_login(self.driver_user)
+        url = f"{reverse('routes:truck_inventory')}?mode=form&session={session.pk}"
+
+        response = self.client.get(url)
+        self.assertContains(response, f'name="session" value="{session.pk}"')
+
+        payload = self._inventory_payload(
+            route=self.other_route,
+            transportation=self.other_transport,
+        )
+        payload['session'] = str(session.pk)
+        response = self.client.post(url, payload)
+
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        self.assertEqual(session.lines.get(product=self.product).full_loaded, 10)
 
     def test_staff_can_create_inventory_session_from_form(self):
         self.client.force_login(self.staff_user)
