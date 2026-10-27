@@ -27,6 +27,14 @@
         {{ form.description }}
         {{ form.description.errors }}
       </div>
+      {% if is_create %}
+      <div class="pg-mb-3">
+        <label for="{{ form.assigned_to.id_for_label }}" class="pg-label">{{ form.assigned_to.label }}</label>
+        {{ form.assigned_to }}
+        {{ form.assigned_to.errors }}
+        <p id="{{ form.assigned_to.auto_id }}_helptext" class="pg-text-muted pg-small pg-mt-1">{{ form.assigned_to.help_text }}</p>
+      </div>
+      {% endif %}
       <div class="pg-row pg-gap-3">
         <div class="pg-col-md-6">
           <label for="{{ form.client.id_for_label }}" class="pg-label">{{ form.client.label }}</label>

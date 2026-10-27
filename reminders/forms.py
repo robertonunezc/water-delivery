@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import get_user_model
 from clients.models import Client
 
 from .models import Reminder
@@ -32,3 +33,14 @@ class ReminderForm(forms.ModelForm):
         self.fields["client"].required = False
         self.fields["client"].empty_label = "Sin cliente"
         self.fields["reminder_date"].input_formats = ["%Y-%m-%d"]
+
+
+class ReminderCreateForm(ReminderForm):
+    assigned_to = forms.ModelChoiceField(
+        queryset=get_user_model().objects.filter(is_active=True).order_by("username"),
+        required=False,
+        label="Asignar a",
+        empty_label="Mi usuario",
+        help_text="Si no seleccionas un usuario, el recordatorio se asignara a tu usuario.",
+        widget=forms.Select(attrs={"class": "pg-select"}),
+    )
