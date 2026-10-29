@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
@@ -19,7 +20,7 @@ from orders import services
 from payment.models import Payment
 from product.models import Product, ProductClientPrice, ProductCategory
 from invoice.models import Invoice, InvoiceOrderLink
-from orders.admin import BillingAttachedFilter, OrderAdmin
+from orders.admin import BillingAttachedFilter, OrderAdmin, OrderProductAdmin
 
 
 class UpdateOrderTestCase(FastTenantTestCase):
@@ -149,6 +150,237 @@ class UpdateOrderTestCase(FastTenantTestCase):
         self.assertEqual(order_data.total_amount, Decimal("50.00"))
         order_product = OrderProduct.objects.get(order=self.order, product=self.product)
         self.assertEqual(order_product.unit_price, Decimal("25.00"))
+
+
+class CompletedOrderEditTests(FastTenantTestCase):
+    """Completed orders stay locked across user-facing mutation paths."""
+
+    def setUp(self) -> None:
+        self.user = User.objects.create_superuser(username="order-admin", password="test")
+        self.customer = Client.objects.create(name="Locked order customer")
+        category = ProductCategory.objects.create(name="Water")
+        self.product = Product.objects.create(
+            name="Garrafon", presentation="20", unit_of_measure=1,
+            category=category,
+        )
+        ProductClientPrice.objects.create(
+            product=self.product, client=self.customer, price=Decimal("25.00"),
+        )
+        self.order = Order.objects.create(
+            client=self.customer, total_amount=Decimal("50.00"),
+            subtotal_amount=Decimal("50.00"), notes="Original notes",
+        )
+        self.item = OrderProduct.objects.create(
+            order=self.order, product=self.product, quantity=2,
+            unit_price=Decimal("25.00"),
+        )
+        # Keep an old pending instance to exercise stale form/service submissions.
+        Order.objects.filter(pk=self.order.pk).update(status=OrderStatus.COMPLETED.value)
+        self.client.force_login(self.user)
+        self.request = RequestFactory().post("/")
+        self.request.user = self.user
+        self.request.session = {}
+        self.request._messages = FallbackStorage(self.request)
+
+    def test_update_service_rejects_stale_pending_order(self) -> None:
+        with self.assertRaises(ValidationError):
+            services.update_order(
+                self.order, 4, self.product, self.customer,
+                discount=Decimal("10.00"),
+            )
+        self.item.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.item.quantity, 2)
+        self.assertEqual(self.order.total_amount, Decimal("50.00"))
+        self.assertEqual(self.order.discount, Decimal("0.00"))
+
+    def test_update_service_rejects_removing_completed_order_item(self) -> None:
+        with self.assertRaises(ValidationError):
+            services.update_order(self.order, 0, self.product, self.customer)
+        self.assertTrue(OrderProduct.objects.filter(pk=self.item.pk).exists())
+
+    def test_repricing_stale_order_does_not_change_completed_order(self) -> None:
+        ProductClientPrice.objects.filter(product=self.product).update(price=30.00)
+        self.assertFalse(services.refresh_pending_order_prices(self.order))
+        self.item.refresh_from_db()
+        self.order.refresh_from_db()
+        self.assertEqual(self.item.unit_price, Decimal("25.00"))
+        self.assertEqual(self.order.total_amount, Decimal("50.00"))
+
+    def test_update_endpoint_rejects_completed_order(self) -> None:
+        response = self.client.post(
+            reverse("orders:update_order", args=[self.order.pk]),
+            data={"discount": "10.00", "notes": "Changed"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.notes, "Original notes")
+        self.assertEqual(self.order.total_amount, Decimal("50.00"))
+
+    def test_superuser_cannot_post_completed_order_admin_form(self) -> None:
+        response = self.client.post(
+            reverse("admin:orders_order_change", args=[self.order.pk]),
+            data={"client": self.customer.pk, "status": "PENDING", "notes": "Changed",
+                  "total_amount": "40.00", "items-TOTAL_FORMS": "0",
+                  "items-INITIAL_FORMS": "0", "_save": "Save"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "COMPLETED")
+        self.assertEqual(self.order.notes, "Original notes")
+
+    def test_admin_save_rejects_reopening_stale_completed_order(self) -> None:
+        model_admin = OrderAdmin(Order, AdminSite())
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(self.request, self.order, form=None, change=True)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "COMPLETED")
+
+    def test_admin_rejects_bulk_deleting_completed_orders(self) -> None:
+        model_admin = OrderAdmin(Order, AdminSite())
+        with self.assertRaises(PermissionDenied):
+            model_admin.soft_delete_selected(
+                self.request, Order.objects.filter(pk=self.order.pk),
+            )
+        self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
+
+    def test_item_admin_rejects_changes_to_completed_order(self) -> None:
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        self.item.quantity = 5
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(self.request, self.item, form=None, change=True)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.quantity, 2)
+
+    def test_item_admin_rejects_adding_to_completed_order(self) -> None:
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        item = OrderProduct(
+            order=self.order, product=self.product, quantity=1,
+            unit_price=Decimal("25.00"),
+        )
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(self.request, item, form=None, change=False)
+        self.assertEqual(self.order.items.count(), 1)
+
+    def test_item_admin_rejects_moving_item_out_of_completed_order(self) -> None:
+        pending_order = Order.objects.create(client=self.customer, total_amount=0)
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        self.item.order = pending_order
+        with self.assertRaises(PermissionDenied):
+            model_admin.save_model(self.request, self.item, form=None, change=True)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.order_id, self.order.pk)
+
+    def test_item_admin_rejects_bulk_deleting_completed_order_items(self) -> None:
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        with self.assertRaises(PermissionDenied):
+            model_admin.soft_delete_selected(
+                self.request, OrderProduct.objects.filter(pk=self.item.pk),
+            )
+        self.assertTrue(OrderProduct.objects.filter(pk=self.item.pk).exists())
+
+    def test_item_admin_rejects_deleting_completed_order_item(self) -> None:
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        with self.assertRaises(PermissionDenied):
+            model_admin.delete_model(self.request, self.item)
+        self.assertTrue(OrderProduct.objects.filter(pk=self.item.pk).exists())
+
+    def test_item_admin_deletion_checks_current_parent_instead_of_stale_instance(self) -> None:
+        pending_order = Order.objects.create(client=self.customer, total_amount=0)
+        # Emulate a stale object whose item has since moved to a completed order.
+        self.item.order = pending_order
+        model_admin = OrderProductAdmin(OrderProduct, AdminSite())
+        with self.assertRaises(PermissionDenied):
+            model_admin.delete_model(self.request, self.item)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.order_id, self.order.pk)
+        self.assertIsNone(self.item.deleted_at)
+
+    def test_mark_pending_does_not_reopen_completed_order(self) -> None:
+        result = services.mark_orders_as_pending(Order.objects.filter(pk=self.order.pk))
+        self.assertEqual(result["updated"], 0)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "COMPLETED")
+
+    def test_split_rejects_pending_order_without_creating_child(self) -> None:
+        Order.objects.filter(pk=self.order.pk).update(status="PENDING")
+        response = self.client.post(
+            reverse("orders:split_order", args=[self.order.pk]),
+            data={f"quantity_{self.item.pk}": 1},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(Order.objects.count(), 1)
+        self.item.refresh_from_db()
+        self.assertEqual(self.item.quantity, 2)
+
+    def test_checkout_cannot_change_completed_order_metadata(self) -> None:
+        original_date = self.order.order_date
+        response = self.client.post(
+            "/payments/create/",
+            data={"order_id": self.order.pk, "notes": "Changed",
+                  "order_date": "2026-01-02", "payment_method": "cash", "amount": "50.00"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.notes, "Original notes")
+        self.assertEqual(self.order.order_date, original_date)
+        self.assertFalse(self.order.payments.exists())
+
+    def test_completed_order_can_still_receive_payment(self) -> None:
+        response = self.client.post(
+            reverse("orders:create_payment_for_order", args=[self.order.pk]),
+            data={"amount": "50.00", "payment_method": "cash"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.assertEqual(self.order.status, "COMPLETED")
+        self.assertEqual(self.order.total_paid, Decimal("50.00"))
+        self.assertEqual(self.order.notes, "Original notes")
+
+    def test_pending_order_can_still_update_products_and_notes(self) -> None:
+        Order.objects.filter(pk=self.order.pk).update(status="PENDING")
+        response = self.client.post(
+            reverse("orders:update_order", args=[self.order.pk]),
+            data={"product_id": self.product.pk, "quantity": 3,
+                  "discount": "5.00", "notes": "Updated notes", "order_date": "2026-01-02"},
+            content_type="application/json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal("70.00"))
+        self.assertEqual(self.order.notes, "Updated notes")
+        self.assertEqual(timezone.localtime(self.order.order_date).date().isoformat(), "2026-01-02")
+        self.assertEqual(self.item.quantity, 3)
+
+    def test_completed_order_can_still_be_split(self) -> None:
+        Order.objects.filter(pk=self.order.pk).update(cantidad_cobrada=Decimal("50.00"))
+        payment = Payment(
+            order=self.order, client=self.customer, amount=Decimal("50.00"),
+            method="cash", status="completed", created_by=self.user,
+        )
+        payment.save(apply_accounting=False)
+        response = self.client.post(
+            reverse("orders:split_order", args=[self.order.pk]),
+            data={f"quantity_{self.item.pk}": 1},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Order.objects.count(), 2)
+        self.order.refresh_from_db()
+        self.item.refresh_from_db()
+        self.assertEqual(self.order.total_amount, Decimal("25.00"))
+        self.assertEqual(self.item.quantity, 1)
+        child = Order.objects.exclude(pk=self.order.pk).get()
+        self.assertEqual(self.order.status, "COMPLETED")
+        self.assertEqual(child.status, "COMPLETED")
+        self.assertEqual(child.total_amount, Decimal("25.00"))
+        self.assertEqual(self.order.total_paid, Decimal("25.00"))
+        self.assertEqual(child.total_paid, Decimal("25.00"))
+        self.assertEqual(self.order.cantidad_cobrada, Decimal("25.00"))
+        self.assertEqual(child.cantidad_cobrada, Decimal("25.00"))
 
 
 class OrderCancellationQuerySetTestCase(FastTenantTestCase):

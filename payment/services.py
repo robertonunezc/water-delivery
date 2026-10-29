@@ -234,12 +234,21 @@ def pay_client_orders(
     }
 
 
+@transaction.atomic
 def process_payment_request(
     order: Order,
     data: PaymentRequestData,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process a payment request payload in either multi or legacy format."""
+    order = Order.objects.select_for_update().get(pk=order.pk)
+    if not order.is_editable:
+        return {
+            'error': (
+                'Solo se pueden finalizar pedidos pendientes. '
+                'Use la opción Pagar para cobrar un pedido completado.'
+            ),
+        }, 403
     if data.cantidad_cobrada is not None and Decimal(str(data.cantidad_cobrada)) < order.total_amount:
         raise ValueError(f'Cantidad a cobrar menor que el total de la orden: ${data.cantidad_cobrada} < ${order.total_amount}')
     try:

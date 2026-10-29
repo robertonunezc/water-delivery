@@ -280,6 +280,18 @@ class Order(TimeStampedModel):
         Kept for backward compatibility with existing templates.
         """
         return self.get_status_display()
+
+    @property
+    def is_editable(self) -> bool:
+        """Only pending orders may have their contents changed."""
+        return self.status == OrderStatus.PENDING.value
+
+    def validate_editable(self) -> None:
+        if not self.is_editable:
+            raise ValidationError(
+                'Solo se pueden editar pedidos pendientes. '
+                'Cancele el pedido y cree uno nuevo para corregirlo.'
+            )
     
     @property
     def total_paid(self) -> Decimal:

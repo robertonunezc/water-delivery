@@ -2,8 +2,10 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse, path
 from django.utils.safestring import mark_safe
-from django.db.models import Sum, Count, Q
-from django.http import HttpResponse
+from django.db.models import Sum, Count, Q, QuerySet
+from django.db import transaction
+from django.http import HttpRequest, HttpResponse
+from django.forms import ModelForm
 from django.shortcuts import redirect
 from decimal import Decimal
 import csv
@@ -11,6 +13,30 @@ from .models import Order, OrderProduct, OrderReceipt, OrderStatus, OrderSplit
 from django.core.exceptions import PermissionDenied, ValidationError
 from unfold.admin import ModelAdmin, TabularInline
 from core.admin_mixins import SoftDeleteAdminMixin
+
+
+def _validate_editable_orders(order_ids: list[int]) -> None:
+    """Check persisted parent states while holding locks for an admin write."""
+    for order in Order.objects.select_for_update().filter(pk__in=order_ids).order_by('pk'):
+        if not order.is_editable:
+            raise PermissionDenied('Solo se pueden editar pedidos pendientes.')
+
+
+def _validate_editable_items(
+    item_ids: list[int], target_order_id: int | None = None,
+) -> None:
+    """Lock parents before items, rejecting rows moved since the parent lookup."""
+    items = OrderProduct.objects.filter(pk__in=item_ids)
+    order_ids = set(items.values_list('order_id', flat=True))
+    if target_order_id is not None:
+        order_ids.add(target_order_id)
+    _validate_editable_orders(sorted(order_ids))
+    locked_items = list(items.select_for_update().order_by('pk'))
+    if {item.pk for item in locked_items} != set(item_ids) or any(
+        item.order_id not in order_ids for item in locked_items
+    ):
+        raise PermissionDenied('Los productos cambiaron. Recargue el pedido e intente de nuevo.')
+
 
 class OrderAmountFilter(admin.SimpleListFilter):
     title = 'Rango de monto'
@@ -81,11 +107,13 @@ class OrderProductInline(TabularInline):
     # but make inline read-only when viewing an existing Order for non-superusers.
     def get_readonly_fields(self, request, obj=None):
         # If editing an existing order and user is not superuser, make all fields readonly
-        if obj is not None and not request.user.is_superuser:
+        if obj is not None and (not request.user.is_superuser or not obj.is_editable):
             return tuple(self.fields)
         return self.readonly_fields
 
     def has_change_permission(self, request, obj=None):
+        if obj is not None and not obj.is_editable:
+            return False
         # Allow viewing change page for everyone; only superusers can change
         if request.user.is_superuser:
             return True
@@ -93,12 +121,16 @@ class OrderProductInline(TabularInline):
         return True
 
     def has_add_permission(self, request, obj=None):
+        if obj is not None and not obj.is_editable:
+            return False
         # Allow adding inline rows when creating a new order (obj is None) for non-superusers
         if request.user.is_superuser:
             return True
         return obj is None
 
     def has_delete_permission(self, request, obj=None):
+        if obj is not None and not obj.is_editable:
+            return False
         # Only superusers may delete inline items from existing orders
         if request.user.is_superuser:
             return True
@@ -214,17 +246,15 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         return True
 
     def has_change_permission(self, request, obj=None):
-        # Allow the change view to be opened by everyone (so they can visualize),
-        # but only superusers may actually edit/save changes.
-        return True
+        # Terminal orders remain viewable through has_view_permission().
+        return obj is None or obj.is_editable
 
     def has_delete_permission(self, request, obj=None):
-        # Only superusers may delete orders
-        return self.is_super(request)
+        return self.is_super(request) and (obj is None or obj.is_editable)
 
     def get_readonly_fields(self, request, obj=None):
         # If the user is not superuser and is viewing an existing object, make fields readonly
-        if not self.is_super(request) and obj is not None:
+        if obj is not None and (not self.is_super(request) or not obj.is_editable):
             # Make all concrete model fields readonly to prevent edits
             model_fields = [f.name for f in self.model._meta.concrete_fields]
             # Include existing readonly fields (display helpers)
@@ -240,9 +270,10 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         return self.readonly_fields
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        """Adjust change form UI: hide save/delete buttons for non-superusers viewing existing orders."""
+        """Hide mutation buttons when an existing order cannot be edited."""
         extra_context = extra_context or {}
-        if not self.is_super(request) and object_id is not None:
+        obj = self.get_object(request, object_id) if object_id is not None else None
+        if obj is not None and (not self.is_super(request) or not obj.is_editable):
             # Hide save buttons and delete link in the change form
             extra_context.update({
                 'show_save': False,
@@ -258,11 +289,28 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
             return {}
         return super().get_actions(request)
 
-    def save_model(self, request, obj, form, change):
+    @transaction.atomic
+    def save_model(
+        self, request: HttpRequest, obj: Order, form: ModelForm | None, change: bool,
+    ) -> None:
         # Prevent non-superusers from saving edits to existing orders
         if change and not self.is_super(request):
             raise PermissionDenied("You do not have permission to edit this order.")
+        if change:
+            _validate_editable_orders([obj.pk])
         return super().save_model(request, obj, form, change)
+
+    @transaction.atomic
+    def delete_model(self, request: HttpRequest, obj: Order) -> None:
+        _validate_editable_orders([obj.pk])
+        super().delete_model(request, obj)
+
+    @transaction.atomic
+    def soft_delete_selected(self, request: HttpRequest, queryset: QuerySet[Order]) -> None:
+        _validate_editable_orders(list(queryset.values_list('pk', flat=True)))
+        super().soft_delete_selected(request, queryset)
+
+    soft_delete_selected.short_description = 'Eliminar seleccionados'
 
     def save_related(self, request, form, formsets, change):
         # Prevent non-superusers from saving related objects when editing
@@ -551,7 +599,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
         message = f"{result['updated']} pedidos marcados como pendientes."
         if result['skipped'] > 0:
-            message += f" ({result['skipped']} ya estaban pendientes)"
+            message += f" ({result['skipped']} omitidos; no se pueden reabrir pedidos terminados)"
 
         self.message_user(request, message)
     mark_as_pending.short_description = 'Marcar como pendiente'
@@ -569,7 +617,7 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
         
         order = queryset.first()
         
-        # Validate order status is COMPLETED
+        # Splitting is a separate operation available only for completed orders.
         if order.status != OrderStatus.COMPLETED.value:
             self.message_user(
                 request,
@@ -734,13 +782,13 @@ class OrderProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         # Allow opening change view for visualization, but prevent saving for non-superusers
-        return True
+        return obj is None or obj.order.is_editable
 
     def has_delete_permission(self, request, obj=None):
-        return self.is_super(request)
+        return self.is_super(request) and (obj is None or obj.order.is_editable)
 
     def get_readonly_fields(self, request, obj=None):
-        if not self.is_super(request) and obj is not None:
+        if obj is not None and (not self.is_super(request) or not obj.order.is_editable):
             # Make all fields readonly for existing objects
             field_names = [f.name for f in self.model._meta.concrete_fields]
             field_names += list(self.readonly_fields)
@@ -755,6 +803,30 @@ class OrderProductAdmin(SoftDeleteAdminMixin, ModelAdmin):
         if not self.is_super(request):
             return {}
         return super().get_actions(request)
+
+    @transaction.atomic
+    def save_model(
+        self, request: HttpRequest, obj: OrderProduct, form: ModelForm | None, change: bool,
+    ) -> None:
+        if change and not self.is_super(request):
+            raise PermissionDenied('No tiene permiso para editar los productos del pedido.')
+        if change:
+            _validate_editable_items([obj.pk], target_order_id=obj.order_id)
+        else:
+            _validate_editable_orders([obj.order_id])
+        super().save_model(request, obj, form, change)
+
+    @transaction.atomic
+    def delete_model(self, request: HttpRequest, obj: OrderProduct) -> None:
+        _validate_editable_items([obj.pk])
+        super().delete_model(request, obj)
+
+    @transaction.atomic
+    def soft_delete_selected(self, request: HttpRequest, queryset: QuerySet[OrderProduct]) -> None:
+        _validate_editable_items(list(queryset.values_list('pk', flat=True)))
+        super().soft_delete_selected(request, queryset)
+
+    soft_delete_selected.short_description = 'Eliminar seleccionados'
     
     def order_link(self, obj):
         url = reverse('admin:orders_order_change', args=[obj.order.id])

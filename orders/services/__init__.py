@@ -1,4 +1,5 @@
 from datetime import date
+from collections.abc import Iterable
 from decimal import Decimal
 from django.db import transaction
 from django.db.models import Count, QuerySet, Sum
@@ -6,7 +7,7 @@ from django.utils import timezone
 from clients.models import Client
 from core import models
 from orders.models import Order, OrderProduct, OrderStatus
-from product.models import ProductClientPrice
+from product.models import Product, ProductClientPrice
 from dataclasses import dataclass
 from typing import List, Optional, Dict
 from datetime import datetime
@@ -118,8 +119,10 @@ def get_product_price_for_client(product, client):
         return Decimal(str(getattr(product, 'price', 0.0)))
 
 
+@transaction.atomic
 def refresh_pending_order_prices(order: Order) -> bool:
-    if order.status != OrderStatus.PENDING.value:
+    order.refresh_from_db(from_queryset=Order.objects.select_for_update())
+    if not order.is_editable:
         return False
 
     changed = False
@@ -137,7 +140,10 @@ def refresh_pending_order_prices(order: Order) -> bool:
 
     return changed
     
-def update_order(order: Order, quantity: int, product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
+@transaction.atomic
+def update_order(order: Order, quantity: int, product: Product, client: Client, discount: Decimal = Decimal('0.00')) -> Order:
+    order = Order.objects.select_for_update().get(pk=order.pk)
+    order.validate_editable()
     unit_price = get_product_price_for_client(product, client)
     if not isinstance(unit_price, Decimal):
         unit_price = Decimal(str(unit_price))
@@ -281,6 +287,7 @@ def _reverse_completed_balance_payments(
     balance_payments = order.payments.select_for_update().filter(
         method='balance',
         status='completed',
+        amount__gt=0,
     )
     for payment in balance_payments:
         balance_service.reverse_balance_payment(payment=payment, user=user)
@@ -319,10 +326,20 @@ def _reverse_credit_purchase_transactions(
         reference_order=order,
         transaction_type='purchase',
     ).order_by('created_at', 'id')
+    reversed_amount = credit_account.credit_transactions.filter(
+        reference_order=order,
+        transaction_type='purchase_reversal',
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
     for credit_purchase in credit_purchases:
+        # A split may already have reassigned part of this order's credit.
+        already_reversed = min(reversed_amount, credit_purchase.amount)
+        reversed_amount -= already_reversed
+        amount = credit_purchase.amount - already_reversed
+        if amount <= 0:
+            continue
         balance_service.reverse_credit_purchase(
             client=order.client,
-            amount=credit_purchase.amount,
+            amount=amount,
             user=user,
             reference_order=order,
             reference_payment=credit_purchase.reference_payment,
@@ -653,44 +670,8 @@ def cancel_orders(queryset: QuerySet, user: object | None = None) -> Dict[str, i
     }
 
 
-@transaction.atomic
-def mark_orders_as_pending(queryset, user=None) -> Dict[str, int]:
-    """
-    Mark multiple orders as pending.
-
-    This function:
-    1. Updates status to PENDING
-    2. Logs the operation with user information
-
-    This is typically used to revert orders to pending status for corrections.
-
-    Args:
-        queryset: QuerySet of Order objects to mark as pending
-        user: User performing the operation (for audit trail)
-
-    Returns:
-        dict with 'updated' count and 'skipped' count
-    """
-    updated = 0
-    skipped = 0
-
-    for order in queryset:
-        # Skip if already pending
-        if order.status == OrderStatus.PENDING.value:
-            logger.info(f"Order #{order.id} already pending, skipping")
-            skipped += 1
-            continue
-
-        # Update status
-        order.status = OrderStatus.PENDING.value
-        order.save(update_fields=['status', 'updated_at'])
-
-        logger.info(
-            f"Order #{order.id} marked as PENDING by {user.username if user else 'system'}"
-        )
-        updated += 1
-
-    return {
-        'updated': updated,
-        'skipped': skipped,
-    }
+def mark_orders_as_pending(
+    queryset: Iterable[Order], user: object | None = None,
+) -> Dict[str, int]:
+    """Keep legacy callers safe: completed/cancelled orders cannot be reopened."""
+    return {'updated': 0, 'skipped': sum(1 for _ in queryset)}

@@ -9,7 +9,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, Count, Prefetch
@@ -20,11 +20,11 @@ from .models import (
     ORDER_STATUS_CHOICES,
     Order,
     OrderProduct,
-    OrderSplit,
     OrderStatus,
     ReceiptDeliveryMethod,
 )
 from .forms import OrderReceiptSignForm, OrderReceiptSignOnlyForm, SplitOrderForm
+from orders.services.order_split_service import OrderSplitError, split_order as split_completed_order
 from core.utils import combine_date_with_local_time, parse_date_input
 from core.services.feature_flags import is_receipt_signature_enabled
 from product.models import Product, ProductClientPrice
@@ -90,7 +90,7 @@ def _get_order_redirect_url(user: AbstractBaseUser, client: Client) -> str:
 
 
 def _order_is_editable(order: Order) -> bool:
-    return order.status == OrderStatus.PENDING.value
+    return order.is_editable
 
 
 def calculate_payment_breakdown(order_total, client_balance):
@@ -406,7 +406,7 @@ def _handle_orders_dashboard_bulk_action(request):
         messages.success(
             request,
             f"{result['updated']} pedido(s) marcados como pendientes."
-            + (f" {result['skipped']} ya estaban pendientes." if result['skipped'] else ''),
+            + (f" {result['skipped']} omitidos; no se pueden reabrir pedidos terminados." if result['skipped'] else ''),
         )
         return redirect(redirect_to)
 
@@ -660,7 +660,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
 @require_http_methods(["POST"])
 @transaction.atomic
 def update_order(request, order_pk):
-    order = get_object_or_404(Order, pk=order_pk)
+    order = get_object_or_404(Order.objects.select_for_update(), pk=order_pk)
     if not _order_is_editable(order):
         return JsonResponse(
             {
@@ -714,6 +714,7 @@ def update_order(request, order_pk):
             effective_discount,
         )
         if notes is not None:
+            order.notes = notes.strip() or None
             order.save(update_fields=['notes', 'updated_at'])
     elif discount is not None:
         order.discount = discount
@@ -774,149 +775,35 @@ def cancel_order(request, order_pk):
 @login_required
 @require_http_methods(["GET", "POST"])
 @transaction.atomic
-def split_order(request, order_id):
+def split_order(request: HttpRequest, order_id: int) -> HttpResponse:
     """View to split an order into two orders"""
-    order = get_object_or_404(Order.objects.prefetch_related('items__product'), pk=order_id)
+    order = get_object_or_404(
+        Order.objects.select_for_update().prefetch_related('items__product'), pk=order_id,
+    )
+    if order.status != OrderStatus.COMPLETED.value:
+        raise PermissionDenied('Solo se pueden dividir pedidos completados.')
     order_items = order.items.all()
     
     if request.method == 'POST':
         form = SplitOrderForm(request.POST, order=order)
         
         if form.is_valid():
-            # Create the new order
-            new_order = Order.objects.create(
-                client=order.client,
-                order_date=order.order_date,
-                status=order.status,
-                total_amount=Decimal('0.00'),  # Will be calculated
-                cantidad_cobrada=None,  # Will be calculated
-                owner=order.owner,
-                notes=f'Dividida de Orden #{order.id}'
-            )
-            
-            # Track amounts for proportional cantidad_cobrada split
-            original_total = Decimal('0.00')
-            new_total = Decimal('0.00')
-            
-            # Process each item
-            new_order_products = []
-            items_to_update = []
-            items_to_delete = []
-
-            for item in order_items:
-                field_name = f'quantity_{item.id}'
-                quantity_to_move = form.cleaned_data.get(field_name, 0)
-                
-                if quantity_to_move > 0:
-                    # Collect item for new order
-                    new_order_products.append(
-                        OrderProduct(
-                            order=new_order,
-                            product=item.product,
-                            quantity=quantity_to_move,
-                            unit_price=item.unit_price,
-                            note=item.note
-                        )
-                    )
-                    
-                    # Calculate amounts
-                    new_total += quantity_to_move * item.unit_price
-                    
-                    # Update original order item
-                    remaining_quantity = item.quantity - quantity_to_move
-                    if remaining_quantity > 0:
-                        item.quantity = remaining_quantity
-                        items_to_update.append(item)
-                        original_total += remaining_quantity * item.unit_price
-                    else:
-                        # Collect item to remove if quantity is 0
-                        items_to_delete.append(item.id)
-
-            if new_order_products:
-                OrderProduct.objects.bulk_create(new_order_products)
-            
-            if items_to_update:
-                OrderProduct.objects.bulk_update(items_to_update, ['quantity'])
-
-            if items_to_delete:
-                OrderProduct.objects.filter(id__in=items_to_delete).delete()
-
-            # Update totals
-            order.total_amount = original_total
-            new_order.total_amount = new_total
-            
-            # Split cantidad_cobrada proportionally if it exists
-            if order.cantidad_cobrada is not None and order.cantidad_cobrada > 0:
-                original_order_total = original_total + new_total
-                if original_order_total > 0:
-                    # Store the original cantidad_cobrada before modifying
-                    original_cantidad_cobrada = order.cantidad_cobrada
-                    
-                    # Calculate proportional split
-                    proportion_original = original_total / original_order_total
-                    proportion_new = new_total / original_order_total
-                    
-                    order.cantidad_cobrada = (original_cantidad_cobrada * proportion_original).quantize(Decimal('0.01'))
-                    new_order.cantidad_cobrada = (original_cantidad_cobrada * proportion_new).quantize(Decimal('0.01'))
-            
-            order.save()
-            new_order.save()
-            
-            # Handle payments - split them proportionally
-            original_payments = Payment.objects.filter(order=order, status='completed')
-            if original_payments.exists():
-                original_order_total = original_total + new_total
-                if original_order_total > 0:
-                    proportion_original = original_total / original_order_total
-                    proportion_new = new_total / original_order_total
-                    
-                    for payment in original_payments:
-                        # Store original amount before modifying
-                        original_amount = payment.amount
-                        original_balance_used = payment.balance_used
-                        original_credit_used = payment.credit_used
-                        
-                        # Calculate proportional amounts
-                        original_payment_amount = (original_amount * proportion_original).quantize(Decimal('0.01'))
-                        new_payment_amount = (original_amount * proportion_new).quantize(Decimal('0.01'))
-                        
-                        # Create new payment for the new order (skip processing by setting status after creation)
-                        new_payment = Payment(
-                            order=new_order,
-                            client=new_order.client,
-                            amount=new_payment_amount,
-                            method=payment.method,
-                            status='pending',  # Set as pending first to avoid triggering save logic
-                            balance_used=(original_balance_used * proportion_new).quantize(Decimal('0.01')) if original_balance_used else Decimal('0.00'),
-                            credit_used=(original_credit_used * proportion_new).quantize(Decimal('0.01')) if original_credit_used else Decimal('0.00'),
-                            created_by=request.user
-                        )
-                        new_payment.save()
-                        # Now update status to completed without triggering balance/credit logic
-                        Payment.objects.filter(pk=new_payment.pk).update(status='completed')
-                        
-                        # Update the original payment amount directly to avoid triggering save logic
-                        Payment.objects.filter(pk=payment.pk).update(
-                            amount=original_payment_amount,
-                            balance_used=(original_balance_used * proportion_original).quantize(Decimal('0.01')) if original_balance_used else Decimal('0.00'),
-                            credit_used=(original_credit_used * proportion_original).quantize(Decimal('0.01')) if original_credit_used else Decimal('0.00')
-                        )
-            
-            # Create split record for tracking
-            OrderSplit.objects.create(
-                source_order=order,
-                child_order=new_order,
-                split_by=request.user
-            )
-            
-            from django.contrib import messages
-            messages.success(
-                request,
-                f'Orden dividida exitosamente. Nueva orden #{new_order.id} creada con total ${new_order.total_amount}. '
-                f'Orden original #{order.id} actualizada con total ${order.total_amount}.'
-            )
-            
-            return redirect('admin_orders')
+            quantities = {
+                item.pk: form.cleaned_data[f'quantity_{item.pk}']
+                for item in order_items
+            }
+            try:
+                new_order = split_completed_order(order, quantities, request.user)
+            except OrderSplitError as exc:
+                form.add_error(None, str(exc))
+            else:
+                order.refresh_from_db()
+                messages.success(
+                    request,
+                    f'Orden dividida exitosamente. Nueva orden #{new_order.id} creada con total ${new_order.total_amount}. '
+                    f'Orden original #{order.id} actualizada con total ${order.total_amount}.',
+                )
+                return redirect('admin_orders')
     else:
         form = SplitOrderForm(order=order)
     
