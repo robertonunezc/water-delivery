@@ -473,42 +473,49 @@ def update_credit_limit(
         CreditTransaction if limit changed, None if no change
 
     Raises:
-        ValueError: If new_limit is negative
+        ValueError: If new_limit is negative or below the account's debt
     """
-    from clients.models import CreditTransaction
+    from clients.models import Client, CreditTransaction
 
     if new_limit < 0:
         raise ValueError("Credit limit cannot be negative")
 
-    if new_limit == client.credit_limit:
+    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    if new_limit == locked_client.credit_limit:
+        client.credit_limit = locked_client.credit_limit
+        client.current_debt = locked_client.current_debt
         return None  # No change needed
+    locked_client.validate_credit_limit(new_limit)
 
     # Store previous values
-    debt_before = client.current_debt
-    credit_limit_before = client.credit_limit
+    debt_before = locked_client.current_debt
+    credit_limit_before = locked_client.credit_limit
 
     # Update credit limit
-    client.credit_limit = new_limit
+    locked_client.credit_limit = new_limit
 
     # Save client
-    client.save(update_fields=["credit_limit", "updated_at"])
-    if client.type == "corporate":
+    locked_client.save(update_fields=["credit_limit", "updated_at"])
+    if locked_client.type == "corporate":
         from clients.services.client_service import (
             sync_inherited_branch_credit_from_corporate,
         )
 
-        sync_inherited_branch_credit_from_corporate(client)
+        sync_inherited_branch_credit_from_corporate(locked_client)
+
+    client.credit_limit = locked_client.credit_limit
+    client.current_debt = locked_client.current_debt
 
     # Create transaction record
     final_notes = (
         notes or f"Cambio de límite de crédito de ${credit_limit_before:.2f} a ${new_limit:.2f}"
     )
     return CreditTransaction.objects.create(
-        client=client,
+        client=locked_client,
         transaction_type="limit_change",
         amount=abs(new_limit - credit_limit_before),
         debt_before=debt_before,
-        debt_after=client.current_debt,
+        debt_after=locked_client.current_debt,
         credit_limit_before=credit_limit_before,
         credit_limit_after=new_limit,
         notes=final_notes,

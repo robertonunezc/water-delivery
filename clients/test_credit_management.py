@@ -6,7 +6,8 @@ from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from clients.models import Client, ClientCreditConfig
+from clients.forms import ClientCoreForm, ClientCreditPolicyForm
+from clients.models import Client, ClientCreditConfig, CreditTransaction
 from clients.services import balance_service
 from clients.services.client_service import (
     ClientUpdateData,
@@ -190,6 +191,171 @@ class BranchCreditServiceTests(FastTenantTestCase):
 
         branch.refresh_from_db()
         self.assertEqual(branch.credit_limit, Decimal('500.00'))
+
+
+class CreditLimitChangeTests(FastTenantTestCase):
+    def setUp(self) -> None:
+        self.user = User.objects.create_user(username='credit-limit-user')
+        self.customer = Client.objects.create(
+            name='Cliente cambio de límite',
+            type='corporate',
+            credit_limit=Decimal('300.00'),
+            current_debt=Decimal('106.00'),
+            balance=Decimal('25.00'),
+        )
+
+    def test_credit_policy_form_rejects_limit_below_debt(self) -> None:
+        form = ClientCreditPolicyForm(
+            data={'credit_limit': '50.00'}, instance=self.customer,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('credit_limit', form.errors)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.get_available_credit(), Decimal('194.00'))
+
+    def test_client_update_rejects_limit_below_debt(self) -> None:
+        with self.assertRaises(ValidationError):
+            update_client(
+                self.customer, ClientUpdateData(credit_limit=Decimal('50.00')),
+                self.user,
+            )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.credit_limit, Decimal('300.00'))
+        self.assertEqual(self.customer.current_debt, Decimal('106.00'))
+
+    def test_limit_service_rejects_limit_below_debt_without_history(self) -> None:
+        with self.assertRaisesRegex(ValueError, 'menor que la deuda actual'):
+            balance_service.update_credit_limit(
+                self.customer, Decimal('50.00'), user=self.user,
+            )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.credit_limit, Decimal('300.00'))
+        self.assertFalse(self.customer.credit_transactions.exists())
+
+    def test_limit_service_checks_persisted_debt_for_stale_client(self) -> None:
+        self.customer.current_debt = Decimal('0.00')
+
+        with self.assertRaisesRegex(ValueError, 'menor que la deuda actual'):
+            balance_service.update_credit_limit(
+                self.customer, Decimal('50.00'), user=self.user,
+            )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.credit_limit, Decimal('300.00'))
+        self.assertEqual(self.customer.current_debt, Decimal('106.00'))
+
+    def test_client_update_preserves_financial_state_for_stale_client(self) -> None:
+        self.customer.current_debt = Decimal('0.00')
+        self.customer.balance = Decimal('0.00')
+
+        update_client(
+            self.customer, ClientUpdateData(credit_limit=Decimal('200.00')),
+            self.user,
+        )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal('106.00'))
+        self.assertEqual(self.customer.balance, Decimal('25.00'))
+        self.assertEqual(self.customer.get_available_credit(), Decimal('94.00'))
+
+    def test_limit_equal_to_debt_is_allowed_and_audited(self) -> None:
+        credit_transaction = balance_service.update_credit_limit(
+            self.customer, Decimal('106.00'), user=self.user,
+        )
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.get_available_credit(), Decimal('0.00'))
+        self.assertEqual(credit_transaction.debt_before, Decimal('106.00'))
+        self.assertEqual(credit_transaction.debt_after, Decimal('106.00'))
+        self.assertEqual(credit_transaction.credit_limit_before, Decimal('300.00'))
+        self.assertEqual(credit_transaction.credit_limit_after, Decimal('106.00'))
+
+    def test_existing_negative_available_credit_can_be_blocked(self) -> None:
+        Client.objects.filter(pk=self.customer.pk).update(credit_limit=Decimal('50.00'))
+        self.customer.refresh_from_db()
+        form = ClientCreditPolicyForm(
+            data={'credit_limit': '50.00', 'can_pay_with_credit': 'on'},
+            instance=self.customer,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.customer.refresh_from_db()
+        self.assertFalse(self.customer.can_pay_with_credit)
+        self.assertEqual(self.customer.current_debt, Decimal('106.00'))
+
+    def test_existing_negative_available_credit_can_be_corrected(self) -> None:
+        Client.objects.filter(pk=self.customer.pk).update(credit_limit=Decimal('50.00'))
+        self.customer.refresh_from_db()
+        form = ClientCreditPolicyForm(
+            data={'credit_limit': '106.00'}, instance=self.customer,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.get_available_credit(), Decimal('0.00'))
+
+    def test_core_form_skips_limit_validation_after_another_request_corrects_it(self) -> None:
+        self.customer.credit_limit = Decimal('50.00')
+        Client.objects.filter(pk=self.customer.pk).update(credit_limit=Decimal('106.00'))
+        form = ClientCoreForm(
+            data={
+                'name': self.customer.name,
+                'type': 'corporate',
+                'active': 'on',
+                'confirmation_delivery_method': 'whatsapp',
+            },
+            instance=self.customer,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_unchanged_limit_refreshes_stale_client_without_a_history_entry(self) -> None:
+        Client.objects.filter(pk=self.customer.pk).update(credit_limit=Decimal('200.00'))
+
+        credit_transaction = balance_service.update_credit_limit(
+            self.customer, Decimal('200.00'), user=self.user,
+        )
+
+        self.assertIsNone(credit_transaction)
+        self.assertEqual(self.customer.credit_limit, Decimal('200.00'))
+        self.assertEqual(self.customer.current_debt, Decimal('106.00'))
+        self.assertFalse(self.customer.credit_transactions.exists())
+
+    def test_switching_to_own_credit_preserves_the_original_debt_account(self) -> None:
+        branch = Client.objects.create(
+            name='Sucursal cambio de cuenta', type='branch',
+            corporate=self.customer, credit_limit=Decimal('300.00'),
+        )
+        order = Order.objects.create(
+            client=branch, total_amount=Decimal('159.00'), type='credito',
+        )
+        purchase = balance_service.add_debt(
+            client=branch, amount=Decimal('159.00'), transaction_type='purchase',
+            reference_order=order,
+        )
+
+        update_client(
+            branch, ClientUpdateData(
+                credit_override_enabled=True, credit_limit=Decimal('50.00'),
+            ), self.user,
+        )
+
+        self.customer.refresh_from_db()
+        branch.refresh_from_db()
+        purchase.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal('265.00'))
+        self.assertEqual(branch.current_debt, Decimal('0.00'))
+        self.assertEqual(branch.get_available_credit(), Decimal('50.00'))
+        self.assertEqual(purchase.client_id, self.customer.pk)
+        self.assertEqual(purchase.reference_order.client_id, branch.pk)
+        self.assertEqual(CreditTransaction.objects.filter(reference_order=order).count(), 1)
 
 
 class CreditSaleEnforcementTests(FastTenantTestCase):

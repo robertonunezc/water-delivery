@@ -50,6 +50,7 @@ from dataclasses import dataclass
 from typing import Optional
 from decimal import Decimal
 from django.contrib.auth.models import User
+from django.db import transaction
 from clients.models import Client, ClientCreditConfig
 
 
@@ -184,6 +185,7 @@ def _branch_credit_policy_edit_allowed(client: Client, update_data: ClientUpdate
     return client_type != 'branch' or credit_override_enabled
 
 
+@transaction.atomic
 def update_client(client: Client, update_data: ClientUpdateData, user: User) -> Client:
     """
     Update a client with the provided data.
@@ -199,6 +201,7 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     Raises:
         ValueError: If validation fails
     """
+    client = Client.objects.select_for_update().get(pk=client.pk)
     if _has_credit_policy_update(update_data) and not _branch_credit_policy_edit_allowed(client, update_data):
         raise ValueError(
             'La configuración de crédito se administra desde el corporativo para esta sucursal.'
