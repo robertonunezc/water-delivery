@@ -45,6 +45,11 @@ Troubleshooting:
 
 VPS Docker Compose production commands
 
+The GitHub Actions workflow writes `APP_IMAGE` to `.env.production` using the exact
+image digest produced by its build. The web, Celery worker, and Celery beat services
+all use that image. Workflow runs are serialized to prevent overlapping deployments.
+Manual deployments without `APP_IMAGE` use `robe/development:water`.
+
 If you deploy on a VPS with `docker-compose.prod.yml`, run this stack to include Celery:
 
 ```bash

@@ -3,7 +3,7 @@ version: '3.8'
 services:
 
   web:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_web_prod
     restart: unless-stopped
     logging:
@@ -29,7 +29,7 @@ services:
       - "service=web"
 
   celery-worker:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_celery_worker_prod
     restart: unless-stopped
     env_file:
@@ -49,7 +49,7 @@ services:
       - "service=celery-worker"
 
   celery-beat:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_celery_beat_prod
     restart: unless-stopped
     env_file:
