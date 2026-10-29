@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404, render
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.base_user import AbstractBaseUser
 from django.db.models import (
     Q, Max, Min, Sum, Avg, Subquery, OuterRef, Count, Prefetch, QuerySet,
 )
@@ -47,10 +48,14 @@ def _report_invoice_links_prefetch() -> Prefetch:
     )
 
 
-def _get_report_orders_queryset(status_filter: str = '') -> QuerySet:
-    if status_filter == OrderStatus.CANCELLED.value:
-        return Order.objects.including_cancelled()
-    return Order.objects.active()
+def _get_report_orders_queryset(
+    user: AbstractBaseUser,
+    status_filter: str = '',
+) -> QuerySet:
+    orders = Order.objects.filter(owner=user)
+    if status_filter and status_filter != 'all':
+        return orders.filter(status=status_filter)
+    return orders
 
 
 def _get_payment_method_order_ids(payment_method: str) -> QuerySet:
@@ -87,6 +92,7 @@ def _get_order_payment_method_keys(order: Order) -> str:
 def _build_orders_export_url(request: HttpRequest) -> str:
     query_params = request.GET.copy()
     query_params.pop('page', None)
+    query_params.pop('employee', None)
     query_string = query_params.urlencode()
     export_url = reverse('report:orders_report_csv')
     if query_string:
@@ -404,33 +410,31 @@ def client_debt_report(request):
 
 
 @login_required
-def orders_report(request):
+def orders_report(request: HttpRequest) -> HttpResponse:
     """
     Comprehensive orders report with multiple filters:
     - Search by client name, order ID, or notes
     - Filter by order status
     - Filter by date range (today, this week, this month, custom)
-    - Filter by employee/owner
+    - Always scoped to orders created by the logged-in user
     - Filter by amount range
     - Sort options
     """
     # CSV download support
     if request.GET.get('download') == 'csv':
         return orders_report_csv(request)
-    owner = request.user
     # Get filter parameters from request
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '').strip()
     date_filter = request.GET.get('date_filter', '').strip()
     start_date = request.GET.get('start_date', '').strip()
     end_date = request.GET.get('end_date', '').strip()
-    employee_filter = request.GET.get('employee', '').strip()
     has_billing = request.GET.get('has_billing', '').strip()
     min_amount = request.GET.get('min_amount', '').strip()
     max_amount = request.GET.get('max_amount', '').strip()
     sort_by = request.GET.get('sort_by', '-order_date').strip()
     
-    orders_queryset = _get_report_orders_queryset(status_filter).select_related(
+    orders_queryset = _get_report_orders_queryset(request.user, status_filter).select_related(
         'client', 'owner', 'receipt',
     ).prefetch_related(
         'items__product',
@@ -465,10 +469,6 @@ def orders_report(request):
             invoice_links__invoice__status=InvoiceStatus.ACTIVE,
         ).distinct()
 
-    # Apply status filter
-    if status_filter and status_filter != 'all':
-        orders_queryset = orders_queryset.filter(status=status_filter)
-    
     # Apply date filters
     today = timezone.localdate()
     if date_filter == 'today':
@@ -490,12 +490,6 @@ def orders_report(request):
         except ValueError:
             start_date = end_date = ''  # Clear invalid dates
     
-    # Apply employee filter
-    if employee_filter != 'all' and employee_filter:
-        orders_queryset = orders_queryset.filter(owner_id=employee_filter)
-    if not employee_filter:
-        orders_queryset = orders_queryset.filter(owner=owner)
-
     # Apply amount range filters
     if min_amount:
         try:
@@ -535,11 +529,6 @@ def orders_report(request):
         count=Count('id')
     ).order_by('status')
     
-    # Get all employees for filter dropdown
-    employees = get_user_model().objects.filter(
-        id__in=Order.objects.active().values_list('owner_id', flat=True).distinct()
-    ).order_by('first_name', 'last_name')
-    
     # Pagination
     paginator = Paginator(orders_queryset, 20)  # Show 20 orders per page
     page = request.GET.get('page')
@@ -554,7 +543,7 @@ def orders_report(request):
     # Check if filters are applied
     has_filters = bool(
         search_query or (status_filter and status_filter != 'all') or
-        date_filter or employee_filter or min_amount or max_amount or payment_method
+        date_filter or min_amount or max_amount or payment_method
     )
 
     # consider has_billing as a filter when set to yes/no
@@ -570,7 +559,6 @@ def orders_report(request):
         'date_filter': date_filter,
         'start_date': start_date,
         'end_date': end_date,
-        'employee_filter': employee_filter,
         'min_amount': min_amount,
         'max_amount': max_amount,
         'sort_by': sort_by,
@@ -580,7 +568,6 @@ def orders_report(request):
         'order_stats': order_stats,
         'status_distribution': status_distribution,
         'order_status_choices': ORDER_STATUS_CHOICES,
-        'employees': employees,
         'today_date': today.strftime('%Y-%m-%d'),
         'orders_export_url': _build_orders_export_url(request),
         'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
@@ -594,25 +581,23 @@ def orders_report(request):
 from django.utils.encoding import smart_str
 
 @login_required
-def orders_report_csv(request):
+def orders_report_csv(request: HttpRequest) -> HttpResponse:
     """
     Download filtered orders as CSV (same filters as orders_report)
     """
     # Duplicate filter logic from orders_report
-    owner = request.user
     search_query = request.GET.get('search', '').strip()
     status_filter = request.GET.get('status', '').strip()
     date_filter = request.GET.get('date_filter', '').strip()
     start_date = request.GET.get('start_date', '').strip()
     end_date = request.GET.get('end_date', '').strip()
-    employee_filter = request.GET.get('employee', '').strip()
     has_billing = request.GET.get('has_billing', '').strip()
     min_amount = request.GET.get('min_amount', '').strip()
     max_amount = request.GET.get('max_amount', '').strip()
     sort_by = request.GET.get('sort_by', '-order_date').strip()
     payment_method = request.GET.get('payment_method', '').strip()
 
-    orders_queryset = _get_report_orders_queryset(status_filter).select_related(
+    orders_queryset = _get_report_orders_queryset(request.user, status_filter).select_related(
         'client', 'owner',
     ).prefetch_related(
         'items__product',
@@ -640,8 +625,6 @@ def orders_report_csv(request):
         orders_queryset = orders_queryset.exclude(
             invoice_links__invoice__status=InvoiceStatus.ACTIVE,
         ).distinct()
-    if status_filter and status_filter != 'all':
-        orders_queryset = orders_queryset.filter(status=status_filter)
     today = timezone.localdate()
     if date_filter == 'today':
         orders_queryset = orders_queryset.filter(order_date__date=today)
@@ -661,10 +644,6 @@ def orders_report_csv(request):
             )
         except ValueError:
             pass
-    if employee_filter != 'all' and employee_filter:
-        orders_queryset = orders_queryset.filter(owner_id=employee_filter)
-    if not employee_filter:
-        orders_queryset = orders_queryset.filter(owner=owner)
     if min_amount:
         try:
             min_amount_value = Decimal(min_amount)
@@ -693,7 +672,7 @@ def orders_report_csv(request):
 
     # Header
     writer.writerow([
-        'NoPedido', 'Fecha', 'Cliente','Producto',  'Tipo de pago','Estado', 'Total'
+        'NoPedido', 'Fecha', 'Cliente', 'Usuario', 'Producto', 'Tipo de pago', 'Estado', 'Total'
     ])
 
     for order in orders_queryset:
@@ -704,6 +683,7 @@ def orders_report_csv(request):
             smart_str(order.id),
             order.order_date.strftime('%Y-%m-%d %H:%M'),
             smart_str(order.client.name if order.client else ''),
+            smart_str(order.owner.get_full_name() or order.owner.get_username()),
             products,
             payment_methods,
             order.get_status_display(),

@@ -9,6 +9,7 @@
     <div class="pg-row pg-mb-4">
       <div class="pg-col-md-8">
         <h1><i class="fas fa-shopping-cart pg-me-2"></i>Reporte de Órdenes</h1>
+        <p class="pg-text-muted pg-mb-0">Pedidos creados por {{ user.get_full_name|default:user.username }}</p>
         {% if has_search or has_filters %}
           <p class="pg-text-muted pg-mb-0">
             {% if has_search %}
@@ -118,20 +119,6 @@
               <option value="custom" {% if date_filter == 'custom' %}selected{% endif %}>Rango personalizado</option>
             </select>
           </div>
-                          {% if user.is_superuser%}
-
-          <div class="pg-col-md-2">
-            <label for="employee" class="pg-label">Empleado:</label>
-            <select class="pg-select" id="employee" name="employee">
-              <option value="all" {% if employee_filter == 'all' or not employee_filter %}selected{% endif %}>Todos</option>
-              {% for employee in employees %}
-                <option value="{{ employee.id }}" {% if employee_filter == employee.id|stringformat:"s" %}selected{% endif %}>
-                  {{ employee.get_full_name|default:employee.username }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-                            {% endif %}
           <div class="pg-col-md-2">
             <label for="sort_by" class="pg-label">Ordenar por:</label>
             <select class="pg-select" id="sort_by" name="sort_by">
@@ -238,6 +225,7 @@
               <thead>
                 <tr>
                   <th scope="col">ID / Cliente</th>
+                  <th scope="col">Usuario</th>
                   <th scope="col">Fecha</th>
                   <th scope="col" class="pg-text-end">Monto</th>
                   <th scope="col" class="pg-text-center">Metodo Pago</th>
@@ -260,6 +248,7 @@
                             
                       </div>
                     </td>
+                    <td>{{ order.owner.get_full_name|default:order.owner.username }}</td>
                     <td>
                       <div class="date-info">
                         <strong>{{ order.order_date|date:"d/m/Y" }}</strong>
@@ -356,12 +345,12 @@
               <ul class="pg-pagination pg-justify-center">
                 {% if orders.has_previous %}
                   <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
                       <i class="fas fa-angle-double-left"></i>
                     </a>
                   </li>
                   <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
                       <i class="fas fa-angle-left"></i>
                     </a>
                   </li>
@@ -382,11 +371,11 @@
                     </li>
                   {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
                     <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
                     <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                     </li>
                   {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
                     <li class="pg-page-item pg-disabled">
@@ -397,12 +386,12 @@
 
                 {% if orders.has_next %}
                   <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
+                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
                       <i class="fas fa-angle-right"></i>
                     </a>
                   </li>
                   <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if employee_filter %}employee={{ employee_filter }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
+                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
                       <i class="fas fa-angle-double-right"></i>
                     </a>
                   </li>
