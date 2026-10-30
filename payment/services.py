@@ -43,6 +43,15 @@ class PaymentRequestData:
     payment_date: Optional[object] = None
 
 
+def _sync_completed_order_inventory(order: Order) -> None:
+    if order.status != OrderStatus.COMPLETED.value:
+        return
+
+    from routes.services import sync_open_inventory_sessions_for_order
+
+    sync_open_inventory_sessions_for_order(order)
+
+
 def get_unpaid_amount(order: Order) -> Decimal:
     """Return the remaining unpaid amount for an order."""
     return max(
@@ -587,6 +596,7 @@ def process_multiple_payments(
 
     order.status = OrderStatus.COMPLETED.value
     order.save()
+    _sync_completed_order_inventory(order)
 
     response_data = {
         'success': True,
@@ -640,6 +650,7 @@ def process_legacy_payment(
 
     order.status = OrderStatus.COMPLETED.value
     order.save()
+    _sync_completed_order_inventory(order)
 
     response_data = {
         'success': True,
@@ -855,6 +866,7 @@ def _register_credit_order_from_payment_rows(
             order.type = 'credito'
             order.status = OrderStatus.COMPLETED.value
             order.save(update_fields=['type', 'status', 'updated_at'])
+            _sync_completed_order_inventory(order)
     except ValueError as exc:
         return {'error': str(exc)}, 400
 
@@ -941,6 +953,7 @@ def _register_credit_order_debt(
             if order.status != OrderStatus.COMPLETED.value:
                 order.status = OrderStatus.COMPLETED.value
                 order.save(update_fields=['status', 'updated_at'])
+                _sync_completed_order_inventory(order)
     except ValueError as exc:
         return {'error': str(exc)}, 400
 
@@ -1031,6 +1044,7 @@ def _settle_pending_credit_order(
 
         order.status = OrderStatus.COMPLETED.value
         order.save(update_fields=['status', 'updated_at'])
+        _sync_completed_order_inventory(order)
 
     return {
         'success': True,
