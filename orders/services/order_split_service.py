@@ -9,6 +9,7 @@ from clients.models import Client, CreditTransaction
 from orders.models import Order, OrderProduct, OrderSplit, OrderStatus
 from payment.models import Payment
 from payment.services import get_unpaid_amount
+from orders.services.credit_lock_service import lock_order_credit_clients
 
 ZERO = Decimal("0.00")
 CENT = Decimal("0.01")
@@ -37,6 +38,8 @@ def _create_child(order: Order, subtotal: Decimal, proportion: Decimal) -> Order
     discount = _portion(order.discount, proportion)
     child = Order.objects.create(
         client=order.client, status=order.status, type=order.type, owner=order.owner,
+        credit_account=order.credit_account,
+        credit_terms_snapshot=order.credit_terms_snapshot,
         notes=f"Dividida de Orden #{order.pk}", subtotal_amount=subtotal,
         discount=discount, total_amount=subtotal - discount,
         cantidad_cobrada=(
@@ -111,12 +114,19 @@ def _transfer_credit(
         raise OrderSplitError(
             "El crédito del pedido no tiene una compra vinculada. Requiere revisión."
         )
-    account = Client.objects.select_for_update().get(pk=purchase.client_id)
-    if entries.exclude(client=account).exists() or entries.exclude(
-        transaction_type__in=["purchase", "purchase_reversal"],
+    account = Client.objects.select_for_update().get(pk=pending.order.get_credit_account().pk)
+    if entries.exclude(
+        transaction_type__in=[
+            "purchase", "purchase_reversal", "transfer_in", "transfer_out",
+            "payment", "payment_from_balance", "payment_reversal",
+        ],
     ).exists():
         raise OrderSplitError("El crédito tiene cuentas o ajustes ambiguos. Requiere revisión.")
-    summary = entries.aggregate_summary()
+    for previous_id in entries.exclude(client=account).values_list('client_id', flat=True).distinct():
+        previous = entries.filter(client_id=previous_id).aggregate_summary()
+        if previous['total_purchases'] != previous['total_payments']:
+            raise OrderSplitError("El crédito tiene cuentas o ajustes ambiguos. Requiere revisión.")
+    summary = entries.filter(client=account).aggregate_summary()
     if summary["total_purchases"] - summary["total_payments"] != pending.amount:
         raise OrderSplitError(
             "La deuda del pedido no coincide con su crédito pendiente. Requiere revisión."
@@ -136,6 +146,8 @@ def _record_credit_transfer(
     amount = child_pending.amount
     if amount <= ZERO:
         return
+    child_pending.order.credit_account = account
+    child_pending.order.save(update_fields=['credit_account', 'updated_at'])
     common = dict(
         client=account, amount=amount, created_by=user, date=timezone.localdate(),
         credit_limit_before=account.credit_limit, credit_limit_after=account.credit_limit,
@@ -204,6 +216,7 @@ def split_order(
     order: Order, quantities: dict[int, int], user: AbstractBaseUser | None = None,
 ) -> Order:
     """Split a completed sale, preserving money received and total credit debt."""
+    lock_order_credit_clients([order.pk])
     order = Order.objects.select_for_update().get(pk=order.pk)
     if order.status != OrderStatus.COMPLETED.value:
         raise OrderSplitError("Solo se pueden dividir pedidos completados.")
@@ -274,6 +287,7 @@ def _validate_legacy_credit(order: Order, children: list[Order]) -> Payment:
 @transaction.atomic
 def repair_split_order_credit(order: Order, user: AbstractBaseUser | None = None) -> int:
     """Repair unambiguous unpaid legacy splits; preserve debt and allow safe retries."""
+    lock_order_credit_clients([order.pk])
     order = Order.objects.select_for_update().get(pk=order.pk)
     if order.status != OrderStatus.COMPLETED.value or order.type != "credito":
         raise OrderSplitError("La orden original debe estar completada y ser a crédito.")

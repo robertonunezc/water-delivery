@@ -13,6 +13,7 @@ from clients.services.credit_payment_service import (
 from clients.services.credit_reconciliation_service import (
     get_credit_reconciliation_summary,
 )
+from clients.services.client_service import ClientUpdateData, update_client
 from orders.models import Order, OrderProduct, OrderSplit, OrderStatus
 from orders.services import cancel_order
 from orders.services.order_split_service import OrderSplitError, split_order
@@ -92,6 +93,27 @@ class CreditOrderSplitTests(FastTenantTestCase):
             child.payments.get(method="pending_credit").amount, Decimal("282.00"),
         )
         self.assertEqual(child.type, "credito")
+
+    def test_split_after_credit_transfer_keeps_destination_debt_balanced(self) -> None:
+        update_client(
+            self.customer,
+            ClientUpdateData(credit_override_enabled=True, credit_limit=Decimal("1500.00")),
+            self.user,
+        )
+
+        child = self._split_order()
+
+        self.corporate.refresh_from_db()
+        self.customer.refresh_from_db()
+        self.assertEqual(self.corporate.current_debt, Decimal("0.00"))
+        self.assertEqual(self.customer.current_debt, Decimal("987.00"))
+        self.assertEqual(child.get_credit_account().pk, self.customer.pk)
+        summary = get_credit_reconciliation_summary(self.customer)
+        self.assertTrue(summary.is_balanced)
+        result = cancel_order(child, user=self.user)
+        self.assertTrue(result["success"])
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal("705.00"))
 
     def test_split_keeps_credit_reconciliation_balanced(self) -> None:
         self._split_order()

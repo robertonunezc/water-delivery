@@ -328,7 +328,7 @@ class CreditLimitChangeTests(FastTenantTestCase):
         self.assertEqual(self.customer.current_debt, Decimal('106.00'))
         self.assertFalse(self.customer.credit_transactions.exists())
 
-    def test_switching_to_own_credit_preserves_the_original_debt_account(self) -> None:
+    def test_switching_to_own_credit_requires_capacity_for_inherited_debt(self) -> None:
         branch = Client.objects.create(
             name='Sucursal cambio de cuenta', type='branch',
             corporate=self.customer, credit_limit=Decimal('300.00'),
@@ -341,18 +341,20 @@ class CreditLimitChangeTests(FastTenantTestCase):
             reference_order=order,
         )
 
-        update_client(
-            branch, ClientUpdateData(
-                credit_override_enabled=True, credit_limit=Decimal('50.00'),
-            ), self.user,
-        )
+        with self.assertRaisesRegex(ValueError, '159.00'):
+            update_client(
+                branch, ClientUpdateData(
+                    credit_override_enabled=True, credit_limit=Decimal('50.00'),
+                ), self.user,
+            )
 
         self.customer.refresh_from_db()
         branch.refresh_from_db()
         purchase.refresh_from_db()
         self.assertEqual(self.customer.current_debt, Decimal('265.00'))
         self.assertEqual(branch.current_debt, Decimal('0.00'))
-        self.assertEqual(branch.get_available_credit(), Decimal('50.00'))
+        self.assertFalse(branch.credit_override_enabled)
+        self.assertEqual(branch.get_available_credit(), Decimal('35.00'))
         self.assertEqual(purchase.client_id, self.customer.pk)
         self.assertEqual(purchase.reference_order.client_id, branch.pk)
         self.assertEqual(CreditTransaction.objects.filter(reference_order=order).count(), 1)

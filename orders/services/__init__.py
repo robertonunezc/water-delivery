@@ -357,6 +357,9 @@ def _cancel_order_in_transaction(
     order: Order,
     user: object | None = None,
 ) -> Dict[str, object]:
+    from orders.services.credit_lock_service import lock_order_credit_clients
+
+    lock_order_credit_clients([order.pk])
     locked_order = (
         Order.objects.select_for_update()
         .select_related('client')
@@ -394,8 +397,16 @@ def _cancel_order_in_transaction(
 
     _reverse_added_balance(locked_order, added_balance_amount, user=user)
     _reverse_completed_balance_payments(locked_order, user=user)
-    _reverse_credit_payment_transactions(locked_order, user=user)
-    _reverse_credit_purchase_transactions(locked_order, user=user)
+    if (
+        locked_order.credit_transfers.exists()
+        or locked_order.get_credit_account().pk != locked_order.client.get_credit_account().pk
+    ):
+        from clients.services.credit_order_reversal_service import reverse_transferred_order_credit
+
+        reverse_transferred_order_credit(locked_order, user)
+    else:
+        _reverse_credit_payment_transactions(locked_order, user=user)
+        _reverse_credit_purchase_transactions(locked_order, user=user)
     payments_reversed = _mark_payments_reversed(locked_order)
 
     locked_order.status = OrderStatus.CANCELLED.value
@@ -650,11 +661,15 @@ def cancel_orders(queryset: QuerySet, user: object | None = None) -> Dict[str, i
     Returns:
         dict with 'updated' count and 'skipped' count
     """
+    from orders.services.credit_lock_service import lock_order_credit_clients
+
+    orders = list(queryset)
+    lock_order_credit_clients([order.pk for order in orders])
     updated = 0
     skipped = 0
     review_required = 0
 
-    for order in queryset:
+    for order in orders:
         result = cancel_order(order=order, user=user)
         if result.get('success') and not result.get('skipped'):
             updated += 1

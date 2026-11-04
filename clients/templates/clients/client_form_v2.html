@@ -119,6 +119,12 @@
 									<div class="pg-field-help">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
 									{{ core_form.credit_override_enabled.errors }}
 								</div>
+								<div class="pg-col-md-6">
+									<label class="pg-label">{{ core_form.branch_credit_limit.label }}</label>
+									{{ core_form.branch_credit_limit }}
+									<div class="pg-field-help">{{ core_form.branch_credit_limit.help_text }}</div>
+									{{ core_form.branch_credit_limit.errors }}
+								</div>
 							{% endif %}
 						</div>
 						{% if core_form.non_field_errors %}

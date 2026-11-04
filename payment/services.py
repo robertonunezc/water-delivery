@@ -5,9 +5,11 @@ from dataclasses import dataclass, asdict
 from django.contrib.auth.models import User
 from django.db import transaction
 
+from clients.models import CreditTransaction
 from clients.services import balance_service
 from core.utils import combine_date_with_local_time, parse_date_input
 from orders.models import Order, OrderStatus
+from orders.services.credit_lock_service import lock_order_credit_clients
 
 from .models import Payment
 
@@ -162,6 +164,7 @@ def pay_client_orders(
     payment_date: date | None = None,
 ) -> dict[str, object]:
     """Pay selected unpaid client orders and add overpayment to balance."""
+    lock_order_credit_clients([order.pk for order in orders])
     selected_orders = get_selected_unpaid_orders(
         client=client,
         order_ids=[order.id for order in orders],
@@ -250,6 +253,7 @@ def process_payment_request(
     request_user: User,
 ) -> tuple[dict, int]:
     """Process a payment request payload in either multi or legacy format."""
+    lock_order_credit_clients([order.pk])
     order = Order.objects.select_for_update().get(pk=order.pk)
     if not order.is_editable:
         return {
@@ -392,21 +396,9 @@ def _parse_payment_rows(payments_data: list) -> list[dict[str, object]]:
 
 
 def _get_order_credit_account(order: Order) -> "Client":
-    """Return the credit ledger owner recorded when the order debt was created."""
-    from clients.models import CreditTransaction
-
-    purchase = (
-        CreditTransaction.objects.filter(
-            reference_order=order,
-            transaction_type='purchase',
-        )
-        .select_related('client')
-        .order_by('created_at', 'pk')
-        .first()
-    )
-    if purchase:
-        return purchase.client
-    return order.client.get_credit_account()
+    """Resolve current debt ownership, including switches after the order was loaded."""
+    current_order = Order.objects.select_related('credit_account', 'client__corporate').get(pk=order.pk)
+    return current_order.get_credit_account()
 
 
 @transaction.atomic
@@ -419,6 +411,8 @@ def settle_credit_order_payment(
     payment_date: date | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Record a credit-order payment and reduce the client's debt atomically."""
+    lock_order_credit_clients([order.pk])
+    order = Order.objects.select_for_update().get(pk=order.pk)
     pending_credit = order.payments.select_for_update().filter(
         method='pending_credit',
         status='pending',
@@ -480,7 +474,7 @@ def _reconcile_unapplied_credit_payment(
 ) -> Optional[Payment]:
     """Apply a previously recorded payment that did not reduce credit debt."""
     credit_account = _get_order_credit_account(order)
-    accounted_payment_ids = credit_account.credit_transactions.filter(
+    accounted_payment_ids = CreditTransaction.objects.filter(
         reference_order=order,
         transaction_type__in=['payment', 'payment_from_balance'],
         reference_payment__isnull=False,

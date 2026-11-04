@@ -1,5 +1,6 @@
 from decimal import Decimal
 from datetime import date
+from typing import TYPE_CHECKING
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -12,6 +13,9 @@ from django.utils import timezone
 from product.models import UNIT_CHOICES
 
 from core.models import TimeStampedModel
+
+if TYPE_CHECKING:
+    from clients.models import Client, ClientCreditConfig
 
 class OrderStatus(Enum):
     PENDING = 'PENDING'
@@ -34,6 +38,23 @@ RESERVING_INVOICE_STATUSES = ('DRAFT', 'ACTIVE')
 
 class OrderQuerySet(models.QuerySet):
     """Custom queryset for Order model with common filters"""
+
+    def with_credit_account(self) -> 'OrderQuerySet':
+        """Resolve current ownership while supporting legacy credit purchases."""
+        from clients.models import CreditTransaction
+
+        original_account = CreditTransaction.objects.filter(
+            reference_order_id=OuterRef('pk'), transaction_type='purchase',
+        ).order_by('created_at', 'pk').values('client_id')[:1]
+        return self.annotate(
+            resolved_credit_account_id=Coalesce(
+                'credit_account_id', Subquery(original_account), output_field=models.BigIntegerField(),
+            ),
+        )
+
+    def for_credit_accounts(self, account_ids: list[int]) -> 'OrderQuerySet':
+        """Return orders whose outstanding credit belongs to these accounts."""
+        return self.with_credit_account().filter(resolved_credit_account_id__in=account_ids)
 
     def active(self) -> 'OrderQuerySet':
         """Return non-cancelled orders."""
@@ -242,6 +263,11 @@ class OrderManager(models.Manager):
 # Create your models here.
 class Order(TimeStampedModel):
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='orders')
+    credit_account = models.ForeignKey(
+        'clients.Client', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='credit_orders', verbose_name='Cuenta de crédito actual',
+    )
+    credit_terms_snapshot = models.JSONField(default=dict, blank=True)
     order_date = models.DateTimeField(auto_now_add=True, db_index=True)
     subtotal_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Subtotal", help_text="Suma de los productos antes de descuentos")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -262,6 +288,44 @@ class Order(TimeStampedModel):
     discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, verbose_name="Descuento", help_text="Descuento aplicado a la orden (en la moneda del total)")
     type = models.CharField(max_length=50, default='contado', null=True, blank=True, choices=ORDER_TYPE_CHOICES, verbose_name="Tipo de Orden", help_text="Tipo de orden para diferenciar entre órdenes a credito y órdenes de contado")
     objects = OrderManager()
+
+    def get_credit_account(self) -> 'Client':
+        """Return the account currently holding this order's credit debt."""
+        if self.credit_account_id:
+            return self.credit_account
+        from clients.models import CreditTransaction
+
+        purchase = CreditTransaction.objects.filter(
+            reference_order=self, transaction_type='purchase',
+        ).select_related('client').order_by('created_at', 'pk').first()
+        return purchase.client if purchase else self.client.get_credit_account()
+
+    def get_effective_credit_config(self) -> 'ClientCreditConfig | None':
+        """Use original credit terms even after the debt account changes."""
+        from clients.models import ClientCreditConfig
+
+        if self.credit_terms_snapshot:
+            if not self.credit_terms_snapshot['configured']:
+                return None
+            values = {key: value for key, value in self.credit_terms_snapshot.items() if key != 'configured'}
+            return ClientCreditConfig(**values)
+        return self.get_credit_account().get_effective_credit_config()
+
+    def capture_credit_terms(self, account: 'Client') -> None:
+        """Capture terms once; callers persist this state inside their transaction."""
+        if self.credit_terms_snapshot:
+            return
+        from django.core.exceptions import ObjectDoesNotExist
+
+        try:
+            config = account.credit_config
+        except ObjectDoesNotExist:
+            self.credit_terms_snapshot = {'configured': False}
+            return
+        self.credit_terms_snapshot = {
+            'configured': True, 'payment_term_type': config.payment_term_type,
+            'cutoff_day': config.cutoff_day, 'max_payment_days': config.max_payment_days,
+        }
 
     class Meta:
         ordering = ['-order_date']

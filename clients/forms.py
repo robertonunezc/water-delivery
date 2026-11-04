@@ -1,4 +1,5 @@
 from datetime import date
+from typing import Any
 
 from django import forms
 from django.core.exceptions import ValidationError
@@ -459,6 +460,13 @@ ClientProductPriceFormSet = formset_factory(ClientProductPriceForm, extra=0)
 
 
 class ClientCoreForm(forms.ModelForm):
+    branch_credit_limit = forms.DecimalField(
+        required=False, min_value=0, max_digits=10, decimal_places=2,
+        label='Límite de crédito propio (MXN)',
+        help_text='Al activar crédito propio se transfiere la deuda pendiente de esta sucursal.',
+        widget=forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+    )
+
     class Meta:
         model = Client
         fields = [
@@ -496,11 +504,27 @@ class ClientCoreForm(forms.ModelForm):
             'credit_override_enabled': 'Permite que esta sucursal edite su límite, bloqueo y condiciones de crédito.',
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
         self.fields['corporate'].queryset = Client.objects.filter(type='corporate', active=True).order_by('name')
+        self.fields['branch_credit_limit'].initial = self.instance.credit_limit if self.instance.pk else None
 
-    def clean(self):
+    def save(self, commit: bool = True) -> Client:
+        from clients.services.client_service import update_client_from_instance
+
+        if self.errors:
+            return super().save(commit=commit)
+        field_names = {('corporate_id' if field == 'corporate' else field) for field in self.Meta.fields}
+        if self.cleaned_data.get('credit_override_enabled') and self.cleaned_data.get('branch_credit_limit') is not None:
+            self.instance.credit_limit = self.cleaned_data['branch_credit_limit']
+            field_names.add('credit_limit')
+        if not commit or not self.instance.pk:
+            return super().save(commit=commit)
+        self.instance = update_client_from_instance(self.instance, self.user, field_names)
+        return self.instance
+
+    def clean(self) -> dict[str, object]:
         cleaned_data = super().clean()
         client_type = cleaned_data.get('type')
         corporate = cleaned_data.get('corporate')
@@ -512,6 +536,36 @@ class ClientCoreForm(forms.ModelForm):
         if client_type == 'branch' and not corporate:
             self.add_error('corporate', 'Cliente sucursal debe tener un cliente corporativo asociado.')
 
+        if client_type == 'branch' and corporate:
+            from clients.services.credit_transfer_service import validate_client_credit_switch
+
+            try:
+                validate_client_credit_switch(
+                    self.instance, cleaned_data.get('credit_override_enabled', False),
+                    cleaned_data.get('branch_credit_limit') if cleaned_data.get('credit_override_enabled') else None,
+                )
+            except ValueError as error:
+                self.add_error(None, str(error))
+
+        return cleaned_data
+
+
+class ClientAdminForm(forms.ModelForm):
+    class Meta:
+        model = Client
+        fields = '__all__'
+
+    def clean(self) -> dict[str, object]:
+        from clients.services.credit_transfer_service import validate_client_credit_switch
+
+        cleaned_data = super().clean()
+        try:
+            validate_client_credit_switch(
+                self.instance, cleaned_data.get('credit_override_enabled', False),
+                cleaned_data.get('credit_limit'),
+            )
+        except ValueError as error:
+            self.add_error(None, str(error))
         return cleaned_data
 
 

@@ -778,7 +778,7 @@ def cancel_order(request, order_pk):
 def split_order(request: HttpRequest, order_id: int) -> HttpResponse:
     """View to split an order into two orders"""
     order = get_object_or_404(
-        Order.objects.select_for_update().prefetch_related('items__product'), pk=order_id,
+        Order.objects.prefetch_related('items__product'), pk=order_id,
     )
     if order.status != OrderStatus.COMPLETED.value:
         raise PermissionDenied('Solo se pueden dividir pedidos completados.')

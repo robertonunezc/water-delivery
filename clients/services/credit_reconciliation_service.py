@@ -3,9 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from django.db.models import Q
-
-from clients.models import Client, CreditTransaction
+from clients.models import Client
 from clients.services.client_debt_service import get_client_display_current_debt
 from orders.models import Order
 
@@ -31,27 +29,12 @@ class CreditReconciliationSummary:
 
 def _open_credit_orders(client: Client) -> list[Order]:
     credit_account = client.get_credit_account()
-    credit_transactions = CreditTransaction.objects.filter(
-        transaction_type='purchase',
-        reference_order__isnull=False,
-    )
-    if client.type == 'corporate':
-        credit_transactions = credit_transactions.filter(
-            Q(reference_order__client=client)
-            | Q(reference_order__client__corporate=client),
-        )
-    else:
-        credit_transactions = credit_transactions.filter(
-            client=credit_account,
-            reference_order__client=client,
-        )
-
-    credit_order_ids = credit_transactions.values('reference_order_id')
+    orders = Order.objects.active().unpaid().for_credit_accounts([credit_account.pk])
+    if client.type != 'corporate':
+        orders = orders.filter(client=client)
     return list(
-        Order.objects.active()
-        .unpaid()
+        orders
         .filter(
-            pk__in=credit_order_ids,
             payments__method='pending_credit',
             payments__status='pending',
         )

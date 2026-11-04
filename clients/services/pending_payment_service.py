@@ -77,7 +77,7 @@ def _overdue_order_data(
     maximum_days_overdue = 0
 
     for order in orders:
-        credit_config = order.client.get_effective_credit_config()
+        credit_config = order.get_effective_credit_config()
         if credit_config is None:
             continue
 
@@ -104,18 +104,11 @@ def _overdue_order_data(
 def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
     """Return due-date and overdue information for outstanding credit orders."""
     credit_account = client.get_credit_account()
-    credit_transactions = CreditTransaction.objects.filter(
-        client=credit_account,
-        transaction_type='purchase',
-        reference_order__isnull=False,
-    )
+    orders = Order.objects.active().unpaid().for_credit_accounts([credit_account.pk])
     if credit_account.pk != client.pk:
-        credit_transactions = credit_transactions.filter(reference_order__client=client)
-
-    credit_order_ids = credit_transactions.values('reference_order_id')
+        orders = orders.filter(client=client)
     unpaid_orders = list(
-        Order.objects.active().unpaid()
-        .filter(pk__in=credit_order_ids)
+        orders
         .select_related('client', 'client__credit_config', 'client__corporate')
         .prefetch_related('invoice_links__invoice')
     )
@@ -128,7 +121,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
     due_dates = [
         due_date
         for order in unpaid_orders
-        for credit_config in [order.client.get_effective_credit_config()]
+        for credit_config in [order.get_effective_credit_config()]
         if credit_config
         for due_date in [get_order_credit_due_date(order, credit_config)]
         if due_date is not None
@@ -139,7 +132,7 @@ def get_overdue_orders_for_client(client: Client) -> dict[str, Any]:
         and credit_config.payment_term_type == 'invoice_due'
         and get_order_credit_due_date(order, credit_config) is None
         for order in unpaid_orders
-        for credit_config in [order.client.get_effective_credit_config()]
+        for credit_config in [order.get_effective_credit_config()]
     )
     return {
         'total_overdue_amount': total_overdue,

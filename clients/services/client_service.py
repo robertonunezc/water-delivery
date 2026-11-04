@@ -46,7 +46,7 @@ def get_recent_completed_route_orders(client, limit=5):
     ).order_by('-completed_at')[:limit]
 
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import Optional
 from decimal import Decimal
 from django.contrib.auth.models import User
@@ -60,6 +60,8 @@ class ClientUpdateData:
     name: Optional[str] = None
     active: Optional[bool] = None
     note: Optional[str] = None
+    external_id: Optional[str] = None
+    confirmation_delivery_method: Optional[str] = None
     type: Optional[str] = None
     corporate_id: Optional[int] = None
     balance: Optional[Decimal] = None
@@ -141,7 +143,7 @@ def initialize_branch_credit_from_corporate(client: Client) -> bool:
 
     Returns True when any credit policy/configuration data was copied.
     """
-    if client.type != 'branch' or client.corporate_id is None:
+    if client.type != 'branch' or client.corporate_id is None or client.credit_override_enabled:
         return False
 
     return _copy_corporate_credit_to_branch(client, client.corporate)
@@ -185,8 +187,25 @@ def _branch_credit_policy_edit_allowed(client: Client, update_data: ClientUpdate
     return client_type != 'branch' or credit_override_enabled
 
 
+def update_client_from_instance(
+    client: Client, user: User | None = None, field_names: set[str] | None = None,
+) -> Client:
+    """Persist form/admin configuration through the same credit-switch service."""
+    stored = Client.objects.get(pk=client.pk)
+    changes = {}
+    for field in fields(ClientUpdateData):
+        if field.name in {'balance', 'current_debt'}:
+            continue
+        if field_names is not None and field.name not in field_names:
+            continue
+        value = getattr(client, field.name)
+        if value != getattr(stored, field.name):
+            changes[field.name] = (0 if field.name == 'corporate_id' else '') if value is None else value
+    return update_client(client, ClientUpdateData(**changes), user)
+
+
 @transaction.atomic
-def update_client(client: Client, update_data: ClientUpdateData, user: User) -> Client:
+def update_client(client: Client, update_data: ClientUpdateData, user: User | None) -> Client:
     """
     Update a client with the provided data.
     
@@ -201,7 +220,10 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     Raises:
         ValueError: If validation fails
     """
-    client = Client.objects.select_for_update().get(pk=client.pk)
+    from orders.services.credit_lock_service import lock_credit_policy_client
+
+    client = lock_credit_policy_client(client.pk)
+    original_credit_account = client.get_credit_account()
     if _has_credit_policy_update(update_data) and not _branch_credit_policy_edit_allowed(client, update_data):
         raise ValueError(
             'La configuración de crédito se administra desde el corporativo para esta sucursal.'
@@ -222,6 +244,12 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     if update_data.note is not None:
         client.note = update_data.note
         updated = True
+
+    for field_name in ('external_id', 'confirmation_delivery_method'):
+        value = getattr(update_data, field_name)
+        if value is not None:
+            setattr(client, field_name, value)
+            updated = True
     
     if update_data.type is not None:
         client.type = update_data.type
@@ -239,7 +267,7 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
         updated = True
     
     if update_data.credit_limit is not None:
-        client.credit_limit = update_data.credit_limit
+        client.credit_limit = Decimal(str(update_data.credit_limit))
         updated = True
     
     if update_data.can_pay_with_credit is not None:
@@ -270,6 +298,10 @@ def update_client(client: Client, update_data: ClientUpdateData, user: User) -> 
     credit_policy_changed = _has_credit_policy_update(update_data)
 
     if updated:
+        from clients.services.credit_transfer_service import transfer_branch_credit
+
+        if client.type == 'branch' and original_credit_account.pk != client.get_credit_account().pk:
+            transfer_branch_credit(client, original_credit_account, client.get_credit_account(), user)
         # Run model validation
         client.full_clean()
         # Save the changes

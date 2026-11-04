@@ -6,6 +6,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.db.models import Sum, Q
 from django.db.models.query import QuerySet
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.forms import inlineformset_factory
 from django.urls import reverse
@@ -338,6 +339,15 @@ def create_v2(request):
     return render(request, 'clients/client_form_v2.html', context)
 
 
+def _save_core_client_form(form: ClientCoreForm) -> bool:
+    try:
+        form.save()
+    except (ValueError, ValidationError) as error:
+        form.add_error(None, str(error))
+        return False
+    return True
+
+
 @user_passes_test(_is_admin_user)
 def edit_v2(request, pk):
     client = get_object_or_404(Client, pk=pk)
@@ -348,9 +358,8 @@ def edit_v2(request, pk):
         active_tab = section
 
         if section == 'basic':
-            core_form = ClientCoreForm(request.POST, instance=client)
-            if core_form.is_valid():
-                core_form.save()
+            core_form = ClientCoreForm(request.POST, instance=client, user=request.user)
+            if core_form.is_valid() and _save_core_client_form(core_form):
                 if not client.requires_billing and hasattr(client, 'invoice_schedule'):
                     client.invoice_schedule.is_active = False
                     client.invoice_schedule.save()

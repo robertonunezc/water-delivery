@@ -468,6 +468,16 @@ class BalanceTransaction(TimeStampedModel):
             raise ValidationError({'amount': f'Saldo insuficiente. Disponible: ${self.balance_before:.2f}'})
 
 
+class CreditDebtTransfer(TimeStampedModel):
+    """Audit the reassignment of an order's remaining credit debt."""
+
+    order = models.ForeignKey('orders.Order', on_delete=models.PROTECT, related_name='credit_transfers')
+    source_account = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='credit_transfers_out')
+    target_account = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='credit_transfers_in')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+
+
 class CreditTransaction(TimeStampedModel):
     """
     Track all credit-related transactions for complete audit trail
@@ -478,6 +488,8 @@ class CreditTransaction(TimeStampedModel):
         ('payment_from_balance', 'Pago con Saldo'),  # Payment using client's balance
         ('purchase_reversal', 'Reversión de compra a crédito'),
         ('payment_reversal', 'Reversión de pago de deuda'),
+        ('transfer_in', 'Transferencia de deuda recibida'),
+        ('transfer_out', 'Transferencia de deuda enviada'),
         ('adjustment', 'Ajuste manual'),      # Manual debt adjustment
         ('limit_change', 'Cambio de límite'), # Credit limit modification
         ('interest', 'Interés aplicado'),     # Interest charges
@@ -487,6 +499,10 @@ class CreditTransaction(TimeStampedModel):
     ]
     
     client = models.ForeignKey('Client', related_name='credit_transactions', on_delete=models.PROTECT, verbose_name="Cliente")
+    debt_transfer = models.ForeignKey(
+        CreditDebtTransfer, null=True, blank=True, on_delete=models.PROTECT,
+        related_name='transactions',
+    )
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     debt_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Deuda Anterior")
@@ -531,7 +547,7 @@ class CreditTransaction(TimeStampedModel):
             raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
         
         # Validate debt calculation
-        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment', 'payment_reversal']:
+        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment', 'payment_reversal', 'transfer_in']:
             # Additions to debt
             if self.debt_after != self.debt_before + self.amount:
                 raise ValidationError('Error en cálculo de deuda: adición incorrecta.')

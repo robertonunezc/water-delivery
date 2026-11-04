@@ -220,7 +220,8 @@ def add_debt(
     if amount <= 0:
         raise ValueError("Amount must be positive")
 
-    credit_account = client.get_credit_account()
+    credit_client = Client.objects.select_for_update().get(pk=client.pk)
+    credit_account = credit_client.get_credit_account()
     locked_client = Client.objects.select_for_update().get(pk=credit_account.pk)
     if transaction_type == 'purchase' and not locked_client.can_pay_with_credit:
         raise ValueError('Cliente no puede pagar con credito')
@@ -236,6 +237,11 @@ def add_debt(
             f'${available_credit:.2f}.'
         )
 
+    if transaction_type == 'purchase' and reference_order is not None:
+        reference_order.credit_account = locked_client
+        reference_order.capture_credit_terms(locked_client)
+        reference_order.save(update_fields=['credit_account', 'credit_terms_snapshot', 'updated_at'])
+
     # Store previous values
     debt_before = locked_client.current_debt
     credit_limit_before = locked_client.credit_limit
@@ -247,6 +253,9 @@ def add_debt(
     # Save client
     locked_client.save(update_fields=["current_debt", "updated_at"])
     credit_account.current_debt = locked_client.current_debt
+    caller_account = client.get_credit_account()
+    if caller_account.pk == locked_client.pk:
+        caller_account.current_debt = locked_client.current_debt
     if client.pk == locked_client.pk:
         client.current_debt = locked_client.current_debt
 
@@ -480,7 +489,9 @@ def update_credit_limit(
     if new_limit < 0:
         raise ValueError("Credit limit cannot be negative")
 
-    locked_client = Client.objects.select_for_update().get(pk=client.pk)
+    from orders.services.credit_lock_service import lock_credit_policy_client
+
+    locked_client = lock_credit_policy_client(client.pk)
     if new_limit == locked_client.credit_limit:
         client.credit_limit = locked_client.credit_limit
         client.current_debt = locked_client.current_debt

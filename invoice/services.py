@@ -311,6 +311,9 @@ def create_invoice_with_orders(
         )
 
     with transaction.atomic():
+        from orders.services.credit_lock_service import lock_order_credit_clients
+
+        lock_order_credit_clients(order_ids)
         locked_orders = list(
             Order.objects.select_for_update()
             .select_related('client')
@@ -665,6 +668,9 @@ def create_invoice_from_orders(
     order_ids = [order.pk for order in orders]
 
     with transaction.atomic():
+        from orders.services.credit_lock_service import lock_order_credit_clients
+
+        lock_order_credit_clients(order_ids)
         locked_orders = list(
             Order.objects.select_for_update()
             .select_related('client')
@@ -721,6 +727,9 @@ def issue_draft_invoice(
         raise ValidationError('Debe vincular al menos una venta para emitir la factura.')
 
     with transaction.atomic():
+        from orders.services.credit_lock_service import lock_order_credit_clients
+
+        lock_order_credit_clients(order_ids)
         locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
         if locked_invoice.status != InvoiceStatus.DRAFT:
             raise ValidationError('Solo las facturas en borrador se pueden modificar.')
