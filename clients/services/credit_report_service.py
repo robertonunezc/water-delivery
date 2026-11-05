@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -280,6 +282,35 @@ def get_client_credit_report(
     report_date = as_of or _today()
     orders = _get_open_credit_orders_for_client(client)
     return _build_client_report_from_orders(client, orders, as_of=report_date)
+
+
+def get_credit_report_order_ids(client: Client) -> list[int]:
+    """Return the open orders shown in this client's credit report."""
+    return [order.pk for order in _get_open_credit_orders_for_client(client)]
+
+
+@transaction.atomic
+def pay_credit_report_orders(
+    *, client: Client, order_ids: list[int], payment_method: str,
+    amount: Decimal, request_user: Any, payment_date: date,
+) -> dict[str, object]:
+    """Recheck the report's credit scope under locks before settling orders."""
+    from orders.services.credit_lock_service import lock_order_credit_clients
+    from payment import services as payment_services
+
+    lock_order_credit_clients(order_ids, extra_client_ids=[client.pk])
+    client.refresh_from_db()
+    list(Order.objects.select_for_update().filter(pk__in=order_ids).order_by('pk'))
+    allowed_ids = get_credit_report_order_ids(client)
+    orders = payment_services.get_selected_unpaid_orders(
+        client, order_ids, allowed_order_ids=allowed_ids,
+    )
+    return payment_services.pay_client_orders(
+        client=client, orders=orders, payment_method=payment_method,
+        amount=amount, request_user=request_user, payment_date=payment_date,
+        allowed_order_ids=allowed_ids,
+        payment_client=client if payment_method == 'balance' else None,
+    )
 
 
 def get_global_credit_report(*, as_of: date | None = None) -> GlobalCreditReport:

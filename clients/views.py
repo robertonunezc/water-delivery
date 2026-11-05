@@ -831,6 +831,7 @@ def _selected_order_payment_context(
     amount: Decimal | None = None,
     payment_date: str | None = None,
     error_message: str | None = None,
+    return_url: str = '',
 ) -> dict[str, Any]:
     for order in selected_orders:
         order.remaining_payment_amount = payment_services.get_unpaid_amount(order)
@@ -852,32 +853,48 @@ def _selected_order_payment_context(
         'payment_date': payment_date or timezone.localdate().isoformat(),
         'payment_types': payment_types,
         'error_message': error_message,
+        'return_url': return_url or reverse('clients:detail', args=[client.pk]),
     }
 
 
 @login_required
-def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
+def pay_selected_orders(
+    request: HttpRequest, pk: int, credit_report_scope: bool = False,
+) -> HttpResponse:
+    from clients.services.credit_report_service import (
+        get_credit_report_order_ids, pay_credit_report_orders,
+    )
+
     client = get_object_or_404(Client, pk=pk)
     order_ids = _parse_order_ids(request)
+    return_url = reverse(
+        'report:client_credit_report' if credit_report_scope else 'clients:detail',
+        args=[client.pk],
+    )
+    allowed_ids = get_credit_report_order_ids(client) if credit_report_scope else None
 
     try:
-        selected_orders = payment_services.get_selected_unpaid_orders(client, order_ids)
+        selected_orders = payment_services.get_selected_unpaid_orders(
+            client, order_ids, allowed_order_ids=allowed_ids,
+        )
     except payment_services.ClientOrderPaymentError as exc:
         messages.error(request, str(exc))
-        return redirect('clients:detail', pk=client.pk)
+        return redirect(return_url)
 
     if request.method == 'POST':
         submitted_amount = Decimal('0.00')
         try:
             submitted_amount = _parse_payment_amount(request.POST.get('amount', '0'))
             payment_date = _parse_payment_date(request.POST.get('payment_date'))
-            result = payment_services.pay_client_orders(
-                client=client,
-                orders=selected_orders,
-                payment_method=request.POST.get('payment_method', 'cash'),
-                amount=submitted_amount,
-                request_user=request.user,
-                payment_date=payment_date,
+            payment_options = {
+                'client': client, 'payment_method': request.POST.get('payment_method', 'cash'),
+                'amount': submitted_amount, 'request_user': request.user,
+                'payment_date': payment_date,
+            }
+            result = (
+                pay_credit_report_orders(order_ids=order_ids, **payment_options)
+                if credit_report_scope else
+                payment_services.pay_client_orders(orders=selected_orders, **payment_options)
             )
         except (payment_services.ClientOrderPaymentError, ValueError) as exc:
             context = _selected_order_payment_context(
@@ -886,6 +903,7 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
                 amount=submitted_amount,
                 payment_date=request.POST.get('payment_date'),
                 error_message=str(exc),
+                return_url=return_url,
             )
             return render(request, 'pay_selected_orders.html', context)
 
@@ -898,9 +916,9 @@ def pay_selected_orders(request: HttpRequest, pk: int) -> HttpResponse:
                 request,
                 f'Se agregó ${result["balance_added"]:.2f} al saldo del cliente.',
             )
-        return redirect('clients:detail', pk=client.pk)
+        return redirect(return_url)
 
-    context = _selected_order_payment_context(client, selected_orders)
+    context = _selected_order_payment_context(client, selected_orders, return_url=return_url)
     return render(request, 'pay_selected_orders.html', context)
 
 

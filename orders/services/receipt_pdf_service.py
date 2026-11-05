@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import base64
 from dataclasses import dataclass
+from datetime import date
 from decimal import Decimal
 from io import BytesIO
 from xml.sax.saxutils import escape
 
 from django.utils import timezone
+from django.utils.text import slugify
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
@@ -33,6 +35,30 @@ class ReceiptContactSnapshot:
     email: str
     phone: str = ""
     position: str = ""
+
+
+def get_receipt_filename(order: Order) -> str:
+    client_name = slugify(order.client.name.replace("_", " ")) or "cliente"
+    delivery_date = _receipt_delivery_date(order)
+    return f"{client_name}-{delivery_date:%Y-%m-%d}-{order.pk}.pdf"
+
+
+def _receipt_delivery_date(order: Order) -> date:
+    """Prefer actual delivery, then the scheduled visit or the sale's date."""
+    completed_at = (
+        order.route_orders.filter(is_completed=True, completed_at__isnull=False)
+        .order_by("completed_at", "pk")
+        .values_list("completed_at", flat=True)
+        .first()
+    )
+    if completed_at is not None:
+        return timezone.localdate(completed_at)
+    visit_date = (
+        order.route_orders.order_by("visit_date", "pk")
+        .values_list("visit_date", flat=True)
+        .first()
+    )
+    return visit_date or timezone.localdate(order.order_date)
 
 
 def generate_receipt_pdf(

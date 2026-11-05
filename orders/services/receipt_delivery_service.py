@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from notification.channels.email import EmailAttachment, SendEmail
 from orders.models import Order, OrderReceipt, ReceiptDeliveryMethod
+from orders.services.receipt_pdf_service import get_receipt_filename
 from orders.services.receipt_storage_service import get_receipt_storage
 
 
@@ -43,7 +44,7 @@ class EmailReceiptSender:
     def send(self, receipt: OrderReceipt) -> ReceiptDeliveryOutcome:
         pdf_bytes = get_receipt_storage().download_pdf(receipt.pdf_url)
         attachment = EmailAttachment(
-            filename=f"recibo-pedido-{receipt.order_id}.pdf",
+            filename=get_receipt_filename(receipt.order),
             content=pdf_bytes,
             content_type="application/pdf",
         )
@@ -71,7 +72,10 @@ class WhatsAppReceiptSender:
         if not phone:
             raise ReceiptDeliveryError("El teléfono de contacto no es válido.")
 
-        signed_url = get_receipt_storage().generate_signed_url(receipt.pdf_url)
+        signed_url = get_receipt_storage().generate_signed_url(
+            receipt.pdf_url,
+            filename=get_receipt_filename(receipt.order),
+        )
         greeting = f"Hola {receipt.contact_name}," if receipt.contact_name else "Hola,"
         body = (
             f"{greeting}\n\n"
@@ -185,7 +189,7 @@ class ReceiptBundleDeliveryService:
                 storage = get_receipt_storage()
             attachments.append(
                 EmailAttachment(
-                    filename=f"recibo-pedido-{order.pk}.pdf",
+                    filename=get_receipt_filename(order),
                     content=storage.download_pdf(receipt.pdf_url),
                     content_type="application/pdf",
                 )

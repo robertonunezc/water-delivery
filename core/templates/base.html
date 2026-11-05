@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{% endblock %}</title>
 
-    {% include "includes/clarity.html" %}
+    {% include "includes/posthog.html" %}
 
     <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
     <!-- Font Awesome -->
@@ -69,6 +69,7 @@
                                     <li><a class="pg-dropdown-item" href="{% url 'admin_categories' %}">Categorías</a></li>
                                     <li><a class="pg-dropdown-item" href="{% url 'admin_routes' %}">Rutas</a></li>
                                     <li><a class="pg-dropdown-item" href="{% url 'admin_invoices' %}">Facturas</a></li>
+                                    <li><a class="pg-dropdown-item" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">Calendario de facturación</a></li>
                                 </ul>
                             </li>
                         {% endif %}

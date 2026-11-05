@@ -359,13 +359,22 @@
 							</div>
 						{% endif %}
 						{% if billing_read_only %}
-							<div class="pg-alert pg-alert-warning">Esta sucursal está heredando facturación del corporativo. Los campos se muestran pero están deshabilitados.</div>
+							<div class="pg-alert pg-alert-info">
+								{% if client.corporate %}
+									Esta sucursal hereda los datos fiscales de
+									<a href="{% url 'admin_edit_client' client.corporate.pk %}?tab=billing">{{ client.corporate.name }}</a>.
+									Puedes consultarlos y actualizarlos en el corporativo.
+								{% else %}
+									Asigna un corporativo a esta sucursal para configurar sus datos fiscales.
+								{% endif %}
+							</div>
 						{% endif %}
-						{% if not client.requires_billing %}
+						{% if not client.requires_billing and not billing_read_only %}
 							<div class="pg-alert pg-alert-light">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
 						{% endif %}
 
 						<div class="pg-row pg-gap-3">
+							{% if not billing_read_only %}
 							<div class="pg-col-lg-7">
 								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 									<div class="form-section-title">Datos de Facturación</div>
@@ -381,7 +390,8 @@
 									</form>
 								</div>
 							</div>
-							<div class="pg-col-lg-5">
+							{% endif %}
+							<div class="{% if billing_read_only %}pg-col-lg-12{% else %}pg-col-lg-5{% endif %}">
 								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
 									<div class="form-section-title">Frecuencia de Facturación</div>
 									<div class="pg-mb-3" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
@@ -417,6 +427,7 @@
 							</div>
 						</div>
 
+						{% if not billing_read_only %}
 							<div class="pg-mt-3 pg-p-3 pg-border pg-rounded pg-bg-light">
 								<div class="form-section-title">Información Facturacion</div>
 								<div class="section-muted">
@@ -445,6 +456,7 @@
 								</div>
 
 							</div>
+						{% endif %}
 					{% endif %}
 				</div>
 

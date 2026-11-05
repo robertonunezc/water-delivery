@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import boto3
 from botocore.config import Config
 from django.conf import settings
+from django.utils.http import content_disposition_header
 
 
 class ReceiptStorageError(RuntimeError):
@@ -89,10 +90,16 @@ class CloudflareR2ReceiptStorage:
         )
         return response["Body"].read()
 
-    def generate_signed_url(self, pdf_url: str) -> str:
+    def generate_signed_url(self, pdf_url: str, *, filename: str = "") -> str:
+        params = {"Bucket": self.config.bucket_name, "Key": pdf_url}
+        if filename:
+            params["ResponseContentDisposition"] = content_disposition_header(
+                as_attachment=False,
+                filename=filename,
+            )
         return self.client.generate_presigned_url(
             "get_object",
-            Params={"Bucket": self.config.bucket_name, "Key": pdf_url},
+            Params=params,
             ExpiresIn=self.config.signed_url_expires_seconds,
         )
 

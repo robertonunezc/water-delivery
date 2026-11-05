@@ -7,7 +7,7 @@
       <h1 class="pg-h4 pg-mb-1">Pagar pedidos seleccionados</h1>
       <p class="pg-text-muted pg-mb-0">{{ client.name }}</p>
     </div>
-    <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary">Volver</a>
+    <a href="{{ return_url }}" class="pg-button pg-button-outline-secondary">Volver</a>
   </div>
 
   {% if error_message %}

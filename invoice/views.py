@@ -6,13 +6,27 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, Q, Sum
-from django.http import HttpResponseNotAllowed, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseNotAllowed, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods, require_POST
 from invoice.models import Invoice, InvoiceStatus
 
 # Existing API Views
+
+@staff_member_required
+@require_http_methods(['GET'])
+def client_fiscal_data(request: HttpRequest, client_pk: int) -> JsonResponse:
+    from django.core.exceptions import ValidationError
+    from invoice.services import get_client_invoice_fiscal_data
+
+    client = get_object_or_404(Client.objects.select_related('corporate'), pk=client_pk)
+    try:
+        fiscal_data = get_client_invoice_fiscal_data(client)
+    except ValidationError as exc:
+        return JsonResponse({'error': ' '.join(exc.messages)}, status=400)
+    return JsonResponse({'fiscal_data': fiscal_data})
+
 
 @login_required
 def invoiceable_orders(request, client_pk):
@@ -153,7 +167,7 @@ def list_invoices_admin(request):
 
 
 @staff_member_required
-def create_invoice_admin(request):
+def create_invoice_admin(request: HttpRequest) -> HttpResponse:
     from invoice.forms import InvoiceCreateForm
     from invoice.services import create_invoice_with_orders
     from django.contrib import messages
@@ -176,7 +190,7 @@ def create_invoice_admin(request):
                 )
                 return redirect('admin_edit_invoice', pk=invoice.pk)
     else:
-        form = InvoiceCreateForm()
+        form = InvoiceCreateForm(initial={'client': request.GET.get('client')})
 
     context = {
         'form': form,

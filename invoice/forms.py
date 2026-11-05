@@ -5,6 +5,7 @@ from typing import Any
 from invoice.models import Invoice, InvoiceOrderLink
 from invoice.services import (
     get_editable_orders_for_invoice,
+    get_client_invoice_fiscal_data,
     get_invoice_fiscal_owner,
     get_invoiceable_orders_for_client,
     validate_invoice_orders_total_limit,
@@ -44,13 +45,17 @@ class OrderAmountSelectMultiple(forms.SelectMultiple):
 class InvoiceForm(forms.ModelForm):
     class Meta:
         model = Invoice
-        fields = ['client', 'identifier', 'folio', 'amount', 'emmited_at', 'file', 'auto_amount']
+        fields = ['client', *Invoice.FISCAL_FIELDS, 'identifier', 'folio', 'amount', 'emmited_at', 'file', 'auto_amount']
         widgets = {
             'emmited_at': forms.DateInput(
                 format='%Y-%m-%d',
                 attrs={'type': 'date', 'class': 'pg-input'},
             ),
             'client': forms.Select(attrs={'class': 'pg-select'}),
+            'rfc': forms.TextInput(attrs={'class': 'pg-input'}),
+            'razon_social': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+            'curp': forms.TextInput(attrs={'class': 'pg-input'}),
+            'billing_address': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
             'identifier': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'SER-XXX'}),
             'folio': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'FOL-XXX'}),
             'amount': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
@@ -58,8 +63,12 @@ class InvoiceForm(forms.ModelForm):
             'auto_amount': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        self.selected_client = self._selected_client()
+        self._prefill_initial_fiscal_data()
+        for field in ('rfc', 'razon_social', 'billing_address'):
+            self.fields[field].required = True
         # If the invoice has auto_amount=True, the amount field should be read-only and not required
         if self.instance and self.instance.pk:
             # Client should be read-only for existing invoices to prevent data inconsistency
@@ -69,14 +78,38 @@ class InvoiceForm(forms.ModelForm):
                 self.fields['amount'].required = False
                 self.fields['auto_amount'].disabled = True
 
-    def clean(self):
+    def _selected_client(self) -> Client | None:
+        client_value = (
+            self.data.get(self.add_prefix('client'))
+            if self.is_bound else self.initial.get('client')
+        )
+        if isinstance(client_value, Client):
+            return client_value
+        try:
+            return Client.objects.select_related('corporate').filter(pk=int(client_value)).first()
+        except (TypeError, ValueError):
+            return None
+
+    def _prefill_initial_fiscal_data(self) -> None:
+        if self.is_bound or self.instance.pk or self.selected_client is None:
+            return
+        try:
+            self.initial.update(get_client_invoice_fiscal_data(self.selected_client))
+        except ValidationError:
+            # Invalid corporate relationships are reported by clean().
+            return
+
+    def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
         client = cleaned_data.get('client')
         auto_amount = cleaned_data.get('auto_amount')
         amount = cleaned_data.get('amount')
 
         if client and not self.instance.pk:
-            cleaned_data['client'] = get_invoice_fiscal_owner(client)
+            try:
+                cleaned_data['client'] = get_invoice_fiscal_owner(client)
+            except ValidationError as exc:
+                self.add_error('client', exc)
 
         if not auto_amount and amount is None:
             raise ValidationError({'amount': 'El monto es obligatorio para facturas de cálculo manual.'})
@@ -100,22 +133,14 @@ class InvoiceCreateForm(InvoiceForm):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        client = self._selected_client()
-        if client is not None:
-            self.fields['orders'].queryset = get_invoiceable_orders_for_client(
-                client=client,
-                scope='fiscal_owner',
-                as_dict=False,
-            )
-
-    def _selected_client(self) -> Client | None:
-        client_value = self.data.get(self.add_prefix('client')) if self.is_bound else None
-        if isinstance(client_value, Client):
-            return client_value
+        if self.selected_client is None:
+            return
         try:
-            return Client.objects.filter(pk=int(client_value)).first()
-        except (TypeError, ValueError):
-            return None
+            self.fields['orders'].queryset = get_invoiceable_orders_for_client(
+                client=self.selected_client, scope='fiscal_owner', as_dict=False,
+            )
+        except ValidationError:
+            return
 
     def clean(self) -> dict[str, Any]:
         cleaned_data = super().clean()
@@ -150,8 +175,11 @@ class InvoiceDraftEditForm(forms.ModelForm):
 
     class Meta:
         model = Invoice
-        fields = ['identifier', 'folio', 'emmited_at', 'file', 'orders']
+        fields = [*Invoice.FISCAL_FIELDS, 'identifier', 'folio', 'emmited_at', 'file', 'orders']
         widgets = {
+            field: widget for field, widget in InvoiceForm.Meta.widgets.items()
+            if field in Invoice.FISCAL_FIELDS
+        } | {
             'identifier': forms.TextInput(attrs={'class': 'pg-input'}),
             'folio': forms.TextInput(attrs={'class': 'pg-input'}),
             'emmited_at': forms.DateInput(
@@ -163,10 +191,14 @@ class InvoiceDraftEditForm(forms.ModelForm):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        for field in ('rfc', 'razon_social', 'billing_address'):
+            self.fields[field].required = True
         self.fields['orders'].queryset = get_editable_orders_for_invoice(
             self.instance,
         )
         if not self.is_bound:
+            if not any(getattr(self.instance, field) for field in Invoice.FISCAL_FIELDS):
+                self.initial.update(get_client_invoice_fiscal_data(self.instance.client))
             self.initial['orders'] = self.instance.invoice_links.values_list(
                 'order_id',
                 flat=True,

@@ -33,6 +33,7 @@ from .  import services as order_services
 from payment.models import Payment, PAYMENT_METHOD_CHOICES
 from payment import services as payment_services
 from routes import services as route_services
+from orders.services.receipt_pdf_service import get_receipt_filename
 from orders.services.receipt_service import (
     ReceiptCreationError,
     create_signature_only_receipt,
@@ -279,7 +280,10 @@ def receipt_pdf_view(request: HttpRequest, order_id: int) -> HttpResponse:
         return redirect("orders:sign_receipt", order_id=order.pk)
 
     try:
-        signed_url = get_receipt_storage().generate_signed_url(receipt.pdf_url)
+        signed_url = get_receipt_storage().generate_signed_url(
+            receipt.pdf_url,
+            filename=get_receipt_filename(order),
+        )
     except ReceiptStorageError as exc:
         messages.error(request, str(exc))
         return redirect("orders:list")

@@ -17,7 +17,7 @@ from django.utils import timezone
 from calendar import monthrange
 
 from invoice.models import InvoiceSchedule
-from clients.models import Client, InvoiceData
+from clients.models import Address, Client, InvoiceData
 from core.utils import get_first_last_day_of_month
 from orders.models import Order, OrderStatus
 
@@ -36,6 +36,39 @@ def get_invoice_fiscal_owner(client: Client) -> Client:
 def _get_invoice_billing_owner(client: Client) -> Client:
     """Backward-compatible alias for older billing terminology."""
     return get_invoice_fiscal_owner(client)
+
+
+def _format_invoice_address(address: Address | None) -> str:
+    if address is None:
+        return ''
+    street = ' '.join(part for part in [address.street, address.exterior_number] if part)
+    if address.interior_number:
+        street = f'{street} Int. {address.interior_number}'
+    return ', '.join(part for part in [
+        street, address.locality, address.municipality, address.state,
+        address.zip_code, address.country,
+    ] if part)
+
+
+def get_client_invoice_fiscal_data(client: Client) -> dict[str, str]:
+    """Read the fiscal recipient's current data for an invoice snapshot."""
+    owner = get_invoice_fiscal_owner(client)
+    data = InvoiceData.objects.filter(client=owner).first()
+    address = owner.addresses.filter(type='billing', active=True).first()
+    return {
+        'rfc': (data.rfc or '') if data else '',
+        'razon_social': (data.razon_social or '') if data else '',
+        'curp': (data.curp or '') if data else '',
+        'billing_address': _format_invoice_address(address),
+    }
+
+
+def populate_invoice_fiscal_data(invoice: 'invoice.models.Invoice') -> None:
+    """Default a new invoice's recipient without overwriting supplied values."""
+    if any(getattr(invoice, field) for field in invoice.FISCAL_FIELDS):
+        return
+    for field, value in get_client_invoice_fiscal_data(invoice.client).items():
+        setattr(invoice, field, value)
 
 
 def _get_missing_invoice_data_fields(invoice_data: Optional[InvoiceData]) -> List[str]:
@@ -323,6 +356,7 @@ def create_invoice_with_orders(
             raise ValidationError('Una o más ventas seleccionadas ya no existen.')
 
         invoice.client = get_invoice_fiscal_owner(invoice.client)
+        populate_invoice_fiscal_data(invoice)
         order_amounts = [order.total_amount for order in locked_orders]
         if invoice.auto_amount:
             invoice.amount = sum(order_amounts, Decimal('0'))
@@ -695,6 +729,7 @@ def create_invoice_from_orders(
 
         invoice = Invoice.objects.create(
             client=fiscal_owner,
+            **get_client_invoice_fiscal_data(fiscal_owner),
             amount=sum(
                 (order.total_amount for order in locked_orders),
                 Decimal('0'),
@@ -764,6 +799,9 @@ def issue_draft_invoice(
         locked_invoice.folio = invoice.folio
         locked_invoice.emmited_at = invoice.emmited_at
         locked_invoice.file = invoice.file
+        for field in Invoice.FISCAL_FIELDS:
+            setattr(locked_invoice, field, getattr(invoice, field))
+        populate_invoice_fiscal_data(locked_invoice)
         locked_invoice.amount = sum(
             (order.total_amount for order in locked_orders),
             Decimal('0'),
