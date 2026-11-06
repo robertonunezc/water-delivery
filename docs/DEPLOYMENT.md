@@ -72,6 +72,27 @@ Required runtime variables in `.env.production` stored next to `docker-compose.p
 - `DJANGO_ALLOWED_HOSTS`
 - `DJANGO_SECRET_KEY`
 
+Redis authentication
+
+Redis reads `REDIS_PASSWORD` from its container environment at startup, using the
+same `.env.production` file as web and Celery. Production refuses to start Redis
+if this password is empty. The command expands the variable inside the container
+and then calls the official Redis entrypoint to retain its user setup.
+
+If Celery reports `AUTH <password> called without any password configured`, the
+Redis instance it reached has no password, while Celery is trying to authenticate.
+Check that `.env.production` defines `REDIS_PASSWORD`, then apply the current
+Compose file and recreate all four services to load matching configuration:
+
+```bash
+docker-compose --env-file .env.production -f docker-compose.prod.yml up -d --force-recreate redis web celery-worker celery-beat
+docker-compose --env-file .env.production -f docker-compose.prod.yml exec -T redis sh -ec 'REDISCLI_AUTH="$REDIS_PASSWORD" redis-cli ping'
+docker-compose --env-file .env.production -f docker-compose.prod.yml logs --tail=50 celery-worker celery-beat
+```
+
+The authenticated Redis check must return `PONG`. A container restart alone does
+not reload a changed environment file; recreate the containers after changing it.
+
 Recommended GitHub Actions setup for the current VPS workflow:
 - Create a GitHub Environment named `production`.
 - Store the production values as environment secrets.

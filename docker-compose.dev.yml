@@ -31,7 +31,11 @@ services:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Expand the password from the same container environment used by clients.
+    command:
+      - /bin/sh
+      - -ec
+      - exec docker-entrypoint.sh redis-server --requirepass "$$REDIS_PASSWORD"
 
   promtail:
     image: grafana/promtail:latest
