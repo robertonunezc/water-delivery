@@ -222,6 +222,7 @@
                       ${{ order.total_amount|floatformat:2 }}
                     </div>
                     <div class="pg-button-group" role="group">
+                      {% include 'orders/_cancel_order_action.html' with button_class='pg-button pg-button-sm pg-button-outline-danger' %}
                       <a href="{% url 'clients:detail' order.client.pk %}" 
                          class="pg-button pg-button-sm pg-button-outline-primary" 
                          title="Ver Cliente">

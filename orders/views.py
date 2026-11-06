@@ -755,9 +755,16 @@ def update_order(request, order_pk):
 
 @login_required
 @require_http_methods(["POST"])
-def cancel_order(request, order_pk):
+def cancel_order(request: HttpRequest, order_pk: int) -> HttpResponse:
     order = get_object_or_404(Order, pk=order_pk)
     result = order_services.cancel_order(order=order, user=request.user)
+
+    if request.POST.get('response_format') == 'html':
+        if result.get('success'):
+            messages.success(request, result.get('message', 'Pedido cancelado correctamente.'))
+        else:
+            messages.error(request, result.get('error', 'No se pudo cancelar el pedido.'))
+        return redirect(_get_safe_next_url(request, 'orders:list'))
 
     if not result.get('success'):
         return JsonResponse(
