@@ -201,11 +201,39 @@ class TruckInventoryLineForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['product'].queryset = Product.objects.ordered_for_clients()
 
+    def is_empty_new_line(self) -> bool:
+        if self.instance.pk:
+            return False
+        if self.cleaned_data.get('product') is None:
+            return True
+        return not any(
+            self.cleaned_data.get(field)
+            for field in ('full_loaded', 'full_returned', 'empty_returned', 'notes')
+        )
+
+
+class BaseTruckInventoryLineFormSet(forms.BaseInlineFormSet):
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return
+
+        seen_products = set()
+        for form in self.forms:
+            if form.cleaned_data.get('DELETE') or form.is_empty_new_line():
+                continue
+
+            product_id = form.cleaned_data['product'].pk
+            if product_id in seen_products:
+                form.add_error('product', 'Este producto ya está en el inventario.')
+            seen_products.add(product_id)
+
 
 TruckInventoryLineFormSet = inlineformset_factory(
     TruckInventorySession,
     TruckInventoryLine,
     form=TruckInventoryLineForm,
+    formset=BaseTruckInventoryLineFormSet,
     fields=['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes'],
     extra=3,
     can_delete=True,

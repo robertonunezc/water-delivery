@@ -804,6 +804,30 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             ).exists()
         )
 
+    def test_duplicate_product_submission_shows_error_without_saving(self) -> None:
+        self.client.force_login(self.staff_user)
+        payload = self._inventory_payload(
+            route=self.route,
+            transportation=self.transport,
+        )
+        payload.update({
+            'lines-TOTAL_FORMS': '2',
+            'lines-1-product': str(self.product.pk),
+            'lines-1-full_loaded': '5',
+            'lines-1-full_returned': '1',
+            'lines-1-empty_returned': '3',
+        })
+
+        response = self.client.post(reverse('routes:truck_inventory'), payload)
+
+        self.assertContains(response, 'Este producto ya está en el inventario.')
+        self.assertFormError(
+            response.context['line_formset'].forms[1],
+            'product',
+            'Este producto ya está en el inventario.',
+        )
+        self.assertFalse(TruckInventorySession.objects.filter(route=self.route).exists())
+
     def test_closed_inventory_session_rejects_explicit_edits(self):
         session = TruckInventorySession.objects.create(
             route=self.route,
@@ -876,6 +900,31 @@ class RouteTruckInventoryViewTest(FastTenantTestCase):
             service_date=self.today,
         )
         self.assertEqual(session.lines.count(), 0)
+
+    def test_ignored_rows_can_repeat_a_product_being_saved(self) -> None:
+        self.client.force_login(self.staff_user)
+        payload = self._inventory_payload(
+            route=self.route,
+            transportation=self.transport,
+        )
+        payload.update({
+            'lines-TOTAL_FORMS': '3',
+            'lines-1-product': str(self.product.pk),
+            'lines-1-full_loaded': '0',
+            'lines-1-full_returned': '0',
+            'lines-1-empty_returned': '0',
+            'lines-2-product': str(self.product.pk),
+            'lines-2-full_loaded': '5',
+            'lines-2-full_returned': '1',
+            'lines-2-empty_returned': '3',
+            'lines-2-DELETE': 'on',
+        })
+
+        response = self.client.post(reverse('routes:truck_inventory'), payload)
+
+        self.assertRedirects(response, reverse('routes:truck_inventory'))
+        session = TruckInventorySession.objects.get(route=self.route)
+        self.assertEqual(session.lines.get(product=self.product).full_loaded, 10)
 
 
 class RouteTruckInventoryIntegrationTest(FastTenantTestCase):

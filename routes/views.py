@@ -255,17 +255,6 @@ def _get_inventory_session_from_request(request: Any) -> TruckInventorySession |
     )
 
 
-def _line_form_is_empty(cleaned_data: dict) -> bool:
-    if cleaned_data.get('product') is None:
-        return True
-    counts = [
-        cleaned_data.get('full_loaded') or 0,
-        cleaned_data.get('full_returned') or 0,
-        cleaned_data.get('empty_returned') or 0,
-    ]
-    return all(count == 0 for count in counts) and not cleaned_data.get('notes')
-
-
 def _save_inventory_line_formset(formset: Any) -> None:
     for line_form in formset.forms:
         cleaned_data = getattr(line_form, 'cleaned_data', None)
@@ -275,7 +264,7 @@ def _save_inventory_line_formset(formset: Any) -> None:
             if line_form.instance.pk:
                 line_form.instance.delete()
             continue
-        if not line_form.instance.pk and _line_form_is_empty(cleaned_data):
+        if line_form.is_empty_new_line():
             continue
 
         line = line_form.save(commit=False)
