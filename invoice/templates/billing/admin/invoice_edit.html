@@ -60,6 +60,22 @@
               <code>{{ invoice.folio }}</code>
             </div>
             <div class="pg-col-md-6">
+              <div class="pg-text-muted pg-small">RFC</div>
+              <div class="pg-fw-bold">{{ invoice.rfc|default:'Sin registrar' }}</div>
+            </div>
+            <div class="pg-col-md-6">
+              <div class="pg-text-muted pg-small">CURP</div>
+              <div>{{ invoice.curp|default:'Sin registrar' }}</div>
+            </div>
+            <div class="pg-col-12">
+              <div class="pg-text-muted pg-small">Razón social</div>
+              <div class="pg-fw-bold">{{ invoice.razon_social|default:'Sin registrar' }}</div>
+            </div>
+            <div class="pg-col-12">
+              <div class="pg-text-muted pg-small">Domicilio fiscal</div>
+              <div>{{ invoice.billing_address|default:'Sin registrar'|linebreaksbr }}</div>
+            </div>
+            <div class="pg-col-md-6">
               <div class="pg-text-muted pg-small">Fecha de emisión</div>
               <div class="pg-fw-bold">{{ invoice.emmited_at|date:'d/m/Y'|default:'Sin fecha' }}</div>
             </div>

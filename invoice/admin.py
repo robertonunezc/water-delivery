@@ -9,6 +9,7 @@ from django.templatetags.static import static
 from collections import Counter
 from typing import Any
 
+from invoice.forms import InvoiceForm
 from invoice.models import Invoice, InvoiceOrderLink, InvoiceFrequencyReport, InvoiceSchedule, BILLING_FREQUENCY_CHOICES
 from unfold.admin import ModelAdmin, StackedInline
 from core.admin_mixins import SoftDeleteAdminMixin
@@ -162,6 +163,24 @@ InvoiceOrderLinkInlineAdmin.form = InvoiceOrderLinkAdminForm
 InvoiceOrderLinkInlineAdmin.formset = InvoiceOrderLinkInlineFormSet
 
 class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
+	change_form_template = 'billing/admin/invoice_change_form.html'
+
+	class Media:
+		js = ('invoice/js/invoice_fiscal_data.js',)
+
+	def get_form(
+		self, request: Any, obj: Invoice | None = None, **kwargs: Any,
+	) -> type[forms.ModelForm]:
+		if obj is None:
+			kwargs['form'] = InvoiceForm
+			kwargs['widgets'] = {
+				**InvoiceForm.Meta.widgets,
+				'client': self.formfield_for_foreignkey(
+					Invoice._meta.get_field('client'), request,
+				).widget,
+			}
+		return super().get_form(request, obj, **kwargs)
+
 	list_display = ('id', 'identifier', 'client', 'amount', 'status', 'date')
 	list_filter = ('status', 'date', 'client')
 	search_fields = ('client__name', 'description', 'identifier')
@@ -229,10 +248,13 @@ class InvoiceAdmin(SoftDeleteAdminMixin, ModelAdmin):
 			from invoice.services import sync_invoice_amount
 			sync_invoice_amount(form.instance)
 
-	def save_model(self, request, obj, form, change):
+	def save_model(self, request: Any, obj: Invoice, form: Any, change: bool) -> None:
 		if obj.client_id and (not change or 'client' in form.changed_data):
 			from invoice.services import get_invoice_fiscal_owner
 			obj.client = get_invoice_fiscal_owner(obj.client)
+		if not change:
+			from invoice.services import populate_invoice_fiscal_data
+			populate_invoice_fiscal_data(obj)
 		super().save_model(request, obj, form, change)
 
 	def get_urls(self):

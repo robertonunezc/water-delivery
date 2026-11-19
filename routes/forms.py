@@ -3,8 +3,12 @@ from typing import Any
 
 from django import forms
 from django.db.models import Q
+from django.forms import inlineformset_factory
 
-from .models import Route, RouteClient
+from core.models import Transport
+from product.models import Product
+from .models import Route, RouteClient, TruckInventoryLine, TruckInventorySession
+from .services import get_inventory_routes
 
 
 class RouteClientForm(forms.ModelForm):
@@ -121,3 +125,116 @@ class RouteForm(forms.ModelForm):
         transportation = cleaned_data.get('transportation')
         weekday = cleaned_data.get('weekday')
         return cleaned_data
+
+
+class TruckInventorySessionForm(forms.ModelForm):
+    service_date = forms.DateField(
+        label='Fecha',
+        widget=forms.DateInput(
+            format='%Y-%m-%d',
+            attrs={'type': 'date', 'class': 'pg-input'},
+        ),
+        input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
+    )
+
+    class Meta:
+        model = TruckInventorySession
+        fields = ['service_date', 'route', 'transportation', 'notes']
+        widgets = {
+            'route': forms.Select(attrs={'class': 'pg-select'}),
+            'transportation': forms.Select(attrs={'class': 'pg-select'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+        }
+
+    def __init__(
+        self,
+        *args: Any,
+        service_date: datetime.date | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        current_date = self._resolve_service_date(service_date)
+        self.fields['service_date'].initial = current_date
+        self.fields['route'].queryset = get_inventory_routes()
+        self.fields['transportation'].queryset = Transport.objects.filter(
+            is_active=True,
+        ).order_by('license_plate')
+
+    def _resolve_service_date(
+        self,
+        service_date: datetime.date | None,
+    ) -> datetime.date:
+        if service_date is not None:
+            return service_date
+
+        if self.is_bound:
+            raw_date = self.data.get(self.add_prefix('service_date'), '')
+            try:
+                return datetime.date.fromisoformat(raw_date)
+            except ValueError:
+                return datetime.date.today()
+
+        return datetime.date.today()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        route = cleaned_data.get('route')
+        transportation = cleaned_data.get('transportation')
+        if route and transportation and route.transportation_id != transportation.pk:
+            raise forms.ValidationError('La ruta no corresponde a la camioneta seleccionada.')
+        return cleaned_data
+
+
+class TruckInventoryLineForm(forms.ModelForm):
+    class Meta:
+        model = TruckInventoryLine
+        fields = ['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes']
+        widgets = {
+            'product': forms.Select(attrs={'class': 'pg-select'}),
+            'full_loaded': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'full_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'empty_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
+            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 1}),
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.fields['product'].queryset = Product.objects.ordered_for_clients()
+
+    def is_empty_new_line(self) -> bool:
+        if self.instance.pk:
+            return False
+        if self.cleaned_data.get('product') is None:
+            return True
+        return not any(
+            self.cleaned_data.get(field)
+            for field in ('full_loaded', 'full_returned', 'empty_returned', 'notes')
+        )
+
+
+class BaseTruckInventoryLineFormSet(forms.BaseInlineFormSet):
+    def clean(self) -> None:
+        super().clean()
+        if any(self.errors):
+            return
+
+        seen_products = set()
+        for form in self.forms:
+            if form.cleaned_data.get('DELETE') or form.is_empty_new_line():
+                continue
+
+            product_id = form.cleaned_data['product'].pk
+            if product_id in seen_products:
+                form.add_error('product', 'Este producto ya está en el inventario.')
+            seen_products.add(product_id)
+
+
+TruckInventoryLineFormSet = inlineformset_factory(
+    TruckInventorySession,
+    TruckInventoryLine,
+    form=TruckInventoryLineForm,
+    formset=BaseTruckInventoryLineFormSet,
+    fields=['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes'],
+    extra=3,
+    can_delete=True,
+)

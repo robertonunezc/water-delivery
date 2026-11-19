@@ -3,6 +3,11 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
+concurrency:
+  group: production-vps
+  cancel-in-progress: false
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -66,6 +71,8 @@ jobs:
     if: always() && needs.test.result == 'success'
     runs-on: ubuntu-latest
     needs: [test]
+    outputs:
+      image_digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -77,6 +84,7 @@ jobs:
           password: ${{ secrets.DOCKER_REGISTRY_PASSWORD }}
       
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -137,6 +145,7 @@ jobs:
           
       - name: Deploy to VPS
         env:
+          APP_IMAGE: ${{ secrets.DOCKER_REGISTRY_USERNAME }}/development@${{ needs.build_and_push.outputs.image_digest }}
           POSTGRES_DB: ${{ secrets['POSTGRES_DB'] }}
           POSTGRES_PASSWORD: ${{ secrets['POSTGRES_PASSWORD'] }}
           POSTGRES_USER: ${{ secrets['POSTGRES_USER'] }}
@@ -167,6 +176,7 @@ jobs:
           {
             printf '%s\n' 'ENV=prod'
             printf '%s\n' 'DEBUG=false'
+            printf '%s\n' "APP_IMAGE=${APP_IMAGE}"
             printf '%s\n' 'POSTGRES_HOST=postgres'
             printf '%s\n' 'POSTGRES_PORT=5432'
             printf '%s\n' 'REDIS_HOST=redis'
@@ -228,7 +238,7 @@ jobs:
             echo "Creating static and media directories..."
             mkdir -p staticfiles media
             
-            # Pull immutable image
+            # Pull this workflow's exact build, pinned by APP_IMAGE in .env.production.
             docker-compose --env-file .env.production -f docker-compose.prod.yml pull web celery-worker celery-beat
             
             echo "Stopping existing containers..."

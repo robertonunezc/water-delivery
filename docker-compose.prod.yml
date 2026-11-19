@@ -3,7 +3,7 @@ version: '3.8'
 services:
 
   web:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_web_prod
     restart: unless-stopped
     logging:
@@ -29,7 +29,7 @@ services:
       - "service=web"
 
   celery-worker:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_celery_worker_prod
     restart: unless-stopped
     env_file:
@@ -49,7 +49,7 @@ services:
       - "service=celery-worker"
 
   celery-beat:
-    image: robe/development:water
+    image: ${APP_IMAGE:-robe/development:water}
     container_name: purigest_celery_beat_prod
     restart: unless-stopped
     env_file:
@@ -93,11 +93,13 @@ services:
     restart: unless-stopped
     env_file:
       - ./.env.production
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --requirepass ${REDIS_PASSWORD}
+    # Read the container's env_file and preserve the image's Redis user setup.
+    command:
+      - /bin/sh
+      - -ec
+      - exec docker-entrypoint.sh redis-server --requirepass "$${REDIS_PASSWORD:?REDIS_PASSWORD must be set}"
 
 volumes:
   postgres_data:

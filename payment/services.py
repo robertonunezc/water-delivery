@@ -5,9 +5,11 @@ from dataclasses import dataclass, asdict
 from django.contrib.auth.models import User
 from django.db import transaction
 
+from clients.models import CreditTransaction
 from clients.services import balance_service
 from core.utils import combine_date_with_local_time, parse_date_input
 from orders.models import Order, OrderStatus
+from orders.services.credit_lock_service import lock_order_credit_clients
 
 from .models import Payment
 
@@ -41,6 +43,15 @@ class PaymentRequestData:
     notes: Optional[str] = None
     order_date: Optional[object] = None
     payment_date: Optional[object] = None
+
+
+def _sync_completed_order_inventory(order: Order) -> None:
+    if order.status != OrderStatus.COMPLETED.value:
+        return
+
+    from routes.services import sync_open_inventory_sessions_for_order
+
+    sync_open_inventory_sessions_for_order(order)
 
 
 def get_unpaid_amount(order: Order) -> Decimal:
@@ -153,6 +164,7 @@ def pay_client_orders(
     payment_date: date | None = None,
 ) -> dict[str, object]:
     """Pay selected unpaid client orders and add overpayment to balance."""
+    lock_order_credit_clients([order.pk for order in orders])
     selected_orders = get_selected_unpaid_orders(
         client=client,
         order_ids=[order.id for order in orders],
@@ -234,12 +246,22 @@ def pay_client_orders(
     }
 
 
+@transaction.atomic
 def process_payment_request(
     order: Order,
     data: PaymentRequestData,
     request_user: User,
 ) -> tuple[dict, int]:
     """Process a payment request payload in either multi or legacy format."""
+    lock_order_credit_clients([order.pk])
+    order = Order.objects.select_for_update().get(pk=order.pk)
+    if not order.is_editable:
+        return {
+            'error': (
+                'Solo se pueden finalizar pedidos pendientes. '
+                'Use la opción Pagar para cobrar un pedido completado.'
+            ),
+        }, 403
     if data.cantidad_cobrada is not None and Decimal(str(data.cantidad_cobrada)) < order.total_amount:
         raise ValueError(f'Cantidad a cobrar menor que el total de la orden: ${data.cantidad_cobrada} < ${order.total_amount}')
     try:
@@ -374,21 +396,9 @@ def _parse_payment_rows(payments_data: list) -> list[dict[str, object]]:
 
 
 def _get_order_credit_account(order: Order) -> "Client":
-    """Return the credit ledger owner recorded when the order debt was created."""
-    from clients.models import CreditTransaction
-
-    purchase = (
-        CreditTransaction.objects.filter(
-            reference_order=order,
-            transaction_type='purchase',
-        )
-        .select_related('client')
-        .order_by('created_at', 'pk')
-        .first()
-    )
-    if purchase:
-        return purchase.client
-    return order.client.get_credit_account()
+    """Resolve current debt ownership, including switches after the order was loaded."""
+    current_order = Order.objects.select_related('credit_account', 'client__corporate').get(pk=order.pk)
+    return current_order.get_credit_account()
 
 
 @transaction.atomic
@@ -401,6 +411,8 @@ def settle_credit_order_payment(
     payment_date: date | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Record a credit-order payment and reduce the client's debt atomically."""
+    lock_order_credit_clients([order.pk])
+    order = Order.objects.select_for_update().get(pk=order.pk)
     pending_credit = order.payments.select_for_update().filter(
         method='pending_credit',
         status='pending',
@@ -462,7 +474,7 @@ def _reconcile_unapplied_credit_payment(
 ) -> Optional[Payment]:
     """Apply a previously recorded payment that did not reduce credit debt."""
     credit_account = _get_order_credit_account(order)
-    accounted_payment_ids = credit_account.credit_transactions.filter(
+    accounted_payment_ids = CreditTransaction.objects.filter(
         reference_order=order,
         transaction_type__in=['payment', 'payment_from_balance'],
         reference_payment__isnull=False,
@@ -578,6 +590,7 @@ def process_multiple_payments(
 
     order.status = OrderStatus.COMPLETED.value
     order.save()
+    _sync_completed_order_inventory(order)
 
     response_data = {
         'success': True,
@@ -631,6 +644,7 @@ def process_legacy_payment(
 
     order.status = OrderStatus.COMPLETED.value
     order.save()
+    _sync_completed_order_inventory(order)
 
     response_data = {
         'success': True,
@@ -846,6 +860,7 @@ def _register_credit_order_from_payment_rows(
             order.type = 'credito'
             order.status = OrderStatus.COMPLETED.value
             order.save(update_fields=['type', 'status', 'updated_at'])
+            _sync_completed_order_inventory(order)
     except ValueError as exc:
         return {'error': str(exc)}, 400
 
@@ -932,6 +947,7 @@ def _register_credit_order_debt(
             if order.status != OrderStatus.COMPLETED.value:
                 order.status = OrderStatus.COMPLETED.value
                 order.save(update_fields=['status', 'updated_at'])
+                _sync_completed_order_inventory(order)
     except ValueError as exc:
         return {'error': str(exc)}, 400
 
@@ -1022,6 +1038,7 @@ def _settle_pending_credit_order(
 
         order.status = OrderStatus.COMPLETED.value
         order.save(update_fields=['status', 'updated_at'])
+        _sync_completed_order_inventory(order)
 
     return {
         'success': True,

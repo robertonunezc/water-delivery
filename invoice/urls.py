@@ -3,6 +3,7 @@ from . import views
 app_name = 'invoice'
 
 urlpatterns = [
+    path('clients/<int:client_pk>/fiscal-data/', views.client_fiscal_data, name='client_fiscal_data'),
     # Define billing-related URL patterns here
     path('orders/<int:client_pk>/invoiceable-orders/', views.invoiceable_orders, name='invoiceable_orders'),
     # Invoice-prefixed aliases for admin JS endpoints

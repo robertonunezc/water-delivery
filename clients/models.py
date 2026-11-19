@@ -149,6 +149,19 @@ class Client(TimeStampedModel):
     
     def __str__(self):
         return self.name
+
+    def clean_fields(self, exclude: set[str] | None = None) -> None:
+        """Validate credit limits only when the caller includes that field."""
+        from django.core.exceptions import ValidationError
+
+        super().clean_fields(exclude=exclude)
+        if exclude and 'credit_limit' in exclude:
+            return
+        try:
+            self._validate_credit_limit_change()
+        except ValueError as error:
+            raise ValidationError({'credit_limit': str(error)}) from error
+
     # Validate that if type is 'branch', corporate must be set
     def clean(self):
         super().clean()
@@ -182,9 +195,6 @@ class Client(TimeStampedModel):
         # but this should be validated at the business logic level (e.g., when creating orders)
         # rather than at the model level, to allow proper admin inline workflow.
 
-        # if self.current_debt > self.credit_limit:
-        #     errors['current_debt'] = 'La deuda actual no puede exceder el límite de crédito.'
-
         try:
             credit_config = self.credit_config
         except ObjectDoesNotExist:
@@ -204,6 +214,28 @@ class Client(TimeStampedModel):
             raise ValidationError(errors)
 
     # Balance and Credit State Methods (pure state queries, no side effects)
+    def validate_credit_limit(self, new_limit: Decimal) -> None:
+        """Validate a proposed limit against this account's own debt."""
+        if new_limit < 0:
+            raise ValueError('Credit limit cannot be negative')
+        if new_limit < self.current_debt:
+            raise ValueError(
+                f'El nuevo límite (${new_limit:.2f}) no puede ser menor que '
+                f'la deuda actual (${self.current_debt:.2f}).'
+            )
+
+    def _validate_credit_limit_change(self) -> None:
+        """Validate changed limits while allowing edits to existing over-limit accounts."""
+        if self.type == 'branch' and not self.credit_override_enabled:
+            return
+        stored_client = (
+            Client.all_objects.only('credit_limit', 'current_debt').filter(pk=self.pk).first()
+            if self.pk else None
+        )
+        if stored_client and self.credit_limit == stored_client.credit_limit:
+            return
+        (stored_client or self).validate_credit_limit(self.credit_limit)
+
     def get_credit_account(self) -> "Client":
         """Return the client whose credit ledger applies to this client."""
         if self.type == 'branch' and self.corporate_id and not self.credit_override_enabled:
@@ -436,6 +468,16 @@ class BalanceTransaction(TimeStampedModel):
             raise ValidationError({'amount': f'Saldo insuficiente. Disponible: ${self.balance_before:.2f}'})
 
 
+class CreditDebtTransfer(TimeStampedModel):
+    """Audit the reassignment of an order's remaining credit debt."""
+
+    order = models.ForeignKey('orders.Order', on_delete=models.PROTECT, related_name='credit_transfers')
+    source_account = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='credit_transfers_out')
+    target_account = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='credit_transfers_in')
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.SET_NULL)
+
+
 class CreditTransaction(TimeStampedModel):
     """
     Track all credit-related transactions for complete audit trail
@@ -446,6 +488,8 @@ class CreditTransaction(TimeStampedModel):
         ('payment_from_balance', 'Pago con Saldo'),  # Payment using client's balance
         ('purchase_reversal', 'Reversión de compra a crédito'),
         ('payment_reversal', 'Reversión de pago de deuda'),
+        ('transfer_in', 'Transferencia de deuda recibida'),
+        ('transfer_out', 'Transferencia de deuda enviada'),
         ('adjustment', 'Ajuste manual'),      # Manual debt adjustment
         ('limit_change', 'Cambio de límite'), # Credit limit modification
         ('interest', 'Interés aplicado'),     # Interest charges
@@ -455,6 +499,10 @@ class CreditTransaction(TimeStampedModel):
     ]
     
     client = models.ForeignKey('Client', related_name='credit_transactions', on_delete=models.PROTECT, verbose_name="Cliente")
+    debt_transfer = models.ForeignKey(
+        CreditDebtTransfer, null=True, blank=True, on_delete=models.PROTECT,
+        related_name='transactions',
+    )
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES, verbose_name="Tipo de Transacción")
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     debt_before = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Deuda Anterior")
@@ -499,7 +547,7 @@ class CreditTransaction(TimeStampedModel):
             raise ValidationError({'amount': 'El monto debe ser mayor a cero.'})
         
         # Validate debt calculation
-        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment', 'payment_reversal']:
+        if self.transaction_type in ['purchase', 'interest', 'fee', 'adjustment', 'payment_reversal', 'transfer_in']:
             # Additions to debt
             if self.debt_after != self.debt_before + self.amount:
                 raise ValidationError('Error en cálculo de deuda: adición incorrecta.')

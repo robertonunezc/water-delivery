@@ -123,6 +123,7 @@ class InvoiceManager(models.Manager.from_queryset(InvoiceQuerySet)):
 
 
 class Invoice(TimeStampedModel):
+    FISCAL_FIELDS = ('rfc', 'razon_social', 'curp', 'billing_address')
     IMMUTABLE_FIELDS = (
         'client_id',
         'amount',
@@ -133,9 +134,14 @@ class Invoice(TimeStampedModel):
         'auto_amount',
         'status',
         'cancelled_at',
+        *FISCAL_FIELDS,
     )
 
     client = models.ForeignKey('clients.Client', on_delete=models.CASCADE, related_name='invoices', verbose_name='Cliente')
+    rfc = models.CharField(max_length=255, blank=True, default='', verbose_name='RFC')
+    razon_social = models.TextField(blank=True, default='', verbose_name='Razón social')
+    curp = models.CharField(max_length=255, blank=True, default='', verbose_name='CURP')
+    billing_address = models.TextField(blank=True, default='', verbose_name='Domicilio fiscal')
     amount = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Monto")
     identifier = models.CharField(max_length=100,  verbose_name="Serie")
     folio = models.CharField(max_length=100, verbose_name="Folio")

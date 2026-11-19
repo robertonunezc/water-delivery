@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block extra_css %}
 {% endblock %}
@@ -23,7 +24,7 @@
       </p>
     </div>
     <div class="pg-card-body pg-p-4">
-      <form method="post" enctype="multipart/form-data" id="invoice-create-form" novalidate>
+      <form method="post" enctype="multipart/form-data" id="invoice-create-form" data-fiscal-data-url="{% url 'invoice:client_fiscal_data' 0 %}" novalidate>
         {% csrf_token %}
 
         {% if form.errors %}
@@ -53,6 +54,30 @@
               {% endif %}
             {% endif %}
           </div>
+
+          <fieldset class="pg-col-md-12 pg-border pg-p-3">
+            <legend class="pg-h6">Datos fiscales del receptor</legend>
+            <p class="pg-field-help">Se precargan del cliente y se guardan en esta factura. Puedes ajustarlos antes de emitirla.</p>
+            <p id="invoice-fiscal-data-status" class="pg-field-help" role="status" aria-live="polite"></p>
+            <div class="pg-row pg-gap-3">
+              <div class="pg-col-md-6">
+                <label for="{{ form.rfc.id_for_label }}" class="pg-label">RFC *</label>
+                {{ form.rfc }}
+              </div>
+              <div class="pg-col-md-6">
+                <label for="{{ form.curp.id_for_label }}" class="pg-label">CURP</label>
+                {{ form.curp }}
+              </div>
+              <div class="pg-col-md-12">
+                <label for="{{ form.razon_social.id_for_label }}" class="pg-label">Razón social *</label>
+                {{ form.razon_social }}
+              </div>
+              <div class="pg-col-md-12">
+                <label for="{{ form.billing_address.id_for_label }}" class="pg-label">Domicilio fiscal *</label>
+                {{ form.billing_address }}
+              </div>
+            </div>
+          </fieldset>
 
           <div class="pg-col-md-12">
             <label for="{{ form.orders.id_for_label }}" class="pg-label">Ventas vinculadas *</label>
@@ -131,6 +156,7 @@
     </div>
   </div>
 </div>
+{% endblock %}
 
 {% block extra_js %}
 {% if is_draft_edit %}
@@ -169,6 +195,7 @@
   });
 </script>
 {% else %}
+<script src="{% static 'invoice/js/invoice_fiscal_data.js' %}"></script>
 <script>
   // OOP-style Javascript manager for Invoice Creation interactivity
   class InvoiceCreateManager {
@@ -259,6 +286,4 @@
   });
 </script>
 {% endif %}
-{% endblock %}
-
 {% endblock %}

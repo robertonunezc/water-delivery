@@ -1,0 +1,10 @@
+{% if order.status != 'CANCELLED' %}
+  <form method="post" action="{% url 'orders:cancel_order' order.pk %}" class="pg-d-inline"
+        onsubmit="return window.confirm('¿Desea cancelar este pedido? El pedido se marcará como cancelado y se revertirán los movimientos internos cuando aplique.');">
+    {% csrf_token %}
+    <input type="hidden" name="response_format" value="html">
+    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <button type="submit" class="{{ button_class|default:'pg-dropdown-item pg-text-danger' }}"
+            aria-label="Cancelar pedido #{{ order.pk }}">Cancelar pedido</button>
+  </form>
+{% endif %}

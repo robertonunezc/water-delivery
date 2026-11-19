@@ -353,6 +353,87 @@ class ReminderViewTests(FastTenantTestCase):
         self.assertEqual(reminder.client, self.client_record)
         self.assertTrue(reminder.urgent)
 
+    def test_create_form_offers_active_users_for_assignment(self) -> None:
+        User.objects.create_user(username="inactive", is_active=False)
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("reminders:create"))
+
+        self.assertContains(response, 'name="assigned_to"')
+        assignment = response.context["form"].fields["assigned_to"]
+        self.assertFalse(assignment.required)
+        self.assertEqual(list(assignment.queryset), [self.other_user, self.user])
+
+    def test_create_assigns_selected_user(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("reminders:create"),
+            {"title": "Para otro usuario", "assigned_to": self.other_user.pk},
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        reminder = Reminder.objects.get(title="Para otro usuario")
+        self.assertEqual(reminder.created_by, self.other_user)
+        self.assertNotIn(reminder, Reminder.objects.for_user(self.user))
+        self.assertIn(reminder, Reminder.objects.for_user(self.other_user))
+        self.assertIn(
+            reminder, get_home_reminder_context(self.other_user)["today_reminders"]
+        )
+        self.assertNotIn(
+            reminder, get_home_reminder_context(self.user)["today_reminders"]
+        )
+
+    def test_create_with_empty_assignment_defaults_to_logged_in_user(self) -> None:
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("reminders:create"),
+            {"title": "Sin asignar", "assigned_to": ""},
+        )
+
+        self.assertRedirects(response, reverse("core:home"), fetch_redirect_response=False)
+        self.assertEqual(Reminder.objects.get(title="Sin asignar").created_by, self.user)
+
+    def test_create_rejects_inactive_or_unknown_assignee(self) -> None:
+        inactive_user = User.objects.create_user(username="inactive", is_active=False)
+        self.client.force_login(self.user)
+
+        for assignee_id in [inactive_user.pk, 999999]:
+            with self.subTest(assignee_id=assignee_id):
+                response = self.client.post(
+                    reverse("reminders:create"),
+                    {"title": "Asignacion invalida", "assigned_to": assignee_id},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("assigned_to", response.context["form"].errors)
+                self.assertFalse(Reminder.objects.filter(title="Asignacion invalida").exists())
+
+    def test_assigned_reminder_can_only_be_managed_by_assignee(self) -> None:
+        self.client.force_login(self.user)
+        self.client.post(
+            reverse("reminders:create"),
+            {"title": "Encargo", "assigned_to": self.other_user.pk},
+        )
+        reminder = Reminder.objects.get(title="Encargo")
+
+        for action, status in [("edit", 404), ("complete", 403), ("delete", 403)]:
+            with self.subTest(action=action):
+                response = self.client.post(
+                    reverse(f"reminders:{action}", kwargs={"pk": reminder.pk}),
+                    {"title": "Cambiado"},
+                )
+                self.assertEqual(response.status_code, status)
+
+        self.client.force_login(self.other_user)
+        response = self.client.get(reverse("reminders:edit", kwargs={"pk": reminder.pk}))
+        self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse("reminders:complete", kwargs={"pk": reminder.pk}))
+        self.assertEqual(response.status_code, 302)
+        reminder.refresh_from_db()
+        self.assertEqual(reminder.completed_by, self.other_user)
+
     def test_create_with_client_query_preselects_client(self) -> None:
         self.client.force_login(self.user)
 

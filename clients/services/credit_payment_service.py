@@ -26,10 +26,7 @@ def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
             | Q(reference_order__client__corporate=client),
         )
     else:
-        credit_transactions = credit_transactions.filter(
-            client=client.get_credit_account(),
-            reference_order__client=client,
-        )
+        credit_transactions = credit_transactions.filter(reference_order__client=client)
 
     credit_order_ids = credit_transactions.values('reference_order_id')
     orders = (
@@ -45,6 +42,8 @@ def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
         .distinct()
         .order_by('-order_date', '-id')
     )
+    if client.type != 'corporate':
+        orders = orders.for_credit_accounts([client.get_credit_account().pk])
     return list(orders)
 
 

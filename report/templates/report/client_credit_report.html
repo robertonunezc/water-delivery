@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block extra_css %}
 {% endblock %}
@@ -82,6 +83,18 @@
       </div>
     </div>
 
+    {% if report_data.open_credit_total > 0 %}
+      <form id="credit-report-payment-form" method="get" action="{% url 'report:pay_credit_orders' client.pk %}"></form>
+      <div class="pg-flex pg-flex-wrap pg-justify-between pg-align-center pg-gap-3 pg-mb-3">
+        <label class="pg-flex pg-align-center pg-gap-2">
+          <input type="checkbox" class="pg-checkbox-input" id="select-all-credit-orders">
+          Seleccionar todos los pedidos
+        </label>
+        <span id="credit-report-selected-total" class="pg-text-muted" role="status" aria-live="polite">0 pedidos seleccionados · $0.00</span>
+        <button type="submit" form="credit-report-payment-form" id="pay-credit-report-orders" class="pg-button pg-button-primary" disabled>Pagar seleccionados</button>
+      </div>
+    {% endif %}
+
     <div class="pg-card pg-mb-4">
       <div class="pg-card-header">
         <h5 class="pg-mb-0">
@@ -107,6 +120,18 @@
                     <td>
                       <strong>{{ item.invoice.identifier }} {{ item.invoice.folio }}</strong>
                       <br><small class="pg-text-muted">{{ item.orders|length }} venta{{ item.orders|length|pluralize }}</small>
+                      <div class="pg-mt-2">
+                        <label class="pg-flex pg-align-center pg-gap-2 pg-small pg-mb-2">
+                          <input type="checkbox" class="pg-checkbox-input credit-report-invoice-checkbox" data-invoice="{{ item.invoice.pk }}">
+                          Seleccionar pedidos de esta factura
+                        </label>
+                        {% for sale in item.orders %}
+                          <label class="pg-flex pg-align-center pg-gap-2 pg-small pg-mb-1">
+                            <input type="checkbox" class="pg-checkbox-input credit-report-order-checkbox" name="orders" value="{{ sale.order.pk }}" form="credit-report-payment-form" data-invoice="{{ item.invoice.pk }}" data-amount="{{ sale.remaining_amount|floatformat:'2u' }}">
+                            Pedido #{{ sale.order.pk }} · {{ sale.order.client.name }} · ${{ sale.remaining_amount|floatformat:2 }}
+                          </label>
+                        {% endfor %}
+                      </div>
                     </td>
                     <td class="pg-text-end amount-current">${{ item.open_amount|floatformat:2 }}</td>
                     <td class="pg-text-end">
@@ -162,6 +187,7 @@
                 {% for item in report_data.uninvoiced_orders %}
                   <tr>
                     <td>
+                      <input type="checkbox" class="pg-checkbox-input credit-report-order-checkbox pg-me-2" name="orders" value="{{ item.order.pk }}" form="credit-report-payment-form" data-amount="{{ item.remaining_amount|floatformat:'2u' }}" aria-label="Seleccionar pedido #{{ item.order.pk }}">
                       <a href="{% url 'orders:get_order' item.order.id %}" class="pg-fw-bold pg-text-decoration-none">
                         #{{ item.order.id }}
                       </a>
@@ -195,4 +221,8 @@
       </div>
     </div>
   </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="{% static 'report/js/credit_report_payments.js' %}"></script>
 {% endblock %}

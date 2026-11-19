@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
+from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from clients.models import Client, ClientCreditConfig, CreditTransaction
+from clients.models import Client, ClientCreditConfig
 from clients.services.pending_payment_service import (
     get_order_credit_due_date,
     is_order_overdue,
@@ -90,40 +92,22 @@ def _money(value: Decimal | int | float | None) -> Decimal:
 
 def _get_credit_order_ids_for_clients(client_ids: list[int]) -> list[int]:
     return list(
-        CreditTransaction.objects.filter(
-            client_id__in=client_ids,
-            transaction_type="purchase",
-            reference_order__isnull=False,
-        )
-        .values_list("reference_order_id", flat=True)
-        .distinct()
+        Order.objects.all().for_credit_accounts(client_ids).values_list('pk', flat=True)
     )
 
 
 def _get_credit_client_ids_by_order_id(client_ids: list[int]) -> dict[int, int]:
-    rows = CreditTransaction.objects.filter(
-        client_id__in=client_ids,
-        transaction_type="purchase",
-        reference_order__isnull=False,
-    ).values_list("reference_order_id", "client_id")
+    rows = Order.objects.all().for_credit_accounts(client_ids).values_list('pk', 'resolved_credit_account_id')
     return dict(rows)
 
 
 def _get_open_credit_orders_for_client(client: Client) -> list[Order]:
     credit_account = client.get_credit_account()
-    credit_transactions = CreditTransaction.objects.filter(
-        client=credit_account,
-        transaction_type="purchase",
-        reference_order__isnull=False,
-    )
+    orders = Order.objects.active().unpaid().for_credit_accounts([credit_account.pk])
     if credit_account.pk != client.pk:
-        credit_transactions = credit_transactions.filter(reference_order__client=client)
-
-    credit_order_ids = credit_transactions.values("reference_order_id")
+        orders = orders.filter(client=client)
     return list(
-        Order.objects.active()
-        .unpaid()
-        .filter(pk__in=credit_order_ids)
+        orders
         .select_related("client", "client__credit_config", "client__corporate")
         .prefetch_related("invoice_links__invoice", "payments")
         .order_by("order_date", "id")
@@ -167,7 +151,7 @@ def _get_credit_config(client: Client) -> ClientCreditConfig | None:
 
 
 def _get_order_due_date(order: Order) -> date | None:
-    credit_config = order.client.get_effective_credit_config()
+    credit_config = order.get_effective_credit_config()
     if credit_config is None:
         return None
     return get_order_credit_due_date(order, credit_config)
@@ -298,6 +282,35 @@ def get_client_credit_report(
     report_date = as_of or _today()
     orders = _get_open_credit_orders_for_client(client)
     return _build_client_report_from_orders(client, orders, as_of=report_date)
+
+
+def get_credit_report_order_ids(client: Client) -> list[int]:
+    """Return the open orders shown in this client's credit report."""
+    return [order.pk for order in _get_open_credit_orders_for_client(client)]
+
+
+@transaction.atomic
+def pay_credit_report_orders(
+    *, client: Client, order_ids: list[int], payment_method: str,
+    amount: Decimal, request_user: Any, payment_date: date,
+) -> dict[str, object]:
+    """Recheck the report's credit scope under locks before settling orders."""
+    from orders.services.credit_lock_service import lock_order_credit_clients
+    from payment import services as payment_services
+
+    lock_order_credit_clients(order_ids, extra_client_ids=[client.pk])
+    client.refresh_from_db()
+    list(Order.objects.select_for_update().filter(pk__in=order_ids).order_by('pk'))
+    allowed_ids = get_credit_report_order_ids(client)
+    orders = payment_services.get_selected_unpaid_orders(
+        client, order_ids, allowed_order_ids=allowed_ids,
+    )
+    return payment_services.pay_client_orders(
+        client=client, orders=orders, payment_method=payment_method,
+        amount=amount, request_user=request_user, payment_date=payment_date,
+        allowed_order_ids=allowed_ids,
+        payment_client=client if payment_method == 'balance' else None,
+    )
 
 
 def get_global_credit_report(*, as_of: date | None = None) -> GlobalCreditReport:

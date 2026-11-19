@@ -26,14 +26,25 @@
                                     <span class="pg-badge pg-bg-info pg-me-2">{{ route.get_weekday_display }}</span>
                                     <small class="pg-text-muted">{{ route.description|default:"No description" }}</small>
                                 </div>
+                                <div class="pg-flex pg-align-center pg-gap-2 pg-flex-wrap">
+                                    {% if inventory_status %}
+                                        <a href="{{ inventory_status.url }}" class="pg-button pg-button-sm pg-button-outline-primary">
+                                            <i class="fas fa-boxes-stacked pg-me-1"></i>
+                                            Inventario de camioneta
+                                            <span class="pg-badge {% if inventory_status.has_differences %}pg-bg-danger{% elif inventory_status.session %}pg-bg-success{% else %}pg-bg-secondary{% endif %} pg-ms-1">
+                                                {{ inventory_status.status }}
+                                            </span>
+                                        </a>
+                                    {% endif %}
                                 {% if not is_today_view %}
-                                    <div class="pg-flex pg-align-center">
+                                    <div class="pg-flex pg-align-center pg-ms-2">
                                         <i class="fas fa-users pg-me-1"></i>
                                         <span class="pg-badge pg-bg-secondary">
                                             {% if route_clients %}{{ route_clients|length }}{% elif regular_clients %}{{ regular_clients|length }}{% else %}0{% endif %} clients
                                         </span>
                                     </div>
                                 {% endif %}
+                                </div>
                             </div>
                     </div>
                 </div>

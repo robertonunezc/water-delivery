@@ -20,12 +20,13 @@ from django.db.models.functions import Coalesce, Greatest
 from clients.models import Client, CreditTransaction
 
 ZERO = Decimal("0.00")
-DEBT_INCREASE_TYPES = ("purchase", "interest", "fee", "payment_reversal")
+DEBT_INCREASE_TYPES = ("purchase", "interest", "fee", "payment_reversal", "transfer_in")
 DEBT_DECREASE_TYPES = (
     "payment",
     "payment_from_balance",
     "forgiveness",
     "purchase_reversal",
+    "transfer_out",
 )
 
 

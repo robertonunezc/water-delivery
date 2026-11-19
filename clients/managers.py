@@ -122,12 +122,12 @@ class CreditTransactionQuerySet(models.QuerySet):
 
     def purchases(self) -> Self:
         """Filter to purchase-type transactions (debt increase)."""
-        return self.by_types(["purchase", "interest", "fee", "payment_reversal"])
+        return self.by_types(["purchase", "interest", "fee", "payment_reversal", "transfer_in"])
 
     def payments(self) -> Self:
         """Filter to payment-type transactions (debt decrease)."""
         return self.by_types(
-            ["payment", "payment_from_balance", "forgiveness", "purchase_reversal"]
+            ["payment", "payment_from_balance", "forgiveness", "purchase_reversal", "transfer_out"]
         )
 
     def debt_at(self, target_date: date | datetime) -> Decimal:

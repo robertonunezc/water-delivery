@@ -99,6 +99,74 @@
       </div>
     {% endif %}
 
+    {% if inventory_summaries %}
+      <section class="pg-mb-4">
+        <div class="pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-2 pg-mb-2">
+          <h2 class="pg-h4 pg-mb-0">
+            <i class="fas fa-truck-loading pg-me-2"></i>Cuadre de camionetas
+          </h2>
+          <span class="pg-badge pg-bg-light pg-text-dark">{{ inventory_summaries|length }} captura{{ inventory_summaries|length|pluralize }}</span>
+        </div>
+        <div class="pg-card">
+          <div class="pg-card-body pg-p-0">
+            <div class="pg-table-responsive">
+              <table class="pg-table pg-table-hover pg-mb-0">
+                <thead>
+                  <tr>
+                    <th>Ruta</th>
+                    <th>Camioneta</th>
+                    <th>Estado</th>
+                    <th class="pg-text-end">Cargados</th>
+                    <th class="pg-text-end">Llenos regreso</th>
+                    <th class="pg-text-end">Vacíos regreso</th>
+                    <th class="pg-text-end">Venta esperada</th>
+                    <th class="pg-text-end">Venta reportada</th>
+                    <th class="pg-text-end">Dif. venta</th>
+                    <th class="pg-text-end">Envases faltantes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for summary in inventory_summaries %}
+                    <tr>
+                      <td>{{ summary.route.name }}</td>
+                      <td>{{ summary.transportation.license_plate }}</td>
+                      <td>
+                        <span class="pg-badge {% if summary.status == 'Cerrada' %}pg-bg-success{% else %}pg-bg-info{% endif %}">
+                          {{ summary.status }}
+                        </span>
+                      </td>
+                      <td class="pg-text-end">{{ summary.totals.full_loaded }}</td>
+                      <td class="pg-text-end">{{ summary.totals.full_returned }}</td>
+                      <td class="pg-text-end">{{ summary.totals.empty_returned }}</td>
+                      <td class="pg-text-end">{{ summary.totals.expected_sales }}</td>
+                      <td class="pg-text-end">{{ summary.totals.reported_sales }}</td>
+                      <td class="pg-text-end">
+                        <span class="pg-badge {% if summary.totals.sales_difference %}pg-bg-danger{% else %}pg-bg-success{% endif %}">
+                          {{ summary.totals.sales_difference }}
+                        </span>
+                      </td>
+                      <td class="pg-text-end">
+                        <span class="pg-badge {% if summary.totals.missing_containers %}pg-bg-warning pg-text-dark{% else %}pg-bg-success{% endif %}">
+                          {{ summary.totals.missing_containers }}
+                        </span>
+                      </td>
+                    </tr>
+                    {% if summary.session.notes %}
+                      <tr>
+                        <td colspan="10">
+                          <small class="pg-text-muted">Notas: {{ summary.session.notes }}</small>
+                        </td>
+                      </tr>
+                    {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+    {% endif %}
+
     <!-- Payment Methods Breakdown -->
     {% if payment_method_stats %}
       {% for method_key, method_data in payment_method_stats.items %}

@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+
+{% block form_top %}
+  {{ block.super }}
+  {% if add %}
+    <div id="invoice-fiscal-data-config" data-url="{% url 'invoice:client_fiscal_data' 0 %}" hidden></div>
+    <p id="invoice-fiscal-data-status" role="status" aria-live="polite"></p>
+  {% endif %}
+{% endblock %}

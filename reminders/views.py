@@ -5,6 +5,7 @@ from typing import Any
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, QuerySet
+from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -12,7 +13,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 from clients.models import Client
 
-from .forms import ReminderForm
+from .forms import ReminderCreateForm, ReminderForm
 from .models import Reminder
 from .services import complete_reminder, soft_delete_reminder
 
@@ -40,17 +41,17 @@ def list(request):
 
 
 @login_required
-def create(request):
+def create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
-        form = ReminderForm(request.POST)
+        form = ReminderCreateForm(request.POST)
         if form.is_valid():
             reminder = form.save(commit=False)
-            reminder.created_by = request.user
+            reminder.created_by = form.cleaned_data["assigned_to"] or request.user
             reminder.save()
             messages.success(request, "Recordatorio creado correctamente.")
             return redirect("core:home")
     else:
-        form = ReminderForm(initial=_create_initial_data(request.GET.get("client")))
+        form = ReminderCreateForm(initial=_create_initial_data(request.GET.get("client")))
 
     return render(request, "reminders/form.html", {"form": form, "is_create": True})
 

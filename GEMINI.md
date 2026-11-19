@@ -1,4 +1,4 @@
-Project: water-delivery — Copilot instructions for coding agents
+Project: water-delivery — CODEX agents instructions
 
 Purpose
 - Help an AI contributor become productive quickly by documenting project-specific structure, conventions, workflows, and common operations.

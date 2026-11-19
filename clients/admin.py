@@ -4,7 +4,8 @@ from django.utils.html import format_html
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path
 from django.contrib import messages
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpRequest, HttpResponseRedirect, HttpResponse
+from django.forms import ModelForm
 from django.urls import reverse
 from unfold.admin import ModelAdmin, StackedInline, TabularInline
 from unfold.contrib.inlines.admin import NonrelatedTabularInline
@@ -15,12 +16,14 @@ from .forms import (
 	BulkBalanceDepositForm,
 	ClientBillingFrequencyForm,
 	AddressInlineForm,
+	ClientAdminForm,
 )
 from .admin_mixins import BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin
 from product.services import ensure_client_product_prices
 from clients.services.client_service import (
 	initialize_branch_credit_from_corporate,
 	sync_inherited_branch_credit_from_corporate,
+	update_client_from_instance,
 )
 from routes.models import RouteClient
 from core.admin_mixins import SoftDeleteAdminMixin
@@ -108,6 +111,7 @@ class ClientInvoiceDataInline(StackedInline):
 
 @admin.register(models.Client)
 class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin, AdminActionsMixin, ModelAdmin):
+	form = ClientAdminForm
 	list_display = ('name', 'active','type','corporate', 'balance', 'current_debt','requires_billing' ,'get_available_credit')
 	search_fields = ('name','type',)
 	list_filter = ('active', 'type', 'corporate', 'requires_billing')
@@ -212,10 +216,15 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 				self._create_billing_address(request, formset)
 
 
-	def save_model(self, request, obj, form, change):
-		super().save_model(request, obj, form, change)
+	def save_model(self, request: HttpRequest, obj: models.Client, form: ModelForm | None, change: bool) -> None:
 		if change:
+			field_names = {
+				'corporate_id' if field == 'corporate' else field for field in form.changed_data
+			} if form is not None else None
+			saved = update_client_from_instance(obj, request.user, field_names)
+			obj.current_debt = saved.current_debt
 			return
+		super().save_model(request, obj, form, change)
 
 		initialize_branch_credit_from_corporate(obj)
 
@@ -277,7 +286,7 @@ class ClientAdmin(SoftDeleteAdminMixin, BalanceDisplayMixin, BillingDisplayMixin
 	def get_readonly_fields(self, request, obj=None):
 		fields = list(super().get_readonly_fields(request, obj))
 		if obj and obj.type == 'branch' and not obj.credit_override_enabled:
-			fields.extend(['can_pay_with_credit', 'credit_limit'])
+			fields.extend(['can_pay_with_credit'])
 		return tuple(dict.fromkeys(fields))
 
 	def get_fieldsets(self, request, obj=None):
