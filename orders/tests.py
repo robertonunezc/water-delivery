@@ -151,6 +151,49 @@ class UpdateOrderTestCase(FastTenantTestCase):
         order_product = OrderProduct.objects.get(order=self.order, product=self.product)
         self.assertEqual(order_product.unit_price, Decimal("25.00"))
 
+    def test_create_order_view_renders_product_cart_layout_with_existing_quantities(self) -> None:
+        """Create order view renders Cubic product-cart layout and pre-populates existing cart items."""
+        from clients.models import Address
+        from django_tenants.test.client import TenantClient
+
+        user = User.objects.create_user(username="cart-view-user", password="testpassword")
+        Address.objects.create(
+            client=self.client,
+            type="delivery",
+            street="Calle Agua",
+            exterior_number="10",
+            locality="Centro",
+            municipality="Monterrey",
+            state="NL",
+            zip_code="64000",
+            country="MX",
+        )
+        ProductClientPrice.objects.create(
+            product=self.product,
+            client=self.client,
+            price=25.00,
+        )
+        OrderProduct.objects.create(
+            order=self.order,
+            product=self.product,
+            quantity=3,
+            unit_price=Decimal("25.00"),
+        )
+        self.order.total_amount = services.calculate_order_total(self.order)
+        self.order.save(update_fields=["subtotal_amount", "total_amount"])
+
+        test_client = TenantClient(self.tenant)
+        test_client.force_login(user)
+        response = test_client.get(reverse("orders:get_order", args=[self.order.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'class="table product-overview m-b-0"')
+        self.assertContains(response, 'class="white-box pro-cart')
+        self.assertContains(response, 'id="cart-items-count">3</span>')
+        self.assertContains(response, 'value="3"')
+        self.assertContains(response, '$75.00')
+
+
 
 class CompletedOrderEditTests(FastTenantTestCase):
     """Completed orders stay locked across user-facing mutation paths."""

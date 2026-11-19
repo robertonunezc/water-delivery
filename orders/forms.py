@@ -21,12 +21,15 @@ class SplitOrderForm(forms.Form):
                     min_value=0,
                     max_value=item.quantity,
                     initial=0,
-                    required=True,
+                    required=False,
                     widget=forms.NumberInput(attrs={
-                        'class': 'pg-input',
-                        'placeholder': f'Max: {item.quantity}'
+                        'class': 'form-control input-sm text-center',
+                        'min': '0',
+                        'max': str(item.quantity),
+                        'step': '1',
+                        'placeholder': '0',
                     }),
-                    help_text=f'Precio unitario: ${item.unit_price} | Total disponible: ${item.get_total_price()}'
+                    help_text=f'Máx: {item.quantity} disponibles'
                 )
     
     def clean(self):
@@ -35,11 +38,16 @@ class SplitOrderForm(forms.Form):
         if not self.order:
             raise forms.ValidationError("No se encontró la orden a dividir.")
         
+        for item in self.order.items.all():
+            field_name = f'quantity_{item.id}'
+            if cleaned_data.get(field_name) is None:
+                cleaned_data[field_name] = 0
+        
         # Check that at least one item is being moved
         total_items_to_move = 0
         for item in self.order.items.all():
             field_name = f'quantity_{item.id}'
-            quantity = cleaned_data.get(field_name, 0)
+            quantity = cleaned_data.get(field_name) or 0
             total_items_to_move += quantity
         
         if total_items_to_move == 0:
@@ -48,7 +56,7 @@ class SplitOrderForm(forms.Form):
         # Check that the source order will still have items
         for item in self.order.items.all():
             field_name = f'quantity_{item.id}'
-            quantity_to_move = cleaned_data.get(field_name, 0)
+            quantity_to_move = cleaned_data.get(field_name) or 0
             remaining = item.quantity - quantity_to_move
             
             # If this item will have 0 remaining, check if other items exist
@@ -58,7 +66,7 @@ class SplitOrderForm(forms.Form):
                 for other_item in self.order.items.all():
                     if other_item.id != item.id:
                         other_field_name = f'quantity_{other_item.id}'
-                        other_remaining = other_item.quantity - cleaned_data.get(other_field_name, 0)
+                        other_remaining = other_item.quantity - (cleaned_data.get(other_field_name) or 0)
                         if other_remaining > 0:
                             has_other_items = True
                             break
@@ -73,7 +81,7 @@ class SplitOrderForm(forms.Form):
         source_will_have_items = False
         for item in self.order.items.all():
             field_name = f'quantity_{item.id}'
-            quantity_to_move = cleaned_data.get(field_name, 0)
+            quantity_to_move = cleaned_data.get(field_name) or 0
             if item.quantity - quantity_to_move > 0:
                 source_will_have_items = True
                 break
@@ -94,7 +102,7 @@ class OrderForm(forms.ModelForm):
         decimal_places=2,
         required=False,
         widget=forms.NumberInput(attrs={
-            'class': 'pg-input',
+            'class': 'form-control pg-input',
             'step': '0.01',
             'placeholder': '0.00',
             'id': 'cantidad_cobrada'
@@ -137,7 +145,11 @@ class OrderForm(forms.ModelForm):
 
 
 class OrderReceiptSignForm(forms.Form):
-    contact_id = forms.ChoiceField(required=False, label="Contacto")
+    contact_id = forms.ChoiceField(
+        required=False,
+        label="Contacto",
+        widget=forms.Select(attrs={'class': 'form-control pg-select'}),
+    )
     method = forms.ChoiceField(
         choices=(
             (ReceiptDeliveryMethod.EMAIL, "Email"),
@@ -145,10 +157,28 @@ class OrderReceiptSignForm(forms.Form):
         ),
         widget=forms.HiddenInput(),
     )
-    contact_name = forms.CharField(max_length=100, label="Nombre")
-    contact_email = forms.EmailField(required=False, label="Correo electronico")
-    contact_phone = forms.CharField(max_length=20, required=False, label="Telefono")
-    contact_position = forms.CharField(max_length=100, required=False, label="Puesto")
+    contact_name = forms.CharField(
+        max_length=100,
+        label="Nombre",
+        widget=forms.TextInput(attrs={'class': 'form-control pg-input'}),
+    )
+    contact_email = forms.EmailField(
+        required=False,
+        label="Correo electronico",
+        widget=forms.EmailInput(attrs={'class': 'form-control pg-input'}),
+    )
+    contact_phone = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Telefono",
+        widget=forms.TextInput(attrs={'class': 'form-control pg-input'}),
+    )
+    contact_position = forms.CharField(
+        max_length=100,
+        required=False,
+        label="Puesto",
+        widget=forms.TextInput(attrs={'class': 'form-control pg-input'}),
+    )
     signature_data = forms.CharField(widget=forms.HiddenInput())
 
     def __init__(self, *args, client: Client, **kwargs) -> None:

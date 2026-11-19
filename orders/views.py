@@ -567,6 +567,11 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
     
     # Calculate summary statistics
     total_orders = orders.count()
+    filtered_total_amount = (
+        orders.active().aggregate(total=Sum('total_amount'))['total']
+        or Decimal('0.00')
+    )
+    unpaid_orders_count = orders.active().unpaid().count()
     
     # Pagination
     paginator = Paginator(orders, per_page)
@@ -606,11 +611,34 @@ def _build_orders_list_context(request, per_page: int = 15) -> dict:
         },
         'has_filters': any([status_filter, client_filter, date_from, date_to, search_query]),
         'total_orders': total_orders,
+        'filtered_total_amount': filtered_total_amount,
+        'unpaid_orders_count': unpaid_orders_count,
         'review_required_count': review_required_count,
         'page_stats': page_stats,
         'today': date.today(),
         'receipt_signature_enabled': is_receipt_signature_enabled(request.user),
     }
+
+
+def _build_client_products_for_cart(
+    client: Client,
+    order: Order,
+) -> tuple[list[ProductClientPrice], int]:
+    """Attach existing order item quantities and line totals to client products."""
+    client_products = list(client.get_products())
+    order_items_by_product = {
+        item.product_id: item
+        for item in order.items.select_related('product').all()
+    }
+    cart_items_count = 0
+    for client_product in client_products:
+        existing_item = order_items_by_product.get(client_product.product_id)
+        unit_price = Decimal(str(client_product.price or 0))
+        quantity = int(existing_item.quantity) if existing_item else 0
+        client_product.cart_quantity = quantity
+        client_product.cart_line_total = (unit_price * quantity).quantize(Decimal('0.01'))
+        cart_items_count += quantity
+    return client_products, cart_items_count
 
 
 @login_required
@@ -627,7 +655,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
 
     owner = request.user
     order_is_editable = _order_is_editable(order)
-    client_products = client.get_products()
+    client_products, cart_items_count = _build_client_products_for_cart(client, order)
     has_delivery_address = client.addresses.filter(type='delivery').exists()
     has_pending_credit_payment = order.payments.filter(method='pending_credit', status='pending').exists()
     can_pay_with_credit = client.get_credit_account().can_pay_with_credit
@@ -643,6 +671,7 @@ def get_or_create_order(request, client_pk=None, order_id=None):
         'client': client, 
         'order': order, 
         'client_products': client_products, 
+        'cart_items_count': cart_items_count,
         'payment_types': payment_types,
         'order_type': selected_order_type,
         'has_pending_credit_payment': has_pending_credit_payment,
@@ -800,7 +829,7 @@ def split_order(request: HttpRequest, order_id: int) -> HttpResponse:
         
         if form.is_valid():
             quantities = {
-                item.pk: form.cleaned_data[f'quantity_{item.pk}']
+                item.pk: int(form.cleaned_data.get(f'quantity_{item.pk}') or 0)
                 for item in order_items
             }
             try:

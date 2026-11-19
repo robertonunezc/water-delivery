@@ -20,19 +20,19 @@ class ConfirmationOverrideForm(forms.Form):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.fields['status'].widget.attrs['class'] = 'pg-select'
-        self.fields['note'].widget.attrs['class'] = 'pg-input'
+        self.fields['status'].widget.attrs['class'] = 'form-control pg-select'
+        self.fields['note'].widget.attrs['class'] = 'form-control pg-input'
 
 
 class ManualConfirmationSendForm(forms.Form):
     clients = forms.ModelMultipleChoiceField(
         queryset=Client.objects.filter(active=True).order_by('name'),
         label='Clientes',
-        widget=forms.SelectMultiple(attrs={'class': 'pg-select', 'size': 12}),
+        widget=forms.SelectMultiple(attrs={'class': 'form-control pg-select', 'size': 12}),
     )
     visit_date = forms.DateField(
         label='Fecha',
-        widget=forms.DateInput(attrs={'class': 'pg-input', 'type': 'date'}),
+        widget=forms.DateInput(attrs={'class': 'form-control pg-input', 'type': 'date'}),
     )
 
     def __init__(self, *args, **kwargs) -> None:

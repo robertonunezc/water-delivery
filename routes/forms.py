@@ -17,7 +17,7 @@ class RouteClientForm(forms.ModelForm):
     anchor_date = forms.DateField(
         required=False,
         label='Fecha de inicio de ciclo',
-        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
+        widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date', 'class': 'form-control pg-input'}),
         input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
     )
 
@@ -25,7 +25,11 @@ class RouteClientForm(forms.ModelForm):
         model = RouteClient
         fields = ['client', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
         widgets = {
-            'notes': forms.Textarea(attrs={'rows': 3}),
+            'client': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'sequence': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '1'}),
+            'interval_weeks': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '1', 'max': '4'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
+            'notes': forms.Textarea(attrs={'rows': 3, 'class': 'form-control pg-input'}),
         }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -53,7 +57,7 @@ class ClientRouteAssignmentForm(forms.ModelForm):
         label='Fecha de inicio de ciclo',
         widget=forms.DateInput(
             format='%Y-%m-%d',
-            attrs={'type': 'date', 'class': 'pg-input'},
+            attrs={'type': 'date', 'class': 'form-control pg-input'},
         ),
         input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
     )
@@ -62,11 +66,11 @@ class ClientRouteAssignmentForm(forms.ModelForm):
         model = RouteClient
         fields = ['route', 'sequence', 'interval_weeks', 'anchor_date', 'is_active', 'notes']
         widgets = {
-            'route': forms.Select(attrs={'class': 'pg-select'}),
-            'sequence': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1'}),
-            'interval_weeks': forms.NumberInput(attrs={'class': 'pg-input', 'min': '1', 'max': '4'}),
+            'route': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'sequence': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '1'}),
+            'interval_weeks': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '1', 'max': '4'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
-            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+            'notes': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 2}),
         }
         labels = {
             'interval_weeks': 'Intervalo',
@@ -98,7 +102,11 @@ class RouteForm(forms.ModelForm):
         model = Route
         fields = ['name', 'description', 'transportation', 'weekday', 'is_active']
         widgets = {
-            'description': forms.Textarea(attrs={'rows': 3}),
+            'name': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'description': forms.Textarea(attrs={'rows': 3, 'class': 'form-control pg-input'}),
+            'transportation': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'weekday': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -132,7 +140,7 @@ class TruckInventorySessionForm(forms.ModelForm):
         label='Fecha',
         widget=forms.DateInput(
             format='%Y-%m-%d',
-            attrs={'type': 'date', 'class': 'pg-input'},
+            attrs={'type': 'date', 'class': 'form-control pg-input'},
         ),
         input_formats=['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y'],
     )
@@ -141,9 +149,9 @@ class TruckInventorySessionForm(forms.ModelForm):
         model = TruckInventorySession
         fields = ['service_date', 'route', 'transportation', 'notes']
         widgets = {
-            'route': forms.Select(attrs={'class': 'pg-select'}),
-            'transportation': forms.Select(attrs={'class': 'pg-select'}),
-            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
+            'route': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'transportation': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 2}),
         }
 
     def __init__(
@@ -190,11 +198,11 @@ class TruckInventoryLineForm(forms.ModelForm):
         model = TruckInventoryLine
         fields = ['product', 'full_loaded', 'full_returned', 'empty_returned', 'notes']
         widgets = {
-            'product': forms.Select(attrs={'class': 'pg-select'}),
-            'full_loaded': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
-            'full_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
-            'empty_returned': forms.NumberInput(attrs={'class': 'pg-input', 'min': '0'}),
-            'notes': forms.Textarea(attrs={'class': 'pg-input', 'rows': 1}),
+            'product': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'full_loaded': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '0'}),
+            'full_returned': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '0'}),
+            'empty_returned': forms.NumberInput(attrs={'class': 'form-control pg-input', 'min': '0'}),
+            'notes': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 1}),
         }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

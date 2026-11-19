@@ -4,38 +4,44 @@
 {% endblock %}
 
 {% block content %}
-  <div class="pg-container pg-mt-4">
-    <!-- Header Section -->
-    <div class="pg-row pg-mb-4">
-      <div class="pg-col-md-8">
-        <h1><i class="fas fa-calendar-day pg-me-2"></i>Reporte de Órdenes por Método de Pago</h1>
-        <p class="pg-text-muted pg-mb-0">
-          Resumen de todas las órdenes del día
-          {% if selected_date %}
-            {{ selected_date|date:"d/m/Y" }}
-          {% else %}
-            {{ today|date:"d/m/Y" }}
-          {% endif %}
-        </p>
-      </div>
-      <div class="pg-col-md-4 pg-text-md-end">
-       
-        <a href="{{ breakdown_export_url }}" class="pg-button pg-button-outline-success pg-me-2">
-          <i class="fas fa-download pg-me-2"></i>Descargar CSV
-        </a>
+  <!-- Header Section -->
+  <div class="row m-t-15">
+    <div class="col-md-12">
+      <div class="white-box">
+        <div class="row">
+          <div class="col-md-8">
+            <h3 class="box-title m-b-0"><i class="fas fa-calendar-day m-r-5"></i>Reporte de Órdenes por Método de Pago</h3>
+            <p class="text-muted m-b-0">
+              Resumen de todas las órdenes del día
+              {% if selected_date %}
+                {{ selected_date|date:"d/m/Y" }}
+              {% else %}
+                {{ today|date:"d/m/Y" }}
+              {% endif %}
+            </p>
+          </div>
+          <div class="col-md-4 text-right m-t-10">
+            <a href="{{ breakdown_export_url }}" class="btn btn-success btn-outline waves-effect">
+              <i class="fas fa-download m-r-5"></i>Descargar CSV
+            </a>
+          </div>
+        </div>
       </div>
     </div>
-    <div class="pg-card dashboard-card pg-mb-3">
-      <div class="pg-card-body">
-        <form method="get" class="pg-row pg-gap-2 pg-align-end" aria-label="Filtros del reporte">
-          <div class="pg-col-md-3">
-            <label for="date" class="pg-label">Fecha</label>
-            <input id="date" type="date" name="date" class="pg-input" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
+  </div>
+
+  <div class="row">
+    <div class="col-md-12">
+      <div class="white-box">
+        <form method="get" class="row" aria-label="Filtros del reporte">
+          <div class="col-md-3 form-group">
+            <label for="date" class="control-label">Fecha</label>
+            <input id="date" type="date" name="date" class="form-control" value="{{ selected_date|date:'Y-m-d' }}" onchange="this.form.submit()">
           </div>
           {% if can_filter_by_user %}
-            <div class="pg-col-md-4">
-              <label for="employee" class="pg-label">Usuario</label>
-              <select id="employee" name="employee" class="pg-select" onchange="this.form.submit()">
+            <div class="col-md-4 form-group">
+              <label for="employee" class="control-label">Usuario</label>
+              <select id="employee" name="employee" class="form-control" onchange="this.form.submit()">
                 <option value="" {% if not employee_filter or employee_filter == 'all' %}selected{% endif %}>Todos</option>
                 {% for employee in employees %}
                   <option value="{{ employee.pk }}" {% if employee_filter == employee.pk|stringformat:'s' %}selected{% endif %}>
@@ -45,219 +51,251 @@
               </select>
             </div>
           {% endif %}
-          <div class="pg-col-md-2 pg-grid">
-            <button type="submit" class="pg-button pg-button-primary">
-              <i class="fas fa-filter pg-me-2"></i>Filtrar
+          <div class="col-md-2 form-group m-t-25">
+            <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+              <i class="fas fa-filter m-r-5"></i>Filtrar
             </button>
           </div>
         </form>
       </div>
     </div>
-    <!-- Overall Statistics -->
-    {% if stats.total_orders %}
-      <div class="metric-grid">
-        <div class="metric-card metric-orders">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-clipboard-list"></i></span>
-            Órdenes totales
-          </div>
-          <div class="metric-value">{{ stats.total_orders }}</div>
-          <div class="metric-note">Pedidos en el reporte</div>
-        </div>
-        <div class="metric-card metric-capacity">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-calculator"></i></span>
-            Subtotal
-          </div>
-          <div class="metric-value">${{ stats.subtotal_amount|floatformat:2 }}</div>
-          <div class="metric-note">Antes de descuentos</div>
-        </div>
-        <div class="metric-card metric-discount">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-tags"></i></span>
-            Descuentos
-          </div>
-          <div class="metric-value">${{ stats.total_discount|floatformat:2 }}</div>
-          <div class="metric-note">Descuento aplicado</div>
-        </div>
-        <div class="metric-card metric-sales">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-            Monto total
-          </div>
-          <div class="metric-value">${{ stats.total_amount|floatformat:2 }}</div>
-          <div class="metric-note">Vendido neto</div>
-        </div>
-        <div class="metric-card metric-ticket">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-receipt"></i></span>
-            Promedio por orden
-          </div>
-          <div class="metric-value">${{ stats.avg_amount|floatformat:2 }}</div>
-          <div class="metric-note">Monto total / órdenes</div>
-        </div>
-      </div>
-    {% endif %}
+  </div>
 
-    {% if inventory_summaries %}
-      <section class="pg-mb-4">
-        <div class="pg-flex pg-justify-between pg-align-center pg-flex-wrap pg-gap-2 pg-mb-2">
-          <h2 class="pg-h4 pg-mb-0">
-            <i class="fas fa-truck-loading pg-me-2"></i>Cuadre de camionetas
-          </h2>
-          <span class="pg-badge pg-bg-light pg-text-dark">{{ inventory_summaries|length }} captura{{ inventory_summaries|length|pluralize }}</span>
-        </div>
-        <div class="pg-card">
-          <div class="pg-card-body pg-p-0">
-            <div class="pg-table-responsive">
-              <table class="pg-table pg-table-hover pg-mb-0">
-                <thead>
-                  <tr>
-                    <th>Ruta</th>
-                    <th>Camioneta</th>
-                    <th>Estado</th>
-                    <th class="pg-text-end">Cargados</th>
-                    <th class="pg-text-end">Llenos regreso</th>
-                    <th class="pg-text-end">Vacíos regreso</th>
-                    <th class="pg-text-end">Venta esperada</th>
-                    <th class="pg-text-end">Venta reportada</th>
-                    <th class="pg-text-end">Dif. venta</th>
-                    <th class="pg-text-end">Envases faltantes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for summary in inventory_summaries %}
-                    <tr>
-                      <td>{{ summary.route.name }}</td>
-                      <td>{{ summary.transportation.license_plate }}</td>
-                      <td>
-                        <span class="pg-badge {% if summary.status == 'Cerrada' %}pg-bg-success{% else %}pg-bg-info{% endif %}">
-                          {{ summary.status }}
-                        </span>
-                      </td>
-                      <td class="pg-text-end">{{ summary.totals.full_loaded }}</td>
-                      <td class="pg-text-end">{{ summary.totals.full_returned }}</td>
-                      <td class="pg-text-end">{{ summary.totals.empty_returned }}</td>
-                      <td class="pg-text-end">{{ summary.totals.expected_sales }}</td>
-                      <td class="pg-text-end">{{ summary.totals.reported_sales }}</td>
-                      <td class="pg-text-end">
-                        <span class="pg-badge {% if summary.totals.sales_difference %}pg-bg-danger{% else %}pg-bg-success{% endif %}">
-                          {{ summary.totals.sales_difference }}
-                        </span>
-                      </td>
-                      <td class="pg-text-end">
-                        <span class="pg-badge {% if summary.totals.missing_containers %}pg-bg-warning pg-text-dark{% else %}pg-bg-success{% endif %}">
-                          {{ summary.totals.missing_containers }}
-                        </span>
-                      </td>
-                    </tr>
-                    {% if summary.session.notes %}
-                      <tr>
-                        <td colspan="10">
-                          <small class="pg-text-muted">Notas: {{ summary.session.notes }}</small>
-                        </td>
-                      </tr>
-                    {% endif %}
-                  {% endfor %}
-                </tbody>
-              </table>
+  <!-- Overall Statistics -->
+  {% if stats.total_orders %}
+    <div class="row">
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">{{ stats.total_orders }}</span>
+              <p class="font-12">Órdenes totales</p>
+              <small class="text-muted">Pedidos en el reporte</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-primary text-white"><i class="fas fa-clipboard-list"></i></span>
             </div>
           </div>
         </div>
-      </section>
-    {% endif %}
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ stats.subtotal_amount|floatformat:2 }}</span>
+              <p class="font-12">Subtotal</p>
+              <small class="text-muted">Antes de descuentos</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-info text-white"><i class="fas fa-calculator"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ stats.total_discount|floatformat:2 }}</span>
+              <p class="font-12">Descuentos</p>
+              <small class="text-muted">Descuento aplicado</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-warning text-white"><i class="fas fa-tags"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ stats.total_amount|floatformat:2 }}</span>
+              <p class="font-12">Monto total</p>
+              <small class="text-muted">Vendido neto</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-success text-white"><i class="fas fa-dollar-sign"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ stats.avg_amount|floatformat:2 }}</span>
+              <p class="font-12">Promedio por orden</p>
+              <small class="text-muted">Monto total / órdenes</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-primary text-white"><i class="fas fa-receipt"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
 
-    <!-- Payment Methods Breakdown -->
-    {% if payment_method_stats %}
-      {% for method_key, method_data in payment_method_stats.items %}
-        {% if method_data.order_count > 0 %}
-          <div class="payment-method-section">
-            <h3 class="payment-method-title pg-border-bottom pg-pb-2">
-              {{ method_data.name }}: Total ${{ method_data.total_amount|floatformat:2 }}
-              {% if method_data.total_discount %}
-                | Descuento ${{ method_data.total_discount|floatformat:2 }}
-              {% endif %}
-            </h3>
-            <div class="pg-card">
-              <div class="pg-card-body pg-p-0">
-                <div class="pg-table-responsive">
-                  <table class="pg-table pg-table-hover pg-mb-0">
-                    <thead>
+  {% if inventory_summaries %}
+    <div class="row">
+      <div class="col-md-12">
+        <div class="white-box">
+          <div class="row m-b-15">
+            <div class="col-xs-8">
+              <h3 class="box-title m-b-0">
+                <i class="fas fa-truck-loading m-r-5"></i>Cuadre de camionetas
+              </h3>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="label label-info">{{ inventory_summaries|length }} captura{{ inventory_summaries|length|pluralize }}</span>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-hover color-table info-table m-b-0">
+              <thead>
+                <tr>
+                  <th>Ruta</th>
+                  <th>Camioneta</th>
+                  <th>Estado</th>
+                  <th class="text-right">Cargados</th>
+                  <th class="text-right">Llenos regreso</th>
+                  <th class="text-right">Vacíos regreso</th>
+                  <th class="text-right">Venta esperada</th>
+                  <th class="text-right">Venta reportada</th>
+                  <th class="text-right">Dif. venta</th>
+                  <th class="text-right">Envases faltantes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for summary in inventory_summaries %}
+                  <tr>
+                    <td>{{ summary.route.name }}</td>
+                    <td>{{ summary.transportation.license_plate }}</td>
+                    <td>
+                      <span class="label {% if summary.status == 'Cerrada' %}label-success{% else %}label-info{% endif %}">
+                        {{ summary.status }}
+                      </span>
+                    </td>
+                    <td class="text-right">{{ summary.totals.full_loaded }}</td>
+                    <td class="text-right">{{ summary.totals.full_returned }}</td>
+                    <td class="text-right">{{ summary.totals.empty_returned }}</td>
+                    <td class="text-right">{{ summary.totals.expected_sales }}</td>
+                    <td class="text-right">{{ summary.totals.reported_sales }}</td>
+                    <td class="text-right">
+                      <span class="label {% if summary.totals.sales_difference %}label-danger{% else %}label-success{% endif %}">
+                        {{ summary.totals.sales_difference }}
+                      </span>
+                    </td>
+                    <td class="text-right">
+                      <span class="label {% if summary.totals.missing_containers %}label-warning{% else %}label-success{% endif %}">
+                        {{ summary.totals.missing_containers }}
+                      </span>
+                    </td>
+                  </tr>
+                  {% if summary.session.notes %}
+                    <tr>
+                      <td colspan="10">
+                        <small class="text-muted">Notas: {{ summary.session.notes }}</small>
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Payment Methods Breakdown -->
+  {% if payment_method_stats %}
+    {% for method_key, method_data in payment_method_stats.items %}
+      {% if method_data.order_count > 0 %}
+        <div class="row payment-method-section">
+          <div class="col-md-12">
+            <div class="white-box">
+              <h3 class="box-title payment-method-title">
+                {{ method_data.name }}: Total ${{ method_data.total_amount|floatformat:2 }}
+                {% if method_data.total_discount %}
+                  | Descuento ${{ method_data.total_discount|floatformat:2 }}
+                {% endif %}
+              </h3>
+              <div class="table-responsive">
+                <table class="table table-hover color-table info-table m-b-0">
+                  <thead>
+                    <tr>
+                      <th scope="col">Orden #</th>
+                      <th scope="col">Cliente</th>
+                      <th scope="col">Productos</th>
+                      <th scope="col">Hora</th>
+                      <th scope="col" class="text-right">Subtotal</th>
+                      <th scope="col" class="text-right">Descuento</th>
+                      <th scope="col" class="text-right">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for order in method_data.orders %}
                       <tr>
-                        <th scope="col">Orden #</th>
-                        <th scope="col">Cliente</th>
-                        <th scope="col">Productos</th>
-                        <th scope="col">Hora</th>
-                        <th scope="col" class="pg-text-end">Subtotal</th>
-                        <th scope="col" class="pg-text-end">Descuento</th>
-                        <th scope="col" class="pg-text-end">Total</th>
+                        <td>
+                          <span class="font-bold text-primary">#{{ order.id }}</span>
+                        </td>
+                        <td>
+                          <strong>{{ order.client.name }}</strong>
+                        </td>
+                        <td>
+                          {% if order.items.exists %}
+                            {% for item in order.items.all %}
+                              <span class="label label-default m-r-5">
+                                {{ item.quantity }}x {{ item.product }}
+                              </span>
+                              {% if not forloop.last %}<br>{% endif %}
+                            {% endfor %}
+                          {% else %}
+                            <span class="text-muted">Sin productos</span>
+                          {% endif %}
+                        </td>
+                        <td>
+                          <small class="text-muted">{{ order.order_date|time:"H:i" }}</small>
+                        </td>
+                        <td class="text-right">
+                          <span class="font-bold">${{ order.subtotal_amount|floatformat:2 }}</span>
+                        </td>
+                        <td class="text-right">
+                          <span class="font-bold text-danger">${{ order.discount|floatformat:2 }}</span>
+                        </td>
+                        <td class="text-right">
+                          <span class="font-bold text-success">${{ order.total_amount|floatformat:2 }}</span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {% for order in method_data.orders %}
-                        <tr>
-                          <td>
-                            <span class="pg-fw-bold pg-text-primary">#{{ order.id }}</span>
-                          </td>
-                          <td>
-                            <div>
-                              <strong>{{ order.client.name }}</strong>
-
-                            </div>
-                          </td>
-                          <td>
-                            {% if order.items.exists %}
-                              {% for item in order.items.all %}
-                                <span class="pg-badge pg-bg-light pg-text-dark pg-me-1">
-                                  {{ item.quantity }}x {{ item.product }}
-                                </span>
-                                {% if not forloop.last %}<br>{% endif %}
-                              {% endfor %}
-                            {% else %}
-                              <span class="pg-text-muted">Sin productos</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            <small class="pg-text-muted">{{ order.order_date|time:"H:i" }}</small>
-                          </td>
-                          <td class="pg-text-end">
-                            <span class="pg-fw-bold">${{ order.subtotal_amount|floatformat:2 }}</span>
-                          </td>
-                          <td class="pg-text-end">
-                            <span class="pg-fw-bold pg-text-danger">${{ order.discount|floatformat:2 }}</span>
-                          </td>
-                          <td class="pg-text-end">
-                            <span class="pg-fw-bold pg-text-success">${{ order.total_amount|floatformat:2 }}</span>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
+                    {% endfor %}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
-        {% endif %}
-      {% endfor %}
-    {% else %}
-      <!-- Empty State -->
-      <div class="pg-text-center pg-py-5">
-        <i class="fas fa-calendar-times fa-4x pg-text-muted pg-mb-3"></i>
-        <h4 class="pg-text-muted">No hay órdenes para hoy</h4>
-        <p class="pg-text-muted">
-          No se encontraron órdenes para el día de hoy ({{ today|date:"d/m/Y" }})
-        </p>
-        <div class="pg-mt-3">
-          <a href="{% url 'orders:create' %}" class="pg-button pg-button-primary pg-me-2">
-            <i class="fas fa-plus pg-me-2"></i>Crear Nueva Orden
-          </a>
-          <a href="{% url 'report:orders' %}" class="pg-button pg-button-outline-secondary">
-            <i class="fas fa-chart-bar pg-me-2"></i>Ver Reporte Completo
-          </a>
         </div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <!-- Empty State -->
+    <div class="white-box text-center p-30">
+      <i class="fas fa-calendar-times fa-4x text-muted m-b-15"></i>
+      <h4 class="text-muted">No hay órdenes para hoy</h4>
+      <p class="text-muted">
+        No se encontraron órdenes para el día de hoy ({{ today|date:"d/m/Y" }})
+      </p>
+      <div class="m-t-15">
+        <a href="{% url 'orders:create' %}" class="btn btn-info waves-effect waves-light m-r-5">
+          <i class="fas fa-plus m-r-5"></i>Crear Nueva Orden
+        </a>
+        <a href="{% url 'report:orders' %}" class="btn btn-default waves-effect">
+          <i class="fas fa-chart-bar m-r-5"></i>Ver Reporte Completo
+        </a>
       </div>
-    {% endif %}
-  </div>
+    </div>
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}

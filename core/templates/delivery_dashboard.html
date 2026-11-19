@@ -6,37 +6,37 @@
 {% endblock %}
 
 {% block content %}
-<div class="delivery-shell pg-mx-auto">
+<div class="delivery-shell m-t-15">
 
   {% include "reminders/_home_block.html" %}
   {% include "includes/confirmations_no_route.html" %}
-  <div class="pg-row pg-gap-3">
+  <div class="row">
     {% for action in dashboard_actions %}
-      <div class="pg-col-12 pg-col-md-6 pg-col-xl-4">
-        <article class="pg-card delivery-action pg-border-{{ action.variant }}">
-          <div class="pg-card-body pg-flex pg-flex-column pg-gap-3">
-            <div class="pg-flex pg-justify-between pg-align-start pg-gap-3">
-              <span class="delivery-action-icon pg-text-{{ action.variant }}">
+      <div class="col-xs-12 col-md-6 col-lg-4">
+        <article class="white-box delivery-action">
+          <div class="row m-b-15">
+            <div class="col-xs-8">
+              <span class="delivery-action-icon text-{{ action.variant }}">
                 <i class="fas {{ action.icon }} fa-lg"></i>
               </span>
-              <div class="pg-flex pg-flex-wrap pg-justify-end pg-gap-2">
-                {% if action.badge_count is not None %}
-                  <span class="pg-badge pg-badge-light">{{ action.badge_count }}</span>
-                {% endif %}
-              </div>
             </div>
+            <div class="col-xs-4 text-right">
+              {% if action.badge_count is not None %}
+                <span class="badge badge-info">{{ action.badge_count }}</span>
+              {% endif %}
+            </div>
+          </div>
 
-            <div>
-              <h2 class="pg-h5 pg-mb-2">{{ action.title }}</h2>
-              <p class="pg-text-muted pg-mb-2">{{ action.description }}</p>
-              <div class="delivery-action-meta pg-small pg-text-muted">{{ action.meta }}</div>
-            </div>
+          <div class="m-b-15">
+            <h3 class="box-title m-b-5">{{ action.title }}</h3>
+            <p class="text-muted m-b-5">{{ action.description }}</p>
+            <div class="delivery-action-meta small text-muted">{{ action.meta }}</div>
+          </div>
 
-            <div class="pg-mt-auto">
-              <a href="{{ action.url }}" class="pg-button pg-button-{{ action.variant }} pg-w-100">
-                Abrir
-              </a>
-            </div>
+          <div>
+            <a href="{{ action.url }}" class="btn btn-{{ action.variant }} btn-block waves-effect waves-light">
+              Abrir
+            </a>
           </div>
         </article>
       </div>

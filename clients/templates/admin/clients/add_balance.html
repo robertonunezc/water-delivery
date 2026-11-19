@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block breadcrumbs %}
-<div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">{% trans 'Home' %}</a>
+<div class="breadcrumbs m-t-15">
+<a href="{% url 'admin:index' %}">Home</a>
 &rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
 &rsaquo; <a href="{% url 'admin:clients_client_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
 &rsaquo; {{ title }}
@@ -9,103 +9,105 @@
 {% endblock %}
 
 {% block content %}
-<div class="balance-form-shell pg-container-fluid pg-px-0">
-    <h1 class="pg-mb-4">{{ title }}</h1>
+<div class="balance-form-shell m-t-15">
+    <div class="white-box">
+        <h3 class="box-title m-b-0">{{ title }}</h3>
+        <p class="text-muted m-b-30 font-13">Complete los campos para registrar el movimiento de saldo en la cuenta del cliente.</p>
 
-    <div class="pg-card dashboard-card pg-mb-4">
-        <div class="pg-card-body pg-p-4">
-            <form method="post" action="" novalidate>
-                {% csrf_token %}
+        <form method="post" action="" novalidate>
+            {% csrf_token %}
 
-                <div class="pg-mb-3">
-                    <label for="id_client" class="pg-label">{{ form.client.label }}</label>
-                    {{ form.client }}
-                    {% if form.client.errors %}
-                        <ul class="errorlist">
-                            {% for error in form.client.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                    {% if form.client.help_text %}
-                        <p class="help-text">{{ form.client.help_text }}</p>
-                    {% endif %}
-                </div>
+            <div class="form-group {% if form.client.errors %}has-error{% endif %}">
+                <label for="id_client" class="control-label">{{ form.client.label }}</label>
+                {{ form.client }}
+                {% if form.client.errors %}
+                    <ul class="errorlist text-danger">
+                        {% for error in form.client.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.client.help_text %}
+                    <span class="help-block"><small>{{ form.client.help_text }}</small></span>
+                {% endif %}
+            </div>
 
-                <div class="pg-mb-3">
-                    <label for="id_transaction_type" class="pg-label">{{ form.transaction_type.label }}</label>
-                    {{ form.transaction_type }}
-                    {% if form.transaction_type.errors %}
-                        <ul class="errorlist">
-                            {% for error in form.transaction_type.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
+            <div class="form-group {% if form.transaction_type.errors %}has-error{% endif %}">
+                <label for="id_transaction_type" class="control-label">{{ form.transaction_type.label }}</label>
+                {{ form.transaction_type }}
+                {% if form.transaction_type.errors %}
+                    <ul class="errorlist text-danger">
+                        {% for error in form.transaction_type.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
 
-                <div class="pg-mb-3">
-                    <label for="id_amount" class="pg-label">{{ form.amount.label }}</label>
+            <div class="form-group {% if form.amount.errors %}has-error{% endif %}">
+                <label for="id_amount" class="control-label">{{ form.amount.label }}</label>
+                <div class="input-group">
+                    <span class="input-group-addon">$</span>
                     {{ form.amount }}
-                    {% if form.amount.errors %}
-                        <ul class="errorlist">
-                            {% for error in form.amount.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                    {% if form.amount.help_text %}
-                        <p class="help-text">{{ form.amount.help_text }}</p>
-                    {% endif %}
                 </div>
+                {% if form.amount.errors %}
+                    <ul class="errorlist text-danger">
+                        {% for error in form.amount.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.amount.help_text %}
+                    <span class="help-block"><small>{{ form.amount.help_text }}</small></span>
+                {% endif %}
+            </div>
 
-                <div class="pg-mb-3">
-                    <label for="id_description" class="pg-label">{{ form.description.label }}</label>
-                    {{ form.description }}
-                    {% if form.description.errors %}
-                        <ul class="errorlist">
-                            {% for error in form.description.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                    {% if form.description.help_text %}
-                        <p class="help-text">{{ form.description.help_text }}</p>
-                    {% endif %}
-                </div>
+            <div class="form-group {% if form.description.errors %}has-error{% endif %}">
+                <label for="id_description" class="control-label">{{ form.description.label }}</label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <ul class="errorlist text-danger">
+                        {% for error in form.description.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.description.help_text %}
+                    <span class="help-block"><small>{{ form.description.help_text }}</small></span>
+                {% endif %}
+            </div>
 
-                <div class="pg-mb-4">
-                    <label for="id_notes" class="pg-label">{{ form.notes.label }}</label>
-                    {{ form.notes }}
-                    {% if form.notes.errors %}
-                        <ul class="errorlist">
-                            {% for error in form.notes.errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                    {% if form.notes.help_text %}
-                        <p class="help-text">{{ form.notes.help_text }}</p>
-                    {% endif %}
-                </div>
+            <div class="form-group {% if form.notes.errors %}has-error{% endif %}">
+                <label for="id_notes" class="control-label">{{ form.notes.label }}</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}
+                    <ul class="errorlist text-danger">
+                        {% for error in form.notes.errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+                {% if form.notes.help_text %}
+                    <span class="help-block"><small>{{ form.notes.help_text }}</small></span>
+                {% endif %}
+            </div>
 
-                <div class="pg-flex pg-flex-wrap pg-gap-2">
-                    <button type="submit" class="pg-button pg-button-primary">Agregar Saldo</button>
-                    <a href="{% url 'admin:clients_client_changelist' %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
-                </div>
-            </form>
-        </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-success waves-effect waves-light m-r-10">Agregar Saldo</button>
+                <a href="{% url 'admin:clients_client_changelist' %}" class="btn btn-inverse waves-effect waves-light">Cancelar</a>
+            </div>
+        </form>
     </div>
 
-    <div class="pg-alert pg-alert-info" role="alert">
-        <h2 class="pg-h5 pg-mb-3">Información Importante</h2>
-        <ul class="pg-mb-3">
+    <div class="alert alert-info" role="alert">
+        <h4 class="m-t-0">Información Importante</h4>
+        <ul>
             <li><strong>Depósito:</strong> Cliente agregó dinero a su cuenta</li>
             <li><strong>Reembolso:</strong> Devolver dinero por orden cancelada o problema</li>
             <li><strong>Ajuste manual:</strong> Corrección administrativa autorizada</li>
             <li><strong>Corrección:</strong> Corrección de error previo</li>
         </ul>
-        <p class="pg-mb-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente con su usuario como responsable.</p>
+        <p class="m-b-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente con su usuario como responsable.</p>
     </div>
 </div>
 
@@ -119,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         if (field.tagName === 'SELECT' || field.tagName === 'TEXTAREA' || field.tagName === 'INPUT') {
-            field.classList.add('pg-input');
+            field.classList.add('pg-input', 'form-control');
         }
     });
 });

@@ -17,14 +17,14 @@ class ReminderForm(forms.ModelForm):
             "urgent": "Urgente",
         }
         widgets = {
-            "title": forms.TextInput(attrs={"class": "pg-input"}),
-            "description": forms.Textarea(attrs={"class": "pg-input", "rows": 4}),
-            "client": forms.Select(attrs={"class": "pg-select"}),
+            "title": forms.TextInput(attrs={"class": "form-control pg-input"}),
+            "description": forms.Textarea(attrs={"class": "form-control pg-input", "rows": 4}),
+            "client": forms.Select(attrs={"class": "form-control pg-select"}),
             "reminder_date": forms.DateInput(
                 format="%Y-%m-%d",
-                attrs={"class": "pg-input", "type": "date"},
+                attrs={"class": "form-control pg-input", "type": "date"},
             ),
-            "urgent": forms.CheckboxInput(attrs={"class": "pg-checkbox"}),
+            "urgent": forms.CheckboxInput(attrs={"class": "pg-checkbox-input"}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -42,5 +42,5 @@ class ReminderCreateForm(ReminderForm):
         label="Asignar a",
         empty_label="Mi usuario",
         help_text="Si no seleccionas un usuario, el recordatorio se asignara a tu usuario.",
-        widget=forms.Select(attrs={"class": "pg-select"}),
+        widget=forms.Select(attrs={"class": "form-control pg-select"}),
     )

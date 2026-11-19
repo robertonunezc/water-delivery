@@ -4,260 +4,254 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-mt-3">
-  <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-    <div>
-      <h1 class="pg-h3 pg-mb-1">Pedidos</h1>
-      <p class="pg-text-muted pg-mb-0">Vista administrativa con filtros y paginador.</p>
-    </div>
-    <!-- <a href="{% url 'clients:list' %}" class="pg-button pg-button-primary">Nuevo Pedido</a> -->
-  </div>
-
-  <div class="metric-grid">
-    <div class="metric-card metric-orders">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-clipboard-list"></i></span>
-        Total pedidos
-      </div>
-      <div class="metric-value">{{ total_orders }}</div>
-      <div class="metric-note">Pedidos registrados</div>
-    </div>
-    <div class="metric-card metric-pending">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-list-ol"></i></span>
-        Pedidos en página
-      </div>
-      <div class="metric-value">{{ page_stats.count|default:0 }}</div>
-      <div class="metric-note">Resultado visible</div>
-    </div>
-    <div class="metric-card metric-sales">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-        Total página
-      </div>
-      <div class="metric-value">${{ page_stats.total_amount|floatformat:2 }}</div>
-      <div class="metric-note">Vendido en esta página</div>
-    </div>
-    <a href="?status=REVIEW_REQUIRED" class="metric-card metric-risk metric-card-link">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
-        Cancelaciones por revisar
-      </div>
-      <div class="metric-value">{{ review_required_count }}</div>
-      <div class="metric-note">Ver pedidos pendientes</div>
-    </a>
-    
-  </div>
-
-  <div class="pg-card dashboard-card pg-mb-3">
-    <div class="pg-card-body">
-      <form method="get" class="pg-row pg-gap-2 pg-align-end">
-        <div class="pg-col-md-4">
-          <label class="pg-label" for="search">Buscar</label>
-          <input id="search" name="search" value="{{ filters.search }}" class="pg-input" placeholder="ID, cliente, producto...">
+<div class="row m-t-15">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-md-4 col-sm-12">
+          <h3 class="box-title m-b-0">Pedidos</h3>
+          <p class="text-muted m-b-0">Vista administrativa con filtros y paginador.</p>
         </div>
-        <div class="pg-col-md-2">
-          <label class="pg-label" for="status">Estado</label>
-          <select id="status" name="status" class="pg-select">
+        <div class="col-md-8 col-sm-12">
+          <div class="row text-center">
+            <div class="col-xs-3 b-r">
+              <h3 class="font-light m-t-0 m-b-0 text-info">{{ total_orders }}</h3>
+              <small class="text-muted">Pedidos{% if has_filters %} (filtrados){% endif %}</small>
+            </div>
+            <div class="col-xs-3 b-r">
+              <h3 class="font-light m-t-0 m-b-0 text-success">${{ filtered_total_amount|floatformat:2 }}</h3>
+              <small class="text-muted">Monto total</small>
+            </div>
+            <div class="col-xs-3 b-r">
+              <a href="?status=UNPAID" class="db" style="text-decoration:none;">
+                <h3 class="font-light m-t-0 m-b-0 {% if unpaid_orders_count > 0 %}text-warning{% else %}text-muted{% endif %}">{{ unpaid_orders_count }}</h3>
+                <small class="text-muted">No pagados</small>
+              </a>
+            </div>
+            <div class="col-xs-3">
+              <a href="?status=REVIEW_REQUIRED" class="db" style="text-decoration:none;">
+                <h3 class="font-light m-t-0 m-b-0 {% if review_required_count > 0 %}text-danger{% else %}text-muted{% endif %}">
+                  {{ review_required_count }}
+                  {% if review_required_count > 0 %}<i class="fas fa-triangle-exclamation font-14"></i>{% endif %}
+                </h3>
+                <small class="{% if review_required_count > 0 %}text-danger font-semibold{% else %}text-muted{% endif %}">Por revisar</small>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <form method="get" class="row">
+        <div class="col-md-4 form-group">
+          <label class="control-label" for="search">Buscar</label>
+          <input id="search" name="search" value="{{ filters.search }}" class="form-control" placeholder="ID, cliente, producto...">
+        </div>
+        <div class="col-md-2 form-group">
+          <label class="control-label" for="status">Estado</label>
+          <select id="status" name="status" class="form-control">
             <option value="">Todos</option>
             {% for status_value, status_display in status_choices %}
               <option value="{{ status_value }}" {% if filters.status == status_value %}selected{% endif %}>{{ status_display }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="pg-col-md-3">
-          <label class="pg-label" for="client">Cliente</label>
-          <select id="client" name="client" class="pg-select">
+        <div class="col-md-3 form-group">
+          <label class="control-label" for="client">Cliente</label>
+          <select id="client" name="client" class="form-control">
             <option value="">Todos</option>
             {% for client in all_clients %}
               <option value="{{ client.id }}" {% if filters.client == client.id|stringformat:'s' %}selected{% endif %}>{{ client.name }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="pg-col-md-1">
-          <label class="pg-label" for="date_from">Desde</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="pg-input">
+        <div class="col-md-1 form-group">
+          <label class="control-label" for="date_from">Desde</label>
+          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="form-control">
         </div>
-        <div class="pg-col-md-1">
-          <label class="pg-label" for="date_to">Hasta</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="pg-input">
+        <div class="col-md-1 form-group">
+          <label class="control-label" for="date_to">Hasta</label>
+          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="form-control">
         </div>
-        <div class="pg-col-md-1 pg-grid">
-          <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
+        <div class="col-md-1 form-group m-t-25">
+          <button type="submit" class="btn btn-info btn-block waves-effect waves-light">Filtrar</button>
         </div>
       </form>
-      <div class="pg-mt-2">
-        <a href="{% url 'admin_orders' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
+      <div>
+        <a href="{% url 'admin_orders' %}" class="btn btn-default btn-sm waves-effect">Limpiar</a>
       </div>
     </div>
   </div>
+</div>
 
-  <div class="pg-card dashboard-card">
-    <div class="pg-card-header pg-bg-white pg-border-0 pg-pt-3 pg-pb-2">
-      <form id="bulk-orders-form" method="post" action="{{ request.get_full_path }}">
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <form id="bulk-orders-form" method="post" action="{{ request.get_full_path }}" class="m-b-20">
         {% csrf_token %}
-        <div class="pg-row pg-gap-2 pg-align-end">
-          <div class="pg-col-md-4 pg-col-lg-3">
-            <label class="pg-label" for="bulk-action">Acciones masivas</label>
-            <select id="bulk-action" name="bulk_action" class="pg-select">
+        <div class="row">
+          <div class="col-md-4 col-lg-3 form-group">
+            <label class="control-label" for="bulk-action">Acciones masivas</label>
+            <select id="bulk-action" name="bulk_action" class="form-control">
               <option value="">Selecciona una acción</option>
               {% for action in bulk_actions %}
                 <option value="{{ action.value }}">{{ action.label }}</option>
               {% endfor %}
             </select>
           </div>
-          <div class="pg-col-md-4 pg-col-lg-3">
-            <button type="submit" id="bulk-action-submit" class="pg-button pg-button-dark pg-w-100" disabled>
+          <div class="col-md-4 col-lg-3 form-group m-t-25">
+            <button type="submit" id="bulk-action-submit" class="btn btn-inverse btn-block waves-effect waves-light" disabled>
               Ejecutar acción
             </button>
           </div>
-          <div class="pg-col-md-4 pg-col-lg-6 pg-text-md-end">
-            <small class="pg-text-muted pg-block pg-mt-md-4" id="bulk-selection-summary">0 pedidos seleccionados</small>
+          <div class="col-md-4 col-lg-6 text-right m-t-30">
+            <small class="text-muted" id="bulk-selection-summary">0 pedidos seleccionados</small>
           </div>
         </div>
       </form>
-    </div>
-    <div class="pg-table-responsive">
-      <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
-        <thead class="pg-table-light">
-          <tr>
-            <th class="pg-w-12">
-              <input type="checkbox" id="select-all-orders" class="pg-checkbox-input">
-            </th>
-            <th>ID</th>
-            <th>Cliente</th>
-            <th>Fecha</th>
-            {% comment %} <th>Subtotal</th> {% endcomment %}
-            <th>Descuento</th>
-            <th>Total</th>
-            <th>Productos</th>
-            <th>Estado</th>
-            <th>Pagado</th>
-            <th>Facturado</th>
-            <th class="pg-text-end">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for order in orders %}
-            <tr>
-              <td>
-                <input
-                  type="checkbox"
-                  class="pg-checkbox-input order-select-checkbox"
-                  name="selected_orders"
-                  value="{{ order.id }}"
-                  form="bulk-orders-form"
-                >
-              </td>
-              <td>#{{ order.id }}</td>
-              <td>
-                <a href="{% url 'clients:detail' order.client.pk %}" class="pg-text-decoration-none pg-fw-semibold">
-                  {{ order.client.name }}
-                </a>
-              </td>
-              <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
-              {% comment %} <td>${{ order.subtotal|floatformat:2 }}</td> {% endcomment %}
-              <td>${{ order.discount|floatformat:2 }}</td>
-              <td>${{ order.total_amount|floatformat:2 }}</td>
-              <td>
-  <small>
-                          {% for item in order.items.all %}
-                            {{ item.product.name }} ({{ item.quantity }})<br>
-                          {% endfor %}
-                        </small>
 
-              </td>
-              <td>
-                <span class="status-pill status-{{ order.status }}">{{ order.get_status_display_fixed }}</span>
-                {% if order.cancellation_review_required %}
-                  <span
-                    class="pg-badge pg-bg-danger pg-ms-1"
-                    title="{{ order.cancellation_review_reason|default:'Requiere revisión' }}"
+      <div class="table-responsive">
+        <table class="table table-hover color-table info-table">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" id="select-all-orders" class="pg-checkbox-input">
+              </th>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Fecha</th>
+              <th>Descuento</th>
+              <th>Total</th>
+              <th>Productos</th>
+              <th>Estado</th>
+              <th>Pagado</th>
+              <th>Facturado</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    class="pg-checkbox-input order-select-checkbox"
+                    name="selected_orders"
+                    value="{{ order.id }}"
+                    form="bulk-orders-form"
                   >
-                    Requiere revisión de cancelación
-                  </span>
-                  {% if order.cancellation_review_reason %}
-                    <div class="pg-small pg-text-danger pg-mt-1">{{ order.cancellation_review_reason }}</div>
+                </td>
+                <td>#{{ order.id }}</td>
+                <td>
+                  <a href="{% url 'clients:detail' order.client.pk %}" class="font-bold">
+                    {{ order.client.name }}
+                  </a>
+                </td>
+                <td>{{ order.order_date|date:'d/m/Y H:i' }}</td>
+                <td>${{ order.discount|floatformat:2 }}</td>
+                <td>${{ order.total_amount|floatformat:2 }}</td>
+                <td>
+                  <small>
+                    {% for item in order.items.all %}
+                      {{ item.product.name }} ({{ item.quantity }})<br>
+                    {% endfor %}
+                  </small>
+                </td>
+                <td>
+                  <span class="label label-info status-{{ order.status }}">{{ order.get_status_display_fixed }}</span>
+                  {% if order.cancellation_review_required %}
+                    <span
+                      class="label label-danger m-l-5"
+                      title="{{ order.cancellation_review_reason|default:'Requiere revisión' }}"
+                    >
+                      Requiere revisión de cancelación
+                    </span>
+                    {% if order.cancellation_review_reason %}
+                      <div class="small text-danger m-t-5">{{ order.cancellation_review_reason }}</div>
+                    {% endif %}
                   {% endif %}
-                {% endif %}
-              </td>
-              <td>
-                {% if order.is_paid %}
-                  <span class="pg-badge pg-bg-success pg-ms-1">Pagado</span>
-                {%else %}
-                  <span class="pg-badge pg-bg-warning pg-ms-1">Pendiente</span>
-
-                {% endif %}
-              </td>
-              <td>
-                {% if order.invoice_links.all %}
-                  {%for  link in order.invoice_links.all %}
+                </td>
+                <td>
+                  {% if order.is_paid %}
+                    <span class="label label-success">Pagado</span>
+                  {% else %}
+                    <span class="label label-warning">Pendiente</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if order.invoice_links.all %}
+                    {% for link in order.invoice_links.all %}
                       <a href="{% url 'admin_edit_invoice' link.invoice.pk %}">Ver factura</a>
-                  {% endfor %}
-                {%else %}
-                  <span class="pg-badge pg-bg-warning pg-ms-1">No facturado</span>
-
-                {% endif %}
-              </td>
-              <td class="pg-text-end">
-                <div class="pg-dropdown">
-                  <button class="pg-button pg-button-sm pg-button-outline-secondary pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
-                    Opciones
-                  </button>
-                  <ul class="pg-dropdown-menu pg-dropdown-menu-end">
-                    <li><a class="pg-dropdown-item" href="{% url 'clients:detail' order.client.pk %}">Cliente</a></li>
-                    {% if order.status == 'COMPLETED' %}
-                      <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
-                    {% endif %}
-                    {% include 'orders/_receipt_dropdown_items.html' %}
-                    <li>{% include 'orders/_cancel_order_action.html' %}</li>
-                    {% if order.status == 'PENDING' %}
-                      <li><a class="pg-dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
-                    {% endif %}
-                    {% if order.cancellation_review_required %}
-                      <li><a class="pg-dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
-                    {% endif %}
-                    {% if not order.is_paid and order.status == 'COMPLETED' %}
-                      <li><a class="pg-dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
-                    {% endif %}
-                  </ul>
-                </div>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="10" class="pg-text-center pg-py-4 pg-text-muted">No hay pedidos para mostrar.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {% if orders.has_other_pages %}
-      <div class="pg-card-footer pg-bg-white">
-        <nav>
-          <ul class="pg-pagination pg-justify-center pg-mb-0">
-            {% if orders.has_previous %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.previous_page_number }}">Anterior</a>
-              </li>
-            {% else %}
-              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
-            {% endif %}
-
-            <li class="pg-page-item pg-disabled"><span class="pg-page-link">Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span></li>
-
-            {% if orders.has_next %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.next_page_number }}">Siguiente</a>
-              </li>
-            {% else %}
-              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
-            {% endif %}
-          </ul>
-        </nav>
+                    {% endfor %}
+                  {% else %}
+                    <span class="label label-warning">No facturado</span>
+                  {% endif %}
+                </td>
+                <td class="text-right">
+                  <div class="pg-dropdown">
+                    <button class="btn btn-default btn-sm pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
+                      Opciones
+                    </button>
+                    <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                      <li><a class="pg-dropdown-item" href="{% url 'clients:detail' order.client.pk %}">Cliente</a></li>
+                      {% if order.status == 'COMPLETED' %}
+                        <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
+                      {% endif %}
+                      {% include 'orders/_receipt_dropdown_items.html' %}
+                      <li>{% include 'orders/_cancel_order_action.html' %}</li>
+                      {% if order.status == 'PENDING' %}
+                        <li><a class="pg-dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>
+                      {% endif %}
+                      {% if order.cancellation_review_required %}
+                        <li><a class="pg-dropdown-item" href="{% url 'admin:orders_order_change' order.id %}">Revisar cancelación</a></li>
+                      {% endif %}
+                      {% if not order.is_paid and order.status == 'COMPLETED' %}
+                        <li><a class="pg-dropdown-item" href="{% url 'orders:create_payment_for_order' order.id %}">Pagar</a></li>
+                      {% endif %}
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="11" class="text-center p-20 text-muted">No hay pedidos para mostrar.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
-    {% endif %}
+
+      {% if orders.has_other_pages %}
+        <div class="text-center m-t-20">
+          <nav>
+            <ul class="pagination m-b-0">
+              {% if orders.has_previous %}
+                <li>
+                  <a href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.previous_page_number }}">Anterior</a>
+                </li>
+              {% else %}
+                <li class="disabled"><span>Anterior</span></li>
+              {% endif %}
+
+              <li class="disabled"><span>Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span></li>
+
+              {% if orders.has_next %}
+                <li>
+                  <a href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ orders.next_page_number }}">Siguiente</a>
+                </li>
+              {% else %}
+                <li class="disabled"><span>Siguiente</span></li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 <script>

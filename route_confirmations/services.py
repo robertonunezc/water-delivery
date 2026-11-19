@@ -660,7 +660,7 @@ def _build_route_client_state(
             visit_date=visit_date,
             confirmation=None,
             display_status='Sin enviar',
-            badge_class='pg-bg-secondary',
+            badge_class='label-default pg-bg-secondary',
             action_label='Enviar confirmación',
             can_send=True,
         )
@@ -671,16 +671,16 @@ def _build_route_client_state(
             visit_date=visit_date,
             confirmation=confirmation,
             display_status=display_status,
-            badge_class='pg-bg-warning',
+            badge_class='label-warning pg-bg-warning',
             action_label='Reenviar confirmación',
             can_send=True,
         )
 
     badge_class = {
-        VisitConfirmation.Status.SENT: 'pg-bg-info',
-        VisitConfirmation.Status.CONFIRMED: 'pg-bg-success',
-        VisitConfirmation.Status.DO_NOT_VISIT: 'pg-bg-danger',
-    }.get(confirmation.status, 'pg-bg-secondary')
+        VisitConfirmation.Status.SENT: 'label-info pg-bg-info',
+        VisitConfirmation.Status.CONFIRMED: 'label-success pg-bg-success',
+        VisitConfirmation.Status.DO_NOT_VISIT: 'label-danger pg-bg-danger',
+    }.get(confirmation.status, 'label-default pg-bg-secondary')
     action_label = (
         'Reenviar confirmación'
         if confirmation.status == VisitConfirmation.Status.SENT

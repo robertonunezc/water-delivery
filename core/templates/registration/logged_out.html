@@ -1,20 +1,16 @@
-{% extends 'base.html' %}
+{% extends 'base_auth.html' %}
 
 {% block title %}Sesión Cerrada - PuriGest{% endblock %}
 
 {% block content %}
-<div class="pg-row pg-justify-center">
-    <div class="pg-col-md-6">
-        <div class="pg-card pg-shadow">
-            <div class="pg-card-body pg-text-center pg-py-5">
-                <i class="fas fa-sign-out-alt fa-3x pg-text-success pg-mb-3"></i>
-                <h3 class="pg-text-success">Sesión Cerrada</h3>
-                <p class="pg-text-muted pg-mb-4">Has cerrado sesión exitosamente.</p>
-                <a href="{% url 'core:login' %}" class="pg-button pg-button-primary">
-                    <i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión Nuevamente
-                </a>
-            </div>
-        </div>
+<div class="login-box">
+    <div class="white-box text-center p-t-30 p-b-30">
+        <i class="fas fa-sign-out-alt fa-3x text-success m-b-15"></i>
+        <h3 class="box-title text-success">Sesión Cerrada</h3>
+        <p class="text-muted m-b-20">Has cerrado sesión exitosamente.</p>
+        <a href="{% url 'core:login' %}" class="btn btn-info btn-lg btn-block text-uppercase waves-effect waves-light">
+            <i class="fas fa-sign-in-alt m-r-5"></i>Iniciar Sesión Nuevamente
+        </a>
     </div>
 </div>
 {% endblock %}

@@ -28,13 +28,13 @@ class ProductForm(forms.ModelForm):
             'active'
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'pg-input'}),
-            'presentation': forms.TextInput(attrs={'class': 'pg-input'}),
-            'unit_of_measure': forms.Select(attrs={'class': 'pg-select'}),
-            'price': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
-            'orden': forms.NumberInput(attrs={'class': 'pg-input', 'step': '1', 'min': '0'}),
-            'category': forms.Select(attrs={'class': 'pg-select'}),
-            'note': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
+            'name': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'presentation': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'unit_of_measure': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control pg-input', 'step': '0.01'}),
+            'orden': forms.NumberInput(attrs={'class': 'form-control pg-input', 'step': '1', 'min': '0'}),
+            'category': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'note': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 3}),
             'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
@@ -44,10 +44,10 @@ class ProductClientPriceForm(forms.ModelForm):
         model = ProductClientPrice
         fields = ['client', 'price', 'active', 'note']
         widgets = {
-            'client': forms.Select(attrs={'class': 'pg-select'}),
-            'price': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
+            'client': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'price': forms.NumberInput(attrs={'class': 'form-control pg-input', 'step': '0.01'}),
             'active': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
-            'note': forms.TextInput(attrs={'class': 'pg-input'}),
+            'note': forms.TextInput(attrs={'class': 'form-control pg-input'}),
         }
 
 
@@ -102,7 +102,7 @@ class ProductCategoryForm(forms.ModelForm):
             'name': 'Nombre',
         }
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'Nombre de la categoría'}),
+            'name': forms.TextInput(attrs={'class': 'form-control pg-input', 'placeholder': 'Nombre de la categoría'}),
         }
 
     def clean_name(self) -> str:
@@ -134,8 +134,18 @@ class BulkProductPriceUpdateForm(forms.Form):
     )
 
     product_id = forms.IntegerField(widget=forms.HiddenInput())
-    mode = forms.ChoiceField(choices=MODE_CHOICES, label='Tipo de incremento')
-    value = forms.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'), label='Valor')
+    mode = forms.ChoiceField(
+        choices=MODE_CHOICES,
+        label='Tipo de incremento',
+        widget=forms.Select(attrs={'class': 'form-control pg-select'}),
+    )
+    value = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        min_value=Decimal('0.01'),
+        label='Valor',
+        widget=forms.NumberInput(attrs={'class': 'form-control pg-input', 'step': '0.01'}),
+    )
 
     def clean(self):
         cleaned = super().clean()
@@ -154,6 +164,7 @@ class ProductsCSVImportForm(forms.Form):
     csv_file = forms.FileField(
         label='Archivo CSV de productos y precios',
         help_text='Sube un archivo .csv con la plantilla de productos y precios por cliente.',
+        widget=forms.ClearableFileInput(attrs={'class': 'form-control pg-input'}),
     )
 
     def clean_csv_file(self):

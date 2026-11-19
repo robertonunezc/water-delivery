@@ -2,12 +2,12 @@
 
 {% block content %}
 {% if user.is_authenticated %}
-<div class="pg-container pg-mt-4">
-    <div class="pg-row">
-        <div class="pg-col-12">
-            <h1 class="pg-mb-4">Panel Principal</h1>
-            <div class="pg-alert pg-alert-info">
-                <i class="fas fa-user pg-me-2"></i>
+<div class="row m-t-15">
+    <div class="col-md-12">
+        <div class="white-box">
+            <h3 class="box-title m-b-15">Panel Principal</h3>
+            <div class="alert alert-info m-b-0">
+                <i class="fas fa-user m-r-5"></i>
                 Bienvenido, <strong>{{ user.get_full_name|default:user.username }}. </strong>
                 {% if today_invoices_count > 0 and user.is_staff %}
                 Tiene <strong>{{ today_invoices_count }}</strong> facturas pendientes. 
@@ -18,111 +18,103 @@
             </div>
         </div>
     </div>
+</div>
 
-    {% include "reminders/_home_block.html" %}
-    
-    <div class="pg-row">
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-plus-circle fa-2x pg-text-primary pg-mb-2"></i>
-                    <h5 class="pg-card-title">Nuevo Pedido</h5>
-                    <p class="pg-card-text">Crear un nuevo pedido de agua</p>
-                    <a href="#" class="pg-button pg-button-primary">Crear Pedido</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-route fa-2x pg-text-success pg-mb-2"></i>
-                    <h5 class="pg-card-title">Mi Ruta</h5>
-                    <p class="pg-card-text">Ver mi ruta de entregas del día</p>
-                    <a href="/routes/today/" class="pg-button pg-button-success">Ver Ruta</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-shopping-cart fa-2x pg-text-info pg-mb-2"></i>
-                    <h5 class="pg-card-title">Ventas</h5>
-                    <p class="pg-card-text">Gestionar todas las ventas</p>
-                    <a href="{% url 'orders:list' %}" class="pg-button pg-button-info">Ver Ventas</a>
-                </div>
-            </div>
-        </div>
-        
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-users fa-2x pg-text-secondary pg-mb-2"></i>
-                    <h5 class="pg-card-title">Clientes</h5>
-                    <p class="pg-card-text">Gestionar información de clientes</p>
-                    <a href="{% url 'clients:list' %}" class="pg-button pg-button-secondary">Ver Clientes</a>
-                </div>
-            </div>
-        </div>
+{% include "reminders/_home_block.html" %}
 
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-map-marked-alt fa-2x pg-text-warning pg-mb-2"></i>
-                    <h5 class="pg-card-title">Rutas</h5>
-                    <p class="pg-card-text">Gestionar rutas de entrega</p>
-                    <a href="{% url 'routes:list' %}" class="pg-button pg-button-warning">Ver Rutas</a>
-                </div>
-            </div>
+<div class="row">
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-plus-circle fa-2x text-info m-b-10"></i>
+            <h4 class="box-title">Nuevo Pedido</h4>
+            <p class="text-muted">Crear un nuevo pedido de agua</p>
+            <a href="#" class="btn btn-info waves-effect waves-light">Crear Pedido</a>
         </div>
-        
-        {% if user.is_staff %}
-        <div class="pg-col-md-6 pg-col-lg-4 pg-mb-3">
-            <div class="pg-card">
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-cog fa-2x pg-text-dark pg-mb-2"></i>
-                    <h5 class="pg-card-title">Administración</h5>
-                    <p class="pg-card-text">Panel de administración</p>
-                    <a href="{% url 'admin:index' %}" class="pg-button pg-button-dark">Admin</a>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-route fa-2x text-success m-b-10"></i>
+            <h4 class="box-title">Mi Ruta</h4>
+            <p class="text-muted">Ver mi ruta de entregas del día</p>
+            <a href="/routes/today/" class="btn btn-success waves-effect waves-light">Ver Ruta</a>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-shopping-cart fa-2x text-primary m-b-10"></i>
+            <h4 class="box-title">Ventas</h4>
+            <p class="text-muted">Gestionar todas las ventas</p>
+            <a href="{% url 'orders:list' %}" class="btn btn-primary waves-effect waves-light">Ver Ventas</a>
+        </div>
+    </div>
+    
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-users fa-2x text-muted m-b-10"></i>
+            <h4 class="box-title">Clientes</h4>
+            <p class="text-muted">Gestionar información de clientes</p>
+            <a href="{% url 'clients:list' %}" class="btn btn-default waves-effect">Ver Clientes</a>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-map-marked-alt fa-2x text-warning m-b-10"></i>
+            <h4 class="box-title">Rutas</h4>
+            <p class="text-muted">Gestionar rutas de entrega</p>
+            <a href="{% url 'routes:list' %}" class="btn btn-warning waves-effect waves-light">Ver Rutas</a>
+        </div>
+    </div>
+    
+    {% if user.is_staff %}
+    <div class="col-md-6 col-lg-4">
+        <div class="white-box text-center">
+            <i class="fas fa-cog fa-2x text-dark m-b-10"></i>
+            <h4 class="box-title">Administración</h4>
+            <p class="text-muted">Panel de administración</p>
+            <a href="{% url 'admin:index' %}" class="btn btn-inverse waves-effect waves-light">Admin</a>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% else %}
-<div class="pg-container pg-mt-4">
-    <div class="pg-row pg-justify-center">
-        <div class="pg-col-lg-8">
-            <div class="pg-hero pg-bg-primary pg-text-white pg-text-center pg-py-5 pg-rounded">
-                <i class="fas fa-tint fa-4x pg-mb-4"></i>
-                <h1 class="pg-h1">PuriGest</h1>
-                <p class="pg-lead">Sistema de Gestión de Entregas de Agua</p>
-                <hr class="pg-my-4 pg-border-white">
-                <p>Para acceder al sistema, por favor inicia sesión con tu cuenta.</p>
-                <a class="pg-button pg-button-light pg-button-lg" href="{% url 'core:login' %}" role="button">
-                    <i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión
-                </a>
-            </div>
+<div class="row m-t-20">
+    <div class="col-lg-8 col-lg-offset-2">
+        <div class="white-box bg-primary text-white text-center p-30">
+            <i class="fas fa-tint fa-4x m-b-20"></i>
+            <h1 class="text-white">PuriGest</h1>
+            <p class="lead">Sistema de Gestión de Entregas de Agua</p>
+            <hr>
+            <p>Para acceder al sistema, por favor inicia sesión con tu cuenta.</p>
+            <a class="btn btn-default btn-lg waves-effect" href="{% url 'core:login' %}" role="button">
+                <i class="fas fa-sign-in-alt m-r-5"></i>Iniciar Sesión
+            </a>
         </div>
     </div>
-    
-    <div class="pg-row pg-mt-5">
-        <div class="pg-col-md-4 pg-text-center">
-            <i class="fas fa-shipping-fast fa-3x pg-text-primary pg-mb-3"></i>
+</div>
+
+<div class="row m-t-30">
+    <div class="col-md-4 text-center">
+        <div class="white-box">
+            <i class="fas fa-shipping-fast fa-3x text-info m-b-15"></i>
             <h4>Entregas Rápidas</h4>
-            <p class="pg-text-muted">Sistema eficiente de gestión de rutas y entregas</p>
+            <p class="text-muted">Sistema eficiente de gestión de rutas y entregas</p>
         </div>
-        <div class="pg-col-md-4 pg-text-center">
-            <i class="fas fa-users fa-3x pg-text-success pg-mb-3"></i>
+    </div>
+    <div class="col-md-4 text-center">
+        <div class="white-box">
+            <i class="fas fa-users fa-3x text-success m-b-15"></i>
             <h4>Gestión de Clientes</h4>
-            <p class="pg-text-muted">Control completo de información y historial de clientes</p>
+            <p class="text-muted">Control completo de información y historial de clientes</p>
         </div>
-        <div class="pg-col-md-4 pg-text-center">
-            <i class="fas fa-chart-line fa-3x pg-text-info pg-mb-3"></i>
+    </div>
+    <div class="col-md-4 text-center">
+        <div class="white-box">
+            <i class="fas fa-chart-line fa-3x text-primary m-b-15"></i>
             <h4>Reportes</h4>
-            <p class="pg-text-muted">Análisis y reportes detallados de ventas y entregas</p>
+            <p class="text-muted">Análisis y reportes detallados de ventas y entregas</p>
         </div>
     </div>
 </div>

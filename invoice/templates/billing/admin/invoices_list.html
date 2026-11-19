@@ -4,236 +4,248 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-mt-3">
-  <div class="pg-flex pg-flex-wrap pg-justify-between pg-align-center pg-gap-3 pg-mb-3">
-    <div>
-      <h1 class="pg-h3 pg-mb-1">Facturas</h1>
-      <p class="pg-text-muted pg-mb-0">Consulta el historial, completa borradores y cancela facturas.</p>
-    </div>
-    <div class="pg-flex pg-gap-2">
-      <a href="{% url 'admin_create_invoice' %}" class="pg-button pg-button-primary"><i class="fas fa-plus"></i> Nueva factura</a>
-      <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="pg-button pg-button-outline-dark">Reporte de Programación de Facturación</a>
-    </div>
-  </div>
-
-  <div class="metric-grid">
-    <div class="metric-card metric-invoice">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-        Total facturas
-      </div>
-      <div class="metric-value">{{ total_invoices }}</div>
-      <div class="metric-note">Facturas registradas</div>
-    </div>
-    <div class="metric-card metric-pending">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-list-ol"></i></span>
-        Activas en página
-      </div>
-      <div class="metric-value">{{ page_stats.active_count }}</div>
-      <div class="metric-note">Con efecto financiero</div>
-    </div>
-    <div class="metric-card metric-sales">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-        Monto activo de la página
-      </div>
-      <div class="metric-value">${{ page_stats.total_amount|floatformat:2 }}</div>
-      <div class="metric-note">Excluye canceladas</div>
-    </div>
-    <div class="metric-card metric-pending">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-ban"></i></span>
-        Canceladas en página
-      </div>
-      <div class="metric-value">{{ page_stats.cancelled_count }}</div>
-      <div class="metric-note">Solo historial</div>
-    </div>
-    
-  </div>
-
-  <!-- Filter Card -->
-  <div class="pg-card dashboard-card pg-mb-3">
-    <div class="pg-card-body">
-      <form method="get" class="pg-row pg-gap-2 pg-align-end">
-        <div class="pg-col-md-3">
-          <label class="pg-label" for="search">Buscar</label>
-          <input id="search" name="search" value="{{ filters.search }}" class="pg-input" placeholder="Serie, Folio, Nombre del cliente...">
+<div class="row m-t-15">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-sm-7">
+          <h3 class="box-title m-b-0">Facturas</h3>
+          <p class="text-muted m-b-0">Consulta el historial, completa borradores y cancela facturas.</p>
         </div>
-        <div class="pg-col-md-2">
-          <label class="pg-label" for="client">Cliente</label>
-          <select id="client" name="client" class="pg-select">
+        <div class="col-sm-5 text-right m-t-10">
+          <a href="{% url 'admin_create_invoice' %}" class="btn btn-info waves-effect waves-light"><i class="fas fa-plus"></i> Nueva factura</a>
+          <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="btn btn-default waves-effect">Reporte de Programación de Facturación</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">{{ total_invoices }}</span>
+          <p class="font-12">Total facturas</p>
+          <small class="text-muted">Facturas registradas</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-primary text-white"><i class="fas fa-file-invoice-dollar"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">{{ page_stats.active_count }}</span>
+          <p class="font-12">Activas en página</p>
+          <small class="text-muted">Con efecto financiero</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-info text-white"><i class="fas fa-list-ol"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">${{ page_stats.total_amount|floatformat:2 }}</span>
+          <p class="font-12">Monto activo de la página</p>
+          <small class="text-muted">Excluye canceladas</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-success text-white"><i class="fas fa-dollar-sign"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">{{ page_stats.cancelled_count }}</span>
+          <p class="font-12">Canceladas en página</p>
+          <small class="text-muted">Solo historial</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-danger text-white"><i class="fas fa-ban"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter Card -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <form method="get" class="row">
+        <div class="col-md-3 form-group">
+          <label class="control-label" for="search">Buscar</label>
+          <input id="search" name="search" value="{{ filters.search }}" class="form-control" placeholder="Serie, Folio, Nombre del cliente...">
+        </div>
+        <div class="col-md-2 form-group">
+          <label class="control-label" for="client">Cliente</label>
+          <select id="client" name="client" class="form-control">
             <option value="">Todos los clientes</option>
             {% for client in all_clients %}
               <option value="{{ client.id }}" {% if filters.client == client.id|stringformat:'s' %}selected{% endif %}>{{ client.name }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="pg-col-md-2">
-          <label class="pg-label" for="status">Estado</label>
-          <select id="status" name="status" class="pg-select">
+        <div class="col-md-2 form-group">
+          <label class="control-label" for="status">Estado</label>
+          <select id="status" name="status" class="form-control">
             <option value="">Todos</option>
             <option value="DRAFT" {% if filters.status == 'DRAFT' %}selected{% endif %}>Borrador</option>
             <option value="ACTIVE" {% if filters.status == 'ACTIVE' %}selected{% endif %}>Activa</option>
             <option value="CANCELLED" {% if filters.status == 'CANCELLED' %}selected{% endif %}>Cancelada</option>
           </select>
         </div>
-        <div class="pg-col-md-2">
-          <label class="pg-label" for="date_from">Desde</label>
-          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="pg-input">
+        <div class="col-md-2 form-group">
+          <label class="control-label" for="date_from">Desde</label>
+          <input id="date_from" type="date" name="date_from" value="{{ filters.date_from }}" class="form-control">
         </div>
-        <div class="pg-col-md-2">
-          <label class="pg-label" for="date_to">Hasta</label>
-          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="pg-input">
+        <div class="col-md-2 form-group">
+          <label class="control-label" for="date_to">Hasta</label>
+          <input id="date_to" type="date" name="date_to" value="{{ filters.date_to }}" class="form-control">
         </div>
-        <div class="pg-col-md-1 pg-grid">
-          <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
+        <div class="col-md-1 form-group m-t-25">
+          <button type="submit" class="btn btn-info btn-block waves-effect waves-light">Filtrar</button>
         </div>
       </form>
-      <div class="pg-mt-2">
-        <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
+      <div>
+        <a href="{% url 'admin_invoices' %}" class="btn btn-default btn-sm waves-effect">Limpiar</a>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- Invoices Table -->
-  <div class="pg-card dashboard-card">
-    <div class="pg-table-responsive">
-      <table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
-        <thead class="pg-table-light">
-          <tr>
-            <th class="pg-w-20">ID</th>
-            <th>Cliente</th>
-            <th>Serie</th>
-            <th>Folio</th>
-            <th>Emitida</th>
-            <th>Estado</th>
-            <!-- <th>Estado de Pago</th> -->
-            <!-- <th>Calculation</th> -->
-            <th>Total</th>
-            <th>Total Pagado</th>
-            <th>Saldo pendiente</th>
-            
-            <th class="pg-text-end">Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for invoice in invoices %}
+<!-- Invoices Table -->
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="table-responsive">
+        <table class="table table-hover color-table info-table">
+          <thead>
             <tr>
-              <td><strong>#{{ invoice.id }}</strong></td>
-              <td>
-                <div class="pg-fw-bold">
-                  <a href="{% url 'clients:detail' invoice.client.id %}">
-                    {{ invoice.client.name }}
-                  </a>
-                </div>
-                {% if invoice.client.rfc %}
-                  <small class="pg-text-muted">RFC: {{ invoice.client.rfc }}</small>
-                {% endif %}
-              </td>
-              <td><code>{{ invoice.identifier }}</code></td>
-              <td><code>{{ invoice.folio }}</code></td>
-              <td>{{ invoice.emmited_at|date:'d/m/Y'|default:'-' }}</td>
-              <td>
-                {% if invoice.status == 'ACTIVE' %}
-                  <span class="pg-badge pg-bg-success">ACTIVA</span>
-                {% elif invoice.status == 'DRAFT' %}
-                  <span class="pg-badge pg-bg-warning">BORRADOR</span>
-                {% else %}
-                  <span class="pg-badge pg-bg-danger">CANCELADA</span>
-                {% endif %}
-              </td>
-              <!-- <td>
-                {% if invoice.payment_status == "Pagada" %}
-                  <span class="status-pill status-has-file">Pagada</span>
-                {% elif invoice.payment_status == "No Pagada" %}
-                  <span class="status-pill status-no-file">No Pagada</span>
-                {% else %}
-                  <span class="status-pill status-manual">Sin órdenes</span>
-                {% endif %}
-              </td> -->
-              <!-- <td>
-                {% if invoice.auto_amount %}
-                  <span class="status-pill status-auto">Automático</span>
-                {% else %}
-                  <span class="status-pill status-manual">Manual</span>
-                {% endif %}
-              </td> -->
-              <td>
-                <strong class="pg-text-success">${{ invoice.amount|floatformat:2 }}</strong>
-              </td>
-              <td>
-                {% if invoice.status != 'ACTIVE' %}
-                  <span class="pg-text-muted">—</span>
-                {% elif invoice.total_payments == invoice.amount %}
-                  <strong class="pg-text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
-                {% else %}
-                  <strong class="pg-text-danger">${{ invoice.total_payments|floatformat:2 }}</strong>
-                {% endif %}
-              </td>
-              <td>
-                {% if invoice.status != 'ACTIVE' %}
-                  <span class="pg-text-muted">—</span>
-                {% elif invoice.pending_amount > 0 %}
-                  <span class="status-pill status-no-file">${{ invoice.pending_amount|floatformat:2 }}</span>
-                {% else %}
-                  <span class="status-pill status-has-file">${{ invoice.pending_amount|floatformat:2 }}</span>
-                {% endif %}
-              </td>
-              <td class="pg-text-end">
-                <div class="pg-flex pg-justify-end pg-gap-2">
-                  <a href="{% url 'admin_edit_invoice' invoice.id %}" class="pg-button pg-button-sm pg-button-outline-dark" title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}" aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
-                    <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}"></i>
-                  </a>
-                  {% if invoice.status != 'CANCELLED' %}
-                    <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
-                      {% csrf_token %}
-                      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                      <button type="submit" class="pg-button pg-button-sm pg-button-outline-danger" title="Cancelar factura" aria-label="Cancelar factura">
-                        <i class="fas fa-ban"></i>
-                      </button>
-                    </form>
+              <th>ID</th>
+              <th>Cliente</th>
+              <th>Serie</th>
+              <th>Folio</th>
+              <th>Emitida</th>
+              <th>Estado</th>
+              <th>Total</th>
+              <th>Total Pagado</th>
+              <th>Saldo pendiente</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in invoices %}
+              <tr>
+                <td><strong>#{{ invoice.id }}</strong></td>
+                <td>
+                  <div class="font-bold">
+                    <a href="{% url 'clients:detail' invoice.client.id %}">
+                      {{ invoice.client.name }}
+                    </a>
+                  </div>
+                  {% if invoice.client.rfc %}
+                    <small class="text-muted">RFC: {{ invoice.client.rfc }}</small>
                   {% endif %}
-                </div>
-              </td>
-            </tr>
-          {% empty %}
-            <tr>
-              <td colspan="10" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron facturas.</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+                </td>
+                <td><code>{{ invoice.identifier }}</code></td>
+                <td><code>{{ invoice.folio }}</code></td>
+                <td>{{ invoice.emmited_at|date:'d/m/Y'|default:'-' }}</td>
+                <td>
+                  {% if invoice.status == 'ACTIVE' %}
+                    <span class="label label-success">ACTIVA</span>
+                  {% elif invoice.status == 'DRAFT' %}
+                    <span class="label label-warning">BORRADOR</span>
+                  {% else %}
+                    <span class="label label-danger">CANCELADA</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong class="text-success">${{ invoice.amount|floatformat:2 }}</strong>
+                </td>
+                <td>
+                  {% if invoice.status != 'ACTIVE' %}
+                    <span class="text-muted">—</span>
+                  {% elif invoice.total_payments == invoice.amount %}
+                    <strong class="text-success">${{ invoice.total_payments|floatformat:2 }}</strong>
+                  {% else %}
+                    <strong class="text-danger">${{ invoice.total_payments|floatformat:2 }}</strong>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if invoice.status != 'ACTIVE' %}
+                    <span class="text-muted">—</span>
+                  {% elif invoice.pending_amount > 0 %}
+                    <span class="label label-danger">${{ invoice.pending_amount|floatformat:2 }}</span>
+                  {% else %}
+                    <span class="label label-success">${{ invoice.pending_amount|floatformat:2 }}</span>
+                  {% endif %}
+                </td>
+                <td class="text-right">
+                  <div>
+                    <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-default btn-sm" title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}" aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
+                      <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}"></i>
+                    </a>
+                    {% if invoice.status != 'CANCELLED' %}
+                      <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" style="display:inline-block;" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                        <button type="submit" class="btn btn-danger btn-outline btn-sm" title="Cancelar factura" aria-label="Cancelar factura">
+                          <i class="fas fa-ban"></i>
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="10" class="text-center p-20 text-muted">No se encontraron facturas.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
 
-    <!-- Pagination -->
-    {% if invoices.has_other_pages %}
-      <div class="pg-card-footer pg-bg-white">
-        <nav>
-          <ul class="pg-pagination pg-justify-center pg-mb-0">
+      <!-- Pagination -->
+      {% if invoices.has_other_pages %}
+        <div class="text-center m-t-20">
+          <ul class="pagination m-b-0">
             {% if invoices.has_previous %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.previous_page_number }}">Anterior</a>
+              <li>
+                <a href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.previous_page_number }}">Anterior</a>
               </li>
             {% else %}
-              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
+              <li class="disabled"><span>Anterior</span></li>
             {% endif %}
 
-            <li class="pg-page-item pg-disabled">
-              <span class="pg-page-link">Página {{ invoices.number }} de {{ invoices.paginator.num_pages }}</span>
+            <li class="disabled">
+              <span>Página {{ invoices.number }} de {{ invoices.paginator.num_pages }}</span>
             </li>
 
             {% if invoices.has_next %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.next_page_number }}">Siguiente</a>
+              <li>
+                <a href="?{% for key, value in filters.items %}{% if value %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}page={{ invoices.next_page_number }}">Siguiente</a>
               </li>
             {% else %}
-              <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
+              <li class="disabled"><span>Siguiente</span></li>
             {% endif %}
           </ul>
-        </nav>
-      </div>
-    {% endif %}
+        </div>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endblock %}

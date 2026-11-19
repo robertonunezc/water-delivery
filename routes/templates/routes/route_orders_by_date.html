@@ -3,105 +3,103 @@
 {% block title %}Route Orders - {{ route.name }} - {{ visit_date }}{% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid">
-    <div class="pg-row">
-        <div class="pg-col-12">
-            <div class="pg-card">
-                <div class="pg-card-header">
-                    <h3 class="pg-card-title">{{ route.name }} - {{ visit_date|date:"l, F d, Y" }}</h3>
-                    <div class="pg-card-tools">
-                        <span class="pg-badge pg-badge-info">{{ route.get_weekday_display }}</span>
-                        <span class="pg-badge pg-badge-primary">{{ route.transportation.license_plate }}</span>
-                    </div>
+<div class="row m-t-15">
+    <div class="col-md-12">
+        <div class="white-box">
+            <div class="row m-b-15">
+                <div class="col-sm-8">
+                    <h3 class="box-title m-b-0">{{ route.name }} - {{ visit_date|date:"l, F d, Y" }}</h3>
                 </div>
-                <div class="pg-card-body">
-                    <!-- Date Navigation -->
-                    <div class="pg-row pg-mb-3">
-                        <div class="pg-col-md-6">
-                            <form method="GET" class="form-inline">
-                                <div class="form-group">
-                                    <label for="date" class="mr-2">Select Date:</label>
-                                    <input type="date" name="date" id="date" class="pg-input" 
-                                           value="{{ visit_date|date:'Y-m-d' }}">
-                                </div>
-                                <button type="submit" class="pg-button pg-button-primary ml-2">Go</button>
-                            </form>
-                        </div>
-                        <div class="pg-col-md-6 text-right">
-                            <a href="{% url 'routes:detail' route.id %}" class="pg-button pg-button-secondary">
-                                Back to Route
-                            </a>
-                        </div>
-                    </div>
-
-                    <!-- Orders for this date -->
-                    {% if route_orders %}
-                        <div class="pg-table-responsive">
-                            <table class="pg-table pg-table-bordered pg-table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>Id</th>
-                                        <th>Cliente</th>
-                                        <th>Orden</th>
-                                        <th>Direccion</th>
-                                        <th>Estado</th>
-                                        <th>Completada</th>
-                                        <th>Notas</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for route_order in route_orders %}
-                                        <tr class="{% if route_order.is_completed %}pg-table-success{% endif %}">
-                                            <td><strong>{{ route_order.sequence }}</strong></td>
-                                            <td>{{ route_order.client.name }}</td>
-                                            <td>
-                                                Order #{{ route_order.order.id }}<br>
-                                                <small class="pg-text-muted">
-                                                    ${{ route_order.order.total_amount }}<br>
-                                                    {{ route_order.order.get_status_display_fixed }}
-                                                </small>
-                                            </td>
-                                            <td>
-                                                {% for address in route_order.client.addresses.all %}
-                                                    {% if address.active %}
-                                                        {{ address.street }}<br>
-                                                        <small class="pg-text-muted">{{ address.city }}, {{ address.state }}</small>
-                                                        {% if forloop.first %}{% endif %}
-                                                    {% endif %}
-                                                {% endfor %}
-                                            </td>
-                                            <td>{{ route_order.order.get_status_display_fixed }}</td>
-                                            <td>
-                                                {% if route_order.is_completed %}
-                                                    <span class="pg-badge pg-badge-success">
-                                                        <i class="fas fa-check"></i> Completada
-                                                    </span>
-                                                    {% if route_order.completed_at %}
-                                                        <br><small class="pg-text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
-                                                    {% endif %}
-                                                {% else %}
-                                                    <span class="pg-badge pg-badge-warning">
-                                                        <i class="fas fa-clock"></i> Pendiente
-                                                    </span>
-                                                {% endif %}
-                                            </td>
-                                            <td>{{ route_order.notes|default:"—"|truncatechars:30 }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="pg-alert pg-alert-info">
-                            <h5>No hay órdenes programadas</h5>
-                            <p>No hay ordenenes programadas para {{ visit_date|date:"l, F d, Y" }} en esta Ruta</p>
-                            <a href="{% url 'routes:detail' route.id %}" class="pg-button pg-button-primary">
-                                Ver clientes
-                            </a>
-                        </div>
-                    {% endif %}
+                <div class="col-sm-4 text-right">
+                    <span class="label label-info">{{ route.get_weekday_display }}</span>
+                    <span class="label label-primary">{{ route.transportation.license_plate }}</span>
                 </div>
             </div>
+
+            <!-- Date Navigation -->
+            <div class="row m-b-20">
+                <div class="col-md-6">
+                    <form method="GET" class="form-inline">
+                        <div class="form-group">
+                            <label for="date" class="m-r-10">Select Date:</label>
+                            <input type="date" name="date" id="date" class="form-control" 
+                                   value="{{ visit_date|date:'Y-m-d' }}">
+                        </div>
+                        <button type="submit" class="btn btn-info m-l-5 waves-effect waves-light">Go</button>
+                    </form>
+                </div>
+                <div class="col-md-6 text-right">
+                    <a href="{% url 'routes:detail' route.id %}" class="btn btn-default waves-effect">
+                        Back to Route
+                    </a>
+                </div>
+            </div>
+
+            <!-- Orders for this date -->
+            {% if route_orders %}
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped color-table info-table">
+                        <thead>
+                            <tr>
+                                <th>Id</th>
+                                <th>Cliente</th>
+                                <th>Orden</th>
+                                <th>Direccion</th>
+                                <th>Estado</th>
+                                <th>Completada</th>
+                                <th>Notas</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for route_order in route_orders %}
+                                <tr class="{% if route_order.is_completed %}success{% endif %}">
+                                    <td><strong>{{ route_order.sequence }}</strong></td>
+                                    <td>{{ route_order.client.name }}</td>
+                                    <td>
+                                        Order #{{ route_order.order.id }}<br>
+                                        <small class="text-muted">
+                                            ${{ route_order.order.total_amount }}<br>
+                                            {{ route_order.order.get_status_display_fixed }}
+                                        </small>
+                                    </td>
+                                    <td>
+                                        {% for address in route_order.client.addresses.all %}
+                                            {% if address.active %}
+                                                {{ address.street }}<br>
+                                                <small class="text-muted">{{ address.city }}, {{ address.state }}</small>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                    <td>{{ route_order.order.get_status_display_fixed }}</td>
+                                    <td>
+                                        {% if route_order.is_completed %}
+                                            <span class="label label-success">
+                                                <i class="fas fa-check"></i> Completada
+                                            </span>
+                                            {% if route_order.completed_at %}
+                                                <br><small class="text-muted">{{ route_order.completed_at|date:"M d, H:i" }}</small>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="label label-warning">
+                                                <i class="fas fa-clock"></i> Pendiente
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ route_order.notes|default:"—"|truncatechars:30 }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="alert alert-info m-b-0">
+                    <h5>No hay órdenes programadas</h5>
+                    <p>No hay ordenenes programadas para {{ visit_date|date:"l, F d, Y" }} en esta Ruta</p>
+                    <a href="{% url 'routes:detail' route.id %}" class="btn btn-info waves-effect waves-light">
+                        Ver clientes
+                    </a>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>

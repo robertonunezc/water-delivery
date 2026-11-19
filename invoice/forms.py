@@ -49,17 +49,17 @@ class InvoiceForm(forms.ModelForm):
         widgets = {
             'emmited_at': forms.DateInput(
                 format='%Y-%m-%d',
-                attrs={'type': 'date', 'class': 'pg-input'},
+                attrs={'type': 'date', 'class': 'form-control pg-input'},
             ),
-            'client': forms.Select(attrs={'class': 'pg-select'}),
-            'rfc': forms.TextInput(attrs={'class': 'pg-input'}),
-            'razon_social': forms.Textarea(attrs={'class': 'pg-input', 'rows': 2}),
-            'curp': forms.TextInput(attrs={'class': 'pg-input'}),
-            'billing_address': forms.Textarea(attrs={'class': 'pg-input', 'rows': 3}),
-            'identifier': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'SER-XXX'}),
-            'folio': forms.TextInput(attrs={'class': 'pg-input', 'placeholder': 'FOL-XXX'}),
-            'amount': forms.NumberInput(attrs={'class': 'pg-input', 'step': '0.01'}),
-            'file': forms.ClearableFileInput(attrs={'class': 'pg-input'}),
+            'client': forms.Select(attrs={'class': 'form-control pg-select'}),
+            'rfc': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'razon_social': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 2}),
+            'curp': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'billing_address': forms.Textarea(attrs={'class': 'form-control pg-input', 'rows': 3}),
+            'identifier': forms.TextInput(attrs={'class': 'form-control pg-input', 'placeholder': 'SER-XXX'}),
+            'folio': forms.TextInput(attrs={'class': 'form-control pg-input', 'placeholder': 'FOL-XXX'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control pg-input', 'step': '0.01'}),
+            'file': forms.ClearableFileInput(attrs={'class': 'form-control pg-input'}),
             'auto_amount': forms.CheckboxInput(attrs={'class': 'pg-checkbox-input'}),
         }
 
@@ -125,7 +125,7 @@ class InvoiceCreateForm(InvoiceForm):
         error_messages={
             'required': 'Debe vincular al menos una venta para crear la factura.',
         },
-        widget=forms.SelectMultiple(attrs={'class': 'pg-select', 'size': 8}),
+        widget=forms.SelectMultiple(attrs={'class': 'form-control pg-select', 'size': 8}),
     )
 
     class Meta(InvoiceForm.Meta):
@@ -169,7 +169,7 @@ class InvoiceDraftEditForm(forms.ModelForm):
             'required': 'Debe vincular al menos una venta para emitir la factura.',
         },
         widget=OrderAmountSelectMultiple(
-            attrs={'class': 'pg-select', 'size': 10},
+            attrs={'class': 'form-control pg-select', 'size': 10},
         ),
     )
 
@@ -180,13 +180,13 @@ class InvoiceDraftEditForm(forms.ModelForm):
             field: widget for field, widget in InvoiceForm.Meta.widgets.items()
             if field in Invoice.FISCAL_FIELDS
         } | {
-            'identifier': forms.TextInput(attrs={'class': 'pg-input'}),
-            'folio': forms.TextInput(attrs={'class': 'pg-input'}),
+            'identifier': forms.TextInput(attrs={'class': 'form-control pg-input'}),
+            'folio': forms.TextInput(attrs={'class': 'form-control pg-input'}),
             'emmited_at': forms.DateInput(
                 format='%Y-%m-%d',
-                attrs={'type': 'date', 'class': 'pg-input'},
+                attrs={'type': 'date', 'class': 'form-control pg-input'},
             ),
-            'file': forms.ClearableFileInput(attrs={'class': 'pg-input'}),
+            'file': forms.ClearableFileInput(attrs={'class': 'form-control pg-input'}),
         }
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -210,7 +210,7 @@ class InvoiceOrderLinkForm(forms.ModelForm):
         model = InvoiceOrderLink
         fields = ['order']
         widgets = {
-            'order': forms.Select(attrs={'class': 'pg-select'}),
+            'order': forms.Select(attrs={'class': 'form-control pg-select'}),
         }
 
     def __init__(self, *args, **kwargs):

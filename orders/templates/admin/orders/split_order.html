@@ -1,161 +1,351 @@
 {% extends "base.html" %}
 {% load static %}
 
-
-{% block extra_css %}
-    {{ block.super }}
-{% endblock %}
+{% block title %}{{ title }}{% endblock %}
 
 {% block content %}
-<div class="split-order-container">
-    <h3>{{ title }}</h3>
-    
-    <div class="order-info">
-        <h2>📋 Información de la Orden Original</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Cliente</div>
-                <div class="info-value">{{ order.client.name }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Estado</div>
-                <div class="info-value">{{ order.get_status_display }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Fecha</div>
-                <div class="info-value">{{ order.order_date|date:"d/m/Y H:i" }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Total</div>
-                <div class="info-value pg-text-success pg-fw-bold">${{ order.total_amount }}</div>
-            </div>
+<div class="row m-t-15">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-md-5 col-sm-12">
+          <h3 class="box-title m-b-0"><i class="fas fa-scissors text-info m-r-5"></i> {{ title }}</h3>
+          <p class="text-muted m-b-0 font-13">Transfiera cantidades de productos a una nueva orden manteniendo pagos y crédito proporcionales.</p>
         </div>
+        <div class="col-md-7 col-sm-12">
+          <div class="row text-center">
+            <div class="col-xs-3 b-r">
+              <small class="text-muted db">Cliente</small>
+              <strong class="text-dark">{{ order.client.name }}</strong>
+            </div>
+            <div class="col-xs-3 b-r">
+              <small class="text-muted db">Fecha</small>
+              <strong class="text-dark">{{ order.order_date|date:"d/m/Y H:i" }}</strong>
+            </div>
+            <div class="col-xs-3 b-r">
+              <small class="text-muted db">Estado / Tipo</small>
+              <span class="label label-success">{{ order.get_status_display }}</span>
+              <span class="label label-info">{{ order.get_type_display }}</span>
+            </div>
+            <div class="col-xs-3">
+              <small class="text-muted db">Total Original</small>
+              <h4 class="font-bold text-success m-t-0 m-b-0">${{ order.total_amount|floatformat:2 }}</h4>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    
-    <div class="pg-alert pg-alert-info">
-        <strong>ℹ️ Instrucciones:</strong><br>
-        Especifique la cantidad de cada producto que desea mover a la nueva orden. 
-        La orden original mantendrá la cantidad restante de cada producto.
-        <br><br>
-        <strong>Importante:</strong> La orden original debe mantener al menos un producto con cantidad mayor a 0.
-    </div>
-    
-    {% if form.non_field_errors %}
-        <ul class="errorlist">
-            {% for error in form.non_field_errors %}
-                <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    
-    <form method="post" id="splitOrderForm">
-        {% csrf_token %}
-        
-        <h2>🔀 Seleccione las cantidades a mover</h2>
-        
-        <div class="pg-table-responsive">
-            <table class="products-table">
-                <thead>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="panel panel-info">
+      <div class="panel-heading">
+        <i class="fas fa-sliders m-r-5"></i> Distribución de Productos entre Órdenes
+      </div>
+      <div class="panel-wrapper collapse in" aria-expanded="true">
+        <div class="panel-body">
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger alert-dismissable">
+              <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+              <i class="fas fa-circle-exclamation m-r-5"></i>
+              <strong>No se pudo dividir la orden:</strong>
+              <ul class="m-t-5 m-b-0 p-l-20">
+                {% for error in form.non_field_errors %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          <div id="clientValidationAlert" class="alert alert-warning" style="display:none;">
+            <i class="fas fa-triangle-exclamation m-r-5"></i>
+            <span id="clientValidationMessage"></span>
+          </div>
+
+          <form method="post" action="{% url 'orders:split_order' order.id %}" id="splitOrderForm" novalidate>
+            {% csrf_token %}
+            <div class="form-body">
+              <div class="row m-b-20">
+                <div class="col-md-6 col-sm-6">
+                  <div class="well well-sm m-b-0">
+                    <div class="row">
+                      <div class="col-xs-7">
+                        <span class="text-muted text-uppercase font-12 font-semibold">Permanece en Orden #{{ order.id }}</span>
+                        <p class="text-muted m-b-0 font-12"><span id="sourceItemsCount">0</span> unidades</p>
+                      </div>
+                      <div class="col-xs-5 text-right">
+                        <h3 class="m-t-0 m-b-0 text-info" id="sourceOrderTotal">${{ order.total_amount|floatformat:2 }}</h3>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6 col-sm-6">
+                  <div class="well well-sm m-b-0">
+                    <div class="row">
+                      <div class="col-xs-7">
+                        <span class="text-muted text-uppercase font-12 font-semibold">Nueva Orden Dividida</span>
+                        <p class="text-muted m-b-0 font-12"><span id="childItemsCount">0</span> unidades a transferir</p>
+                      </div>
+                      <div class="col-xs-5 text-right">
+                        <h3 class="m-t-0 m-b-0 text-success" id="childOrderTotal">$0.00</h3>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-hover color-table info-table m-b-0">
+                  <thead>
                     <tr>
-                        <th>Producto</th>
-                        <th>Cantidad Actual</th>
-                        <th>Precio Unitario</th>
-                        <th>Total Actual</th>
-                        <th>Cantidad a Mover</th>
-                        <th>Quedará en Original</th>
+                      <th>Producto</th>
+                      <th class="text-center">Cant. Actual</th>
+                      <th class="text-right">Precio Unit.</th>
+                      <th class="text-right">Subtotal Actual</th>
+                      <th class="text-center" style="width: 210px;">Cantidad a Mover</th>
+                      <th class="text-center">Queda en #{{ order.id }}</th>
+                      <th class="text-right">Subtotal Nueva Orden</th>
                     </tr>
-                </thead>
-                <tbody>
+                  </thead>
+                  <tbody>
                     {% for item_data in items_with_fields %}
-                    <tr data-item-id="{{ item_data.item.id }}" data-max-quantity="{{ item_data.item.quantity }}">
-                        <td>
-                            <strong>{{ item_data.item.product.name }}</strong>
-                            {% if item_data.item.note %}
-                                <br><small class="pg-text-muted">Nota: {{ item_data.item.note }}</small>
+                    <tr data-item-row
+                        data-item-id="{{ item_data.item.id }}"
+                        data-max-quantity="{{ item_data.item.quantity }}"
+                        data-unit-price="{{ item_data.item.unit_price }}">
+                      <td>
+                        <strong>{{ item_data.item.product.name }}</strong>
+                        {% if item_data.item.note %}
+                          <br><small class="text-muted">Nota: {{ item_data.item.note }}</small>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        <span class="label label-default font-14">{{ item_data.item.quantity }}</span>
+                      </td>
+                      <td class="text-right">${{ item_data.item.unit_price|floatformat:2 }}</td>
+                      <td class="text-right"><strong>${{ item_data.item.get_total_price|floatformat:2 }}</strong></td>
+                      <td class="text-center">
+                        {% if item_data.field %}
+                          <div class="form-group m-b-0 {% if item_data.field.errors %}has-error{% endif %}">
+                            <div class="input-group input-group-sm">
+                              <span class="input-group-btn">
+                                <button type="button"
+                                        class="btn btn-default"
+                                        data-qty-step="-1"
+                                        data-target-item="{{ item_data.item.id }}"
+                                        title="Disminuir">
+                                  <i class="fas fa-minus"></i>
+                                </button>
+                              </span>
+                              {{ item_data.field }}
+                              <span class="input-group-btn">
+                                <button type="button"
+                                        class="btn btn-default"
+                                        data-qty-step="1"
+                                        data-target-item="{{ item_data.item.id }}"
+                                        title="Aumentar">
+                                  <i class="fas fa-plus"></i>
+                                </button>
+                              </span>
+                            </div>
+                            {% if item_data.field.errors %}
+                              {% for error in item_data.field.errors %}
+                                <span class="help-block text-danger m-b-0"><small>{{ error }}</small></span>
+                              {% endfor %}
                             {% endif %}
-                        </td>
-                        <td>{{ item_data.item.quantity }}</td>
-                        <td>${{ item_data.item.unit_price }}</td>
-                        <td><strong>${{ item_data.item.get_total_price }}</strong></td>
-                        <td>
-                            {% if item_data.field %}
-                                {{ item_data.field }}
-                                {% if item_data.field.errors %}
-                                    <ul class="errorlist">
-                                        {% for error in item_data.field.errors %}
-                                            <li>{{ error }}</li>
-                                        {% endfor %}
-                                    </ul>
-                                {% endif %}
-                                {% if item_data.field.help_text %}
-                                    <div class="help-text">{{ item_data.field.help_text }}</div>
-                                {% endif %}
-                            {% endif %}
-                        </td>
-                        <td>
-                            <span id="remaining_{{ item_data.item.id }}" class="remaining-quantity pg-fw-bold pg-text-info">
-                                {{ item_data.item.quantity }}
-                            </span>
-                        </td>
+                          </div>
+                        {% endif %}
+                      </td>
+                      <td class="text-center">
+                        <span id="remaining_{{ item_data.item.id }}" class="label label-info font-14">
+                          {{ item_data.item.quantity }}
+                        </span>
+                      </td>
+                      <td class="text-right">
+                        <strong id="moved_subtotal_{{ item_data.item.id }}" class="text-muted">$0.00</strong>
+                      </td>
                     </tr>
                     {% endfor %}
-                </tbody>
-            </table>
+                  </tbody>
+                </table>
+              </div>
+
+              <div class="alert alert-info m-t-20 m-b-0">
+                <i class="fas fa-circle-info m-r-5"></i>
+                <strong>Reglas de división:</strong>
+                Ambos pedidos deben conservar al menos <strong>1 producto</strong>. Los pagos registrados, descuentos ({{ order.discount|floatformat:2 }}) y saldo a crédito se dividirán proporcionalmente entre la orden original y la nueva orden.
+              </div>
+            </div>
+
+            <hr class="m-t-20 m-b-20">
+
+            <div class="text-right">
+              <a href="{% url 'admin_orders' %}" class="btn btn-default waves-effect m-r-10">
+                <i class="fas fa-arrow-left m-r-5"></i> Volver a Pedidos
+              </a>
+              <button type="submit" id="submitSplitBtn" class="btn btn-success waves-effect waves-light">
+                <i class="fas fa-scissors m-r-5"></i> Dividir Orden
+              </button>
+            </div>
+          </form>
         </div>
-        
-        <div class="summary-box">
-            <h3>📊 Resumen</h3>
-            <p>La nueva orden tendrá el mismo cliente, estado y fecha de la orden original.</p>
-            <p>El campo "cantidad_cobrada" será dividido proporcionalmente según los totales de cada orden.</p>
-            <p><strong>Nota:</strong> Se creará un registro automático en el historial de divisiones para fines de reporte.</p>
-        </div>
-        
-        <div class="form-actions">
-            <a href="{% url 'admin_orders' %}" class="pg-button pg-button-secondary">
-                ← Cancelar
-            </a>
-            <button type="submit" class="pg-button pg-button-primary">
-                ✂️ Dividir Orden
-            </button>
-        </div>
-    </form>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-// Update remaining quantities dynamically
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('splitOrderForm');
-    const inputs = form.querySelectorAll('input[type="number"]');
-    
-    inputs.forEach(input => {
-        const itemId = input.name.replace('quantity_', '');
-        const maxQuantity = parseInt(input.max);
-        
-        input.addEventListener('input', function() {
-            let value = parseInt(this.value) || 0;
-            
-            // Ensure value is within bounds
-            if (value < 0) value = 0;
-            if (value > maxQuantity) value = maxQuantity;
-            
-            // Update the remaining quantity display
-            const remaining = maxQuantity - value;
-            const remainingSpan = document.getElementById('remaining_' + itemId);
-            
-            if (remainingSpan) {
-                remainingSpan.textContent = remaining;
-                
-                remainingSpan.classList.remove('pg-text-danger', 'pg-text-warning', 'pg-text-success', 'pg-text-info');
-                if (remaining === 0) {
-                    remainingSpan.classList.add('pg-text-danger');
-                } else if (remaining < maxQuantity / 2) {
-                    remainingSpan.classList.add('pg-text-warning');
-                } else {
-                    remainingSpan.classList.add('pg-text-success');
-                }
-            }
-        });
+class SplitOrderQuantityController {
+  constructor() {
+    this.form = document.getElementById('splitOrderForm');
+    if (!this.form) {
+      return;
+    }
+    this.orderSubtotal = parseFloat('{{ order.subtotal_amount|default:order.total_amount|stringformat:"f" }}') || 0;
+    this.orderDiscount = parseFloat('{{ order.discount|default:0|stringformat:"f" }}') || 0;
+    this.orderTotal = parseFloat('{{ order.total_amount|stringformat:"f" }}') || 0;
+    this.rows = Array.from(this.form.querySelectorAll('[data-item-row]'));
+    this.sourceItemsCountEl = document.getElementById('sourceItemsCount');
+    this.childItemsCountEl = document.getElementById('childItemsCount');
+    this.sourceOrderTotalEl = document.getElementById('sourceOrderTotal');
+    this.childOrderTotalEl = document.getElementById('childOrderTotal');
+    this.validationAlertEl = document.getElementById('clientValidationAlert');
+    this.validationMsgEl = document.getElementById('clientValidationMessage');
+    this.init();
+  }
+
+  init() {
+    this.rows.forEach((row) => {
+      const input = row.querySelector('input[type="number"]');
+      if (!input) {
+        return;
+      }
+      input.addEventListener('input', () => this.recalculate());
+      input.addEventListener('blur', () => {
+        this.clampInput(input, parseInt(row.dataset.maxQuantity, 10) || 0);
+        this.recalculate();
+      });
     });
+
+    this.form.querySelectorAll('[data-qty-step]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const itemId = btn.getAttribute('data-target-item');
+        const step = parseInt(btn.getAttribute('data-qty-step'), 10) || 0;
+        this.stepQuantity(itemId, step);
+      });
+    });
+
+    this.recalculate();
+  }
+
+  clampInput(input, maxQuantity) {
+    let value = parseInt(input.value, 10);
+    if (Number.isNaN(value) || value < 0) {
+      value = 0;
+    }
+    if (value > maxQuantity) {
+      value = maxQuantity;
+    }
+    input.value = value;
+    return value;
+  }
+
+  stepQuantity(itemId, delta) {
+    const row = this.form.querySelector('[data-item-row][data-item-id="' + itemId + '"]');
+    if (!row) {
+      return;
+    }
+    const input = row.querySelector('input[type="number"]');
+    const maxQuantity = parseInt(row.dataset.maxQuantity, 10) || 0;
+    if (!input) {
+      return;
+    }
+    const current = parseInt(input.value, 10) || 0;
+    input.value = Math.min(maxQuantity, Math.max(0, current + delta));
+    this.recalculate();
+  }
+
+  recalculate() {
+    let totalRemainingUnits = 0;
+    let totalMovedUnits = 0;
+    let childSubtotal = 0;
+
+    this.rows.forEach((row) => {
+      const itemId = row.dataset.itemId;
+      const maxQuantity = parseInt(row.dataset.maxQuantity, 10) || 0;
+      const unitPrice = parseFloat(row.dataset.unitPrice) || 0;
+      const input = row.querySelector('input[type="number"]');
+      let moved = parseInt(input ? input.value : '0', 10);
+      if (Number.isNaN(moved) || moved < 0) {
+        moved = 0;
+      }
+      if (moved > maxQuantity) {
+        moved = maxQuantity;
+        if (input) {
+          input.value = moved;
+        }
+      }
+
+      const remaining = maxQuantity - moved;
+      const movedLineSubtotal = moved * unitPrice;
+
+      totalRemainingUnits += remaining;
+      totalMovedUnits += moved;
+      childSubtotal += movedLineSubtotal;
+
+      const remainingBadge = document.getElementById('remaining_' + itemId);
+      if (remainingBadge) {
+        remainingBadge.textContent = remaining;
+        remainingBadge.className = 'label font-14 ';
+        if (remaining === 0) {
+          remainingBadge.className += 'label-danger';
+        } else if (remaining < maxQuantity) {
+          remainingBadge.className += 'label-warning';
+        } else {
+          remainingBadge.className += 'label-info';
+        }
+      }
+
+      const movedSubtotalEl = document.getElementById('moved_subtotal_' + itemId);
+      if (movedSubtotalEl) {
+        movedSubtotalEl.textContent = '$' + movedLineSubtotal.toFixed(2);
+        movedSubtotalEl.className = moved > 0 ? 'text-success font-bold' : 'text-muted';
+      }
+    });
+
+    const proportion = this.orderSubtotal > 0 ? (childSubtotal / this.orderSubtotal) : 0;
+    const childDiscount = Math.round(this.orderDiscount * proportion * 100) / 100;
+    const childTotal = Math.max(0, childSubtotal - childDiscount);
+    const sourceTotal = Math.max(0, this.orderTotal - childTotal);
+
+    if (this.sourceItemsCountEl) {
+      this.sourceItemsCountEl.textContent = totalRemainingUnits;
+    }
+    if (this.childItemsCountEl) {
+      this.childItemsCountEl.textContent = totalMovedUnits;
+    }
+    if (this.sourceOrderTotalEl) {
+      this.sourceOrderTotalEl.textContent = '$' + sourceTotal.toFixed(2);
+    }
+    if (this.childOrderTotalEl) {
+      this.childOrderTotalEl.textContent = '$' + childTotal.toFixed(2);
+    }
+
+    if (this.validationAlertEl && this.validationMsgEl) {
+      if (totalRemainingUnits === 0 && totalMovedUnits > 0) {
+        this.validationMsgEl.textContent = 'La orden original debe conservar al menos 1 producto. Reduzca la cantidad a mover.';
+        this.validationAlertEl.style.display = 'block';
+      } else {
+        this.validationAlertEl.style.display = 'none';
+      }
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  new SplitOrderQuantityController();
 });
 </script>
 {% endblock %}

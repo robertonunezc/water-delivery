@@ -1022,6 +1022,7 @@ class QuantityController {
 
   init() {
     this.bindAddRemove();
+    this.bindDirectQuantityInputs();
     this.bindSummaryRemoval();
   }
 
@@ -1030,7 +1031,7 @@ class QuantityController {
     const removeButtons = document.querySelectorAll('button.pg-button-danger[data-product]');
 
     addButtons.forEach(button => {
-      button.addEventListener('click', () => this.handleQuantityChange(button, 0, true));
+      button.addEventListener('click', () => this.handleQuantityChange(button, 1));
     });
 
     removeButtons.forEach(button => {
@@ -1038,8 +1039,29 @@ class QuantityController {
     });
   }
 
+  bindDirectQuantityInputs() {
+    const qtyInputs = document.querySelectorAll('input.quantity-input[data-product]');
+    qtyInputs.forEach(input => {
+      input.addEventListener('change', () => {
+        const productId = input.getAttribute('data-product');
+        const nextValue = Math.max(0, parseInt(input.value || '0', 10) || 0);
+        input.value = nextValue;
+        this.submitProductQuantity(productId, nextValue);
+      });
+    });
+  }
+
   bindSummaryRemoval() {
     document.addEventListener('click', event => {
+      const clearButton = event.target.closest('.clear-product-row-btn');
+      if (clearButton) {
+        const productId = clearButton.getAttribute('data-product-id');
+        if (productId) {
+          this.confirmAndRemove(productId);
+        }
+        return;
+      }
+
       const button = event.target.closest('.remove-item-btn, .remove-item-btn-mobile');
       if (!button) return;
       const productId = button.getAttribute('data-product-id');
@@ -1047,21 +1069,23 @@ class QuantityController {
     });
   }
 
-  async handleQuantityChange(button, delta, useInputValue = false) {
+  async handleQuantityChange(button, delta) {
     const row = button.closest('tr');
     const qtyInput = row?.querySelector('input[type="number"]');
     const productId = button.getAttribute('data-product');
     if (!qtyInput || !productId) return;
 
     const currentValue = parseInt(qtyInput.value || '0', 10) || 0;
-    const newValue = useInputValue
-      ? Math.max(currentValue || 1, 0)
-      : Math.max(0, currentValue + delta);
+    const newValue = Math.max(0, currentValue + delta);
     qtyInput.value = newValue;
 
+    await this.submitProductQuantity(productId, newValue);
+  }
+
+  async submitProductQuantity(productId, quantity) {
     try {
-      const data = await this.api.updateOrder({ quantity: newValue, product_id: productId, discount: this.discountManager.getAmount() });
-      this.afterQuantityUpdate(productId, newValue, data);
+      const data = await this.api.updateOrder({ quantity, product_id: productId, discount: this.discountManager.getAmount() });
+      this.afterQuantityUpdate(productId, quantity, data);
     } catch (error) {
       this.alertManager.show('danger', 'Error', 'No se pudo actualizar el pedido.', 5000);
       console.error('Update quantity error', error);
@@ -1081,7 +1105,24 @@ class QuantityController {
     }
   }
 
+  updateRowLineTotalAndCartCount(productId, quantity) {
+    const row = document.querySelector(`tr[data-product-id="${productId}"]`);
+    const unitPrice = parseFloat(row?.dataset.unitPrice || '0') || 0;
+    const lineTotalCell = document.getElementById(`line-total-${productId}`);
+    if (lineTotalCell) {
+      lineTotalCell.textContent = `$${(unitPrice * Math.max(0, parseInt(quantity, 10) || 0)).toFixed(2)}`;
+    }
+
+    const countEl = document.getElementById('cart-items-count');
+    if (countEl) {
+      const allInputs = Array.from(document.querySelectorAll('input.quantity-input'));
+      const totalItems = allInputs.reduce((sum, input) => sum + (Math.max(0, parseInt(input.value || '0', 10) || 0)), 0);
+      countEl.textContent = String(totalItems);
+    }
+  }
+
   afterQuantityUpdate(productId, quantity, data) {
+    this.updateRowLineTotalAndCartCount(productId, quantity);
     if (typeof this.applyTotals === 'function') {
       this.applyTotals(data);
     } else {
@@ -1683,8 +1724,7 @@ class OrderPageApp {
     try {
       const data = await this.api.updateOrder({ discount: amount });
       this.applyServerTotals(data);
-      this.alertManager.show('success', 'Descuento', 'Descuento aplicado. Recargando...', 1500);
-      setTimeout(() => window.location.reload(), 1200);
+      this.alertManager.show('success', 'Descuento', 'Descuento aplicado correctamente.', 3000);
     } catch (error) {
       this.alertManager.show('danger', 'Error', 'No se pudo aplicar el descuento.', 4000);
       console.error('Discount update error', error);

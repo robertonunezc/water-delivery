@@ -3,29 +3,29 @@
 {% block title %}Confirmación de visita{% endblock %}
 
 {% block content %}
-<div class="pg-container pg-mt-4">
-    <div class="pg-card dashboard-card">
-        <div class="pg-card-body pg-text-center">
+<div class="row m-t-20">
+    <div class="col-md-8 col-md-offset-2">
+        <div class="white-box text-center p-30">
             {% if outcome == 'recorded' %}
-                <h1 class="pg-h3 pg-mb-2">Gracias por confirmar</h1>
-                <p class="pg-mb-1"><strong>{{ client_name }}</strong></p>
-                <p class="pg-text-muted pg-mb-2">Visita: {{ visit_date }}</p>
-                <span class="pg-badge {% if decision == 'Confirmada' %}pg-bg-success{% else %}pg-bg-danger{% endif %}">
+                <h3 class="box-title m-b-10">Gracias por confirmar</h3>
+                <p class="m-b-5"><strong>{{ client_name }}</strong></p>
+                <p class="text-muted m-b-10">Visita: {{ visit_date }}</p>
+                <span class="label {% if decision == 'Confirmada' %}label-success{% else %}label-danger{% endif %}">
                     {{ decision }}
                 </span>
             {% elif outcome == 'already_answered' %}
-                <h1 class="pg-h3 pg-mb-2">Esta visita ya fue respondida</h1>
-                <p class="pg-mb-1"><strong>{{ client_name }}</strong></p>
-                <p class="pg-text-muted pg-mb-2">Visita: {{ visit_date }}</p>
-                <span class="pg-badge {% if decision == 'Confirmada' %}pg-bg-success{% else %}pg-bg-danger{% endif %}">
+                <h3 class="box-title m-b-10">Esta visita ya fue respondida</h3>
+                <p class="m-b-5"><strong>{{ client_name }}</strong></p>
+                <p class="text-muted m-b-10">Visita: {{ visit_date }}</p>
+                <span class="label {% if decision == 'Confirmada' %}label-success{% else %}label-danger{% endif %}">
                     {{ decision }}
                 </span>
             {% elif outcome == 'expired' %}
-                <h1 class="pg-h3 pg-mb-2">Enlace expirado</h1>
-                <p class="pg-text-muted pg-mb-0">{{ expired_message }}</p>
+                <h3 class="box-title m-b-10">Enlace expirado</h3>
+                <p class="text-muted m-b-0">{{ expired_message }}</p>
             {% else %}
-                <h1 class="pg-h3 pg-mb-2">Enlace inválido</h1>
-                <p class="pg-text-muted pg-mb-0">No pudimos procesar esta confirmación.</p>
+                <h3 class="box-title m-b-10">Enlace inválido</h3>
+                <p class="text-muted m-b-0">No pudimos procesar esta confirmación.</p>
             {% endif %}
         </div>
     </div>

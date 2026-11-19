@@ -8,3 +8,231 @@
   color: #ffffff;
   text-decoration: none;
 }
+
+.puri-cubic-logout-form {
+  margin: 0;
+}
+
+.puri-cubic-logout-form .btn-link {
+  color: #333333;
+  padding: 9px 15px;
+  text-decoration: none;
+}
+
+.puri-cubic-logout-form .btn-link:hover,
+.puri-cubic-logout-form .btn-link:focus {
+  background-color: #f5f5f5;
+  color: #262626;
+  text-decoration: none;
+}
+
+.page-wrapper .white-box {
+  background: #ffffff;
+  border-radius: 4px;
+  margin-bottom: 20px;
+  padding: 25px;
+}
+
+.page-wrapper .pg-input,
+.page-wrapper .pg-select {
+  background-color: #ffffff;
+  border: 1px solid #e4e7ea;
+  border-radius: 0;
+  box-shadow: none;
+  color: #565656;
+  height: 38px;
+  max-width: 100%;
+  padding: 7px 12px;
+  transition: all 300ms linear 0s;
+}
+
+.page-wrapper select.pg-select[multiple],
+.page-wrapper textarea.pg-input {
+  height: auto;
+}
+
+.page-wrapper .pg-input:focus,
+.page-wrapper .pg-select:focus {
+  border-color: #2ecc71;
+  box-shadow: none;
+  outline: 0;
+}
+
+.page-wrapper .product-overview td {
+  vertical-align: middle;
+}
+
+.page-wrapper .product-overview .quantity-input {
+  height: 34px;
+  min-height: 34px;
+  padding: 6px 8px;
+}
+
+.page-wrapper .field-hidden {
+  display: none !important;
+}
+
+/* Route Client List & Mobile Readability Overrides */
+.page-wrapper .route-client-table th {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 12px 10px;
+}
+
+.page-wrapper .route-client-table td {
+  font-size: 14px;
+  line-height: 1.45;
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+
+.page-wrapper .route-client-mobile-heading {
+  font-size: 15px;
+  gap: 8px;
+}
+
+.page-wrapper .route-client-mobile-heading strong {
+  color: #2b2b2b;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.page-wrapper .route-client-sequence-pill {
+  background-color: #00bbd9;
+  border-color: #00bbd9;
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 24px;
+  min-width: 34px;
+  padding: 3px 9px;
+}
+
+.page-wrapper .route-client-table .label,
+.page-wrapper .route-client-table .badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  padding: 5px 10px;
+}
+
+.page-wrapper .route-last-order-status {
+  border-radius: 4px;
+  font-size: 13px !important;
+  font-weight: 700;
+  padding: 5px 10px !important;
+}
+
+.page-wrapper .route-last-order-date {
+  color: #686868;
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.page-wrapper .route-client-finance-item {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.page-wrapper .route-client-finance-label {
+  color: #686868;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 56px;
+}
+
+.page-wrapper .route-client-product-item {
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+
+@media (max-width: 900px) {
+  .page-wrapper .route-client-table .route-client-row {
+    background: #ffffff;
+    border: 1px solid #dce2e8;
+    border-left: 4px solid #00bbd9;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    gap: 12px;
+    grid-template-areas:
+      "name name"
+      "last confirmation"
+      "finance products"
+      "actions actions";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 14px;
+  }
+
+  .page-wrapper .route-client-table .route-client-confirmation-cell {
+    grid-area: confirmation;
+  }
+
+  .page-wrapper .route-client-table.compact-table td,
+  .page-wrapper .route-client-table td {
+    font-size: 14px;
+  }
+
+  .page-wrapper .route-client-mobile-heading strong {
+    font-size: 16px;
+  }
+
+  .page-wrapper .route-client-sequence-pill {
+    font-size: 13px;
+    min-height: 26px;
+    padding: 4px 10px;
+  }
+
+  .page-wrapper .route-client-table td[data-label]::before {
+    color: #54667a;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+
+  .page-wrapper .route-client-table .route-last-order-status {
+    font-size: 14px !important;
+    padding: 6px 12px !important;
+  }
+
+  .page-wrapper .route-client-table .route-last-order-date {
+    font-size: 13px;
+  }
+
+  .page-wrapper .route-client-table .route-client-finance-cell,
+  .page-wrapper .route-client-table .route-client-products-cell,
+  .page-wrapper .route-client-table .route-client-confirmation-cell {
+    background: #f7fafc;
+    border: 1px solid #e4e7ea;
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+
+  .page-wrapper .route-client-table .route-client-actions-primary .btn {
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .page-wrapper .route-client-table .route-client-row {
+    gap: 10px;
+    grid-template-areas:
+      "name"
+      "last"
+      "actions"
+      "finance"
+      "products"
+      "confirmation";
+    grid-template-columns: 1fr;
+    padding: 14px;
+  }
+}
+
+
+

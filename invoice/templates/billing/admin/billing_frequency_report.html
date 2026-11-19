@@ -6,129 +6,135 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid">
-    <!-- Filter Form -->
-    <div class="filter-form">
-        <form method="get">
-            <div class="filter-grid">
-                <div>
-                    <label>Rango de Fechas:</label>
-                    <select name="date_preset" class="pg-input" onchange="this.form.submit()">
-                        <option value="">Personalizado</option>
-                        <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Hoy</option>
-                        <option value="this_week" {% if date_preset == 'this_week' %}selected{% endif %}>Esta Semana</option>
-                        <option value="this_month" {% if date_preset == 'this_month' %}selected{% endif %}>Este Mes</option>
-                        <option value="next_7_days" {% if date_preset == 'next_7_days' %}selected{% endif %}>Próximos 7 Días</option>
-                    </select>
-                </div>
+<div class="row m-t-15">
+    <div class="col-md-12">
+        <!-- Filter Form -->
+        <div class="white-box">
+            <form method="get">
+                <div class="row">
+                    <div class="col-md-3 form-group">
+                        <label class="control-label">Rango de Fechas:</label>
+                        <select name="date_preset" class="form-control" onchange="this.form.submit()">
+                            <option value="">Personalizado</option>
+                            <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Hoy</option>
+                            <option value="this_week" {% if date_preset == 'this_week' %}selected{% endif %}>Esta Semana</option>
+                            <option value="this_month" {% if date_preset == 'this_month' %}selected{% endif %}>Este Mes</option>
+                            <option value="next_7_days" {% if date_preset == 'next_7_days' %}selected{% endif %}>Próximos 7 Días</option>
+                        </select>
+                    </div>
 
-                {% if not date_preset %}
-                <div>
-                    <label>Fecha Inicio:</label>
-                    <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="pg-input">
-                </div>
+                    {% if not date_preset %}
+                    <div class="col-md-2 form-group">
+                        <label class="control-label">Fecha Inicio:</label>
+                        <input type="date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="form-control">
+                    </div>
 
-                <div>
-                    <label>Fecha Fin:</label>
-                    <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="pg-input">
-                </div>
-                {% endif %}
-
-                <div>
-                    <label>Frecuencia:</label>
-                    <select name="frequency" class="pg-input">
-                        <option value="">Todas</option>
-                        {% for value, label in frequency_choices %}
-                        <option value="{{ value }}" {% if frequency_filter == value %}selected{% endif %}>{{ label }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div>
-                    <label>Buscar Cliente:</label>
-                    <input type="text" name="search" value="{{ search_query }}" class="pg-input" placeholder="Nombre, RFC...">
-                </div>
-            </div>
-
-            <div class="pg-mt-3">
-                <button type="submit" class="pg-button pg-button-primary">Filtrar</button>
-                <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="pg-button pg-button-secondary">Limpiar</a>
-            </div>
-        </form>
-    </div>
-
-    <!-- Results -->
-    <p><strong>Mostrando {{ results|length }} de {{ total_clients }} clientes</strong></p>
-
-    {% if results %}
-    <table class="results-table">
-        <thead>
-            <tr>
-                <th>Cliente</th>
-                <th>Tipo</th>
-                <th>Frecuencia</th>
-                <th>Próxima(s) Factura(s)</th>
-                <th>Órdenes</th>
-                <th>Monto Total</th>
-                <th>Acciones</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for result in results %}
-            <tr>
-                <td>
-                    <strong>{{ result.client.name }}</strong><br>
-                    <small>{{ result.client.invoice_data.rfc|default:"Sin RFC" }}</small>
-                </td>
-                <td>
-                    {% if result.client.type == 'corporate' %}
-                    <span class="pg-badge pg-badge-primary">Corporativo</span>
-                    {% else %}
-                    <span class="pg-badge pg-badge-info">Sucursal</span>
+                    <div class="col-md-2 form-group">
+                        <label class="control-label">Fecha Fin:</label>
+                        <input type="date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="form-control">
+                    </div>
                     {% endif %}
-                </td>
-                <td>
-                    <strong>{{ result.frequency_display }}</strong><br>
-                    <small>{{ result.billing_info }}</small>
-                </td>
-                <td>
-                    {% for billing_date in result.billing_dates %}
-                    <span class="pg-badge pg-badge-success">{{ billing_date|date:"d/m/Y" }}</span>
-                    {% endfor %}
-                </td>
-                <td>{{ result.orders_count }}</td>
-                <td>${{ result.total_amount|floatformat:2 }}</td>
-                <td>
-                    <a href="{% url 'admin:clients_client_change' result.client.id %}" class="pg-button pg-button-sm pg-button-outline-primary">Ver</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
 
-    <!-- Pagination -->
-    {% if page_obj.has_other_pages %}
-    <div class="pg-mt-4 pg-text-center">
-        <div class="pg-pagination">
-            {% if page_obj.has_previous %}
-            <a href="?page=1{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">&laquo; Primera</a>
-            <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Anterior</a>
+                    <div class="col-md-2 form-group">
+                        <label class="control-label">Frecuencia:</label>
+                        <select name="frequency" class="form-control">
+                            <option value="">Todas</option>
+                            {% for value, label in frequency_choices %}
+                            <option value="{{ value }}" {% if frequency_filter == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-3 form-group">
+                        <label class="control-label">Buscar Cliente:</label>
+                        <input type="text" name="search" value="{{ search_query }}" class="form-control" placeholder="Nombre, RFC...">
+                    </div>
+                </div>
+
+                <div>
+                    <button type="submit" class="btn btn-info waves-effect waves-light">Filtrar</button>
+                    <a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}" class="btn btn-default waves-effect">Limpiar</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="white-box">
+            <!-- Results -->
+            <p><strong>Mostrando {{ results|length }} de {{ total_clients }} clientes</strong></p>
+
+            {% if results %}
+            <div class="table-responsive">
+                <table class="table table-hover color-table info-table results-table">
+                    <thead>
+                        <tr>
+                            <th>Cliente</th>
+                            <th>Tipo</th>
+                            <th>Frecuencia</th>
+                            <th>Próxima(s) Factura(s)</th>
+                            <th>Órdenes</th>
+                            <th>Monto Total</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for result in results %}
+                        <tr>
+                            <td>
+                                <strong>{{ result.client.name }}</strong><br>
+                                <small class="text-muted">{{ result.client.invoice_data.rfc|default:"Sin RFC" }}</small>
+                            </td>
+                            <td>
+                                {% if result.client.type == 'corporate' %}
+                                <span class="label label-primary">Corporativo</span>
+                                {% else %}
+                                <span class="label label-info">Sucursal</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <strong>{{ result.frequency_display }}</strong><br>
+                                <small class="text-muted">{{ result.billing_info }}</small>
+                            </td>
+                            <td>
+                                {% for billing_date in result.billing_dates %}
+                                <span class="label label-success">{{ billing_date|date:"d/m/Y" }}</span>
+                                {% endfor %}
+                            </td>
+                            <td>{{ result.orders_count }}</td>
+                            <td>${{ result.total_amount|floatformat:2 }}</td>
+                            <td>
+                                <a href="{% url 'admin:clients_client_change' result.client.id %}" class="btn btn-info btn-outline btn-sm">Ver</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <div class="m-t-20 text-center">
+                <ul class="pagination m-b-0">
+                    {% if page_obj.has_previous %}
+                    <li><a href="?page=1{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">&laquo; Primera</a></li>
+                    <li><a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Anterior</a></li>
+                    {% endif %}
+
+                    <li class="disabled"><span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span></li>
+
+                    {% if page_obj.has_next %}
+                    <li><a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Siguiente</a></li>
+                    <li><a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Última &raquo;</a></li>
+                    {% endif %}
+                </ul>
+            </div>
             {% endif %}
 
-            <span>Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
-
-            {% if page_obj.has_next %}
-            <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Siguiente</a>
-            <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}{% if frequency_filter %}&frequency={{ frequency_filter }}{% endif %}{% if date_preset %}&date_preset={{ date_preset }}{% endif %}{% if not date_preset %}&start_date={{ start_date|date:'Y-m-d' }}&end_date={{ end_date|date:'Y-m-d' }}{% endif %}">Última &raquo;</a>
+            {% else %}
+            <div class="alert alert-info m-b-0">
+                <p class="m-b-0">No se encontraron clientes que requieran facturación en este período.</p>
+            </div>
             {% endif %}
         </div>
     </div>
-    {% endif %}
-
-    {% else %}
-    <div class="no-results">
-        <p>No se encontraron clientes que requieran facturación en este período.</p>
-    </div>
-    {% endif %}
 </div>
 {% endblock %}

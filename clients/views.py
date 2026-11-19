@@ -33,8 +33,14 @@ from .forms import (
 )
 from .services import get_upcoming_route_orders, get_recent_completed_route_orders
 from .services.client_detail_service import (
+    MOVEMENT_TYPES,
+    ORDER_FILTERS,
     build_client_detail_snapshot,
+    filter_client_detail_movements,
+    filter_client_detail_orders,
     get_client_detail_current_debt,
+    resolve_choice,
+    resolve_client_detail_tab,
 )
 from .services.client_debt_service import with_display_current_debt
 from .services.client_service import (
@@ -113,13 +119,7 @@ def _get_route_assignment_formset(*, data: Any = None, instance: Client | None =
 
 
 def _get_active_client_detail_tab(request: HttpRequest) -> str:
-    active_tab = request.GET.get('tab', 'sales')
-    available_tabs = {'sales', 'payments', 'invoices', 'routes', 'profile'}
-    if request.user.is_staff:
-        available_tabs.add('prices')
-    if active_tab not in available_tabs:
-        return 'sales'
-    return active_tab
+    return resolve_client_detail_tab(request.GET.get('tab'))
 
 
 def _get_client_product_price_formset(*, data: Any = None, client: Client) -> Any:
@@ -931,7 +931,7 @@ def create_invoice_from_selected_orders(
     client = get_object_or_404(Client, pk=pk)
     order_ids = [order_id for order_id in dict.fromkeys(_parse_order_ids(request))]
     redirect_to = (
-        f"{reverse('clients:detail', args=[client.pk])}?tab=sales#sales-tab-pane"
+        f"{reverse('clients:detail', args=[client.pk])}?tab=orders#orders-tab-pane"
     )
 
     if not order_ids:
@@ -1011,6 +1011,8 @@ def send_selected_order_receipts(request: HttpRequest, pk: int) -> JsonResponse:
 def detail(request, pk):
     client = get_object_or_404(Client, pk=pk)
     active_detail_tab = _get_active_client_detail_tab(request)
+    orders_filter = resolve_choice(request.GET.get('orders_filter'), ORDER_FILTERS)
+    movements_type = resolve_choice(request.GET.get('movements_type'), MOVEMENT_TYPES)
     orders = (
         client.orders.all()
         .select_related('receipt')
@@ -1019,10 +1021,17 @@ def detail(request, pk):
     )
     payments = client.payments.all()
     all_payment_data = _build_payment_history(client)
-    orders_page = _paginate_client_detail_items(request, orders, page_param='orders_page')
+    from clients.services.pending_payment_service import get_overdue_orders_for_client
+    pending_payment_data = get_overdue_orders_for_client(client)
+    overdue_order_ids = [order.pk for order in pending_payment_data['overdue_orders']]
+    orders_page = _paginate_client_detail_items(
+        request,
+        filter_client_detail_orders(orders, orders_filter, overdue_order_ids),
+        page_param='orders_page',
+    )
     payments_page = _paginate_client_detail_items(
         request,
-        all_payment_data,
+        filter_client_detail_movements(all_payment_data, movements_type),
         page_param='payments_page',
     )
     client_invoices = _get_client_detail_invoices(client)
@@ -1054,9 +1063,6 @@ def detail(request, pk):
     recent_completed_routes = get_recent_completed_route_orders(client, limit=5)
     billing_frequency = client.billing_info.effective.frequency
     billing_data = client.billing_info.effective.data
-    # Get pending payment data
-    from clients.services.pending_payment_service import get_overdue_orders_for_client
-    pending_payment_data = get_overdue_orders_for_client(client)
     detail_current_debt = get_client_detail_current_debt(client)
     credit_account = client.get_credit_account()
     effective_credit_config = client.get_effective_credit_config()
@@ -1077,6 +1083,9 @@ def detail(request, pk):
     context = {
         'client': client,
         'active_detail_tab': active_detail_tab,
+        'orders_filter': orders_filter,
+        'movements_type': movements_type,
+        'overdue_order_ids': overdue_order_ids,
         'orders': orders_page,
         'payments': payments_page,
         'all_payment_data': payments_page,
@@ -1219,7 +1228,7 @@ def update_product_prices(request: HttpRequest, pk: int) -> HttpResponse:
     else:
         messages.error(request, 'No se pudieron actualizar los precios por producto.')
 
-    return redirect(f"{reverse('clients:detail', args=[client.pk])}?tab=prices")
+    return redirect(f"{reverse('clients:detail', args=[client.pk])}?tab=data#client-prices")
 
 
 @login_required

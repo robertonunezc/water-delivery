@@ -3197,43 +3197,6 @@ body.pg-modal-open {
             color: var(--pg-foreground);
         }
         
-        .form-group {
-            margin-bottom: 20px;
-            background: white;
-            padding: 20px;
-            border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        .form-group label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: var(--pg-foreground);
-        }
-        
-        .form-group select, .form-group input {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid var(--pg-border);
-            border-radius: 4px;
-            font-size: 14px;
-        }
-        
-        .form-group select:focus, .form-group input:focus {
-            outline: none;
-            border-color: var(--pg-primary);
-        }
-        
-        .form-actions {
-            background: var(--pg-muted);
-            padding: 20px;
-            border-radius: 4px;
-            display: flex;
-            gap: 10px;
-            justify-content: flex-end;
-        }
-        
   .dashboard-card {
     border: 0;
     border-radius: 14px;

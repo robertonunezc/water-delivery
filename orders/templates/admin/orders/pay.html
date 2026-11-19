@@ -6,68 +6,76 @@
 {% endblock %}
 
 {% block content %}
-<div class="pay-order-container">
-    <h3>Pagar Orden #{{ order.id }}</h3>
-    
-    <div class="order-info">
-        <h2>📋 Información del Pedido</h2>
-        <div class="info-grid">
-            <div class="info-item">
-                <div class="info-label">Cliente</div>
-                <div class="info-value">{{ order.client.name }}</div>
+<div class="row m-t-15">
+    <div class="col-md-8 col-md-offset-2">
+        <div class="white-box">
+            <h3 class="box-title m-b-0">Pagar Orden #{{ order.id }}</h3>
+            <p class="text-muted m-b-30 font-13">Registre el pago correspondiente al saldo pendiente del pedido.</p>
+            
+            <div class="well well-sm order-info">
+                <h4 class="m-t-0">📋 Información del Pedido</h4>
+                <div class="row info-grid">
+                    <div class="col-sm-6 m-b-10 info-item">
+                        <div class="text-muted small info-label">Cliente</div>
+                        <div class="font-bold info-value">{{ order.client.name }}</div>
+                    </div>
+                    <div class="col-sm-6 m-b-10 info-item">
+                        <div class="text-muted small info-label">Saldo Disponible</div>
+                        <div class="font-bold text-info info-value">${{ order.client.balance }}</div>
+                    </div>
+                    <div class="col-sm-6 m-b-10 info-item">
+                        <div class="text-muted small info-label">Estado</div>
+                        <div class="font-bold info-value">{{ order.get_status_display }}</div>
+                    </div>
+                    <div class="col-sm-6 m-b-10 info-item">
+                        <div class="text-muted small info-label">Total a Pagar</div>
+                        <div class="font-bold text-success info-value">${{ payment_amount }}</div>
+                    </div>
+                </div>
             </div>
-            <div class="info-item">
-                <div class="info-label">Saldo Disponible</div>
-                <div class="info-value pg-text-info">${{ order.client.balance }}</div>
+            
+            <div class="alert alert-info">
+                <strong>💡 Sugerencia de Pago:</strong><br>
+                {{ payment_breakdown.message }}
             </div>
-            <div class="info-item">
-                <div class="info-label">Estado</div>
-                <div class="info-value">{{ order.get_status_display }}</div>
-            </div>
-            <div class="info-item">
-                <div class="info-label">Total a Pagar</div>
-                <div class="info-value pg-text-success pg-fw-bold">${{ payment_amount }}</div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="pg-alert pg-alert-info">
-        <strong>💡 Sugerencia de Pago:</strong><br>
-        {{ payment_breakdown.message }}
-    </div>
 
-    <div id="errorMessage" class="pg-alert pg-alert-danger pg-hidden">
-        <strong>Error:</strong> <span id="errorText"></span>
-    </div>
-    
-    <form id="paymentForm">
-        {% csrf_token %}
-        <input type="hidden" id="orderId" value="{{ order.id }}">
-        
-        <div class="form-group">
-            <label for="amount" class="pg-label">Monto (Total del pedido)</label>
-            <input type="number" id="amount" class="pg-input pg-bg-light" value="{{ payment_amount }}" step="0.01" min="0.01" readonly>
-            <small class="pg-field-help pg-block pg-mt-1">El pago debe cubrir el saldo pendiente de la orden.</small>
-        </div>
+            <div id="errorMessage" class="alert alert-danger pg-hidden">
+                <strong>Error:</strong> <span id="errorText"></span>
+            </div>
+            
+            <form id="paymentForm">
+                {% csrf_token %}
+                <input type="hidden" id="orderId" value="{{ order.id }}">
+                
+                <div class="form-group">
+                    <label for="amount" class="control-label">Monto (Total del pedido)</label>
+                    <div class="input-group">
+                        <span class="input-group-addon">$</span>
+                        <input type="number" id="amount" class="form-control pg-input" value="{{ payment_amount }}" step="0.01" min="0.01" readonly>
+                    </div>
+                    <span class="help-block"><small>El pago debe cubrir el saldo pendiente de la orden.</small></span>
+                </div>
 
-        <div class="form-group">
-            <label for="payment_method" class="pg-label">Método de Pago</label>
-            <select id="payment_method" name="payment_method" class="pg-select" required>
-                {% for value, label in payment_types %}
-                    <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-            </select>
+                <div class="form-group">
+                    <label for="payment_method" class="control-label">Método de Pago</label>
+                    <select id="payment_method" name="payment_method" class="form-control pg-select" required>
+                        {% for value, label in payment_types %}
+                            <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="form-actions text-right m-t-20">
+                    <button type="submit" id="submitBtn" class="btn btn-success waves-effect waves-light m-r-10">
+                        💳 Confirmar Pago
+                    </button>
+                    <a href="{% url 'admin:orders_order_change' order.id %}" class="btn btn-inverse waves-effect waves-light">
+                        ← Cancelar
+                    </a>
+                </div>
+            </form>
         </div>
-        
-        <div class="form-actions">
-            <a href="{% url 'admin:orders_order_change' order.id %}" class="pg-button pg-button-secondary">
-                ← Cancelar
-            </a>
-            <button type="submit" id="submitBtn" class="pg-button pg-button-primary">
-                💳 Confirmar Pago
-            </button>
-        </div>
-    </form>
+    </div>
 </div>
 
 <script>

@@ -6,19 +6,19 @@
 {% endblock %}
 
 {% block content %}
-<div class="manager-dashboard">
-    <form method="get" class="dashboard-header">
-        <div class="dashboard-title">
-            <h1 class="pg-h3 pg-mb-1">Dashboard Backoffice</h1>
-            <div class="dashboard-range">
-                {{ date_range.label }}:
-                {{ date_range.start_date|date:"d/m/Y" }} - {{ date_range.end_date|date:"d/m/Y" }}
+<div class="manager-dashboard m-t-15">
+    <div class="white-box">
+        <form method="get" class="row">
+            <div class="col-md-4 m-b-10">
+                <h3 class="box-title m-b-0">Dashboard Backoffice</h3>
+                <div class="text-muted">
+                    {{ date_range.label }}:
+                    {{ date_range.start_date|date:"d/m/Y" }} - {{ date_range.end_date|date:"d/m/Y" }}
+                </div>
             </div>
-        </div>
-        <div class="dashboard-filters">
-            <div>
-                <label for="date_preset" class="pg-label">Rango</label>
-                <select id="date_preset" name="date_preset" class="pg-select">
+            <div class="col-md-2 form-group">
+                <label for="date_preset" class="control-label">Rango</label>
+                <select id="date_preset" name="date_preset" class="form-control">
                     {% for value, label in date_options %}
                         <option value="{{ value }}" {% if selected_preset == value %}selected{% endif %}>
                             {{ label }}
@@ -26,180 +26,204 @@
                     {% endfor %}
                 </select>
             </div>
-            <div>
-                <label for="start_date" class="pg-label">Inicio</label>
-                <input id="start_date" type="date" name="start_date" value="{{ custom_start }}" class="pg-input">
+            <div class="col-md-2 form-group">
+                <label for="start_date" class="control-label">Inicio</label>
+                <input id="start_date" type="date" name="start_date" value="{{ custom_start }}" class="form-control">
             </div>
-            <div>
-                <label for="end_date" class="pg-label">Fin</label>
-                <input id="end_date" type="date" name="end_date" value="{{ custom_end }}" class="pg-input">
+            <div class="col-md-2 form-group">
+                <label for="end_date" class="control-label">Fin</label>
+                <input id="end_date" type="date" name="end_date" value="{{ custom_end }}" class="form-control">
             </div>
-            <div class="pg-grid">
-                <button type="submit" class="pg-button pg-button-primary">
-                    <i class="fas fa-filter pg-me-1"></i>Aplicar
+            <div class="col-md-2 form-group m-t-25">
+                <button type="submit" class="btn btn-info btn-block waves-effect waves-light">
+                    <i class="fas fa-filter m-r-5"></i>Aplicar
                 </button>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 
     {% include "reminders/_home_block.html" %}
-  {% include "includes/confirmations_no_route.html" %}
+    {% include "includes/confirmations_no_route.html" %}
 
-    {% comment %}
-    Manager navigation proposal hidden in favor of the dashboard snapshot.
     <section class="dashboard-section">
-        <div class="section-title">Accesos</div>
-        <div class="metric-grid">
-            {% for action in dashboard_actions %}
-                <article class="pg-card delivery-action pg-border-{{ action.variant }}">
-                    <div class="pg-card-body pg-flex pg-flex-column pg-gap-3">
-                        <div class="pg-flex pg-justify-between pg-align-start pg-gap-3">
-                            <span class="delivery-action-icon pg-text-{{ action.variant }}">
-                                <i class="fas {{ action.icon }} fa-lg"></i>
-                            </span>
+        <h4 class="m-b-15">Ventas</h4>
+        <div class="row">
+            <div class="col-md-3 col-sm-6">
+                <div class="white-box ecom-stat-widget">
+                    <div class="row">
+                        <div class="col-xs-8">
+                            <span class="text-blue font-light">${{ sales_snapshot.total_amount|floatformat:2 }}</span>
+                            <p class="font-12">Vendido</p>
+                            <small class="text-muted">Pedidos completados en el rango</small>
                         </div>
-                        <div>
-                            <h2 class="pg-h5 pg-mb-2">{{ action.title }}</h2>
-                            <p class="pg-text-muted pg-mb-2">{{ action.description }}</p>
-                            <div class="delivery-action-meta pg-small pg-text-muted">{{ action.meta }}</div>
-                        </div>
-                        <div class="pg-mt-auto">
-                            <a href="{{ action.url }}" class="pg-button pg-button-{{ action.variant }} pg-w-100">
-                                Abrir
-                            </a>
+                        <div class="col-xs-4 text-right">
+                            <span class="icoleaf bg-success text-white"><i class="fas fa-dollar-sign"></i></span>
                         </div>
                     </div>
-                </article>
-            {% endfor %}
-        </div>
-    </section>
-    {% endcomment %}
-
-    <section class="dashboard-section">
-        <div class="section-title">Ventas</div>
-        <div class="metric-grid">
-            <div class="metric-card metric-sales">
-                <div class="metric-label">
-                    <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-                    Vendido
                 </div>
-                <div class="metric-value">${{ sales_snapshot.total_amount|floatformat:2 }}</div>
-                <div class="metric-note">Pedidos completados en el rango</div>
             </div>
-            <div class="metric-card metric-orders">
-                <div class="metric-label">
-                    <span class="metric-icon"><i class="fas fa-clipboard-check"></i></span>
-                    Pedidos
+            <div class="col-md-3 col-sm-6">
+                <div class="white-box ecom-stat-widget">
+                    <div class="row">
+                        <div class="col-xs-8">
+                            <span class="text-blue font-light">{{ sales_snapshot.total_orders }}</span>
+                            <p class="font-12">Pedidos</p>
+                            <small class="text-muted">Solo estado completado</small>
+                        </div>
+                        <div class="col-xs-4 text-right">
+                            <span class="icoleaf bg-primary text-white"><i class="fas fa-clipboard-check"></i></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="metric-value">{{ sales_snapshot.total_orders }}</div>
-                <div class="metric-note">Solo estado completado</div>
             </div>
-            <div class="metric-card metric-ticket">
-                <div class="metric-label">
-                    <span class="metric-icon"><i class="fas fa-receipt"></i></span>
-                    Ticket promedio
+            <div class="col-md-3 col-sm-6">
+                <div class="white-box ecom-stat-widget">
+                    <div class="row">
+                        <div class="col-xs-8">
+                            <span class="text-blue font-light">${{ sales_snapshot.average_ticket|floatformat:2 }}</span>
+                            <p class="font-12">Ticket promedio</p>
+                            <small class="text-muted">Vendido / pedidos</small>
+                        </div>
+                        <div class="col-xs-4 text-right">
+                            <span class="icoleaf bg-info text-white"><i class="fas fa-receipt"></i></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="metric-value">${{ sales_snapshot.average_ticket|floatformat:2 }}</div>
-                <div class="metric-note">Vendido / pedidos</div>
             </div>
-            <div class="metric-card metric-discount">
-                <div class="metric-label">
-                    <span class="metric-icon"><i class="fas fa-tags"></i></span>
-                    Descuentos
-                </div>
-                <div class="metric-value">${{ sales_snapshot.total_discount|floatformat:2 }}</div>
-                <div class="metric-note">
-                    <a href="{{ links.orders_report }}">Ver pedidos</a>
+            <div class="col-md-3 col-sm-6">
+                <div class="white-box ecom-stat-widget">
+                    <div class="row">
+                        <div class="col-xs-8">
+                            <span class="text-blue font-light">${{ sales_snapshot.total_discount|floatformat:2 }}</span>
+                            <p class="font-12">Descuentos</p>
+                            <small class="text-muted"><a href="{{ links.orders_report }}">Ver pedidos</a></small>
+                        </div>
+                        <div class="col-xs-4 text-right">
+                            <span class="icoleaf bg-warning text-white"><i class="fas fa-tags"></i></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <div class="pg-row pg-gap-3 dashboard-section">
-        <div class="pg-col-lg-5">
-            <div class="section-title">Métodos de pago</div>
-            <div class="pg-table-panel pg-table-responsive">
-                <table class="pg-table pg-table-sm compact-table">
-                    <thead>
-                        <tr>
-                            <th>Método</th>
-                            <th class="pg-text-end">Pagos</th>
-                            <th class="pg-text-end">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for method in sales_snapshot.payment_methods %}
+    <div class="row dashboard-section">
+        <div class="col-lg-5">
+            <div class="white-box">
+                <h3 class="box-title">Métodos de pago</h3>
+                <div class="table-responsive">
+                    <table class="table table-hover color-table info-table compact-table">
+                        <thead>
                             <tr>
-                                <td>{{ method.label }}</td>
-                                <td class="pg-text-end">{{ method.payment_count }}</td>
-                                <td class="pg-text-end">${{ method.total_amount|floatformat:2 }}</td>
+                                <th>Método</th>
+                                <th class="text-right">Pagos</th>
+                                <th class="text-right">Total</th>
                             </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="3" class="pg-text-center pg-text-muted">Sin pagos en el rango.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for method in sales_snapshot.payment_methods %}
+                                <tr>
+                                    <td>{{ method.label }}</td>
+                                    <td class="text-right">{{ method.payment_count }}</td>
+                                    <td class="text-right">${{ method.total_amount|floatformat:2 }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="3" class="text-center text-muted">Sin pagos en el rango.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
-        <div class="pg-col-lg-7">
-            <div class="section-title">Operación</div>
-            <div class="metric-grid">
-                <div class="metric-card metric-risk">
-                    <div class="metric-label">
-                        <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
-                        Clientes vencidos
-                    </div>
-                    <div class="metric-value">{{ overdue_clients.count }}</div>
-                    <div class="metric-note">
-                        ${{ overdue_clients.total_amount|floatformat:2 }}
-                        <a href="{{ links.overdue_clients }}" class="pg-ms-1">Detalle</a>
-                    </div>
-                </div>
-                <div class="metric-card metric-invoice">
-                    <div class="metric-label">
-                        <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-                        Facturas por cobrar
-                    </div>
-                    <div class="metric-value">{{ invoice_balance.unpaid_balance_count }}</div>
-                    <div class="metric-note">
-                        ${{ invoice_balance.unpaid_balance_total|floatformat:2 }}
-                        {% if links.invoices %}<a href="{{ links.invoices }}" class="pg-ms-1">Detalle</a>{% endif %}
+        <div class="col-lg-7">
+            <h4 class="m-b-15">Operación</h4>
+            <div class="row">
+                <div class="col-sm-6">
+                    <div class="white-box ecom-stat-widget">
+                        <div class="row">
+                            <div class="col-xs-8">
+                                <span class="text-blue font-light">{{ overdue_clients.count }}</span>
+                                <p class="font-12">Clientes vencidos</p>
+                                <small class="text-muted">
+                                    ${{ overdue_clients.total_amount|floatformat:2 }}
+                                    <a href="{{ links.overdue_clients }}" class="m-l-5">Detalle</a>
+                                </small>
+                            </div>
+                            <div class="col-xs-4 text-right">
+                                <span class="icoleaf bg-danger text-white"><i class="fas fa-triangle-exclamation"></i></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="metric-card metric-capacity">
-                    <div class="metric-label">
-                        <span class="metric-icon"><i class="fas fa-gauge-high"></i></span>
-                        Capacidad en facturas
-                    </div>
-                    <div class="metric-value">{{ invoice_balance.available_capacity_count }}</div>
-                    <div class="metric-note">
-                        ${{ invoice_balance.available_capacity_total|floatformat:2 }} disponible
-                        {% if links.invoices %}<a href="{{ links.invoices }}" class="pg-ms-1">Detalle</a>{% endif %}
-                    </div>
-                </div>
-                <div class="metric-card metric-pending">
-                    <div class="metric-label">
-                        <span class="metric-icon"><i class="fas fa-file-circle-plus"></i></span>
-                        Facturas pendientes
-                    </div>
-                    <div class="metric-value">{{ pending_invoices.count }}</div>
-                    <div class="metric-note">
-                        {{ pending_invoices.total_orders }} pedidos
-                        {% if links.pending_invoices %}<a href="{{ links.pending_invoices }}" class="pg-ms-1">Detalle</a>{% endif %}
+                <div class="col-sm-6">
+                    <div class="white-box ecom-stat-widget">
+                        <div class="row">
+                            <div class="col-xs-8">
+                                <span class="text-blue font-light">{{ invoice_balance.unpaid_balance_count }}</span>
+                                <p class="font-12">Facturas por cobrar</p>
+                                <small class="text-muted">
+                                    ${{ invoice_balance.unpaid_balance_total|floatformat:2 }}
+                                    {% if links.invoices %}<a href="{{ links.invoices }}" class="m-l-5">Detalle</a>{% endif %}
+                                </small>
+                            </div>
+                            <div class="col-xs-4 text-right">
+                                <span class="icoleaf bg-primary text-white"><i class="fas fa-file-invoice-dollar"></i></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="metric-card metric-route">
-                    <div class="metric-label">
-                        <span class="metric-icon"><i class="fas fa-route"></i></span>
-                        Clientes en ruta hoy
+                <div class="col-sm-6">
+                    <div class="white-box ecom-stat-widget">
+                        <div class="row">
+                            <div class="col-xs-8">
+                                <span class="text-blue font-light">{{ invoice_balance.available_capacity_count }}</span>
+                                <p class="font-12">Capacidad en facturas</p>
+                                <small class="text-muted">
+                                    ${{ invoice_balance.available_capacity_total|floatformat:2 }} disponible
+                                    {% if links.invoices %}<a href="{{ links.invoices }}" class="m-l-5">Detalle</a>{% endif %}
+                                </small>
+                            </div>
+                            <div class="col-xs-4 text-right">
+                                <span class="icoleaf bg-info text-white"><i class="fas fa-gauge-high"></i></span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="metric-value">{{ route_clients_today.count }}</div>
-                    <div class="metric-note">
-                        {{ route_clients_today.date|date:"d/m/Y" }}
-                        <a href="{{ links.routes_today }}" class="pg-ms-1">Detalle</a>
+                </div>
+                <div class="col-sm-6">
+                    <div class="white-box ecom-stat-widget">
+                        <div class="row">
+                            <div class="col-xs-8">
+                                <span class="text-blue font-light">{{ pending_invoices.count }}</span>
+                                <p class="font-12">Facturas pendientes</p>
+                                <small class="text-muted">
+                                    {{ pending_invoices.total_orders }} pedidos
+                                    {% if links.pending_invoices %}<a href="{{ links.pending_invoices }}" class="m-l-5">Detalle</a>{% endif %}
+                                </small>
+                            </div>
+                            <div class="col-xs-4 text-right">
+                                <span class="icoleaf bg-warning text-white"><i class="fas fa-file-circle-plus"></i></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6">
+                    <div class="white-box ecom-stat-widget">
+                        <div class="row">
+                            <div class="col-xs-8">
+                                <span class="text-blue font-light">{{ route_clients_today.count }}</span>
+                                <p class="font-12">Clientes en ruta hoy</p>
+                                <small class="text-muted">
+                                    {{ route_clients_today.date|date:"d/m/Y" }}
+                                    <a href="{{ links.routes_today }}" class="m-l-5">Detalle</a>
+                                </small>
+                            </div>
+                            <div class="col-xs-4 text-right">
+                                <span class="icoleaf bg-success text-white"><i class="fas fa-route"></i></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
