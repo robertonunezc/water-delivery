@@ -1,100 +1,79 @@
 <!DOCTYPE html>
 {% load static %}
-<html lang="en">
+<html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'core/vendor/cubic/plugins/images/favicon.png' %}">
     <title>{% block title %}{% endblock %}</title>
 
     {% include "includes/posthog.html" %}
 
-    <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
-    <!-- Font Awesome -->
+    <!-- ===== Bootstrap CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/bootstrap/dist/css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- ===== Animation CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/animate.css' %}" rel="stylesheet">
+    <!-- ===== Custom CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/style.css' %}" rel="stylesheet">
+    <!-- ===== Color CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/colors/default.css' %}" id="theme" rel="stylesheet">
+    <!-- Font Awesome 6 -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Project Design System CSS -->
+    <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
+    <!-- Cubic Overrides CSS -->
+    <link href="{% static 'core/css/cubic-overrides.css' %}" rel="stylesheet">
 
     {% block extra_css %}{% endblock %}
 </head>
-<body>
-    <div class="pg-app">
-    <nav class="pg-app-nav">
-        <div class="pg-container pg-app-nav-inner">
-            <a class="pg-brand" href="{% url 'core:home' %}">
-                <span class="pg-brand-mark"><i class="fas fa-tint"></i></span>
-                PuriGest
-            </a>
-            <button class="pg-nav-toggle" type="button" data-pg-toggle="nav" data-pg-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Abrir navegacion">
-                <span class="pg-nav-toggle-lines"></span>
-            </button>
-            <div class="pg-nav-menu" id="navbarNav">
-                <ul class="pg-nav-list">
-                    {% if user.is_authenticated %}
-                        <li>
-                            <a class="pg-nav-link" href="{% url 'clients:list' %}">Clientes</a>
-                        </li>
-                        <li>
-                            <a class="pg-nav-link" href="{% url 'routes:list' %}">Rutas</a>
-                        </li>
-                        <li>
-                            <a class="pg-nav-link" href="{% url 'routes:truck_inventory' %}">Inventarios</a>
-                        </li>
-                        <li>
-                            <a class="pg-nav-link" href="{% url 'route_confirmations:list' %}">Confirmaciones</a>
-                        </li>
-                        <li>
-                            <a class="pg-nav-link" href="{% url 'reminders:list' %}">Recordatorios</a>
-                        </li>
-                        <li class="pg-dropdown">
-                            <button class="pg-dropdown-trigger" type="button" id="reportsDropdown" data-pg-toggle="dropdown">
-                                Reportes
-                                <i class="fas fa-chevron-down pg-small"></i>
-                            </button>
-                            <ul class="pg-dropdown-menu">
-                                <li><a class="pg-dropdown-item" href="{% url 'report:orders_report' %}">Pedidos</a></li>
-                                <li><a class="pg-dropdown-item" href="{% url 'report:breakdown_payment_method' %}">Reporte de Hoy</a></li>
-                                <li><hr class="pg-dropdown-divider"></li>
-                                <li><a class="pg-dropdown-item" href="{% url 'report:credit_report' %}">Crédito</a></li>
-                                <li><a class="pg-dropdown-item" href="{% url 'report:pending_payments' %}">Pagos Vencidos</a></li>
-                            </ul>
-                        </li>
-                        {% if user.is_staff %}
-                            <li class="pg-dropdown">
-                                <button class="pg-dropdown-trigger" type="button" id="adminDropdown" data-pg-toggle="dropdown">
-                                    Administrador
-                                    <i class="fas fa-chevron-down pg-small"></i>
-                                </button>
-                                <ul class="pg-dropdown-menu">
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_orders' %}">Pedidos</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_clients' %}">Clientes</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_products' %}">Productos</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_categories' %}">Categorías</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_routes' %}">Rutas</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin_invoices' %}">Facturas</a></li>
-                                    <li><a class="pg-dropdown-item" href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">Calendario de facturación</a></li>
-                                </ul>
-                            </li>
-                        {% endif %}
-                    {% endif %}
+<body class="mini-sidebar">
+    <!-- Preloader -->
+    <div class="preloader">
+        <div class="cssload-speeding-wheel"></div>
+    </div>
+    <div id="wrapper">
+        <!-- ===== Top-Navigation ===== -->
+        <nav class="navbar navbar-default navbar-static-top m-b-0">
+            <div class="navbar-header">
+                <a class="navbar-toggle font-20 hidden-sm hidden-md hidden-lg" href="javascript:void(0)" data-toggle="collapse" data-target=".navbar-collapse" aria-label="Abrir navegación">
+                    <i class="fa fa-bars"></i>
+                </a>
+                <div class="top-left-part">
+                    <a class="logo puri-cubic-logo" href="{% url 'core:home' %}">
+                        <b>
+                            <i class="fas fa-tint"></i>
+                        </b>
+                        <span>
+                            PuriGest
+                        </span>
+                    </a>
+                </div>
+                <ul class="nav navbar-top-links navbar-left hidden-xs">
+                    <li>
+                        <a href="javascript:void(0)" class="sidebartoggler font-20 waves-effect waves-light" aria-label="Alternar menú lateral"><i class="icon-arrow-left-circle"></i></a>
+                    </li>
                 </ul>
-                <ul class="pg-action-list">
+                <ul class="nav navbar-top-links navbar-right pull-right">
                     {% if user.is_authenticated %}
-                        {% comment %} <li>
-                            <a class="pg-button pg-button-primary pg-button-sm" href="{% url 'reminders:create' %}">
-                                <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
+                        <li class="hidden-xs">
+                            <a href="{% url 'reminders:create' %}" class="waves-effect waves-light">
+                                <i class="fas fa-plus"></i> NUEVO RECORDATORIO
                             </a>
-                        </li> {% endcomment %}
-                        <li class="pg-dropdown">
-                            <button class="pg-dropdown-trigger" type="button" id="navbarDropdown" data-pg-toggle="dropdown">
+                        </li>
+                        <li class="dropdown">
+                            <a class="dropdown-toggle waves-effect waves-light" data-toggle="dropdown" href="javascript:void(0);">
                                 <i class="fas fa-user"></i> {{ user.get_full_name|default:user.username }}
-                                <i class="fas fa-chevron-down pg-small"></i>
-                            </button>
-                            <ul class="pg-dropdown-menu pg-dropdown-menu-end">
-                                <li><a class="pg-dropdown-item" href="#">Mi Perfil</a></li>
-                                <li><hr class="pg-dropdown-divider"></li>
+                                <i class="fa fa-angle-down"></i>
+                            </a>
+                            <ul class="dropdown-menu dropdown-user animated flipInY">
+                                <li><a href="{% url 'core:home' %}"><i class="fa fa-user"></i> Mi Perfil</a></li>
+                                <li role="separator" class="divider"></li>
                                 <li>
-                                    <form method="post" action="{% url 'core:logout' %}">
+                                    <form method="post" action="{% url 'core:logout' %}" class="puri-cubic-logout-form">
                                         {% csrf_token %}
-                                        <button type="submit" class="pg-dropdown-item">
-                                            Cerrar Sesión
+                                        <button type="submit" class="btn btn-link btn-block text-left">
+                                            <i class="fa fa-power-off"></i> Cerrar Sesión
                                         </button>
                                     </form>
                                 </li>
@@ -102,38 +81,140 @@
                         </li>
                     {% else %}
                         <li>
-                            <a class="pg-nav-link" href="{% url 'core:login' %}">Iniciar Sesión</a>
+                            <a class="waves-effect waves-light" href="{% url 'core:login' %}">Iniciar Sesión</a>
                         </li>
                     {% endif %}
                 </ul>
             </div>
-        </div>
-    </nav>
+        </nav>
+        <!-- ===== Top-Navigation-End ===== -->
 
-    <!-- Messages -->
-    {% if messages %}
-        <div class="pg-container pg-mt-3">
-            {% for message in messages %}
-                <div class="pg-alert {% if 'error' in message.tags %}pg-alert-danger{% else %}pg-alert-{{ message.tags }}{% endif %} pg-alert-dismissible" role="alert">
-                    {{ message }}
-                    <button type="button" class="pg-alert-close" data-pg-dismiss="alert"></button>
+        <!-- ===== Left-Sidebar ===== -->
+        <aside class="sidebar" role="navigation">
+            <div class="scroll-sidebar">
+                {% if user.is_authenticated %}
+                <div class="user-profile">
+                    <div class="dropdown user-pro-body">
+                        <p class="profile-text m-t-15 font-16">
+                            <a href="{% url 'core:home' %}">{{ user.get_full_name|default:user.username }}</a>
+                        </p>
+                    </div>
                 </div>
-            {% endfor %}
+                {% endif %}
+                <nav class="sidebar-nav">
+                    <ul id="side-menu">
+                        <li>
+                            <a class="waves-effect" href="{% url 'core:home' %}" aria-expanded="false">
+                                <i class="icon-screen-desktop fa-fw"></i> <span class="hide-menu"> Inicio </span>
+                            </a>
+                        </li>
+                        {% if user.is_authenticated %}
+                            <li>
+                                <a class="waves-effect" href="{% url 'clients:list' %}" aria-expanded="false">
+                                    <i class="icon-people fa-fw"></i> <span class="hide-menu"> Clientes </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="{% url 'orders:list' %}" aria-expanded="false">
+                                    <i class="icon-basket fa-fw"></i> <span class="hide-menu"> Pedidos </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="{% url 'routes:list' %}" aria-expanded="false">
+                                    <i class="icon-map fa-fw"></i> <span class="hide-menu"> Rutas </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="{% url 'routes:truck_inventory' %}" aria-expanded="false">
+                                    <i class="icon-layers fa-fw"></i> <span class="hide-menu"> Inventarios </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="{% url 'route_confirmations:list' %}" aria-expanded="false">
+                                    <i class="icon-check fa-fw"></i> <span class="hide-menu"> Confirmaciones </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="{% url 'reminders:list' %}" aria-expanded="false">
+                                    <i class="icon-bell fa-fw"></i> <span class="hide-menu"> Recordatorios </span>
+                                </a>
+                            </li>
+                            <li>
+                                <a class="waves-effect" href="javascript:void(0);" aria-expanded="false">
+                                    <i class="icon-pie-chart fa-fw"></i> <span class="hide-menu"> Reportes </span>
+                                </a>
+                                <ul aria-expanded="false" class="collapse">
+                                    <li><a href="{% url 'report:orders_report' %}">Pedidos</a></li>
+                                    <li><a href="{% url 'report:breakdown_payment_method' %}">Reporte de Hoy</a></li>
+                                    <li><a href="{% url 'report:credit_report' %}">Crédito</a></li>
+                                    <li><a href="{% url 'report:pending_payments' %}">Pagos Vencidos</a></li>
+                                </ul>
+                            </li>
+                            {% if user.is_staff %}
+                                <li>
+                                    <a class="waves-effect" href="javascript:void(0);" aria-expanded="false">
+                                        <i class="icon-settings fa-fw"></i> <span class="hide-menu"> Administrador </span>
+                                    </a>
+                                    <ul aria-expanded="false" class="collapse">
+                                        <li><a href="{% url 'admin_orders' %}">Pedidos</a></li>
+                                        <li><a href="{% url 'admin_clients' %}">Clientes</a></li>
+                                        <li><a href="{% url 'admin_products' %}">Productos</a></li>
+                                        <li><a href="{% url 'admin_categories' %}">Categorías</a></li>
+                                        <li><a href="{% url 'admin_routes' %}">Rutas</a></li>
+                                        <li><a href="{% url 'admin_invoices' %}">Facturas</a></li>
+                                        <li><a href="{% url 'admin:billing_invoicefrequencyreport_changelist' %}">Calendario de facturación</a></li>
+                                    </ul>
+                                </li>
+                            {% endif %}
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        </aside>
+        <!-- ===== Left-Sidebar-End ===== -->
+
+        <!-- Page Content -->
+        <div class="page-wrapper">
+            <div class="container-fluid">
+                {% block breadcrumbs %}{% endblock %}
+                <!-- Messages -->
+                {% if messages %}
+                    <div class="row m-t-15">
+                        <div class="col-md-12">
+                            {% for message in messages %}
+                                <div class="alert {% if 'error' in message.tags %}alert-danger{% elif message.tags %}alert-{{ message.tags }}{% else %}alert-info{% endif %} alert-dismissible" role="alert">
+                                    <button type="button" class="close" data-dismiss="alert" aria-label="Cerrar"><span aria-hidden="true">&times;</span></button>
+                                    {{ message }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% block content %}{% endblock %}
+            </div>
+            <!-- /.container-fluid -->
+            <footer class="footer t-a-c">
+                &copy; {% now "Y" %} Gestion Purificadora. All rights reserved.
+            </footer>
         </div>
-    {% endif %}
-
-    <!-- Main Content -->
-    <main class="pg-page">
-        {% block content %}{% endblock %}
-    </main>
-
-    <footer class="pg-footer">
-        <div class="pg-container">
-            <p>&copy; {% now "Y" %} Gestion Purificadora. All rights reserved.</p>
-        </div>
-    </footer>
-
+        <!-- /#page-wrapper -->
     </div>
+    <!-- /#wrapper -->
+
+    <!-- jQuery -->
+    <script src="{% static 'core/vendor/cubic/plugins/components/jquery/dist/jquery.min.js' %}"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="{% static 'core/vendor/cubic/bootstrap/dist/js/bootstrap.min.js' %}"></script>
+    <!-- Sidebar menu plugin JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/sidebarmenu.js' %}"></script>
+    <!-- Slimscroll JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/jquery.slimscroll.js' %}"></script>
+    <!-- Wave Effects -->
+    <script src="{% static 'core/vendor/cubic/js/waves.js' %}"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/custom.js' %}"></script>
+    <!-- Project Design System JavaScript -->
     <script src="{% static 'core/js/design-system.js' %}"></script>
     {% block extra_js %}{% endblock %}
 </body>

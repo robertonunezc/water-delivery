@@ -1,236 +1,234 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-  <!-- Font Awesome -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-  <div class="pg-container pg-mt-4">
-    <!-- Header Section -->
-    <div class="pg-row pg-mb-4">
-      <div class="pg-col-md-8">
-        <h1><i class="fas fa-route pg-me-2"></i>
-          {% if employee %}
-            Mis Rutas Asignadas
-          {% else %}
-            Todas las Rutas
-          {% endif %}
-        </h1>
-        {% if has_search %}
-          <p class="pg-text-muted pg-mb-0">
-            Mostrando resultados para: <strong>"{{ search_query }}"</strong>
-          </p>
-        {% endif %}
-      </div>
-      <div class="pg-col-md-4 pg-text-md-end">
-        {% if user.is_staff %}
-          <a href="{% url 'admin:routes_route_add' %}" class="pg-button pg-button-primary">
-            <i class="fas fa-plus"></i> Nueva Ruta
-          </a>
-        {% endif %}
+  <!-- Header Section -->
+  <div class="row m-t-15">
+    <div class="col-md-12">
+      <div class="white-box">
+        <div class="row">
+          <div class="col-md-8">
+            <h3 class="box-title m-b-0"><i class="fas fa-route m-r-5"></i>
+              {% if employee %}
+                Mis Rutas Asignadas
+              {% else %}
+                Todas las Rutas
+              {% endif %}
+            </h3>
+            {% if has_search %}
+              <p class="text-muted m-b-0">
+                Mostrando resultados para: <strong>"{{ search_query }}"</strong>
+              </p>
+            {% endif %}
+          </div>
+          <div class="col-md-4 text-right m-t-10">
+            {% if user.is_staff %}
+              <a href="{% url 'admin:routes_route_add' %}" class="btn btn-info waves-effect waves-light">
+                <i class="fas fa-plus"></i> Nueva Ruta
+              </a>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- Search Form -->
-    <div class="pg-row pg-mb-4">
-      <div class="pg-col-12">
-        <form method="get" action="{% url 'routes:list' %}" class="search-form pg-mx-auto">
-          <div class="pg-input-group">
+  <!-- Search Form -->
+  <div class="row">
+    <div class="col-md-12">
+      <div class="white-box">
+        <form method="get" action="{% url 'routes:list' %}" class="search-form">
+          <div class="input-group">
             <input type="search" 
-                   class="pg-input pg-input-lg" 
+                   class="form-control" 
                    name="search" 
                    value="{{ search_query }}" 
                    placeholder="Buscar rutas por nombre, descripción o cliente..."
                    aria-label="Buscar rutas">
-            <button class="pg-button pg-button-primary" type="submit">
-              <i class="fas fa-search pg-me-2"></i>Buscar
-            </button>
-            {% if has_search %}
-              <a href="{% url 'routes:list' %}" class="pg-button pg-button-outline-secondary">
-                <i class="fas fa-times pg-me-2"></i>Limpiar
-              </a>
-            {% endif %}
+            <span class="input-group-btn">
+              <button class="btn btn-info waves-effect waves-light" type="submit">
+                <i class="fas fa-search m-r-5"></i>Buscar
+              </button>
+              {% if has_search %}
+                <a href="{% url 'routes:list' %}" class="btn btn-default waves-effect">
+                  <i class="fas fa-times m-r-5"></i>Limpiar
+                </a>
+              {% endif %}
+            </span>
           </div>
         </form>
       </div>
     </div>
+  </div>
 
-    <!-- Results Info -->
-    {% if total_routes > 0 %}
-      <div class="pg-alert pg-alert-info">
-        <i class="fas fa-info-circle pg-me-2"></i>
-        {% if has_search %}
-          Se encontraron <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} 
-          que coincide{{ total_routes|pluralize:"," }} con "<strong>{{ search_query }}</strong>"
+  <!-- Results Info -->
+  {% if total_routes > 0 %}
+    <div class="alert alert-info">
+      <i class="fas fa-info-circle m-r-5"></i>
+      {% if has_search %}
+        Se encontraron <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} 
+        que coincide{{ total_routes|pluralize:"," }} con "<strong>{{ search_query }}</strong>"
+      {% else %}
+        {% if employee %}
+          Tienes <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} asignada{{ total_routes|pluralize }}
         {% else %}
-          {% if employee %}
-            Tienes <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} asignada{{ total_routes|pluralize }}
-          {% else %}
-            Mostrando <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} en total
-          {% endif %}
+          Mostrando <strong>{{ total_routes }}</strong> ruta{{ total_routes|pluralize }} en total
         {% endif %}
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
 
-    <!-- Routes List -->
-    {% if routes %}
-      <div class="pg-row">
-        {% for route in routes %}
-          <div class="pg-col-md-6 pg-col-lg-4 pg-mb-4">
-            <div class="pg-card route-card pg-h-100">
-              <div class="pg-card-header pg-bg-primary pg-text-white">
-                <h5 class="pg-card-title pg-mb-0">
-                  <i class="fas fa-route pg-me-2"></i>{{ route.name }}
-                </h5>
+  <!-- Routes List -->
+  {% if routes %}
+    <div class="row">
+      {% for route in routes %}
+        <div class="col-md-6 col-lg-4">
+          <div class="white-box route-card">
+            <h3 class="box-title">
+              <i class="fas fa-route m-r-5 text-info"></i>{{ route.name }}
+            </h3>
+            {% if route.description %}
+              <p class="text-muted">{{ route.description|truncatechars:100 }}</p>
+            {% endif %}
+            
+            <!-- Route Stats -->
+            <div class="row text-center m-b-15">
+              <div class="col-xs-6 b-r">
+                <h4 class="text-primary m-b-0">{{ route.route_clients.count }}</h4>
+                <small class="text-muted">Clientes</small>
               </div>
-              <div class="pg-card-body">
-                {% if route.description %}
-                  <p class="pg-card-text pg-text-muted">{{ route.description|truncatechars:100 }}</p>
-                {% endif %}
-                
-                <!-- Route Stats -->
-                <div class="pg-row pg-text-center pg-mb-3">
-                  <div class="pg-col-6">
-                    <div class="pg-border-end">
-                      <h6 class="pg-text-primary">{{ route.route_clients.count }}</h6>
-                      <small class="pg-text-muted">Clientes</small>
+              <div class="col-xs-6">
+                <h4 class="text-success m-b-0">{{ route.route_employees.count }}</h4>
+                <small class="text-muted">Empleados</small>
+              </div>
+            </div>
+            
+            <!-- First few clients preview -->
+            {% if route.route_clients.all %}
+              <h5 class="font-bold m-b-10">Clientes en ruta:</h5>
+              <div class="m-b-15">
+                {% for route_client in route.route_clients.all|slice:":3" %}
+                  <div class="m-b-10">
+                    <span class="badge badge-info m-r-5">{{ route_client.sequence }}</span>
+                    <strong>{{ route_client.client.name }}</strong>
+                    <div class="small m-t-5">
+                      <span class="label label-default day-badge">{{ route_client.get_day_to_visit_display }}</span>
+                      <span class="label label-info day-badge">{{ route_client.get_frecuency_display }}</span>
                     </div>
                   </div>
-                  <div class="pg-col-6">
-                    <h6 class="pg-text-success">{{ route.route_employees.count }}</h6>
-                    <small class="pg-text-muted">Empleados</small>
-                  </div>
-                </div>
-                
-                <!-- First few clients preview -->
-                {% if route.route_clients.all %}
-                  <h6 class="pg-fw-bold pg-mb-2">Clientes en ruta:</h6>
-                  <div class="pg-mb-3">
-                    {% for route_client in route.route_clients.all|slice:":3" %}
-                      <div class="pg-flex pg-align-center pg-mb-2">
-                        <span class="client-sequence pg-me-2">{{ route_client.sequence }}</span>
-                        <div class="pg-flex-grow">
-                          <strong>{{ route_client.client.name }}</strong>
-                          <div class="pg-small">
-                            <span class="pg-badge day-badge pg-bg-secondary">{{ route_client.get_day_to_visit_display }}</span>
-                            <span class="pg-badge day-badge pg-bg-info">{{ route_client.get_frecuency_display }}</span>
-                          </div>
-                        </div>
-                      </div>
-                    {% endfor %}
-                    {% if route.route_clients.count > 3 %}
-                      <small class="pg-text-muted">
-                        y {{ route.route_clients.count|add:"-3" }} cliente{{ route.route_clients.count|add:"-3"|pluralize }} más...
-                      </small>
-                    {% endif %}
-                  </div>
-                {% else %}
-                  <p class="pg-text-muted">Sin clientes asignados</p>
+                {% endfor %}
+                {% if route.route_clients.count > 3 %}
+                  <small class="text-muted">
+                    y {{ route.route_clients.count|add:"-3" }} cliente{{ route.route_clients.count|add:"-3"|pluralize }} más...
+                  </small>
                 {% endif %}
               </div>
-              
-              <div class="pg-card-footer">
-                <div class="pg-button-group pg-w-100" role="group">
-                  <a href="{% url 'routes:detail' route.id %}" class="pg-button pg-button-primary">
-                    <i class="fas fa-eye"></i> Ver Ruta
+            {% else %}
+              <p class="text-muted">Sin clientes asignados</p>
+            {% endif %}
+            
+            <div class="m-t-15">
+              <div class="btn-group btn-group-justified" role="group">
+                <a href="{% url 'routes:detail' route.id %}" class="btn btn-info waves-effect waves-light">
+                  <i class="fas fa-eye"></i> Ver Ruta
+                </a>
+                {% if user.is_staff %}
+                  <a href="{% url 'admin:routes_route_change' route.id %}" class="btn btn-default waves-effect">
+                    <i class="fas fa-edit"></i> Editar
                   </a>
-                  {% if user.is_staff %}
-                    <a href="{% url 'admin:routes_route_change' route.id %}" class="pg-button pg-button-outline-secondary">
-                      <i class="fas fa-edit"></i> Editar
-                    </a>
-                  {% endif %}
-                </div>
+                {% endif %}
               </div>
             </div>
           </div>
-        {% endfor %}
-      </div>
-
-      <!-- Pagination -->
-      {% if routes.has_other_pages %}
-        <div class="pg-row pg-mt-4">
-          <div class="pg-col-12">
-            <nav aria-label="Navegación de páginas de rutas">
-              <ul class="pg-pagination pg-justify-center">
-                {% if routes.has_previous %}
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page=1">
-                      <i class="fas fa-angle-double-left"></i>
-                    </a>
-                  </li>
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.previous_page_number }}">
-                      <i class="fas fa-angle-left"></i>
-                    </a>
-                  </li>
-                {% endif %}
-
-                {% for page_num in routes.paginator.page_range %}
-                  {% if page_num == routes.number %}
-                    <li class="pg-page-item pg-active">
-                      <span class="pg-page-link">{{ page_num }}</span>
-                    </li>
-                  {% elif page_num > routes.number|add:'-3' and page_num < routes.number|add:'3' %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                  {% endif %}
-                {% endfor %}
-
-                {% if routes.has_next %}
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.next_page_number }}">
-                      <i class="fas fa-angle-right"></i>
-                    </a>
-                  </li>
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.paginator.num_pages }}">
-                      <i class="fas fa-angle-double-right"></i>
-                    </a>
-                  </li>
-                {% endif %}
-              </ul>
-            </nav>
-          </div>
         </div>
-      {% endif %}
+      {% endfor %}
+    </div>
 
-    {% else %}
-      <!-- Empty State -->
-      <div class="pg-text-center pg-py-5">
-        {% if has_search %}
-          <i class="fas fa-search fa-4x pg-text-muted pg-mb-3"></i>
-          <h4 class="pg-text-muted">No se encontraron rutas</h4>
-          <p class="pg-text-muted">
-            No se encontraron rutas que coincidan con "<strong>{{ search_query }}</strong>"
-          </p>
-          <a href="{% url 'routes:list' %}" class="pg-button pg-button-outline-primary">
-            <i class="fas fa-arrow-left pg-me-2"></i>Ver todas las rutas
-          </a>
-        {% else %}
-          <i class="fas fa-route fa-4x pg-text-muted pg-mb-3"></i>
-          <h4 class="pg-text-muted">
-            {% if employee %}
-              No tienes rutas asignadas
-            {% else %}
-              No hay rutas registradas
-            {% endif %}
-          </h4>
-          <p class="pg-text-muted">
-            {% if employee %}
-              Contacta con tu supervisor para que te asignen rutas
-            {% else %}
-              Comienza creando tu primera ruta
-            {% endif %}
-          </p>
-          {% if user.is_staff %}
-            <a href="{% url 'admin:routes_route_add' %}" class="pg-button pg-button-primary">
-              <i class="fas fa-plus"></i> Crear Primera Ruta
-            </a>
-          {% endif %}
-        {% endif %}
+    <!-- Pagination -->
+    {% if routes.has_other_pages %}
+      <div class="row m-t-20">
+        <div class="col-md-12 text-center">
+          <nav aria-label="Navegación de páginas de rutas">
+            <ul class="pagination m-b-0">
+              {% if routes.has_previous %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page=1">
+                    <i class="fas fa-angle-double-left"></i>
+                  </a>
+                </li>
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.previous_page_number }}">
+                    <i class="fas fa-angle-left"></i>
+                  </a>
+                </li>
+              {% endif %}
+
+              {% for page_num in routes.paginator.page_range %}
+                {% if page_num == routes.number %}
+                  <li class="active">
+                    <span>{{ page_num }}</span>
+                  </li>
+                {% elif page_num > routes.number|add:'-3' and page_num < routes.number|add:'3' %}
+                  <li>
+                    <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
+                  </li>
+                {% endif %}
+              {% endfor %}
+
+              {% if routes.has_next %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.next_page_number }}">
+                    <i class="fas fa-angle-right"></i>
+                  </a>
+                </li>
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ routes.paginator.num_pages }}">
+                    <i class="fas fa-angle-double-right"></i>
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
       </div>
     {% endif %}
-  </div>
+
+  {% else %}
+    <!-- Empty State -->
+    <div class="white-box text-center p-30">
+      {% if has_search %}
+        <i class="fas fa-search fa-4x text-muted m-b-15"></i>
+        <h4 class="text-muted">No se encontraron rutas</h4>
+        <p class="text-muted">
+          No se encontraron rutas que coincidan con "<strong>{{ search_query }}</strong>"
+        </p>
+        <a href="{% url 'routes:list' %}" class="btn btn-info btn-outline waves-effect">
+          <i class="fas fa-arrow-left m-r-5"></i>Ver todas las rutas
+        </a>
+      {% else %}
+        <i class="fas fa-route fa-4x text-muted m-b-15"></i>
+        <h4 class="text-muted">
+          {% if employee %}
+            No tienes rutas asignadas
+          {% else %}
+            No hay rutas registradas
+          {% endif %}
+        </h4>
+        <p class="text-muted">
+          {% if employee %}
+            Contacta con tu supervisor para que te asignen rutas
+          {% else %}
+            Comienza creando tu primera ruta
+          {% endif %}
+        </p>
+        {% if user.is_staff %}
+          <a href="{% url 'admin:routes_route_add' %}" class="btn btn-info waves-effect waves-light">
+            <i class="fas fa-plus"></i> Crear Primera Ruta
+          </a>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% endif %}
 {% endblock %}

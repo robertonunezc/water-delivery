@@ -4,170 +4,202 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-mt-3">
-	<div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-		<div>
-			<h1 class="pg-h3 pg-mb-1">Productos</h1>
-			<p class="pg-text-muted pg-mb-0">Vista administrativa con búsqueda y paginador.</p>
-		</div>
-		<div class="pg-flex pg-align-center pg-gap-2">
-			<a href="{% url 'admin_categories' %}" class="pg-button pg-button-outline-secondary">Categorías</a>
-			<a href="{% url 'admin_create_product' %}" class="pg-button pg-button-primary">Nuevo Producto</a>
+<div class="row m-t-15">
+	<div class="col-md-12">
+		<div class="white-box">
+			<div class="row">
+				<div class="col-sm-8">
+					<h3 class="box-title m-b-0">Productos</h3>
+					<p class="text-muted m-b-0">Vista administrativa con búsqueda y paginador.</p>
+				</div>
+				<div class="col-sm-4 text-right m-t-10">
+					<a href="{% url 'admin_categories' %}" class="btn btn-default waves-effect">Categorías</a>
+					<a href="{% url 'admin_create_product' %}" class="btn btn-info waves-effect waves-light">Nuevo Producto</a>
+				</div>
+			</div>
 		</div>
 	</div>
+</div>
 
-	<div class="metric-grid">
-		<div class="metric-card metric-orders">
-			<div class="metric-label">
-				<span class="metric-icon"><i class="fas fa-boxes-stacked"></i></span>
-				Total productos
+<div class="row">
+	<div class="col-md-3 col-sm-6">
+		<div class="white-box ecom-stat-widget">
+			<div class="row">
+				<div class="col-xs-8">
+					<span class="text-blue font-light">{{ total_products|default:0 }}</span>
+					<p class="font-12">Total productos</p>
+					<small class="text-muted">Productos registrados</small>
+				</div>
+				<div class="col-xs-4 text-right">
+					<span class="icoleaf bg-primary text-white"><i class="fas fa-boxes-stacked"></i></span>
+				</div>
 			</div>
-			<div class="metric-value">{{ total_products|default:0 }}</div>
-			<div class="metric-note">Productos registrados</div>
-		</div>
-		<div class="metric-card metric-pending">
-			<div class="metric-label">
-				<span class="metric-icon"><i class="fas fa-list-ol"></i></span>
-				Productos en página
-			</div>
-			<div class="metric-value">{{ products|length }}</div>
-			<div class="metric-note">Resultado visible</div>
-		</div>
-		<div class="metric-card metric-route">
-			<div class="metric-label">
-				<span class="metric-icon"><i class="fas fa-magnifying-glass"></i></span>
-				Con búsqueda
-			</div>
-			<div class="metric-value">{% if has_search %}Sí{% else %}No{% endif %}</div>
-			<div class="metric-note">Filtro de texto</div>
-		</div>
-		<div class="metric-card metric-neutral">
-			<div class="metric-label">
-				<span class="metric-icon"><i class="fas fa-calendar-day"></i></span>
-				Hoy
-			</div>
-			<div class="metric-value">{% now 'd/m/Y' %}</div>
-			<div class="metric-note">Fecha de consulta</div>
 		</div>
 	</div>
+	<div class="col-md-3 col-sm-6">
+		<div class="white-box ecom-stat-widget">
+			<div class="row">
+				<div class="col-xs-8">
+					<span class="text-blue font-light">{{ products|length }}</span>
+					<p class="font-12">Productos en página</p>
+					<small class="text-muted">Resultado visible</small>
+				</div>
+				<div class="col-xs-4 text-right">
+					<span class="icoleaf bg-info text-white"><i class="fas fa-list-ol"></i></span>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3 col-sm-6">
+		<div class="white-box ecom-stat-widget">
+			<div class="row">
+				<div class="col-xs-8">
+					<span class="text-blue font-light">{% if has_search %}Sí{% else %}No{% endif %}</span>
+					<p class="font-12">Con búsqueda</p>
+					<small class="text-muted">Filtro de texto</small>
+				</div>
+				<div class="col-xs-4 text-right">
+					<span class="icoleaf bg-success text-white"><i class="fas fa-magnifying-glass"></i></span>
+				</div>
+			</div>
+		</div>
+	</div>
+	<div class="col-md-3 col-sm-6">
+		<div class="white-box ecom-stat-widget">
+			<div class="row">
+				<div class="col-xs-8">
+					<span class="text-blue font-light">{% now 'd/m/Y' %}</span>
+					<p class="font-12">Hoy</p>
+					<small class="text-muted">Fecha de consulta</small>
+				</div>
+				<div class="col-xs-4 text-right">
+					<span class="icoleaf bg-warning text-white"><i class="fas fa-calendar-day"></i></span>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
 
-	<div class="pg-card dashboard-card pg-mb-3">
-		<div class="pg-card-body">
-			<form method="get" class="pg-row pg-gap-2 pg-align-end" action="{% url 'admin_products' %}">
-				<div class="pg-col-md-10">
-					<label class="pg-label" for="search">Buscar</label>
+<div class="row">
+	<div class="col-md-12">
+		<div class="white-box">
+			<form method="get" class="row" action="{% url 'admin_products' %}">
+				<div class="col-md-10 form-group">
+					<label class="control-label" for="search">Buscar</label>
 					<input
 						id="search"
 						name="search"
 						value="{{ search_query }}"
-						class="pg-input"
+						class="form-control"
 						placeholder="Nombre, notas, presentación..."
 					>
 				</div>
-				<div class="pg-col-md-2 pg-grid">
-					<button type="submit" class="pg-button pg-button-primary">Filtrar</button>
+				<div class="col-md-2 form-group m-t-25">
+					<button type="submit" class="btn btn-info btn-block waves-effect waves-light">Filtrar</button>
 				</div>
 			</form>
-			<div class="pg-mt-2">
-				<a href="{% url 'admin_products' %}" class="pg-button pg-button-sm pg-button-outline-secondary">Limpiar</a>
+			<div>
+				<a href="{% url 'admin_products' %}" class="btn btn-default btn-sm waves-effect">Limpiar</a>
 			</div>
 		</div>
 	</div>
+</div>
 
-	<div class="pg-card dashboard-card">
-		<div class="pg-table-responsive">
-			<table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
-				<thead class="pg-table-light">
-					<tr>
-						<th>ID</th>
-						<th>Orden</th>
-						<th>Nombre</th>
-						<th>Presentación</th>
-						<th>Categoría</th>
-						<th>Precio base</th>
-						<th>Estado</th>
-						<th class="pg-text-end">Acciones</th>
-					</tr>
-				</thead>
-				<tbody>
-					{% for product in products %}
+<div class="row">
+	<div class="col-md-12">
+		<div class="white-box">
+			<div class="table-responsive">
+				<table class="table table-hover">
+					<thead>
 						<tr>
-							<td>#{{ product.id }}</td>
-							<td>
-								{% if product.orden is not None %}
-									{{ product.orden }}
-								{% else %}
-									<span class="pg-text-muted">-</span>
-								{% endif %}
-							</td>
-							<td>
-								<div class="product-name">{{ product.name }}</div>
-								{% if product.note %}
-									<small class="pg-text-muted pg-inline-block text-truncate product-note">{{ product.note }}</small>
-								{% endif %}
-							</td>
-							<td>
-								{{ product.get_presentation_display }}
-							</td>
-							<td>
-								{% if product.category %}
-									{{ product.category.name }}
-								{% else %}
-									<span class="pg-text-muted">-</span>
-								{% endif %}
-							</td>
-							<td>${{ product.price|floatformat:2 }}</td>
-							<td>
-								<span class="status-pill {% if product.active %}status-active{% else %}status-inactive{% endif %}">
-									{% if product.active %}Activo{% else %}Inactivo{% endif %}
-								</span>
-							</td>
-							<td class="pg-text-end">
-								<div class="pg-dropdown">
-									<button class="pg-button pg-button-sm pg-button-outline-primary pg-dropdown-trigger" type="button" id="dropdownMenuButton_{{ product.id }}" data-pg-toggle="dropdown" aria-expanded="false">
-										Acciones
-									</button>
-									<ul class="pg-dropdown-menu" aria-labelledby="dropdownMenuButton_{{ product.id }}">
-										<li><a class="pg-dropdown-item" href="{% url 'admin_edit_product' product.pk %}?tab=basic">Editar</a></li>
-										<li><a class="pg-dropdown-item" href="{% url 'admin_edit_product' product.pk %}?tab=prices">Precios por Cliente</a></li>
-									</ul>
-								</div>
-							</td>
+							<th>ID</th>
+							<th>Orden</th>
+							<th>Nombre</th>
+							<th>Presentación</th>
+							<th>Categoría</th>
+							<th>Precio base</th>
+							<th>Estado</th>
+							<th class="text-right">Acciones</th>
 						</tr>
-					{% empty %}
-						<tr>
-							<td colspan="8" class="pg-text-center pg-py-4 pg-text-muted">No hay productos para mostrar.</td>
-						</tr>
-					{% endfor %}
-				</tbody>
-			</table>
-		</div>
+					</thead>
+					<tbody>
+						{% for product in products %}
+							<tr>
+								<td>#{{ product.id }}</td>
+								<td>
+									{% if product.orden is not None %}
+										{{ product.orden }}
+									{% else %}
+										<span class="text-muted">-</span>
+									{% endif %}
+								</td>
+								<td>
+									<div class="product-name"><strong>{{ product.name }}</strong></div>
+									{% if product.note %}
+										<small class="text-muted db product-note">{{ product.note }}</small>
+									{% endif %}
+								</td>
+								<td>
+									{{ product.get_presentation_display }}
+								</td>
+								<td>
+									{% if product.category %}
+										{{ product.category.name }}
+									{% else %}
+										<span class="text-muted">-</span>
+									{% endif %}
+								</td>
+								<td>${{ product.price|floatformat:2 }}</td>
+								<td>
+									<span class="label {% if product.active %}label-success{% else %}label-default{% endif %}">
+										{% if product.active %}Activo{% else %}Inactivo{% endif %}
+									</span>
+								</td>
+								<td class="text-right">
+									<div class="btn-group">
+										<button class="btn btn-default btn-sm dropdown-toggle" type="button" id="dropdownMenuButton_{{ product.id }}" data-toggle="dropdown" aria-expanded="false">
+											Acciones <span class="caret"></span>
+										</button>
+										<ul class="dropdown-menu dropdown-menu-right" aria-labelledby="dropdownMenuButton_{{ product.id }}">
+											<li><a href="{% url 'admin_edit_product' product.pk %}?tab=basic">Editar</a></li>
+											<li><a href="{% url 'admin_edit_product' product.pk %}?tab=prices">Precios por Cliente</a></li>
+										</ul>
+									</div>
+								</td>
+							</tr>
+						{% empty %}
+							<tr>
+								<td colspan="8" class="text-center p-20 text-muted">No hay productos para mostrar.</td>
+							</tr>
+						{% endfor %}
+					</tbody>
+				</table>
+			</div>
 
-		{% if products.has_other_pages %}
-			<div class="pg-card-footer pg-bg-white">
-				<nav>
-					<ul class="pg-pagination pg-justify-center pg-mb-0">
+			{% if products.has_other_pages %}
+				<div class="text-center m-t-20">
+					<ul class="pagination m-b-0">
 						{% if products.has_previous %}
-							<li class="pg-page-item">
-								<a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ products.previous_page_number }}">Anterior</a>
+							<li>
+								<a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ products.previous_page_number }}">Anterior</a>
 							</li>
 						{% else %}
-							<li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
+							<li class="disabled"><span>Anterior</span></li>
 						{% endif %}
 
-						<li class="pg-page-item pg-disabled"><span class="pg-page-link">Página {{ products.number }} de {{ products.paginator.num_pages }}</span></li>
+						<li class="disabled"><span>Página {{ products.number }} de {{ products.paginator.num_pages }}</span></li>
 
 						{% if products.has_next %}
-							<li class="pg-page-item">
-								<a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ products.next_page_number }}">Siguiente</a>
+							<li>
+								<a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ products.next_page_number }}">Siguiente</a>
 							</li>
 						{% else %}
-							<li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
+							<li class="disabled"><span>Siguiente</span></li>
 						{% endif %}
 					</ul>
-				</nav>
-			</div>
-		{% endif %}
+				</div>
+			{% endif %}
+		</div>
 	</div>
 </div>
 {% endblock %}

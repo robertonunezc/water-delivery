@@ -5,62 +5,62 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-px-0 client-detail-shell">
-  <section class="client-detail-header">
-    <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-gap-3">
-      <div>
-        <div class="pg-flex pg-flex-wrap pg-align-center pg-gap-2 pg-mb-2">
-          <h1 class="pg-h2 pg-mb-0">{{ client.name }}</h1>
-          <span class="pg-badge pg-bg-{% if client.active %}success{% else %}secondary{% endif %}">
+<div class="m-t-15 client-detail-shell">
+  <section class="white-box client-detail-header">
+    <div class="row">
+      <div class="col-lg-6">
+        <div class="m-b-10">
+          <h3 class="box-title m-b-0" style="display:inline-block;">{{ client.name }}</h3>
+          <span class="label label-{% if client.active %}success{% else %}default{% endif %} m-l-5">
             {% if client.active %}Activo{% else %}Inactivo{% endif %}
           </span>
-          <span class="pg-badge pg-bg-info pg-text-dark">{{ client.get_type_display }}</span>
+          <span class="label label-info m-l-5">{{ client.get_type_display }}</span>
           {% if client.corporate %}
-            <a href="{% url 'clients:detail' client.corporate.pk %}" class="pg-badge pg-bg-primary pg-text-decoration-none">
-              <i class="fas fa-building pg-me-1"></i>{{ client.corporate.name }}
+            <a href="{% url 'clients:detail' client.corporate.pk %}" class="label label-primary m-l-5">
+              <i class="fas fa-building m-r-5"></i>{{ client.corporate.name }}
             </a>
           {% endif %}
         </div>
         {% if client.note %}
-          <div class="pg-alert pg-alert-info pg-py-2 pg-mb-0">
+          <div class="alert alert-info m-b-0">
             <strong>Nota:</strong> {{ client.note }}
           </div>
         {% endif %}
       </div>
-      <div class="client-action-bar">
-        <a href="{% url 'orders:create_order' client.pk %}" class="pg-button client-header-action">
-          <i class="fas fa-plus pg-me-1"></i>Nuevo Pedido
+      <div class="col-lg-6 text-right m-t-10 client-action-bar">
+        <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-info waves-effect waves-light m-b-5 client-header-action">
+          <i class="fas fa-plus m-r-5"></i>Nuevo Pedido
         </a>
-        <a href="{% url 'reminders:create' %}?client={{ client.pk }}" class="pg-button client-header-action">
-          <i class="fas fa-bell pg-me-1"></i>NUEVO RECORDATORIO
+        <a href="{% url 'reminders:create' %}?client={{ client.pk }}" class="btn btn-default waves-effect m-b-5 client-header-action">
+          <i class="fas fa-bell m-r-5"></i>NUEVO RECORDATORIO
         </a>
         {% if request.user.is_staff and client.active %}
-          <form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}" class="pg-mb-0" target="_blank">
+          <form method="post" action="{% url 'clients:send_next_route_confirmation' client.pk %}" style="display:inline-block;" class="m-b-5" target="_blank">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <button type="submit" class="pg-button client-header-action">
-              <i class="fas fa-comment-dots pg-me-1"></i>Enviar confirmación
+            <button type="submit" class="btn btn-default waves-effect client-header-action">
+              <i class="fas fa-comment-dots m-r-5"></i>Enviar confirmación
             </button>
           </form>
         {% endif %}
-        <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button client-header-action">
-          <i class="fas fa-credit-card pg-me-1"></i>Reporte de crédito
+        <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-default waves-effect m-b-5 client-header-action">
+          <i class="fas fa-credit-card m-r-5"></i>Reporte de crédito
         </a>
         {% if client.type == 'corporate' %}
-          <a href="{% url 'clients:corporate_branches' client.pk %}" class="pg-button client-header-action">
+          <a href="{% url 'clients:corporate_branches' client.pk %}" class="btn btn-default waves-effect m-b-5 client-header-action">
             <i class="fas fa-code-branch"></i> Ver sucursales / ventas
           </a>
         {% endif %}
         {% if request.user.is_staff %}
-          <a href="{% url 'clients:edit_v2' client.pk %}" class="pg-button client-header-action">
-            <i class="fas fa-edit pg-me-1"></i>Editar Cliente
+          <a href="{% url 'clients:edit_v2' client.pk %}" class="btn btn-default waves-effect m-b-5 client-header-action">
+            <i class="fas fa-edit m-r-5"></i>Editar Cliente
           </a>
-          <a href="{% url 'admin_clients' %}" class="pg-button client-header-action">
-            <i class="fas fa-arrow-left pg-me-1"></i>Volver
+          <a href="{% url 'admin_clients' %}" class="btn btn-default waves-effect m-b-5 client-header-action">
+            <i class="fas fa-arrow-left m-r-5"></i>Volver
           </a>
         {% else %}
-          <a href="{% url 'clients:list' %}" class="pg-button client-header-action">
-            <i class="fas fa-arrow-left pg-me-1"></i>Volver
+          <a href="{% url 'clients:list' %}" class="btn btn-default waves-effect m-b-5 client-header-action">
+            <i class="fas fa-arrow-left m-r-5"></i>Volver
           </a>
         {% endif %}
       </div>
@@ -75,27 +75,25 @@
   {% endif %}
 
   {% if has_financial_risk %}
-    <section class="pg-alert pg-alert-danger client-risk-alert pg-mb-3" role="alert">
-      <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-gap-3">
-        <div>
-          <h2 class="pg-h5 pg-mb-1">¡Atención! Pagos Vencidos</h2>
-          <p class="pg-mb-0">
+    <section class="alert alert-danger client-risk-alert" role="alert">
+      <div class="row">
+        <div class="col-lg-8">
+          <h4 class="m-t-0">¡Atención! Pagos Vencidos</h4>
+          <p class="m-b-0">
             El cliente tiene <strong>${{ pending_payment_data.total_overdue_amount|floatformat:2 }}</strong>
             vencidos. Atraso máximo: <strong>{{ pending_payment_data.days_overdue }} días</strong>.
           </p>
         </div>
-        <div>
-          <div class="pg-flex pg-flex-wrap pg-gap-2">
-            <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button pg-button-outline-danger">
-              {{ credit_report_url_label }}
-            </a>
-          </div>
+        <div class="col-lg-4 text-right m-t-10">
+          <a href="{% url 'report:client_credit_report' client.pk %}" class="btn btn-danger btn-outline">
+            {{ credit_report_url_label }}
+          </a>
         </div>
       </div>
       {% if pending_payment_data.overdue_orders %}
-        <div class="pg-table-responsive pg-bg-white pg-rounded pg-mt-3">
-          <table class="pg-table pg-table-sm pg-table-hover pg-mb-0">
-            <thead class="pg-table-danger">
+        <div class="table-responsive white-box m-t-15 m-b-0">
+          <table class="table table-hover m-b-0">
+            <thead>
               <tr>
                 <th>Orden #</th>
                 <th>Fecha</th>
@@ -109,24 +107,24 @@
               {% for overdue_order in pending_payment_data.overdue_orders %}
                 <tr>
                   <td>
-                    <a href="{% url 'orders:get_order' overdue_order.id %}" class="pg-text-danger pg-fw-bold">
+                    <a href="{% url 'orders:get_order' overdue_order.id %}" class="text-danger font-bold">
                       #{{ overdue_order.id }}
                     </a>
                   </td>
                   <td>{{ overdue_order.order_date|date:"d/m/Y H:i" }}</td>
-                  <td><span class="pg-badge pg-bg-danger">{{ overdue_order.days_overdue }} días</span></td>
-                  <td class="pg-fw-bold pg-text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
+                  <td><span class="label label-danger">{{ overdue_order.days_overdue }} días</span></td>
+                  <td class="font-bold text-danger">${{ overdue_order.remaining_amount|floatformat:2 }}</td>
                   <td>
                     {% for invoice_link in overdue_order.invoice_links.all %}
-                      <a href="{% url 'admin_edit_invoice' invoice_link.invoice.id %}" class="pg-button pg-button-sm pg-button-outline-dark">
+                      <a href="{% url 'admin_edit_invoice' invoice_link.invoice.id %}" class="btn btn-default btn-sm">
                         #{{ invoice_link.invoice.id }}
                       </a>
                     {% empty %}
-                      <span class="pg-text-muted">-</span>
+                      <span class="text-muted">-</span>
                     {% endfor %}
                   </td>
                   <td>
-                    <a href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ overdue_order.id }}" class="pg-button pg-button-sm pg-button-danger">Pagar</a>
+                    <a href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ overdue_order.id }}" class="btn btn-danger btn-sm">Pagar</a>
                   </td>
                 </tr>
               {% endfor %}
@@ -138,24 +136,24 @@
   {% endif %}
 
   {% if credit_reconciliation_warning %}
-    <section class="pg-alert pg-alert-warning pg-mb-3" role="alert">
-      <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
-      <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+    <section class="alert alert-warning" role="alert">
+      <h4 class="m-t-0">Revisión de crédito requerida</h4>
+      <p class="m-b-0">{{ credit_reconciliation_warning.message }}</p>
     </section>
   {% endif %}
 
-  <section class="pg-card-grid pg-mb-4 client-snapshot-grid">
+  <section class="row client-snapshot-grid">
     {% for card in snapshot_cards %}
-      <div class="pg-card client-snapshot-card pg-h-100 pg-border-{{ card.tone }}{% if card.action_label %} client-snapshot-card-actionable{% endif %}">
-        <div class="pg-card-body">
-          <div class="client-snapshot-label">{{ card.label }}</div>
-          <div class="client-snapshot-value pg-my-1">{{ card.value }}</div>
-          <div class="pg-small client-snapshot-note">{{ card.note }}</div>
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box client-snapshot-card pg-border-{{ card.tone }}{% if card.action_label %} client-snapshot-card-actionable{% endif %}">
+          <div class="client-snapshot-label text-muted small">{{ card.label }}</div>
+          <div class="client-snapshot-value font-20 font-bold m-t-5 m-b-5">{{ card.value }}</div>
+          <div class="small client-snapshot-note text-muted">{{ card.note }}</div>
           {% if card.action_label %}
-            <div class="client-snapshot-action">
-              <a href="{% url card.action_url_name client.pk %}" class="pg-button pg-button-sm client-tile-action" title="{{ card.action_label }}" aria-label="{{ card.action_label }}">
+            <div class="client-snapshot-action m-t-10">
+              <a href="{% url card.action_url_name client.pk %}" class="btn btn-info btn-outline btn-sm client-tile-action" title="{{ card.action_label }}" aria-label="{{ card.action_label }}">
                 <i class="{{ card.action_icon }}" aria-hidden="true"></i>
-                <span class="pg-visually-hidden">{{ card.action_label }}</span>
+                <span class="sr-only">{{ card.action_label }}</span>
               </a>
             </div>
           {% endif %}
@@ -164,311 +162,318 @@
     {% endfor %}
   </section>
 
-  <section class="pg-card dashboard-card client-detail-tabs-card">
-    <div class="pg-card-body">
-      <ul class="pg-nav pg-tabs" id="client-detail-tabs" role="tablist">
-        <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab {% if active_detail_tab == 'sales' %}pg-active{% endif %}" id="sales-tab" data-pg-toggle="tab" data-pg-target="#sales-tab-pane" type="button" role="tab" aria-controls="sales-tab-pane" aria-selected="{% if active_detail_tab == 'sales' %}true{% else %}false{% endif %}">
-            Ventas
+  <section class="white-box client-detail-tabs-card">
+    <ul class="nav nav-tabs customtab pg-tabs" id="client-detail-tabs" role="tablist">
+      <li class="pg-tab-item {% if active_detail_tab == 'sales' %}active{% endif %}" role="presentation">
+        <button class="pg-tab {% if active_detail_tab == 'sales' %}pg-active{% endif %}" id="sales-tab" data-pg-toggle="tab" data-pg-target="#sales-tab-pane" type="button" role="tab" aria-controls="sales-tab-pane" aria-selected="{% if active_detail_tab == 'sales' %}true{% else %}false{% endif %}">
+          Ventas
+        </button>
+      </li>
+      <li class="pg-tab-item {% if active_detail_tab == 'payments' %}active{% endif %}" role="presentation">
+        <button class="pg-tab {% if active_detail_tab == 'payments' %}pg-active{% endif %}" id="payments-tab" data-pg-toggle="tab" data-pg-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="{% if active_detail_tab == 'payments' %}true{% else %}false{% endif %}">
+          Historial de transacciones
+        </button>
+      </li>
+      {% if request.user.is_staff %}
+        <li class="pg-tab-item {% if active_detail_tab == 'prices' %}active{% endif %}" role="presentation">
+          <button class="pg-tab {% if active_detail_tab == 'prices' %}pg-active{% endif %}" id="client-prices-tab" data-pg-toggle="tab" data-pg-target="#client-prices-tab-pane" type="button" role="tab" aria-controls="client-prices-tab-pane" aria-selected="{% if active_detail_tab == 'prices' %}true{% else %}false{% endif %}">
+            Precios por producto
           </button>
         </li>
-        <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab {% if active_detail_tab == 'payments' %}pg-active{% endif %}" id="payments-tab" data-pg-toggle="tab" data-pg-target="#payments-tab-pane" type="button" role="tab" aria-controls="payments-tab-pane" aria-selected="{% if active_detail_tab == 'payments' %}true{% else %}false{% endif %}">
-            Historial de transacciones
+      {% endif %}
+      {% if client.requires_billing %}
+        <li class="pg-tab-item {% if active_detail_tab == 'invoices' %}active{% endif %}" role="presentation">
+          <button class="pg-tab {% if active_detail_tab == 'invoices' %}pg-active{% endif %}" id="invoices-tab" data-pg-toggle="tab" data-pg-target="#invoices-tab-pane" type="button" role="tab" aria-controls="invoices-tab-pane" aria-selected="{% if active_detail_tab == 'invoices' %}true{% else %}false{% endif %}">
+            Facturas
           </button>
         </li>
-        {% if request.user.is_staff %}
-          <li class="pg-tab-item" role="presentation">
-            <button class="pg-tab {% if active_detail_tab == 'prices' %}pg-active{% endif %}" id="client-prices-tab" data-pg-toggle="tab" data-pg-target="#client-prices-tab-pane" type="button" role="tab" aria-controls="client-prices-tab-pane" aria-selected="{% if active_detail_tab == 'prices' %}true{% else %}false{% endif %}">
-              Precios por producto
-            </button>
-          </li>
-        {% endif %}
-        {% if client.requires_billing %}
-          <li class="pg-tab-item" role="presentation">
-            <button class="pg-tab {% if active_detail_tab == 'invoices' %}pg-active{% endif %}" id="invoices-tab" data-pg-toggle="tab" data-pg-target="#invoices-tab-pane" type="button" role="tab" aria-controls="invoices-tab-pane" aria-selected="{% if active_detail_tab == 'invoices' %}true{% else %}false{% endif %}">
-              Facturas
-            </button>
-          </li>
-        {% endif %}
-        <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab {% if active_detail_tab == 'routes' %}pg-active{% endif %}" id="routes-tab" data-pg-toggle="tab" data-pg-target="#routes-tab-pane" type="button" role="tab" aria-controls="routes-tab-pane" aria-selected="{% if active_detail_tab == 'routes' %}true{% else %}false{% endif %}">
-            Rutas
-          </button>
-        </li>
-        <li class="pg-tab-item" role="presentation">
-          <button class="pg-tab {% if active_detail_tab == 'profile' %}pg-active{% endif %}" id="profile-tab" data-pg-toggle="tab" data-pg-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="{% if active_detail_tab == 'profile' %}true{% else %}false{% endif %}">
-            Perfil
-          </button>
-        </li>
-      </ul>
-      <div class="tab-content">
-        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'sales' %}pg-show pg-active{% endif %}" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
-          <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-            <h2 class="pg-h5 pg-mb-0">Ventas Recientes</h2>
-            <div class="pg-flex pg-flex-wrap pg-gap-2 pg-align-center pg-justify-end">
-              {% if orders %}
-                <label class="pg-visually-hidden" for="client-order-bulk-action">Acciones masivas</label>
-                <select class="pg-select" id="client-order-bulk-action">
-                  <option value="">Acciones masivas</option>
-                  <option value="pay">Pagar seleccionados</option>
-                  {% if request.user.is_staff %}
-                    <option value="create_invoice">Crear factura</option>
-                  {% endif %}
-                  {% if receipt_signature_enabled %}
-                    <option value="send_receipts">Enviar recibos</option>
-                  {% endif %}
-                </select>
-                <button type="button" class="pg-button pg-button-primary pg-button-sm" id="apply-client-order-bulk-action" disabled>
-                  <i class="fas fa-play pg-me-1" aria-hidden="true"></i>Aplicar
-                </button>
-              {% endif %}
-              <small class="pg-text-muted">
-                {% if orders %}
-                  Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
-                {% else %}
-                  Sin ventas
-                {% endif %}
-              </small>
-            </div>
+      {% endif %}
+      <li class="pg-tab-item {% if active_detail_tab == 'routes' %}active{% endif %}" role="presentation">
+        <button class="pg-tab {% if active_detail_tab == 'routes' %}pg-active{% endif %}" id="routes-tab" data-pg-toggle="tab" data-pg-target="#routes-tab-pane" type="button" role="tab" aria-controls="routes-tab-pane" aria-selected="{% if active_detail_tab == 'routes' %}true{% else %}false{% endif %}">
+          Rutas
+        </button>
+      </li>
+      <li class="pg-tab-item {% if active_detail_tab == 'profile' %}active{% endif %}" role="presentation">
+        <button class="pg-tab {% if active_detail_tab == 'profile' %}pg-active{% endif %}" id="profile-tab" data-pg-toggle="tab" data-pg-target="#profile-tab-pane" type="button" role="tab" aria-controls="profile-tab-pane" aria-selected="{% if active_detail_tab == 'profile' %}true{% else %}false{% endif %}">
+          Perfil
+        </button>
+      </li>
+    </ul>
+
+    <div class="tab-content m-t-20">
+      <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'sales' %}active pg-show pg-active{% endif %}" id="sales-tab-pane" role="tabpanel" aria-labelledby="sales-tab" tabindex="0">
+        <div class="row m-b-15">
+          <div class="col-sm-4">
+            <h4 class="box-title m-b-0">Ventas Recientes</h4>
           </div>
-          {% if orders %}
-            <div class="pg-table-responsive">
-              <table class="pg-table pg-table-hover pg-align-middle">
-                <thead class="pg-table-light">
+          <div class="col-sm-8 text-right form-inline">
+            {% if orders %}
+              <label class="sr-only" for="client-order-bulk-action">Acciones masivas</label>
+              <select class="form-control input-sm" id="client-order-bulk-action">
+                <option value="">Acciones masivas</option>
+                <option value="pay">Pagar seleccionados</option>
+                {% if request.user.is_staff %}
+                  <option value="create_invoice">Crear factura</option>
+                {% endif %}
+                {% if receipt_signature_enabled %}
+                  <option value="send_receipts">Enviar recibos</option>
+                {% endif %}
+              </select>
+              <button type="button" class="btn btn-info btn-sm m-l-5" id="apply-client-order-bulk-action" disabled>
+                <i class="fas fa-play m-r-5" aria-hidden="true"></i>Aplicar
+              </button>
+            {% endif %}
+            <small class="text-muted m-l-10">
+              {% if orders %}
+                Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
+              {% else %}
+                Sin ventas
+              {% endif %}
+            </small>
+          </div>
+        </div>
+        {% if orders %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>
+                    <input class="pg-checkbox-input" type="checkbox" id="select-all-client-orders" aria-label="Seleccionar todos los pedidos visibles">
+                  </th>
+                  <th>ID</th>
+                  <th>Fecha</th>
+                  <th>Estado</th>
+                  <th>Total</th>
+                  <th>Productos</th>
+                  <th>Historial de Transacciones</th>
+                  <th>Estado de Pagos</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for order in orders %}
                   <tr>
-                    <th class="pg-w-10">
-                      <input class="pg-checkbox-input" type="checkbox" id="select-all-client-orders" aria-label="Seleccionar todos los pedidos visibles">
-                    </th>
-                    <th>ID</th>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Total</th>
-                    <th>Productos</th>
-                    <th>Historial de Transacciones</th>
-                    <th>Estado de Pagos</th>
-                    <th>Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for order in orders %}
-                    <tr>
-                      <td>
-                        <input
-                          class="pg-checkbox-input client-order-bulk-checkbox"
-                          type="checkbox"
-                          name="orders"
-                          value="{{ order.pk }}"
-                          form="selected-orders-payment-form"
-                          data-has-receipt="{% if order.receipt and not order.receipt.deleted_at %}true{% else %}false{% endif %}"
-                          aria-label="Seleccionar pedido #{{ order.pk }}">
-                      </td>
-                      <td>
-                        <span class="client-order-id-cell">
-                          <strong>#{{ order.id }}</strong>
-                          {% if order.notes %}
-                            <button
-                              type="button"
-                              class="pg-button pg-button-sm pg-button-outline-secondary client-order-note-trigger"
-                              data-pg-toggle="modal"
-                              data-pg-target="#order-note-modal-{{ order.pk }}"
-                              aria-label="Ver nota del pedido #{{ order.pk }}"
-                              title="Ver nota">
-                              <i class="fas fa-sticky-note" aria-hidden="true"></i>
-                              <span class="pg-visually-hidden">Ver nota</span>
-                            </button>
+                    <td>
+                      <input
+                        class="pg-checkbox-input client-order-bulk-checkbox"
+                        type="checkbox"
+                        name="orders"
+                        value="{{ order.pk }}"
+                        form="selected-orders-payment-form"
+                        data-has-receipt="{% if order.receipt and not order.receipt.deleted_at %}true{% else %}false{% endif %}"
+                        aria-label="Seleccionar pedido #{{ order.pk }}">
+                    </td>
+                    <td>
+                      <span class="client-order-id-cell">
+                        <strong>#{{ order.id }}</strong>
+                        {% if order.notes %}
+                          <button
+                            type="button"
+                            class="btn btn-default btn-xs client-order-note-trigger"
+                            data-pg-toggle="modal"
+                            data-pg-target="#order-note-modal-{{ order.pk }}"
+                            aria-label="Ver nota del pedido #{{ order.pk }}"
+                            title="Ver nota">
+                            <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                            <span class="sr-only">Ver nota</span>
+                          </button>
+                        {% endif %}
+                      </span>
+                    </td>
+                    <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
+                    <td>
+                      <span class="label label-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning{% else %}danger{% endif %}">
+                        {{ order.get_status_display_fixed }}
+                      </span>
+                    </td>
+                    <td>${{ order.total_amount|floatformat:2 }}</td>
+                    <td>
+                      <small>
+                        {% for item in order.items.all %}
+                          {{ item.product.name }} ({{ item.quantity }})<br>
+                        {% empty %}
+                          <span class="text-muted">Sin productos</span>
+                        {% endfor %}
+                      </small>
+                    </td>
+                    <td>
+                      <small>
+                        {% for payment in order.payments.all %}
+                          <span class="label label-default">#{{ payment.id }} {{ payment.get_method_display }}</span><br>
+                        {% empty %}
+                          <span class="text-muted">Sin pago</span>
+                        {% endfor %}
+                      </small>
+                    </td>
+                    <td>
+                      {% if order.status == 'CANCELLED' %}
+                        <span class="label label-danger">Revertido</span>
+                      {% else %}
+                        <span class="label label-{% if order.is_paid %}success{% else %}warning{% endif %}">
+                          {% if order.is_paid %}
+                            Pagado
+                          {% else %}
+                            Pendiente
                           {% endif %}
                         </span>
-                      </td>
-                      <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
-                      <td>
-                        <span class="pg-badge pg-bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning pg-text-dark{% else %}danger{% endif %}">
-                          {{ order.get_status_display_fixed }}
-                        </span>
-                      </td>
-                      <td>${{ order.total_amount|floatformat:2 }}</td>
-                      <td>
-                        <small>
-                          {% for item in order.items.all %}
-                            {{ item.product.name }} ({{ item.quantity }})<br>
-                          {% empty %}
-                            <span class="pg-text-muted">Sin productos</span>
-                          {% endfor %}
-                        </small>
-                      </td>
-                      <td>
-                        <small>
-                          {% for payment in order.payments.all %}
-                            <span class="pg-badge pg-bg-secondary">#{{ payment.id }} {{ payment.get_method_display }}</span><br>
-                          {% empty %}
-                            <span class="pg-text-muted">Sin pago</span>
-                          {% endfor %}
-                        </small>
-                      </td>
-                      <td>
-                        {% if order.status == 'CANCELLED' %}
-                          <span class="pg-badge pg-bg-danger">Revertido</span>
-                        {% else %}
-                          <span class="pg-badge pg-bg-{% if order.is_paid %}success{% else %}warning pg-text-dark{% endif %}">
-                            {% if order.is_paid %}
-                              Pagado
-                            {% else %}
-                              Pendiente
-                            {% endif %}
-                          </span>
-                        {% endif %}
-                      </td>
-                      <td>
-                        <div class="pg-dropdown">
-                          <button class="pg-button pg-button-sm pg-button-outline-secondary pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
-                            Acciones
-                          </button>
-                          <ul class="pg-dropdown-menu pg-dropdown-menu-end">
-                            {% if order.status == 'PENDING' %}
-                              <li><a class="pg-dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
-                            {% endif %}
-                            {% if order.status == 'COMPLETED' %}
-                              <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
-                            {% endif %}
-                            {% include 'orders/_receipt_dropdown_items.html' %}
-                            {% if not order.is_paid and order.status != 'CANCELLED' %}
-                              <li><a class="pg-dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
-                            {% endif %}
-                            <li>
-                              <button
-                                type="button"
-                                class="pg-dropdown-item pg-text-danger client-order-cancel-action"
-                                data-cancel-url="{% url 'orders:cancel_order' order.id %}"
-                                aria-label="Cancelar pedido #{{ order.id }}">
-                                Cancelar
-                              </button>
-                            </li>
-                          </ul>
-                        </div>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% for order in orders %}
-              {% if order.notes %}
-                <div class="pg-modal pg-fade" id="order-note-modal-{{ order.pk }}" tabindex="-1" aria-labelledby="order-note-modal-{{ order.pk }}-label" aria-hidden="true">
-                  <div class="pg-modal-dialog pg-modal-dialog-centered">
-                    <div class="pg-modal-content">
-                      <div class="pg-modal-header">
-                        <h3 class="pg-modal-title pg-h5" id="order-note-modal-{{ order.pk }}-label">Nota del pedido #{{ order.pk }}</h3>
-                        <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div class="pg-dropdown">
+                        <button class="btn btn-default btn-sm pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
+                          Acciones
+                        </button>
+                        <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                          {% if order.status == 'PENDING' %}
+                            <li><a class="pg-dropdown-item" href="{% url 'orders:get_order' order.id %}">Editar</a></li>
+                          {% endif %}
+                          {% if order.status == 'COMPLETED' %}
+                            <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
+                          {% endif %}
+                          {% include 'orders/_receipt_dropdown_items.html' %}
+                          {% if not order.is_paid and order.status != 'CANCELLED' %}
+                            <li><a class="pg-dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
+                          {% endif %}
+                          <li>
+                            <button
+                              type="button"
+                              class="pg-dropdown-item pg-text-danger client-order-cancel-action"
+                              data-cancel-url="{% url 'orders:cancel_order' order.id %}"
+                              aria-label="Cancelar pedido #{{ order.id }}">
+                              Cancelar
+                            </button>
+                          </li>
+                        </ul>
                       </div>
-                      <div class="pg-modal-body">
-                        {{ order.notes|linebreaksbr }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              {% endif %}
-            {% endfor %}
-            {% if orders.has_other_pages %}
-              <nav class="pg-mt-3" aria-label="Paginación de ventas del cliente">
-                <ul class="pg-pagination pg-justify-end pg-mb-0">
-                  {% if orders.has_previous %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?orders_page={{ orders.previous_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Anterior</a>
-                    </li>
-                  {% else %}
-                    <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
-                  {% endif %}
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link">Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span>
-                  </li>
-                  {% if orders.has_next %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?orders_page={{ orders.next_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Siguiente</a>
-                    </li>
-                  {% else %}
-                    <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
-                  {% endif %}
-                </ul>
-              </nav>
-            {% endif %}
-            {% if receipt_signature_enabled %}
-              <button
-                type="button"
-                class="pg-d-none"
-                id="open-receipt-bundle-modal"
-                data-pg-toggle="modal"
-                data-pg-target="#receipt-bundle-modal"
-                aria-hidden="true"
-                tabindex="-1">
-              </button>
-              <div class="pg-modal pg-fade" id="receipt-bundle-modal" tabindex="-1" aria-labelledby="receipt-bundle-modal-label" aria-hidden="true">
-                <div class="pg-modal-dialog pg-modal-dialog-centered pg-modal-dialog-scrollable">
-                  <form
-                    class="pg-modal-content"
-                    id="receipt-bundle-form"
-                    data-send-url="{% url 'clients:send_selected_order_receipts' client.pk %}">
-                    {% csrf_token %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% for order in orders %}
+            {% if order.notes %}
+              <div class="pg-modal pg-fade" id="order-note-modal-{{ order.pk }}" tabindex="-1" aria-labelledby="order-note-modal-{{ order.pk }}-label" aria-hidden="true">
+                <div class="pg-modal-dialog pg-modal-dialog-centered">
+                  <div class="pg-modal-content">
                     <div class="pg-modal-header">
-                      <h3 class="pg-modal-title" id="receipt-bundle-modal-label">Enviar recibos firmados</h3>
+                      <h3 class="pg-modal-title pg-h5" id="order-note-modal-{{ order.pk }}-label">Nota del pedido #{{ order.pk }}</h3>
                       <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
                     </div>
                     <div class="pg-modal-body">
-                      <div class="pg-mb-3">
-                        <label for="receipt-bundle-contact" class="pg-form-label">Contacto</label>
-                        <select class="pg-select" id="receipt-bundle-contact">
-                          <option value="">Capturar destinatario manualmente</option>
-                          {% for contact in contacts %}
-                            <option value="{{ contact.pk }}" data-name="{{ contact.name }}" data-email="{{ contact.email|default:'' }}">
-                              {{ contact.name }}{% if contact.email %} - {{ contact.email }}{% endif %}
-                            </option>
-                          {% endfor %}
-                        </select>
-                      </div>
-                      <div class="pg-mb-3">
-                        <label for="receipt-bundle-recipient-name" class="pg-form-label">Nombre</label>
-                        <input class="pg-input" id="receipt-bundle-recipient-name" name="recipient_name" maxlength="100" autocomplete="name">
-                      </div>
-                      <div class="pg-mb-3">
-                        <label for="receipt-bundle-recipient-email" class="pg-form-label">Correo</label>
-                        <input class="pg-input" id="receipt-bundle-recipient-email" name="recipient_email" type="email" required autocomplete="email">
-                      </div>
-                      <div class="pg-alert pg-alert-info pg-mb-3">
-                        Se adjuntarán <strong id="receipt-bundle-available-count">0</strong> recibo(s) firmado(s).
-                        Los pedidos sin recibo no bloquean el envío.
-                      </div>
-                      <div class="pg-mb-3">
-                        <strong>Recibos disponibles</strong>
-                        <ul class="pg-mb-0" id="receipt-bundle-available-orders"></ul>
-                      </div>
-                      <div class="pg-alert pg-alert-warning pg-d-none pg-mb-3" id="receipt-bundle-missing-section">
-                        <strong>Pedidos sin recibo firmado</strong>
-                        <ul class="pg-mb-1" id="receipt-bundle-missing-orders"></ul>
-                        Firma o crea estos recibos antes de intentar enviarlos.
-                      </div>
-                      <div class="pg-alert pg-d-none pg-mb-0" id="receipt-bundle-result" role="status"></div>
+                      {{ order.notes|linebreaksbr }}
                     </div>
-                    <div class="pg-modal-footer">
-                      <button type="button" class="pg-button pg-button-secondary" data-pg-dismiss="modal">Cerrar</button>
-                      <button type="submit" class="pg-button pg-button-primary" id="send-receipt-bundle">
-                        <i class="fas fa-envelope pg-me-1" aria-hidden="true"></i>Enviar
-                      </button>
-                    </div>
-                  </form>
+                  </div>
                 </div>
               </div>
             {% endif %}
-          {% else %}
-            <p class="pg-text-muted">No hay ventas registradas para este cliente.</p>
-            <a href="{% url 'orders:create_order' client.pk %}" class="pg-button pg-button-primary">
-              <i class="fas fa-plus pg-me-1"></i>Crear Primer Pedido
-            </a>
+          {% endfor %}
+          {% if orders.has_other_pages %}
+            <div class="text-right m-t-15">
+              <nav aria-label="Paginación de ventas del cliente">
+                <ul class="pagination m-b-0">
+                  {% if orders.has_previous %}
+                    <li>
+                      <a href="?orders_page={{ orders.previous_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Anterior</a>
+                    </li>
+                  {% else %}
+                    <li class="disabled"><span>Anterior</span></li>
+                  {% endif %}
+                  <li class="disabled">
+                    <span>Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span>
+                  </li>
+                  {% if orders.has_next %}
+                    <li>
+                      <a href="?orders_page={{ orders.next_page_number }}&payments_page={{ all_payment_data.number }}#sales-tab-pane">Siguiente</a>
+                    </li>
+                  {% else %}
+                    <li class="disabled"><span>Siguiente</span></li>
+                  {% endif %}
+                </ul>
+              </nav>
+            </div>
           {% endif %}
-        </div>
+          {% if receipt_signature_enabled %}
+            <button
+              type="button"
+              class="pg-d-none"
+              id="open-receipt-bundle-modal"
+              data-pg-toggle="modal"
+              data-pg-target="#receipt-bundle-modal"
+              aria-hidden="true"
+              tabindex="-1">
+            </button>
+            <div class="pg-modal pg-fade" id="receipt-bundle-modal" tabindex="-1" aria-labelledby="receipt-bundle-modal-label" aria-hidden="true">
+              <div class="pg-modal-dialog pg-modal-dialog-centered pg-modal-dialog-scrollable">
+                <form
+                  class="pg-modal-content"
+                  id="receipt-bundle-form"
+                  data-send-url="{% url 'clients:send_selected_order_receipts' client.pk %}">
+                  {% csrf_token %}
+                  <div class="pg-modal-header">
+                    <h3 class="pg-modal-title" id="receipt-bundle-modal-label">Enviar recibos firmados</h3>
+                    <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+                  </div>
+                  <div class="pg-modal-body">
+                    <div class="form-group">
+                      <label for="receipt-bundle-contact" class="control-label">Contacto</label>
+                      <select class="form-control" id="receipt-bundle-contact">
+                        <option value="">Capturar destinatario manualmente</option>
+                        {% for contact in contacts %}
+                          <option value="{{ contact.pk }}" data-name="{{ contact.name }}" data-email="{{ contact.email|default:'' }}">
+                            {{ contact.name }}{% if contact.email %} - {{ contact.email }}{% endif %}
+                          </option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label for="receipt-bundle-recipient-name" class="control-label">Nombre</label>
+                      <input class="form-control" id="receipt-bundle-recipient-name" name="recipient_name" maxlength="100" autocomplete="name">
+                    </div>
+                    <div class="form-group">
+                      <label for="receipt-bundle-recipient-email" class="control-label">Correo</label>
+                      <input class="form-control" id="receipt-bundle-recipient-email" name="recipient_email" type="email" required autocomplete="email">
+                    </div>
+                    <div class="alert alert-info m-b-15">
+                      Se adjuntarán <strong id="receipt-bundle-available-count">0</strong> recibo(s) firmado(s).
+                      Los pedidos sin recibo no bloquean el envío.
+                    </div>
+                    <div class="m-b-15">
+                      <strong>Recibos disponibles</strong>
+                      <ul class="m-b-0" id="receipt-bundle-available-orders"></ul>
+                    </div>
+                    <div class="pg-alert pg-alert-warning pg-d-none pg-mb-3" id="receipt-bundle-missing-section">
+                      <strong>Pedidos sin recibo firmado</strong>
+                      <ul class="m-b-5" id="receipt-bundle-missing-orders"></ul>
+                      Firma o crea estos recibos antes de intentar enviarlos.
+                    </div>
+                    <div class="pg-alert pg-d-none pg-mb-0" id="receipt-bundle-result" role="status"></div>
+                  </div>
+                  <div class="pg-modal-footer">
+                    <button type="button" class="btn btn-default" data-pg-dismiss="modal">Cerrar</button>
+                    <button type="submit" class="btn btn-info" id="send-receipt-bundle">
+                      <i class="fas fa-envelope m-r-5" aria-hidden="true"></i>Enviar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted">No hay ventas registradas para este cliente.</p>
+          <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-info waves-effect waves-light">
+            <i class="fas fa-plus m-r-5"></i>Crear Primer Pedido
+          </a>
+        {% endif %}
+      </div>
 
-        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'payments' %}pg-show pg-active{% endif %}" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
-          <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-            <h2 class="pg-h5 pg-mb-0">Pagos Recientes</h2>
-            <small class="pg-text-muted">
+      <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'payments' %}active pg-show pg-active{% endif %}" id="payments-tab-pane" role="tabpanel" aria-labelledby="payments-tab" tabindex="0">
+        <div class="row m-b-15">
+          <div class="col-sm-6">
+            <h4 class="box-title m-b-0">Pagos Recientes</h4>
+          </div>
+          <div class="col-sm-6 text-right">
+            <small class="text-muted">
               {% if all_payment_data %}
                 Mostrando {{ all_payment_data.start_index }}-{{ all_payment_data.end_index }} de {{ all_payment_data.paginator.count }}
               {% else %}
@@ -476,277 +481,203 @@
               {% endif %}
             </small>
           </div>
-          {% if all_payment_data %}
-            <div class="pg-table-responsive">
-              <table class="pg-table pg-table-hover pg-align-middle">
-                <thead class="pg-table-light">
+        </div>
+        {% if all_payment_data %}
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>ID</th>
+                  <th>Fecha</th>
+                  <th>Pedido</th>
+                  <th>Método/Tipo</th>
+                  <th>Estado</th>
+                  <th>Total</th>
+                  <th>Por</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for payment_data in all_payment_data %}
                   <tr>
-                    <th>Tipo</th>
-                    <th>ID</th>
-                    <th>Fecha</th>
-                    <th>Pedido</th>
-                    <th>Método/Tipo</th>
-                    <th>Estado</th>
-                    <th>Total</th>
-                    <th>Por</th>
+                    <td>
+                      {% if payment_data.type == 'payment' %}
+                        <span class="label label-primary">Transaccion de venta </span>
+                      {% elif payment_data.type == 'balance_transaction' %}
+                        <span class="label label-info">Gestion de Saldo</span>
+                      {% elif payment_data.type == 'credit_transaction' %}
+                        <span class="label label-warning">Gestión de Crédito</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="client-order-id-cell">
+                        <strong>#{{ payment_data.id }}</strong>
+                        {% if payment_data.notes %}
+                          <button
+                            type="button"
+                            class="btn btn-default btn-xs client-order-note-trigger client-payment-note-trigger"
+                            data-pg-toggle="modal"
+                            data-pg-target="#{{ payment_data.note_modal_id }}"
+                            aria-label="{{ payment_data.note_aria_label }}"
+                            title="Ver nota">
+                            <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                            <span class="sr-only">Ver nota</span>
+                          </button>
+                        {% endif %}
+                      </span>
+                    </td>
+                    <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
+                    <td>
+                      {% if payment_data.order_id %}
+                        <a href="{% url 'orders:get_order' payment_data.order_id %}">#{{ payment_data.order_id }}</a>
+                      {% else %}
+                        <span class="text-muted">N/A</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ payment_data.method }}</td>
+                    <td>
+                      <span class="label label-{{ payment_data.status_class }}">
+                        {{ payment_data.status }}
+                      </span>
+                    </td>
+                    <td class="font-bold">
+                      {% if payment_data.type == 'payment' %}
+                        {% if payment_data.is_credit_debt %}
+                          <span class="text-danger">${{ payment_data.amount|floatformat:2 }}</span>
+                        {% else %}
+                          <span class="text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                        {% endif %}
+                      {% elif payment_data.is_positive %}
+                        <span class="text-success">+${{ payment_data.amount|floatformat:2 }}</span>
+                      {% else %}
+                        <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
+                      {% endif %}
+                    </td>
+                    <td><small class="text-muted">{{ payment_data.created_by|default:"-" }}</small></td>
                   </tr>
-                </thead>
-                <tbody>
-                  {% for payment_data in all_payment_data %}
-                    <tr>
-                      <td>
-                        {% if payment_data.type == 'payment' %}
-                          <span class="pg-badge pg-bg-primary">Transaccion de venta </span>
-                        {% elif payment_data.type == 'balance_transaction' %}
-                          <span class="pg-badge pg-bg-info pg-text-dark">Gestion de Saldo</span>
-                        {% elif payment_data.type == 'credit_transaction' %}
-                          <span class="pg-badge pg-bg-warning pg-text-dark">Gestión de Crédito</span>
-                        {% endif %}
-                      </td>
-                      <td>
-                        <span class="client-order-id-cell">
-                          <strong>#{{ payment_data.id }}</strong>
-                          {% if payment_data.notes %}
-                            <button
-                              type="button"
-                              class="pg-button pg-button-sm pg-button-outline-secondary client-order-note-trigger client-payment-note-trigger"
-                              data-pg-toggle="modal"
-                              data-pg-target="#{{ payment_data.note_modal_id }}"
-                              aria-label="{{ payment_data.note_aria_label }}"
-                              title="Ver nota">
-                              <i class="fas fa-sticky-note" aria-hidden="true"></i>
-                              <span class="pg-visually-hidden">Ver nota</span>
-                            </button>
-                          {% endif %}
-                        </span>
-                      </td>
-                      <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
-                      <td>
-                        {% if payment_data.order_id %}
-                          <a href="{% url 'orders:get_order' payment_data.order_id %}" class="pg-text-decoration-none">#{{ payment_data.order_id }}</a>
-                        {% else %}
-                          <span class="pg-text-muted">N/A</span>
-                        {% endif %}
-                      </td>
-                      <td>{{ payment_data.method }}</td>
-                      <td>
-                        <span class="pg-badge pg-bg-{{ payment_data.status_class }}">
-                          {{ payment_data.status }}
-                        </span>
-                      </td>
-                      <td class="pg-fw-bold">
-                        {% if payment_data.type == 'payment' %}
-                          {% if payment_data.is_credit_debt %}
-                            <span class="pg-text-danger">${{ payment_data.amount|floatformat:2 }}</span>
-                          {% else %}
-                            <span class="pg-text-success">${{ payment_data.amount|floatformat:2 }}</span>
-                          {% endif %}
-                        {% elif payment_data.is_positive %}
-                          <span class="pg-text-success">+${{ payment_data.amount|floatformat:2 }}</span>
-                        {% else %}
-                          <span class="pg-text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
-                        {% endif %}
-                      </td>
-                      <td><small class="pg-text-muted">{{ payment_data.created_by|default:"-" }}</small></td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-            {% for payment_data in all_payment_data %}
-              {% if payment_data.notes %}
-                <div class="pg-modal pg-fade" id="{{ payment_data.note_modal_id }}" tabindex="-1" aria-labelledby="{{ payment_data.note_modal_id }}-label" aria-hidden="true">
-                  <div class="pg-modal-dialog pg-modal-dialog-centered">
-                    <div class="pg-modal-content">
-                      <div class="pg-modal-header">
-                        <h3 class="pg-modal-title pg-h5" id="{{ payment_data.note_modal_id }}-label">{{ payment_data.note_title }}</h3>
-                        <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
-                      </div>
-                      <div class="pg-modal-body">
-                        {{ payment_data.notes|linebreaksbr }}
-                      </div>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% for payment_data in all_payment_data %}
+            {% if payment_data.notes %}
+              <div class="pg-modal pg-fade" id="{{ payment_data.note_modal_id }}" tabindex="-1" aria-labelledby="{{ payment_data.note_modal_id }}-label" aria-hidden="true">
+                <div class="pg-modal-dialog pg-modal-dialog-centered">
+                  <div class="pg-modal-content">
+                    <div class="pg-modal-header">
+                      <h3 class="pg-modal-title pg-h5" id="{{ payment_data.note_modal_id }}-label">{{ payment_data.note_title }}</h3>
+                      <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="pg-modal-body">
+                      {{ payment_data.notes|linebreaksbr }}
                     </div>
                   </div>
                 </div>
-              {% endif %}
-            {% endfor %}
-            {% if all_payment_data.has_other_pages %}
-              <nav class="pg-mt-3" aria-label="Paginación de pagos del cliente">
-                <ul class="pg-pagination pg-justify-end pg-mb-0">
+              </div>
+            {% endif %}
+          {% endfor %}
+          {% if all_payment_data.has_other_pages %}
+            <div class="text-right m-t-15">
+              <nav aria-label="Paginación de pagos del cliente">
+                <ul class="pagination m-b-0">
                   {% if all_payment_data.has_previous %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.previous_page_number }}#payments-tab-pane">Anterior</a>
+                    <li>
+                      <a href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.previous_page_number }}#payments-tab-pane">Anterior</a>
                     </li>
                   {% else %}
-                    <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
+                    <li class="disabled"><span>Anterior</span></li>
                   {% endif %}
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link">Página {{ all_payment_data.number }} de {{ all_payment_data.paginator.num_pages }}</span>
+                  <li class="disabled">
+                    <span>Página {{ all_payment_data.number }} de {{ all_payment_data.paginator.num_pages }}</span>
                   </li>
                   {% if all_payment_data.has_next %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.next_page_number }}#payments-tab-pane">Siguiente</a>
+                    <li>
+                      <a href="?orders_page={{ orders.number }}&payments_page={{ all_payment_data.next_page_number }}#payments-tab-pane">Siguiente</a>
                     </li>
                   {% else %}
-                    <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
+                    <li class="disabled"><span>Siguiente</span></li>
                   {% endif %}
                 </ul>
               </nav>
-            {% endif %}
-          {% else %}
-            <p class="pg-text-muted pg-mb-0">No hay transacciones registradas para este cliente.</p>
+            </div>
           {% endif %}
-        </div>
+        {% else %}
+          <p class="text-muted m-b-0">No hay transacciones registradas para este cliente.</p>
+        {% endif %}
+      </div>
 
-        {% if request.user.is_staff %}
-          <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'prices' %}pg-show pg-active{% endif %}" id="client-prices-tab-pane" role="tabpanel" aria-labelledby="client-prices-tab" tabindex="0">
-            <form method="post" action="{% url 'clients:update_product_prices' client.pk %}" id="client-product-prices-form">
-              {% csrf_token %}
-              {{ client_product_price_formset.management_form }}
-              <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-align-lg-center pg-gap-2 pg-mb-3">
-                <h2 class="pg-h5 pg-mb-0">Precios por producto</h2>
-                <button type="submit" class="pg-button pg-button-primary pg-button-sm">
+      {% if request.user.is_staff %}
+        <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'prices' %}active pg-show pg-active{% endif %}" id="client-prices-tab-pane" role="tabpanel" aria-labelledby="client-prices-tab" tabindex="0">
+          <form method="post" action="{% url 'clients:update_product_prices' client.pk %}" id="client-product-prices-form">
+            {% csrf_token %}
+            {{ client_product_price_formset.management_form }}
+            <div class="row m-b-15">
+              <div class="col-sm-8">
+                <h4 class="box-title m-b-0">Precios por producto</h4>
+              </div>
+              <div class="col-sm-4 text-right">
+                <button type="submit" class="btn btn-success btn-sm waves-effect waves-light">
                   Guardar precios
                 </button>
               </div>
-              {% if client_product_price_formset.non_form_errors %}
-                <div class="pg-alert pg-alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
-              {% endif %}
-              {% if client_product_price_formset.forms %}
-                <div class="pg-table-responsive">
-                  <table class="pg-table pg-table-hover pg-align-middle">
-                    <thead class="pg-table-light">
-                      <tr>
-                        <th>Producto</th>
-                        <th>Presentación</th>
-                        <th>Precio base</th>
-                        <th>Precio cliente</th>
-                        <th>Activo</th>
-                        <th>Nota</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for price_form in client_product_price_formset.forms %}
-                        <tr>
-                          <td>
-                            {{ price_form.product_id }}
-                            {% if price_form.product %}
-                              <strong>{{ price_form.product.name }}</strong>
-                            {% else %}
-                              <span class="pg-text-danger">Producto no válido</span>
-                            {% endif %}
-                            {{ price_form.product_id.errors }}
-                            {{ price_form.non_field_errors }}
-                          </td>
-                          <td>
-                            {% if price_form.product %}
-                              {{ price_form.product.get_presentation_display }}
-                            {% else %}
-                              <span class="pg-text-muted">-</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            {% if price_form.product %}
-                              ${{ price_form.product.price|floatformat:2 }}
-                            {% else %}
-                              <span class="pg-text-muted">-</span>
-                            {% endif %}
-                          </td>
-                          <td>
-                            {{ price_form.price }}
-                            {{ price_form.price.errors }}
-                          </td>
-                          <td>
-                            <div class="pg-checkbox">
-                              {{ price_form.active }}
-                              <label class="pg-checkbox-label" for="{{ price_form.active.id_for_label }}">Activo</label>
-                            </div>
-                            {{ price_form.active.errors }}
-                          </td>
-                          <td>
-                            {{ price_form.note }}
-                            {{ price_form.note.errors }}
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-              {% else %}
-                <p class="pg-text-muted pg-mb-0">No hay productos activos.</p>
-              {% endif %}
-            </form>
-          </div>
-        {% endif %}
-
-        {% if client.requires_billing %}
-          <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'invoices' %}pg-show pg-active{% endif %}" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
-            <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-              <h2 class="pg-h5 pg-mb-0">Facturas</h2>
-              <small class="pg-text-muted">
-                {% if client_invoices %}
-                  {{ client_invoices|length }} registradas
-                {% else %}
-                  Sin facturas
-                {% endif %}
-              </small>
             </div>
-            {% if client_invoices %}
-              <div class="pg-table-responsive">
-                <table class="pg-table pg-table-hover pg-align-middle">
-                  <thead class="pg-table-light">
+            {% if client_product_price_formset.non_form_errors %}
+              <div class="alert alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
+            {% endif %}
+            {% if client_product_price_formset.forms %}
+              <div class="table-responsive">
+                <table class="table table-hover">
+                  <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Cliente fiscal</th>
-                      <th>Serie</th>
-                      <th>Folio</th>
-                      <th>Emisión</th>
-                      <th>Estado</th>
-                      <th>Monto</th>
-                      <th>Pagado</th>
-                      <th>Pendiente</th>
-                      <th>Acciones</th>
+                      <th>Producto</th>
+                      <th>Presentación</th>
+                      <th>Precio base</th>
+                      <th>Precio cliente</th>
+                      <th>Activo</th>
+                      <th>Nota</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {% for invoice in client_invoices %}
+                    {% for price_form in client_product_price_formset.forms %}
                       <tr>
-                        <td><strong>#{{ invoice.id }}</strong></td>
-                        <td>{{ invoice.client.name }}</td>
-                        <td><code>{{ invoice.identifier }}</code></td>
-                        <td><code>{{ invoice.folio }}</code></td>
-                        <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"-" }}</td>
                         <td>
-                          {% if invoice.status == 'ACTIVE' %}
-                            <span class="pg-badge pg-bg-success">ACTIVA</span>
-                          {% elif invoice.status == 'DRAFT' %}
-                            <span class="pg-badge pg-bg-warning">BORRADOR</span>
+                          {{ price_form.product_id }}
+                          {% if price_form.product %}
+                            <strong>{{ price_form.product.name }}</strong>
                           {% else %}
-                            <span class="pg-badge pg-bg-danger">CANCELADA</span>
+                            <span class="text-danger">Producto no válido</span>
+                          {% endif %}
+                          {{ price_form.product_id.errors }}
+                          {{ price_form.non_field_errors }}
+                        </td>
+                        <td>
+                          {% if price_form.product %}
+                            {{ price_form.product.get_presentation_display }}
+                          {% else %}
+                            <span class="text-muted">-</span>
                           {% endif %}
                         </td>
-                        <td>${{ invoice.amount|floatformat:2 }}</td>
                         <td>
-                          {% if invoice.status == 'ACTIVE' %}${{ invoice.total_payments|floatformat:2 }}{% else %}<span class="pg-text-muted">—</span>{% endif %}
-                        </td>
-                        <td class="{% if invoice.status == 'ACTIVE' and invoice.pending_amount > 0 %}pg-text-danger pg-fw-bold{% else %}pg-text-success{% endif %}">
-                          {% if invoice.status == 'ACTIVE' %}${{ invoice.pending_amount|floatformat:2 }}{% else %}<span class="pg-text-muted">—</span>{% endif %}
+                          {% if price_form.product %}
+                            ${{ price_form.product.price|floatformat:2 }}
+                          {% else %}
+                            <span class="text-muted">-</span>
+                          {% endif %}
                         </td>
                         <td>
-                          <div class="pg-flex pg-gap-2">
-                            <a href="{% url 'admin_edit_invoice' invoice.id %}" class="pg-button pg-button-sm pg-button-outline-dark" title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}" aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
-                              <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}"></i>
-                            </a>
-                            {% if request.user.is_staff and invoice.status != 'CANCELLED' %}
-                              <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
-                                {% csrf_token %}
-                                <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                <button type="submit" class="pg-button pg-button-sm pg-button-outline-danger" title="Cancelar factura" aria-label="Cancelar factura">
-                                  <i class="fas fa-ban"></i>
-                                </button>
-                              </form>
-                            {% endif %}
+                          {{ price_form.price }}
+                          {{ price_form.price.errors }}
+                        </td>
+                        <td>
+                          <div class="checkbox checkbox-info">
+                            {{ price_form.active }}
+                            <label for="{{ price_form.active.id_for_label }}">Activo</label>
                           </div>
+                          {{ price_form.active.errors }}
+                        </td>
+                        <td>
+                          {{ price_form.note }}
+                          {{ price_form.note.errors }}
                         </td>
                       </tr>
                     {% endfor %}
@@ -754,175 +685,271 @@
                 </table>
               </div>
             {% else %}
-              <p class="pg-text-muted pg-mb-0">No hay facturas vinculadas a las ventas de este cliente.</p>
+              <p class="text-muted m-b-0">No hay productos activos.</p>
             {% endif %}
+          </form>
+        </div>
+      {% endif %}
+
+      {% if client.requires_billing %}
+        <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'invoices' %}active pg-show pg-active{% endif %}" id="invoices-tab-pane" role="tabpanel" aria-labelledby="invoices-tab" tabindex="0">
+          <div class="row m-b-15">
+            <div class="col-sm-6">
+              <h4 class="box-title m-b-0">Facturas</h4>
+            </div>
+            <div class="col-sm-6 text-right">
+              <small class="text-muted">
+                {% if client_invoices %}
+                  {{ client_invoices|length }} registradas
+                {% else %}
+                  Sin facturas
+                {% endif %}
+              </small>
+            </div>
           </div>
-        {% endif %}
-
-        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'routes' %}pg-show pg-active{% endif %}" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
-          <h2 class="pg-h5 pg-mb-3">Rutas</h2>
-          {% if route_clients or upcoming_route_orders or recent_completed_routes %}
-            {% if route_clients %}
-              <h3 class="pg-h5 pg-text-primary">Rutas Regulares Asignadas</h3>
-              <div class="pg-table-responsive pg-mb-4">
-                <table class="pg-table pg-table-sm pg-align-middle">
-                  <thead class="pg-table-light">
+          {% if client_invoices %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente fiscal</th>
+                    <th>Serie</th>
+                    <th>Folio</th>
+                    <th>Emisión</th>
+                    <th>Estado</th>
+                    <th>Monto</th>
+                    <th>Pagado</th>
+                    <th>Pendiente</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for invoice in client_invoices %}
                     <tr>
-                      <th>Ruta</th>
-                      <th>Día</th>
-                      <th>Frecuencia</th>
-                      <th>Secuencia</th>
-                      <th>Vehículo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for route_client in route_clients %}
-                      <tr>
-                        <td>{{ route_client.route.name }}</td>
-                        <td>{{ route_client.route.get_weekday_display }}</td>
-                        <td>{{ route_client.get_frequency_display }}</td>
-                        <td>{{ route_client.sequence }}</td>
-                        <td>
-                          {% if route_client.route.transportation %}
-                            {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
-                          {% else %}
-                            <span class="pg-text-muted">Sin vehículo asignado</span>
+                      <td><strong>#{{ invoice.id }}</strong></td>
+                      <td>{{ invoice.client.name }}</td>
+                      <td><code>{{ invoice.identifier }}</code></td>
+                      <td><code>{{ invoice.folio }}</code></td>
+                      <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"-" }}</td>
+                      <td>
+                        {% if invoice.status == 'ACTIVE' %}
+                          <span class="label label-success">ACTIVA</span>
+                        {% elif invoice.status == 'DRAFT' %}
+                          <span class="label label-warning">BORRADOR</span>
+                        {% else %}
+                          <span class="label label-danger">CANCELADA</span>
+                        {% endif %}
+                      </td>
+                      <td>${{ invoice.amount|floatformat:2 }}</td>
+                      <td>
+                        {% if invoice.status == 'ACTIVE' %}${{ invoice.total_payments|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                      </td>
+                      <td class="{% if invoice.status == 'ACTIVE' and invoice.pending_amount > 0 %}text-danger font-bold{% else %}text-success{% endif %}">
+                        {% if invoice.status == 'ACTIVE' %}${{ invoice.pending_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                      </td>
+                      <td>
+                        <div>
+                          <a href="{% url 'admin_edit_invoice' invoice.id %}" class="btn btn-default btn-sm" title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}" aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
+                            <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}"></i>
+                          </a>
+                          {% if request.user.is_staff and invoice.status != 'CANCELLED' %}
+                            <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" style="display:inline-block;" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
+                              {% csrf_token %}
+                              <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                              <button type="submit" class="btn btn-danger btn-outline btn-sm" title="Cancelar factura" aria-label="Cancelar factura">
+                                <i class="fas fa-ban"></i>
+                              </button>
+                            </form>
                           {% endif %}
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endif %}
-
-            {% if upcoming_route_orders %}
-              <h3 class="pg-h5 pg-text-success">Próximas Visitas Programadas</h3>
-              <div class="pg-table-responsive pg-mb-4">
-                <table class="pg-table pg-table-sm pg-align-middle">
-                  <thead class="pg-table-light">
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Ruta</th>
-                      <th>Conductor</th>
-                      <th>Pedido</th>
-                      <th>Estado</th>
+                        </div>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {% for route_order in upcoming_route_orders %}
-                      <tr>
-                        <td>{{ route_order.visit_date|date:"d/m/Y" }}</td>
-                        <td>{{ route_order.route.name }} <small class="pg-text-muted">Seq: {{ route_order.sequence }}</small></td>
-                        <td>
-                          {% if route_order.route.transportation.assigned_driver %}
-                            {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
-                          {% else %}
-                            <span class="pg-text-muted">Sin asignar</span>
-                          {% endif %}
-                        </td>
-                        <td>#{{ route_order.order.id }} <small class="pg-text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small></td>
-                        <td><span class="pg-badge pg-bg-info pg-text-dark">Programado</span></td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endif %}
-
-            {% if recent_completed_routes %}
-              <h3 class="pg-h5 pg-text-secondary">Entregas Recientes Completadas</h3>
-              <div class="pg-table-responsive">
-                <table class="pg-table pg-table-sm pg-align-middle">
-                  <thead class="pg-table-light">
-                    <tr>
-                      <th>Completado</th>
-                      <th>Ruta</th>
-                      <th>Conductor</th>
-                      <th>Pedido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for route_order in recent_completed_routes %}
-                      <tr>
-                        <td>{{ route_order.completed_at|date:"d/m/Y H:i" }}</td>
-                        <td>{{ route_order.route.name }}</td>
-                        <td>
-                          {% if route_order.route.transportation.assigned_driver %}
-                            {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
-                          {% else %}
-                            <span class="pg-text-muted">N/A</span>
-                          {% endif %}
-                        </td>
-                        <td>#{{ route_order.order.id }}</td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            {% endif %}
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
           {% else %}
-            <p class="pg-text-muted pg-mb-0">Este cliente no tiene rutas asignadas actualmente.</p>
+            <p class="text-muted m-b-0">No hay facturas vinculadas a las ventas de este cliente.</p>
           {% endif %}
         </div>
+      {% endif %}
 
-        <div class="pg-tab-pane pg-fade {% if active_detail_tab == 'profile' %}pg-show pg-active{% endif %}" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
-          <div class="client-profile-grid">
-            <section class="client-profile-section">
-              <h3><i class="fas fa-user pg-me-2"></i>Contactos</h3>
+      <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'routes' %}active pg-show pg-active{% endif %}" id="routes-tab-pane" role="tabpanel" aria-labelledby="routes-tab" tabindex="0">
+        <h4 class="box-title m-b-15">Rutas</h4>
+        {% if route_clients or upcoming_route_orders or recent_completed_routes %}
+          {% if route_clients %}
+            <h5 class="text-primary">Rutas Regulares Asignadas</h5>
+            <div class="table-responsive m-b-20">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Ruta</th>
+                    <th>Día</th>
+                    <th>Frecuencia</th>
+                    <th>Secuencia</th>
+                    <th>Vehículo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for route_client in route_clients %}
+                    <tr>
+                      <td>{{ route_client.route.name }}</td>
+                      <td>{{ route_client.route.get_weekday_display }}</td>
+                      <td>{{ route_client.get_frequency_display }}</td>
+                      <td>{{ route_client.sequence }}</td>
+                      <td>
+                        {% if route_client.route.transportation %}
+                          {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
+                        {% else %}
+                          <span class="text-muted">Sin vehículo asignado</span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+
+          {% if upcoming_route_orders %}
+            <h5 class="text-success">Próximas Visitas Programadas</h5>
+            <div class="table-responsive m-b-20">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Ruta</th>
+                    <th>Conductor</th>
+                    <th>Pedido</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for route_order in upcoming_route_orders %}
+                    <tr>
+                      <td>{{ route_order.visit_date|date:"d/m/Y" }}</td>
+                      <td>{{ route_order.route.name }} <small class="text-muted">Seq: {{ route_order.sequence }}</small></td>
+                      <td>
+                        {% if route_order.route.transportation.assigned_driver %}
+                          {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                        {% else %}
+                          <span class="text-muted">Sin asignar</span>
+                        {% endif %}
+                      </td>
+                      <td>#{{ route_order.order.id }} <small class="text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small></td>
+                      <td><span class="label label-info">Programado</span></td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+
+          {% if recent_completed_routes %}
+            <h5 class="text-muted">Entregas Recientes Completadas</h5>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Completado</th>
+                    <th>Ruta</th>
+                    <th>Conductor</th>
+                    <th>Pedido</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for route_order in recent_completed_routes %}
+                    <tr>
+                      <td>{{ route_order.completed_at|date:"d/m/Y H:i" }}</td>
+                      <td>{{ route_order.route.name }}</td>
+                      <td>
+                        {% if route_order.route.transportation.assigned_driver %}
+                          {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                        {% else %}
+                          <span class="text-muted">N/A</span>
+                        {% endif %}
+                      </td>
+                      <td>#{{ route_order.order.id }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        {% else %}
+          <p class="text-muted m-b-0">Este cliente no tiene rutas asignadas actualmente.</p>
+        {% endif %}
+      </div>
+
+      <div class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'profile' %}active pg-show pg-active{% endif %}" id="profile-tab-pane" role="tabpanel" aria-labelledby="profile-tab" tabindex="0">
+        <div class="row client-profile-grid">
+          <section class="col-md-6 m-b-20 client-profile-section">
+            <div class="well well-sm">
+              <h4 class="m-t-0"><i class="fas fa-user m-r-5"></i>Contactos</h4>
               {% if contacts %}
                 {% for contact in contacts %}
-                  <div class="pg-border-bottom pg-pb-2 pg-mb-2">
+                  <div class="b-b p-b-10 m-b-10">
                     <strong>{{ contact.name }}</strong>
-                    {% if contact.position %}<small class="pg-text-muted pg-block">{{ contact.position }}</small>{% endif %}
-                    {% if contact.phone %}<div><i class="fas fa-phone pg-me-1"></i>{{ contact.phone }}</div>{% endif %}
-                    {% if contact.email %}<div><i class="fas fa-envelope pg-me-1"></i>{{ contact.email }}</div>{% endif %}
+                    {% if contact.position %}<small class="text-muted db">{{ contact.position }}</small>{% endif %}
+                    {% if contact.phone %}<div><i class="fas fa-phone m-r-5"></i>{{ contact.phone }}</div>{% endif %}
+                    {% if contact.email %}<div><i class="fas fa-envelope m-r-5"></i>{{ contact.email }}</div>{% endif %}
                   </div>
                 {% endfor %}
               {% else %}
-                <p class="pg-text-muted pg-mb-0">Sin contacto principal</p>
+                <p class="text-muted m-b-0">Sin contacto principal</p>
               {% endif %}
-            </section>
+            </div>
+          </section>
 
-            <section class="client-profile-section client-header-addresses">
-              <h3><i class="fas fa-map-marker-alt pg-me-2"></i>Direcciones</h3>
+          <section class="col-md-6 m-b-20 client-profile-section client-header-addresses">
+            <div class="well well-sm">
+              <h4 class="m-t-0"><i class="fas fa-map-marker-alt m-r-5"></i>Direcciones</h4>
               {% if addresses %}
                 {% for address in addresses %}
-                  <div class="pg-border-bottom pg-pb-2 pg-mb-2">
-                    <span class="pg-badge pg-bg-secondary pg-mb-1">{{ address.get_type_display }}</span>
+                  <div class="b-b p-b-10 m-b-10">
+                    <span class="label label-default m-b-5">{{ address.get_type_display }}</span>
                     <div>{{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
                   </div>
                 {% endfor %}
                 {% if client.address_link %}
-                  <a href="{{ client.address_link }}" target="_blank" class="pg-button pg-button-outline-primary pg-button-sm">
-                    <i class="fas fa-map-marker-alt pg-me-1"></i>Ver Ubicación en Google Maps
+                  <a href="{{ client.address_link }}" target="_blank" class="btn btn-info btn-outline btn-sm">
+                    <i class="fas fa-map-marker-alt m-r-5"></i>Ver Ubicación en Google Maps
                   </a>
                 {% endif %}
               {% else %}
-                <p class="pg-text-muted pg-mb-0">Sin dirección activa</p>
+                <p class="text-muted m-b-0">Sin dirección activa</p>
               {% endif %}
-            </section>
+            </div>
+          </section>
 
-            {% if client.type == 'corporate' %}
-              <section class="client-profile-section">
-                <h3><i class="fas fa-code-branch pg-me-2"></i>Sucursales</h3>
+          {% if client.type == 'corporate' %}
+            <section class="col-md-6 m-b-20 client-profile-section">
+              <div class="well well-sm">
+                <h4 class="m-t-0"><i class="fas fa-code-branch m-r-5"></i>Sucursales</h4>
                 {% if branches %}
                   {% for branch in branches %}
-                    <div class="pg-flex pg-justify-between pg-gap-2 pg-border-bottom pg-pb-2 pg-mb-2">
-                      <a href="{% url 'clients:detail' branch.pk %}" class="pg-fw-semibold pg-text-decoration-none">{{ branch.name }}</a>
-                      <span class="pg-badge pg-bg-{% if branch.active %}success{% else %}secondary{% endif %}">{% if branch.active %}Activo{% else %}Inactivo{% endif %}</span>
+                    <div class="row b-b p-b-10 m-b-10">
+                      <div class="col-xs-8">
+                        <a href="{% url 'clients:detail' branch.pk %}" class="font-bold">{{ branch.name }}</a>
+                      </div>
+                      <div class="col-xs-4 text-right">
+                        <span class="label label-{% if branch.active %}success{% else %}default{% endif %}">{% if branch.active %}Activo{% else %}Inactivo{% endif %}</span>
+                      </div>
                     </div>
                   {% endfor %}
                 {% else %}
-                  <p class="pg-text-muted pg-mb-0">No hay sucursales registradas.</p>
+                  <p class="text-muted m-b-0">No hay sucursales registradas.</p>
                 {% endif %}
-              </section>
-            {% endif %}
+              </div>
+            </section>
+          {% endif %}
 
-            <section class="client-profile-section">
-              <h3><i class="fas fa-file-invoice-dollar pg-me-2"></i>Datos Fiscales</h3>
+          <section class="col-md-6 m-b-20 client-profile-section">
+            <div class="well well-sm">
+              <h4 class="m-t-0"><i class="fas fa-file-invoice-dollar m-r-5"></i>Datos Fiscales</h4>
               {% if client.type == 'branch' and client.corporate %}
-                <p class="pg-text-muted pg-mb-0">
+                <p class="text-muted m-b-0">
                   Esta sucursal hereda los datos fiscales de
                   <a href="{% url 'clients:detail' client.corporate.pk %}">{{ client.corporate.name }}</a>.
                 </p>
@@ -930,62 +957,66 @@
                 <div><strong>RFC:</strong> {{ billing_data.rfc }}</div>
                 <div><strong>Razón Social:</strong> {{ billing_data.razon_social }}</div>
               {% else %}
-                <p class="pg-text-muted pg-mb-0">Sin datos fiscales configurados</p>
+                <p class="text-muted m-b-0">Sin datos fiscales configurados</p>
               {% endif %}
-            </section>
+            </div>
+          </section>
 
-            <section class="client-profile-section">
-              <h3><i class="fas fa-calendar-alt pg-me-2"></i>Frecuencia de Facturación</h3>
+          <section class="col-md-6 m-b-20 client-profile-section">
+            <div class="well well-sm">
+              <h4 class="m-t-0"><i class="fas fa-calendar-alt m-r-5"></i>Frecuencia de Facturación</h4>
               {% if billing_frequency %}
                 <div><strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}</div>
                 <div><strong>Tipo de Fecha:</strong> {{ billing_frequency.get_billing_date_display }}</div>
                 <div>
                   <strong>Estado:</strong>
-                  <span class="pg-badge pg-bg-{% if billing_frequency.is_active %}success{% else %}secondary{% endif %}">
+                  <span class="label label-{% if billing_frequency.is_active %}success{% else %}default{% endif %}">
                     {% if billing_frequency.is_active %}Activo{% else %}Inactivo{% endif %}
                   </span>
                 </div>
                 {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
-                  <div class="pg-mt-2">
+                  <div class="m-t-10">
                     <strong>Próxima Facturación:</strong>
-                    <span class="pg-text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
+                    <span class="text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
                   </div>
                 {% endif %}
                 {% if billing_frequency.notes %}
-                  <p class="pg-small pg-text-muted pg-mt-2 pg-mb-0">{{ billing_frequency.notes }}</p>
+                  <p class="small text-muted m-t-10 m-b-0">{{ billing_frequency.notes }}</p>
                 {% endif %}
               {% else %}
-                <p class="pg-text-muted pg-mb-0">Sin frecuencia configurada</p>
+                <p class="text-muted m-b-0">Sin frecuencia configurada</p>
               {% endif %}
-            </section>
+            </div>
+          </section>
 
-            <section class="client-profile-section">
-              <h3><i class="fas fa-credit-card pg-me-2"></i>Crédito</h3>
+          <section class="col-md-6 m-b-20 client-profile-section">
+            <div class="well well-sm">
+              <h4 class="m-t-0"><i class="fas fa-credit-card m-r-5"></i>Crédito</h4>
               {% if credit_account.credit_limit > 0 %}
                 {% if credit_is_inherited %}
-                  <div class="pg-text-muted pg-mb-2">Crédito administrado por {{ credit_account.name }}</div>
+                  <div class="text-muted m-b-10">Crédito administrado por {{ credit_account.name }}</div>
                 {% endif %}
                 <div><strong>Límite:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
                 <div><strong>Disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
                 <div><strong>Uso:</strong> {{ debt_percentage }}%</div>
-                <div class="pg-mt-2">
+                <div class="m-t-10">
                   <strong>Ciclo de vencimiento:</strong>
                   {% if effective_credit_config and effective_credit_config.payment_term_type == 'monthly_cutoff' %}
                     {{ effective_credit_config.get_cutoff_day_display }}
                   {% elif effective_credit_config and effective_credit_config.payment_term_type == 'invoice_due' %}
                     {{ effective_credit_config.max_payment_days }} días después de emitir la factura
                   {% else %}
-                    <span class="pg-text-muted">Sin configuración</span>
+                    <span class="text-muted">Sin configuración</span>
                   {% endif %}
                 </div>
                 {% if pending_payment_data.nearest_due_date %}
                   <div><strong>Próximo vencimiento:</strong> {{ pending_payment_data.nearest_due_date|date:"d/m/Y" }}</div>
                 {% endif %}
               {% else %}
-                <p class="pg-text-muted pg-mb-0">Sin crédito habilitado</p>
+                <p class="text-muted m-b-0">Sin crédito habilitado</p>
               {% endif %}
-            </section>
-          </div>
+            </div>
+          </section>
         </div>
       </div>
     </div>

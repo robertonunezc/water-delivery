@@ -13,239 +13,215 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-py-2">
-    <div class="pg-row">
-        <div class="pg-col-12">
-            <div class="pg-card compact-card">
-                <div class="pg-card-header {% if is_today_view %}pg-bg-primary pg-text-white{% endif %}">
-                    
-                    <div class="pg-card-tools">
-                       <div class="pg-flex pg-flex-wrap pg-align-center pg-justify-between pg-mb-2">
-                                <div class="pg-flex pg-align-center pg-flex-wrap">
-                                    <h5 class="pg-mb-0 pg-me-3">{{ route.name }}</h5>
-                                    <span class="pg-badge pg-bg-info pg-me-2">{{ route.get_weekday_display }}</span>
-                                    <small class="pg-text-muted">{{ route.description|default:"No description" }}</small>
-                                </div>
-                                <div class="pg-flex pg-align-center pg-gap-2 pg-flex-wrap">
-                                    {% if inventory_status %}
-                                        <a href="{{ inventory_status.url }}" class="pg-button pg-button-sm pg-button-outline-primary">
-                                            <i class="fas fa-boxes-stacked pg-me-1"></i>
-                                            Inventario de camioneta
-                                            <span class="pg-badge {% if inventory_status.has_differences %}pg-bg-danger{% elif inventory_status.session %}pg-bg-success{% else %}pg-bg-secondary{% endif %} pg-ms-1">
-                                                {{ inventory_status.status }}
-                                            </span>
-                                        </a>
+<div class="row m-t-15">
+    <div class="col-md-12">
+        <div class="white-box compact-card">
+            <div class="row m-b-15">
+                <div class="col-sm-7">
+                    <h3 class="box-title m-b-0" style="display:inline-block;">{{ route.name }}</h3>
+                    <span class="label label-info m-l-10">{{ route.get_weekday_display }}</span>
+                    <small class="text-muted m-l-10">{{ route.description|default:"No description" }}</small>
+                </div>
+                <div class="col-sm-5 text-right">
+                    {% if inventory_status %}
+                        <a href="{{ inventory_status.url }}" class="btn btn-info btn-outline btn-sm waves-effect">
+                            <i class="fas fa-boxes-stacked m-r-5"></i>
+                            Inventario de camioneta
+                            <span class="label {% if inventory_status.has_differences %}label-danger{% elif inventory_status.session %}label-success{% else %}label-default{% endif %} m-l-5">
+                                {{ inventory_status.status }}
+                            </span>
+                        </a>
+                    {% endif %}
+                    {% if not is_today_view %}
+                        <span class="label label-default m-l-10">
+                            <i class="fas fa-users m-r-5"></i>
+                            {% if route_clients %}{{ route_clients|length }}{% elif regular_clients %}{{ regular_clients|length }}{% else %}0{% endif %} clients
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Route Info -->
+            <div class="row m-b-15">
+                <div class="col-md-12">
+                    <div class="well well-sm m-b-0">
+                        <span class="m-r-20">
+                            <i class="fas fa-truck m-r-5"></i>
+                            <strong>{{ route.transportation.license_plate }}</strong>
+                        </span>
+                        <span class="m-r-20">
+                            <i class="fas fa-car m-r-5"></i>
+                            <span>{{ route.transportation.model }}</span>
+                        </span>
+                        <span class="m-r-20">
+                            <i class="fas fa-tint m-r-5"></i>
+                            <span>{{ route.transportation.capacity_liters }}L</span>
+                        </span>
+                        {% if route.transportation.assigned_driver %}
+                            <span>
+                                <i class="fas fa-user m-r-5"></i>
+                                <span>{{ route.transportation.assigned_driver.user.get_full_name }}</span>
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Regular Clients -->
+            <h4 class="box-title m-b-10"><i class="fas fa-users"></i> Clientes en Ruta</h4>
+            <form method="get" class="m-b-15">
+                <div class="row">
+                    <div class="col-xs-12 col-md-6">
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-addon"><i class="fas fa-search"></i></span>
+                            <input
+                                type="text"
+                                name="q"
+                                class="form-control"
+                                placeholder="Buscar por cliente"
+                                value="{{ search_query|default:'' }}"
+                            >
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-info waves-effect waves-light">Buscar</button>
+                                {% if search_query %}
+                                    <a href="{% url 'routes:detail' route.id %}" class="btn btn-default waves-effect">Limpiar</a>
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% if search_query %}
+                        <div class="col-xs-12 col-md-6 text-right m-t-5">
+                            <small class="text-muted">
+                                Mostrando {{ route_clients|length }} resultado{{ route_clients|length|pluralize }} para "{{ search_query }}"
+                            </small>
+                        </div>
+                    {% endif %}
+                </div>
+            </form>
+            {% if route_clients %}
+                <div class="table-responsive route-client-table-wrapper">
+                    <table class="table table-striped table-hover compact-table route-client-table">
+                        <thead>
+                            <tr>
+                                <th>Cliente</th>
+                                <th>Último Pedido</th>
+                                <th>Saldo/Crédito</th>
+                                <th>Productos y Precio</th>
+                                <th>Confirmación</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for route_client in route_clients %}
+                            <tr class="route-client-row">
+                                <td class="route-client-name-cell" data-label="Cliente">
+                                    <div class="route-client-mobile-heading">
+                                        <span class="badge badge-info route-client-sequence-pill">#{{ route_client.sequence }}</span>
+                                        <strong>{{ route_client.client.name }}</strong>
+                                        {% if route_client.active_reminders_count %}
+                                            <a href="{% url 'reminders:list' %}?status=activos&client={{ route_client.client.id }}"
+                                               class="label label-warning m-l-5"
+                                               title="Ver recordatorios activos"
+                                               aria-label="{{ route_client.active_reminders_count }} recordatorios activos">
+                                                <i class="fas fa-bell m-r-5" aria-hidden="true"></i>{{ route_client.active_reminders_count }}
+                                            </a>
+                                        {% endif %}
+                                    </div>
+                                    {% if not route_client.client.active %}
+                                        <span class="label label-warning">Inactivo</span>
                                     {% endif %}
-                                {% if not is_today_view %}
-                                    <div class="pg-flex pg-align-center pg-ms-2">
-                                        <i class="fas fa-users pg-me-1"></i>
-                                        <span class="pg-badge pg-bg-secondary">
-                                            {% if route_clients %}{{ route_clients|length }}{% elif regular_clients %}{{ regular_clients|length }}{% else %}0{% endif %} clients
+                                </td>
+                                <td class="route-client-last-order-cell" data-label="Último Pedido">
+                                    {% with route_client.client.recent_orders|first as last_order %}
+                                        {% if last_order %}
+                                            <div class="route-last-order {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}route-last-order-today{% endif %}">
+                                                <span class="pg-badge pg-badge-info label label-info route-last-order-status" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
+                                                    {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}
+                                                        HOY
+                                                    {% else %}
+                                                        {{ last_order.created_at|timesince }}
+                                                    {% endif %}
+                                                </span>
+                                                <span class="route-last-order-date">{{ last_order.created_at|date:"d/m/Y H:i" }}</span>
+                                            </div>
+                                        {% else %}
+                                            <span class="label label-default route-last-order-status">Sin pedidos</span>
+                                        {% endif %}
+                                    {% endwith %}
+                                </td>
+                                <td class="route-client-finance-cell" data-label="Saldo/Crédito">
+                                    <div class="m-b-5">
+                                        <small class="text-muted">Saldo:</small>
+                                        <span class="label {% if route_client.client.balance > 0 %}label-success{% else %}label-default{% endif %}">
+                                            ${{ route_client.client.balance|floatformat:2 }}
                                         </span>
                                     </div>
-                                {% endif %}
-                                </div>
-                            </div>
-                    </div>
-                </div>
-                <div class="pg-card-body">
-                    <!-- Route Info -->
-                    <div class="pg-row pg-mb-2">
-                        <!-- Route Summary - Horizontal Layout -->
-                        <div class="pg-col-12">
-                          
-                            
-                            <!-- Transportation Info - Inline -->
-                            <div class="pg-flex pg-flex-wrap pg-align-center pg-text-sm">
-                                <div class="pg-me-4">
-                                    <i class="fas fa-truck pg-me-1"></i>
-                                    <strong>{{ route.transportation.license_plate }}</strong>
-                                </div>
-                                <div class="pg-me-4">
-                                    <i class="fas fa-car pg-me-1"></i>
-                                    <span>{{ route.transportation.model }}</span>
-                                </div>
-                                <div class="pg-me-4">
-                                    <i class="fas fa-tint pg-me-1"></i>
-                                    <span>{{ route.transportation.capacity_liters }}L</span>
-                                </div>
-                                {% if route.transportation.assigned_driver %}
-                                    <div class="pg-me-4">
-                                        <i class="fas fa-user pg-me-1"></i>
-                                        <span>{{ route.transportation.assigned_driver.user.get_full_name }}</span>
+                                    <div>
+                                        <small class="text-muted">Crédito:</small>
+                                        <span class="label {% if route_client.client.current_debt > 0 %}label-warning{% else %}label-info{% endif %}">
+                                            ${{ route_client.client.current_debt|floatformat:2 }} / ${{ route_client.client.credit_limit|floatformat:2 }}
+                                        </span>
                                     </div>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Regular Clients -->
-                    <h5 class="pg-mb-2"><i class="fas fa-users"></i> Clientes en Ruta</h5>
-                    <form method="get" class="pg-mb-3">
-                        <div class="pg-row pg-gap-2 pg-align-center">
-                            <div class="pg-col-12 pg-col-md-6">
-                                <div class="pg-input-group pg-input-group-sm">
-                                    <span class="pg-input-group-text"><i class="fas fa-search"></i></span>
-                                    <input
-                                        type="text"
-                                        name="q"
-                                        class="pg-input"
-                                        placeholder="Buscar por cliente"
-                                        value="{{ search_query|default:'' }}"
-                                    >
-                                    <button type="submit" class="pg-button pg-button-primary">Buscar</button>
-                                    {% if search_query %}
-                                        <a href="{% url 'routes:detail' route.id %}" class="pg-button pg-button-outline-secondary">Limpiar</a>
+                                </td>
+                                <td class="route-client-products-cell" data-label="Productos y Precio">
+                                    {% if route_client.client.product_prices.all %}
+                                        {% for product_price in route_client.client.product_prices.all %}
+                                            <div class="m-b-5">
+                                                <strong>{{ product_price.product.name }}</strong>
+                                                <span class="text-muted">{{ product_price.product.get_presentation_display }}</span>
+                                                - <span class="text-success">${{ product_price.price|floatformat:2 }}</span>
+                                            </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <span class="text-muted">Sin productos asignados</span>
                                     {% endif %}
-                                </div>
-                            </div>
-                            {% if search_query %}
-                                <div class="pg-col-12 pg-col-md-6 pg-text-md-end">
-                                    <small class="pg-text-muted">
-                                        Mostrando {{ route_clients|length }} resultado{{ route_clients|length|pluralize }} para "{{ search_query }}"
-                                    </small>
-                                </div>
-                            {% endif %}
-                        </div>
-                    </form>
-                    {% if route_clients %}
-                        <div class="pg-table-responsive route-client-table-wrapper">
-                            <table class="pg-table pg-table-striped pg-table-hover compact-table route-client-table">
-                                <thead class="pg-table-dark">
-                                    <tr>
-                                        <th>Cliente</th>
-                                        <th>Último Pedido</th>
-                                        <th>Saldo/Crédito</th>
-                                        <th>Productos y Precio</th>
-                                        <th>Confirmación</th>
-                                        <th>Acciones</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for route_client in route_clients %}
-                                    <tr class="route-client-row">
-                                        <td class="route-client-name-cell" data-label="Cliente">
-                                            <div class="route-client-mobile-heading">
-                                                <span class="route-client-sequence-pill">#{{ route_client.sequence }}</span>
-                                                <strong>{{ route_client.client.name }}</strong>
-                                                {% if route_client.active_reminders_count %}
-                                                    <a href="{% url 'reminders:list' %}?status=activos&client={{ route_client.client.id }}"
-                                                       class="pg-badge pg-bg-warning pg-text-dark pg-text-decoration-none pg-ms-2"
-                                                       title="Ver recordatorios activos"
-                                                       aria-label="{{ route_client.active_reminders_count }} recordatorios activos">
-                                                        <i class="fas fa-bell pg-me-1" aria-hidden="true"></i>{{ route_client.active_reminders_count }}
-                                                    </a>
-                                                {% endif %}
-                                            </div>
-                                            {% if not route_client.client.active %}
-                                                <span class="pg-badge pg-badge-warning">Inactivo</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="route-client-last-order-cell" data-label="Último Pedido">
-                                            {% with route_client.client.recent_orders|first as last_order %}
-                                                {% if last_order %}
-                                                    <div class="route-last-order {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}route-last-order-today{% endif %}">
-                                                        <span class="pg-badge pg-badge-info route-last-order-status" data-order-date="{{ last_order.created_at|date:'Y-m-d' }}">
-                                                            {% if last_order.created_at|date:'Y-m-d' == today|date:'Y-m-d' %}
-                                                                HOY
-                                                            {% else %}
-                                                                {{ last_order.created_at|timesince }}
-                                                            {% endif %}
-                                                        </span>
-                                                        <span class="route-last-order-date">{{ last_order.created_at|date:"d/m/Y H:i" }}</span>
-                                                    </div>
-                                                {% else %}
-                                                    <span class="pg-badge pg-badge-secondary route-last-order-status">Sin pedidos</span>
-                                                {% endif %}
-                                            {% endwith %}
-                                        </td>
-                                        <td class="route-client-finance-cell" data-label="Saldo/Crédito">
-                                            <div class="pg-mb-1">
-                                                <small class="pg-text-muted">Saldo:</small>
-                                                <span class="pg-badge {% if route_client.client.balance > 0 %}pg-bg-success{% else %}pg-bg-secondary{% endif %}">
-                                                    ${{ route_client.client.balance|floatformat:2 }}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <small class="pg-text-muted">Crédito:</small>
-                                                <span class="pg-badge {% if route_client.client.current_debt > 0 %}pg-bg-warning{% else %}pg-bg-info{% endif %}">
-                                                    ${{ route_client.client.current_debt|floatformat:2 }} / ${{ route_client.client.credit_limit|floatformat:2 }}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td class="route-client-products-cell" data-label="Productos y Precio">
-                                            {% if route_client.client.product_prices.all %}
-                                                {% for product_price in route_client.client.product_prices.all %}
-                                                    <div class="pg-mb-1">
-                                                        <strong>{{ product_price.product.name }}</strong>
-                                                        <span class="pg-text-muted">{{ product_price.product.get_presentation_display }}</span>
-                                                        - <span class="pg-text-success">${{ product_price.price|floatformat:2 }}</span>
-                                                    </div>
-                                                {% endfor %}
-                                            {% else %}
-                                                <span class="pg-text-muted">Sin productos asignados</span>
-                                            {% endif %}
-                                        </td>
-                                        <td class="route-client-confirmation-cell" data-label="Confirmación">
-                                            {% with state=route_client.visit_confirmation_state %}
-                                                <div class="pg-mb-1">
-                                                    <span class="pg-badge {{ state.badge_class }}">{{ state.display_status }}</span>
-                                                </div>
-                                                <small class="pg-text-muted">Visita: {{ state.visit_date|date:"d/m/Y" }}</small>
-                                                <form method="post" action="{% url 'route_confirmations:send' route_client.id %}" class="pg-mt-1" target="_blank">
-                                                    {% csrf_token %}
-                                                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
-                                                    <button
-                                                        type="submit"
-                                                        class="pg-button pg-button-sm {% if state.can_send %}pg-button-outline-primary{% else %}pg-button-outline-secondary{% endif %}"
-                                                        {% if not state.can_send %}disabled{% endif %}
-                                                    >
-                                                        {{ state.action_label }}
-                                                    </button>
-                                                </form>
-                                            {% endwith %}
-                                        </td>
-                                        <td class="route-client-actions-cell" data-label="Acciones">
-                                            <div class="pg-button-group route-client-actions-primary" role="group">
-                                                <a href="{% url 'clients:detail' route_client.client.id %}"
-                                                   class="pg-button pg-button-sm pg-button-info"
-                                                   title="Ver detalles del cliente">
-                                                    <i class="fas fa-eye"></i>
-                                                    Información
-                                                </a>
-                                                <a href="{% url 'orders:create_order' route_client.client.id %}"
-                                                   class="pg-button pg-button-sm pg-button-success"
-                                                   title="Crear pedido">
-                                                    <i class="fas fa-plus-circle"></i>
-                                                    Vender
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="pg-alert pg-alert-info">
-                            <h6>No {% if is_today_view %}regular {% endif %}clients</h6>
-                            <p>This route doesn't have any {% if is_today_view %}regular {% endif %}clients assigned yet.</p>
-                        </div>
-                    {% endif %}
+                                </td>
+                                <td class="route-client-confirmation-cell" data-label="Confirmación">
+                                    {% with state=route_client.visit_confirmation_state %}
+                                        <div class="m-b-5">
+                                            <span class="pg-badge {{ state.badge_class }}">{{ state.display_status }}</span>
+                                        </div>
+                                        <small class="text-muted">Visita: {{ state.visit_date|date:"d/m/Y" }}</small>
+                                        <form method="post" action="{% url 'route_confirmations:send' route_client.id %}" class="m-t-5" target="_blank">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                            <button
+                                                type="submit"
+                                                class="btn btn-sm {% if state.can_send %}btn-info btn-outline{% else %}btn-default{% endif %}"
+                                                {% if not state.can_send %}disabled{% endif %}
+                                            >
+                                                {{ state.action_label }}
+                                            </button>
+                                        </form>
+                                    {% endwith %}
+                                </td>
+                                <td class="route-client-actions-cell" data-label="Acciones">
+                                    <div class="btn-group route-client-actions-primary" role="group">
+                                        <a href="{% url 'clients:detail' route_client.client.id %}"
+                                           class="btn btn-info btn-sm"
+                                           title="Ver detalles del cliente">
+                                            <i class="fas fa-eye"></i>
+                                            Información
+                                        </a>
+                                        <a href="{% url 'orders:create_order' route_client.client.id %}"
+                                           class="btn btn-success btn-sm"
+                                           title="Crear pedido">
+                                            <i class="fas fa-plus-circle"></i>
+                                            Vender
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
-                
-                {% comment %} <!-- Footer with navigation buttons -->
-                <div class="pg-card-footer">
-                    {% if is_today_view %}
-                        <a href="{% url 'routes:list' %}" class="pg-button pg-button-secondary">View All Routes</a>
-                        <a href="{% url 'core:home' %}" class="pg-button pg-button-primary">Go to Home</a>
-                    {% else %}
-                        <a href="{% url 'routes:list' %}" class="pg-button pg-button-secondary">Back to Routes</a>
-                        <a href="{% url 'routes:orders_by_date' route.id %}?date={{ today|date:'Y-m-d' }}" 
-                           class="pg-button pg-button-primary">View Today's Orders</a>
-                    {% endif %}
-                </div> {% endcomment %}
-            </div>
+            {% else %}
+                <div class="alert alert-info m-b-0">
+                    <h6>No {% if is_today_view %}regular {% endif %}clients</h6>
+                    <p>This route doesn't have any {% if is_today_view %}regular {% endif %}clients assigned yet.</p>
+                </div>
+            {% endif %}
         </div>
     </div>
 </div>
@@ -296,6 +272,4 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
-
-
 {% endblock %}

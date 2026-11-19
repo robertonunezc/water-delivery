@@ -3,12 +3,21 @@ import json
 import re
 import subprocess
 from types import SimpleNamespace
+import unicodedata
 from unittest.mock import patch
 
 from django.conf import settings
 from django.test import RequestFactory, SimpleTestCase
 
 from core import views
+
+
+def strip_accents(value: str) -> str:
+    return "".join(
+        char
+        for char in unicodedata.normalize("NFD", value)
+        if unicodedata.category(char) != "Mn"
+    )
 
 
 class DashboardDateRangeTests(SimpleTestCase):
@@ -115,6 +124,116 @@ class CubicStaticAssetTests(SimpleTestCase):
                 offenders.append(str(path.relative_to(settings.BASE_DIR)))
 
         self.assertEqual(offenders, [])
+
+
+class CubicBaseTemplateTests(SimpleTestCase):
+    def base_template(self) -> str:
+        return (settings.BASE_DIR / "core/templates/base.html").read_text(encoding="utf-8")
+
+    def test_base_links_cubic_css_before_design_system(self) -> None:
+        content = self.base_template()
+        self.assertLess(
+            content.index("core/vendor/cubic/bootstrap/dist/css/bootstrap.min.css"),
+            content.index("core/css/design-system.css"),
+        )
+        self.assertLess(
+            content.index("core/vendor/cubic/css/style.css"),
+            content.index("core/css/design-system.css"),
+        )
+        self.assertLess(
+            content.index("core/css/design-system.css"),
+            content.index("core/css/cubic-overrides.css"),
+        )
+
+    def test_base_links_scripts_in_dependency_order(self) -> None:
+        content = self.base_template()
+        expected = [
+            "core/vendor/cubic/plugins/components/jquery/dist/jquery.min.js",
+            "core/vendor/cubic/bootstrap/dist/js/bootstrap.min.js",
+            "core/vendor/cubic/js/sidebarmenu.js",
+            "core/vendor/cubic/js/jquery.slimscroll.js",
+            "core/vendor/cubic/js/waves.js",
+            "core/vendor/cubic/js/custom.js",
+            "core/js/design-system.js",
+            "{% block extra_js %}",
+        ]
+        positions = [content.index(item) for item in expected]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_base_uses_cubic_shell_structure(self) -> None:
+        content = self.base_template()
+        self.assertIn('id="wrapper"', content)
+        self.assertIn('class="navbar-header"', content)
+        self.assertIn('class="sidebar"', content)
+        self.assertIn('id="side-menu"', content)
+        self.assertIn('class="page-wrapper"', content)
+
+    def test_base_preserves_required_template_blocks(self) -> None:
+        content = self.base_template()
+        for block in ["title", "extra_css", "content", "extra_js"]:
+            self.assertIn(f"{{% block {block} %}}", content)
+
+    def test_base_keeps_fontawesome_6_for_existing_icons(self) -> None:
+        self.assertIn(
+            "cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css",
+            self.base_template(),
+        )
+
+    def test_base_keeps_logout_as_post_with_csrf(self) -> None:
+        content = self.base_template()
+        self.assertIn('method="post"', content)
+        self.assertIn("{% csrf_token %}", content)
+        self.assertIn("{% url 'core:logout' %}", content)
+
+    def test_base_has_no_sample_cubic_content(self) -> None:
+        content = self.base_template()
+        for sample in [
+            "Hanna Gover",
+            "Buy Cubic Admin",
+            "See all notifications",
+            "Task 1",
+            "eCommerce",
+        ]:
+            self.assertNotIn(sample, content)
+
+
+class CubicAuthTemplateTests(SimpleTestCase):
+    def auth_base_template(self) -> str:
+        return (settings.BASE_DIR / "core/templates/base_auth.html").read_text(encoding="utf-8")
+
+    def login_template(self) -> str:
+        return (
+            settings.BASE_DIR / "core/templates/registration/login.html"
+        ).read_text(encoding="utf-8")
+
+    def test_login_extends_base_auth(self) -> None:
+        self.assertIn("{% extends 'base_auth.html' %}", self.login_template())
+
+    def test_auth_base_links_cubic_assets_without_sidebar(self) -> None:
+        content = self.auth_base_template()
+        self.assertIn("core/vendor/cubic/bootstrap/dist/css/bootstrap.min.css", content)
+        self.assertIn("core/vendor/cubic/css/style.css", content)
+        self.assertIn("core/vendor/cubic/js/custom.js", content)
+        self.assertIn("{% block content %}", content)
+        self.assertNotIn('id="side-menu"', content)
+        self.assertNotIn('class="sidebar"', content)
+
+    def test_login_preserves_django_auth_fields(self) -> None:
+        content = self.login_template()
+        self.assertIn("{% csrf_token %}", content)
+        self.assertIn('name="{{ form.username.name }}"', content)
+        self.assertIn('name="{{ form.password.name }}"', content)
+        self.assertIn('name="next"', content)
+        self.assertIn("{{ next }}", content)
+
+    def test_login_uses_spanish_copy_and_no_cubic_sample_links(self) -> None:
+        content = self.login_template()
+        self.assertIn("Iniciar Sesion", strip_accents(content))
+        self.assertIn("Usuario", content)
+        self.assertIn("Contrasena", strip_accents(content))
+        for sample in ["Forgot pwd", "Facebook", "Google", "register.html", "Sign Up"]:
+            self.assertNotIn(sample, content)
+
 
 
 class HealthCheckViewTests(SimpleTestCase):

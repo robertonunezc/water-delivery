@@ -5,32 +5,31 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container pg-mt-4 pg-narrow">
-  <div class="pg-mb-3">
-    <a href="{% url 'admin_invoices' %}" class="pg-text-decoration-none">← Volver a facturas</a>
-  </div>
+<div class="row m-t-15">
+  <div class="col-md-10 col-md-offset-1">
+    <div class="m-b-15">
+      <a href="{% url 'admin_invoices' %}">← Volver a facturas</a>
+    </div>
 
-  <div class="pg-card form-card">
-    <div class="pg-card-header form-card-header">
-      <h2 class="pg-h5 pg-mb-0">
+    <div class="white-box">
+      <h3 class="box-title m-b-0">
         {% if is_draft_edit %}Completar factura{% else %}Crear nueva factura{% endif %}
-      </h2>
-      <p class="pg-text-white-muted pg-small pg-mb-0 pg-mt-1">
+      </h3>
+      <p class="text-muted m-b-20">
         {% if is_draft_edit %}
           Actualiza los datos fiscales y las ventas antes de emitirla.
         {% else %}
           Especifica los datos del cliente, la serie/folio y el tipo de cálculo.
         {% endif %}
       </p>
-    </div>
-    <div class="pg-card-body pg-p-4">
+
       <form method="post" enctype="multipart/form-data" id="invoice-create-form" data-fiscal-data-url="{% url 'invoice:client_fiscal_data' 0 %}" novalidate>
         {% csrf_token %}
 
         {% if form.errors %}
-          <div class="pg-alert pg-alert-danger">
-            <h6 class="pg-alert-heading pg-fw-bold pg-mb-1">Por favor corrige los siguientes errores:</h6>
-            <ul class="pg-mb-0 pg-small">
+          <div class="alert alert-danger">
+            <h5 class="font-bold m-b-5">Por favor corrige los siguientes errores:</h5>
+            <ul class="m-b-0 small">
               {% for field, errors in form.errors.items %}
                 {% for error in errors %}
                   <li><strong>{{ field|capfirst }}:</strong> {{ error }}</li>
@@ -40,115 +39,102 @@
           </div>
         {% endif %}
 
-        <div class="pg-row pg-gap-3">
+        <div class="row">
           <!-- Client Selection -->
-          <div class="pg-col-md-12">
+          <div class="col-md-12 form-group">
             {% if is_draft_edit %}
-              <label class="pg-label" for="draft-client">Cliente *</label>
-              <input id="draft-client" class="pg-input" value="{{ invoice.client.name }}" disabled>
+              <label class="control-label" for="draft-client">Cliente *</label>
+              <input id="draft-client" class="form-control" value="{{ invoice.client.name }}" disabled>
             {% else %}
-              <label for="{{ form.client.id_for_label }}" class="pg-label">Cliente *</label>
+              <label for="{{ form.client.id_for_label }}" class="control-label">Cliente *</label>
               {{ form.client }}
               {% if form.client.help_text %}
-                <div class="pg-field-help">{{ form.client.help_text }}</div>
+                <span class="help-block">{{ form.client.help_text }}</span>
               {% endif %}
             {% endif %}
           </div>
 
-          <fieldset class="pg-col-md-12 pg-border pg-p-3">
-            <legend class="pg-h6">Datos fiscales del receptor</legend>
-            <p class="pg-field-help">Se precargan del cliente y se guardan en esta factura. Puedes ajustarlos antes de emitirla.</p>
-            <p id="invoice-fiscal-data-status" class="pg-field-help" role="status" aria-live="polite"></p>
-            <div class="pg-row pg-gap-3">
-              <div class="pg-col-md-6">
-                <label for="{{ form.rfc.id_for_label }}" class="pg-label">RFC *</label>
-                {{ form.rfc }}
+          <div class="col-md-12">
+            <fieldset class="well well-sm">
+              <legend class="font-16 m-b-10">Datos fiscales del receptor</legend>
+              <p class="help-block">Se precargan del cliente y se guardan en esta factura. Puedes ajustarlos antes de emitirla.</p>
+              <p id="invoice-fiscal-data-status" class="help-block" role="status" aria-live="polite"></p>
+              <div class="row">
+                <div class="col-md-6 form-group">
+                  <label for="{{ form.rfc.id_for_label }}" class="control-label">RFC *</label>
+                  {{ form.rfc }}
+                </div>
+                <div class="col-md-6 form-group">
+                  <label for="{{ form.curp.id_for_label }}" class="control-label">CURP</label>
+                  {{ form.curp }}
+                </div>
+                <div class="col-md-12 form-group">
+                  <label for="{{ form.razon_social.id_for_label }}" class="control-label">Razón social *</label>
+                  {{ form.razon_social }}
+                </div>
+                <div class="col-md-12 form-group">
+                  <label for="{{ form.billing_address.id_for_label }}" class="control-label">Domicilio fiscal *</label>
+                  {{ form.billing_address }}
+                </div>
               </div>
-              <div class="pg-col-md-6">
-                <label for="{{ form.curp.id_for_label }}" class="pg-label">CURP</label>
-                {{ form.curp }}
-              </div>
-              <div class="pg-col-md-12">
-                <label for="{{ form.razon_social.id_for_label }}" class="pg-label">Razón social *</label>
-                {{ form.razon_social }}
-              </div>
-              <div class="pg-col-md-12">
-                <label for="{{ form.billing_address.id_for_label }}" class="pg-label">Domicilio fiscal *</label>
-                {{ form.billing_address }}
-              </div>
-            </div>
-          </fieldset>
+            </fieldset>
+          </div>
 
-          <div class="pg-col-md-12">
-            <label for="{{ form.orders.id_for_label }}" class="pg-label">Ventas vinculadas *</label>
+          <div class="col-md-12 form-group">
+            <label for="{{ form.orders.id_for_label }}" class="control-label">Ventas vinculadas *</label>
             {{ form.orders }}
-            <div class="pg-field-help">
+            <span class="help-block">
               {% if is_draft_edit %}
                 Selecciona una o más ventas completadas, pagadas y pendientes de facturar.
               {% else %}
                 Selecciona una o más ventas completadas y pendientes de facturar.
               {% endif %}
-            </div>
+            </span>
           </div>
 
           <!-- Serie / Folio -->
-          <div class="pg-col-md-6">
-            <label for="{{ form.identifier.id_for_label }}" class="pg-label">Serie (Identificador) *</label>
+          <div class="col-md-6 form-group">
+            <label for="{{ form.identifier.id_for_label }}" class="control-label">Serie (Identificador) *</label>
             {{ form.identifier }}
           </div>
-          <div class="pg-col-md-6">
-            <label for="{{ form.folio.id_for_label }}" class="pg-label">Folio *</label>
+          <div class="col-md-6 form-group">
+            <label for="{{ form.folio.id_for_label }}" class="control-label">Folio *</label>
             {{ form.folio }}
           </div>
 
           <!-- Calculation Mode / Amount -->
-          <div class="pg-col-md-6">
+          <div class="col-md-6 form-group">
             {% if is_draft_edit %}
-              <label class="pg-label">Importe ($)</label>
-              <input id="draft-invoice-amount" class="pg-input" value="{{ invoice.amount|floatformat:2 }}" disabled>
-              <div class="pg-field-help">Se recalcula con las ventas seleccionadas.</div>
+              <label class="control-label">Importe ($)</label>
+              <input id="draft-invoice-amount" class="form-control" value="{{ invoice.amount|floatformat:2 }}" disabled>
+              <span class="help-block">Se recalcula con las ventas seleccionadas.</span>
             {% else %}
-              <label for="{{ form.amount.id_for_label }}" class="pg-label">Importe ($)</label>
+              <label for="{{ form.amount.id_for_label }}" class="control-label">Importe ($)</label>
               {{ form.amount }}
             {% endif %}
           </div>
-          <div class="pg-col-md-6">
-            <label for="{{ form.emmited_at.id_for_label }}" class="pg-label">Fecha de emisión</label>
+          <div class="col-md-6 form-group">
+            <label for="{{ form.emmited_at.id_for_label }}" class="control-label">Fecha de emisión</label>
             {{ form.emmited_at }}
           </div>
 
-          <!-- Options -->
-          {% comment %} <div class="pg-col-md-6">
-            <div class="pg-card pg-p-3 pg-border pg-shadow-sm pg-h-100">
-              <div class="pg-checkbox pg-switch pg-flex pg-align-center pg-gap-2">
-                {{ form.auto_amount }}
-                <label class="pg-checkbox-label pg-fw-bold" for="{{ form.auto_amount.id_for_label }}">
-                  Cálculo automático del importe
-                </label>
-              </div>
-              <small class="pg-text-muted pg-mt-2">
-                Si está activado, el total de la factura se calculará automáticamente sumando todas las ventas vinculadas.
-              </small>
-            </div>
-          </div> {% endcomment %}
-
           <!-- File Upload -->
-          <div class="pg-col-md-6">
-            <div class="pg-card pg-p-3 pg-border pg-shadow-sm pg-h-100">
-              <label for="{{ form.file.id_for_label }}" class="pg-label">Subir archivo XML/PDF de la factura</label>
+          <div class="col-md-6 form-group">
+            <div class="well well-sm">
+              <label for="{{ form.file.id_for_label }}" class="control-label">Subir archivo XML/PDF de la factura</label>
               {{ form.file }}
-              <small class="pg-text-muted pg-mt-2">
+              <small class="text-muted db m-t-5">
                 Sube el comprobante digital de la factura (PDF o XML).
               </small>
             </div>
           </div>
         </div>
 
-        <div class="pg-flex pg-justify-end pg-gap-2 pg-mt-4">
-          <a href="{% url 'admin_invoices' %}" class="pg-button pg-button-outline-secondary">
+        <div class="form-actions text-right m-t-20">
+          <a href="{% url 'admin_invoices' %}" class="btn btn-default waves-effect">
             {% if is_draft_edit %}Volver{% else %}Cancelar{% endif %}
           </a>
-          <button type="submit" class="pg-button pg-button-primary">
+          <button type="submit" class="btn btn-success waves-effect waves-light">
             {% if is_draft_edit %}Guardar y emitir{% else %}Crear factura y continuar{% endif %}
           </button>
         </div>

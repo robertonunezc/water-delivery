@@ -4,148 +4,160 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-mt-3 pg-mb-4">
-	<div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
-		<div>
-			<h1 class="pg-h3 pg-mb-1">{% if product %}Editar Producto{% else %}Crear Producto{% endif %}</h1>
-		</div>
-		<div class="pg-flex pg-align-center pg-gap-2">
-			{% if product %}
-				<span class="status-pill {% if product.active %}status-active{% else %}status-inactive{% endif %}">
-					{% if product.active %}Activo{% else %}Inactivo{% endif %}
-				</span>
-			{% endif %}
-			<a href="{% url 'admin_categories' %}" class="pg-button pg-button-outline-secondary">Categorías</a>
-			<a href="{% url 'admin_products' %}" class="pg-button pg-button-outline-secondary">Volver a lista</a>
+<div class="row m-t-15">
+	<div class="col-md-12">
+		<div class="white-box">
+			<div class="row">
+				<div class="col-sm-8">
+					<h3 class="box-title m-b-0">{% if product %}Editar Producto{% else %}Crear Producto{% endif %}</h3>
+				</div>
+				<div class="col-sm-4 text-right m-t-10">
+					{% if product %}
+						<span class="label {% if product.active %}label-success{% else %}label-default{% endif %} m-r-10">
+							{% if product.active %}Activo{% else %}Inactivo{% endif %}
+						</span>
+					{% endif %}
+					<a href="{% url 'admin_categories' %}" class="btn btn-default waves-effect">Categorías</a>
+					<a href="{% url 'admin_products' %}" class="btn btn-default waves-effect">Volver a lista</a>
+				</div>
+			</div>
 		</div>
 	</div>
+</div>
 
-	{% if not product %}
-		<div class="pg-alert pg-alert-info">
-			Primero guarda los datos básicos del producto. Después se habilitará la pestaña de Precios por Cliente.
-		</div>
-	{% endif %}
+{% if not product %}
+	<div class="alert alert-info">
+		Primero guarda los datos básicos del producto. Después se habilitará la pestaña de Precios por Cliente.
+	</div>
+{% endif %}
 
-	<div class="pg-card dashboard-card">
-		<div class="pg-card-body">
-			<ul class="pg-nav pg-tabs" role="tablist">
-				<li class="pg-tab-item" role="presentation">
+<div class="row">
+	<div class="col-md-12">
+		<div class="white-box">
+			<ul class="nav nav-tabs customtab pg-tabs" role="tablist">
+				<li class="pg-tab-item {% if active_tab == 'basic' %}active{% endif %}" role="presentation">
 					<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
 				</li>
-				<li class="pg-tab-item" role="presentation">
+				<li class="pg-tab-item {% if active_tab == 'prices' %}active{% endif %}" role="presentation">
 					<button class="pg-tab {% if active_tab == 'prices' %}pg-active{% endif %} {% if not product %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab" {% if not product %}disabled{% endif %}>Precios por Cliente</button>
 				</li>
 			</ul>
 
-			<div class="tab-content">
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'basic' %}pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
+			<div class="tab-content m-t-20">
+				<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'basic' %}active pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
 					<form method="post">
 						{% csrf_token %}
 						<input type="hidden" name="section" value="basic">
-						<div class="pg-row pg-gap-3">
-							<div class="pg-col-md-6">
-								<label class="pg-label">{{ form.name.label }}</label>
+						<div class="row">
+							<div class="col-md-6 form-group">
+								<label class="control-label">{{ form.name.label }}</label>
 								{{ form.name }}
 								{{ form.name.errors }}
 							</div>
-							<div class="pg-col-md-3">
-								<label class="pg-label">{{ form.presentation.label }}</label>
+							<div class="col-md-3 form-group">
+								<label class="control-label">{{ form.presentation.label }}</label>
 								{{ form.presentation }}
 								{{ form.presentation.errors }}
 							</div>
-							<div class="pg-col-md-3">
-								<label class="pg-label">{{ form.unit_of_measure.label }}</label>
+							<div class="col-md-3 form-group">
+								<label class="control-label">{{ form.unit_of_measure.label }}</label>
 								{{ form.unit_of_measure }}
 								{{ form.unit_of_measure.errors }}
 							</div>
 
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ form.category.label }}</label>
+							<div class="col-md-4 form-group">
+								<label class="control-label">{{ form.category.label }}</label>
 								{{ form.category }}
 								{{ form.category.errors }}
 							</div>
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ form.price.label }}</label>
+							<div class="col-md-4 form-group">
+								<label class="control-label">{{ form.price.label }}</label>
 								{{ form.price }}
-								<div class="pg-field-help">{{ form.price.help_text }}</div>
+								<span class="help-block">{{ form.price.help_text }}</span>
 								{{ form.price.errors }}
 							</div>
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ form.orden.label }}</label>
+							<div class="col-md-4 form-group">
+								<label class="control-label">{{ form.orden.label }}</label>
 								{{ form.orden }}
 								{{ form.orden.errors }}
 							</div>
 
-							<div class="pg-col-12">
-								<label class="pg-label">{{ form.note.label }}</label>
+							<div class="col-md-12 form-group">
+								<label class="control-label">{{ form.note.label }}</label>
 								{{ form.note }}
 								{{ form.note.errors }}
 							</div>
 
-							<div class="pg-col-md-12 pg-checkbox pg-mt-3 pg-ps-4">
-								{{ form.add_to_all_clients }}
-								<label class="pg-checkbox-label">{{ form.add_to_all_clients.label }}</label>
-								<div class="pg-field-help">{{ form.add_to_all_clients.help_text }}</div>
+							<div class="col-md-12 form-group">
+								<div class="checkbox checkbox-info">
+									{{ form.add_to_all_clients }}
+									<label for="{{ form.add_to_all_clients.id_for_label }}">{{ form.add_to_all_clients.label }}</label>
+								</div>
+								<span class="help-block">{{ form.add_to_all_clients.help_text }}</span>
 								{{ form.add_to_all_clients.errors }}
 							</div>
 
-							<div class="pg-col-md-12 pg-checkbox pg-mt-3 pg-ps-4">
-								{{ form.active }}
-								<label class="pg-checkbox-label">{{ form.active.label }}</label>
+							<div class="col-md-12 form-group">
+								<div class="checkbox checkbox-info">
+									{{ form.active }}
+									<label for="{{ form.active.id_for_label }}">{{ form.active.label }}</label>
+								</div>
 								{{ form.active.errors }}
 							</div>
 						</div>
 						{% if form.non_field_errors %}
-							<div class="pg-alert pg-alert-danger pg-mt-3 pg-mb-0">{{ form.non_field_errors }}</div>
+							<div class="alert alert-danger m-t-15 m-b-0">{{ form.non_field_errors }}</div>
 						{% endif %}
-						<div class="pg-mt-3 pg-flex pg-justify-end">
-							<button type="submit" class="pg-button pg-button-primary">{% if product %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
+						<div class="form-actions text-right m-t-20">
+							<button type="submit" class="btn btn-success waves-effect waves-light">{% if product %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
 						</div>
 					</form>
 				</div>
 
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'prices' %}pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
+				<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'prices' %}active pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
 					{% if product %}
 						<form method="post">
 							{% csrf_token %}
 							<input type="hidden" name="section" value="prices">
 							{{ formset.management_form }}
 							{% if formset.non_form_errors %}
-								<div class="pg-alert pg-alert-danger">{{ formset.non_form_errors }}</div>
+								<div class="alert alert-danger">{{ formset.non_form_errors }}</div>
 							{% endif %}
-							<div class="pg-row pg-gap-2 pg-align-end pg-mb-3">
-								<div class="pg-col-md-10">
-									<label class="pg-label" for="product-client-price-search">Buscar cliente</label>
+							<div class="row m-b-20">
+								<div class="col-md-10 form-group">
+									<label class="control-label" for="product-client-price-search">Buscar cliente</label>
 									<input
 										id="product-client-price-search"
 										type="search"
-										class="pg-input"
+										class="form-control"
 										placeholder="Nombre, precio o nota..."
 										autocomplete="off"
 									>
 								</div>
-								<div class="pg-col-md-2 pg-grid">
-									<button type="button" class="pg-button pg-button-outline-secondary" data-price-search-clear>Limpiar</button>
+								<div class="col-md-2 form-group m-t-25">
+									<button type="button" class="btn btn-default btn-block waves-effect" data-price-search-clear>Limpiar</button>
 								</div>
 							</div>
-							<div class="pg-row pg-gap-3">
+							<div class="row">
 								{% for inline_form in formset.forms %}
-									<div class="pg-col-12 pg-border pg-rounded pg-p-3" data-price-search-row>
-										<div class="pg-row pg-gap-2">
-											{{ inline_form.errors }}
-											<div class="pg-col-md-4">{{ inline_form.client.label_tag }}{{ inline_form.client }}</div>
-											<div class="pg-col-md-2">{{ inline_form.price.label_tag }}{{ inline_form.price }}</div>
-											<div class="pg-col-md-4">{{ inline_form.note.label_tag }}{{ inline_form.note }}</div>
-											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.active }} <label class="pg-checkbox-label" for="{{ inline_form.active.id_for_label }}">Activo</label></div></div>
-											{% if inline_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ inline_form.DELETE }} <label class="pg-checkbox-label" for="{{ inline_form.DELETE.id_for_label }}">Eliminar</label></div></div>{% endif %}
-											{{ inline_form.id }}
+									<div class="col-md-12 m-b-15" data-price-search-row>
+										<div class="well well-sm m-b-0">
+											<div class="row">
+												{{ inline_form.errors }}
+												<div class="col-md-4 form-group">{{ inline_form.client.label_tag }}{{ inline_form.client }}</div>
+												<div class="col-md-2 form-group">{{ inline_form.price.label_tag }}{{ inline_form.price }}</div>
+												<div class="col-md-4 form-group">{{ inline_form.note.label_tag }}{{ inline_form.note }}</div>
+												<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-info">{{ inline_form.active }} <label for="{{ inline_form.active.id_for_label }}">Activo</label></div></div>
+												{% if inline_form.DELETE %}<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-danger">{{ inline_form.DELETE }} <label for="{{ inline_form.DELETE.id_for_label }}">Eliminar</label></div></div>{% endif %}
+												{{ inline_form.id }}
+											</div>
+											{{ inline_form.non_field_errors }}
 										</div>
-										{{ inline_form.non_field_errors }}
 									</div>
 								{% endfor %}
 							</div>
-							<div class="pg-mt-3 pg-flex pg-justify-end">
-								<button type="submit" class="pg-button pg-button-primary">Guardar Precios</button>
+							<div class="form-actions text-right m-t-20">
+								<button type="submit" class="btn btn-success waves-effect waves-light">Guardar Precios</button>
 							</div>
 						</form>
 					{% endif %}

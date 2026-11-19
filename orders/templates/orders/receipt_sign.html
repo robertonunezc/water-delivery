@@ -2,91 +2,97 @@
 {% load static %}
 
 {% block content %}
-<div class="pg-container pg-mt-4 receipt-sign-page">
-  <div class="pg-flex pg-justify-between pg-align-center pg-mb-3">
-    <div>
-      <h1 class="pg-h4 pg-mb-1">
-        {% if signature_only %}Solo firmar recibo{% else %}Firmar y enviar recibo{% endif %}
-      </h1>
-      <p class="pg-text-muted pg-mb-0">Pedido #{{ order.pk }} - {{ client.name }}</p>
+<div class="row m-t-15 receipt-sign-page">
+  <div class="col-md-10 col-md-offset-1">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-sm-8">
+          <h3 class="box-title m-b-0">
+            {% if signature_only %}Solo firmar recibo{% else %}Firmar y enviar recibo{% endif %}
+          </h3>
+          <p class="text-muted m-b-0">Pedido #{{ order.pk }} - {{ client.name }}</p>
+        </div>
+        <div class="col-sm-4 text-right m-t-10">
+          <a href="{% url 'orders:list' %}" class="btn btn-default waves-effect">Volver</a>
+        </div>
+      </div>
     </div>
-    <a href="{% url 'orders:list' %}" class="pg-button pg-button-outline-secondary">Volver</a>
+
+    <div class="white-box">
+      <form method="post" id="receipt-sign-form"{% if not signature_only %} target="_blank"{% endif %}>
+        {% csrf_token %}
+        {% if signature_only %}
+          <input type="hidden" name="mode" value="sign_only">
+        {% else %}
+          {{ form.method }}
+        {% endif %}
+        {{ form.signature_data }}
+
+        {% if not signature_only %}
+          {% if contacts|length > 1 %}
+            <div class="form-group">
+              <label for="{{ form.contact_id.id_for_label }}" class="control-label">Contacto</label>
+              <select name="{{ form.contact_id.html_name }}" id="{{ form.contact_id.id_for_label }}" class="form-control">
+                {% for contact in contacts %}
+                  <option
+                    value="{{ contact.pk }}"
+                    data-name="{{ contact.name|default_if_none:'' }}"
+                    data-email="{{ contact.email|default_if_none:'' }}"
+                    data-phone="{{ contact.phone|default_if_none:'' }}"
+                    data-position="{{ contact.position|default_if_none:'' }}">
+                    {{ contact.name }} -
+                    {% if contact.email %}
+                      {{ contact.email }}
+                    {% elif contact.phone %}
+                      {{ contact.phone }}
+                    {% else %}
+                      sin correo/teléfono
+                    {% endif %}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          {% else %}
+            {{ form.contact_id.as_hidden }}
+          {% endif %}
+
+          <div class="row">
+            <div class="col-xs-12 col-md-6 form-group">
+              <label class="control-label" for="{{ form.contact_name.id_for_label }}">Nombre</label>
+              {{ form.contact_name }}
+            </div>
+            <div class="col-xs-12 col-md-6 form-group">
+              <label class="control-label" for="{{ form.contact_email.id_for_label }}">Correo</label>
+              {{ form.contact_email }}
+            </div>
+            <div class="col-xs-12 col-md-6 form-group">
+              <label class="control-label" for="{{ form.contact_phone.id_for_label }}">Telefono</label>
+              {{ form.contact_phone }}
+            </div>
+            <div class="col-xs-12 col-md-6 form-group">
+              <label class="control-label" for="{{ form.contact_position.id_for_label }}">Puesto</label>
+              {{ form.contact_position }}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="m-t-20">
+          <label class="control-label" for="receipt-signature-canvas">Firma</label>
+          <canvas
+            id="receipt-signature-canvas"
+            width="640"
+            height="260"
+            class="pg-w-100 pg-border pg-rounded"></canvas>
+          <div class="m-t-15">
+            <button type="button" class="btn btn-default waves-effect m-r-5" id="receipt-signature-clear">Limpiar</button>
+            <button type="submit" class="btn btn-info waves-effect waves-light" id="receipt-submit-button">
+              {% if signature_only %}Guardar recibo{% else %}Enviar recibo{% endif %}
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
-
-  <form method="post" id="receipt-sign-form" class="pg-card pg-shadow-sm"{% if not signature_only %} target="_blank"{% endif %}>
-    {% csrf_token %}
-    {% if signature_only %}
-      <input type="hidden" name="mode" value="sign_only">
-    {% else %}
-      {{ form.method }}
-    {% endif %}
-    {{ form.signature_data }}
-
-    <div class="pg-card-body">
-      {% if not signature_only %}
-      {% if contacts|length > 1 %}
-        <div class="pg-mb-3">
-          <label for="{{ form.contact_id.id_for_label }}" class="pg-label">Contacto</label>
-          <select name="{{ form.contact_id.html_name }}" id="{{ form.contact_id.id_for_label }}" class="pg-select">
-            {% for contact in contacts %}
-              <option
-                value="{{ contact.pk }}"
-                data-name="{{ contact.name|default_if_none:'' }}"
-                data-email="{{ contact.email|default_if_none:'' }}"
-                data-phone="{{ contact.phone|default_if_none:'' }}"
-                data-position="{{ contact.position|default_if_none:'' }}">
-                {{ contact.name }} -
-                {% if contact.email %}
-                  {{ contact.email }}
-                {% elif contact.phone %}
-                  {{ contact.phone }}
-                {% else %}
-                  sin correo/teléfono
-                {% endif %}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-      {% else %}
-        {{ form.contact_id.as_hidden }}
-      {% endif %}
-
-      <div class="pg-row pg-gap-3">
-        <div class="pg-col-12 pg-col-md-6">
-          <label class="pg-label" for="{{ form.contact_name.id_for_label }}">Nombre</label>
-          {{ form.contact_name }}
-        </div>
-        <div class="pg-col-12 pg-col-md-6">
-          <label class="pg-label" for="{{ form.contact_email.id_for_label }}">Correo</label>
-          {{ form.contact_email }}
-        </div>
-        <div class="pg-col-12 pg-col-md-6">
-          <label class="pg-label" for="{{ form.contact_phone.id_for_label }}">Telefono</label>
-          {{ form.contact_phone }}
-        </div>
-        <div class="pg-col-12 pg-col-md-6">
-          <label class="pg-label" for="{{ form.contact_position.id_for_label }}">Puesto</label>
-          {{ form.contact_position }}
-        </div>
-      </div>
-      {% endif %}
-
-      <div class="pg-mt-4">
-        <label class="pg-label" for="receipt-signature-canvas">Firma</label>
-        <canvas
-          id="receipt-signature-canvas"
-          width="640"
-          height="260"
-          class="pg-w-100 pg-border pg-rounded"></canvas>
-        <div class="pg-flex pg-gap-2 pg-mt-2">
-          <button type="button" class="pg-button pg-button-outline-secondary" id="receipt-signature-clear">Limpiar</button>
-          <button type="submit" class="pg-button pg-button-primary" id="receipt-submit-button">
-            {% if signature_only %}Guardar recibo{% else %}Enviar recibo{% endif %}
-          </button>
-        </div>
-      </div>
-    </div>
-  </form>
 </div>
 {% endblock %}
 

@@ -4,258 +4,272 @@
 {% block title %}Pagar Crédito - {{ client.name }}{% endblock %}
 
 {% block content %}
-<div class="credit-form-shell pg-container-fluid pg-mt-3 pg-mb-4">
-    <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
-        <div>
-            <h1 class="pg-h3 pg-mb-1">Pagar Crédito</h1>
-            <p class="pg-text-muted pg-mb-0">{{ client.name }}</p>
+<div class="credit-form-shell m-t-15">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="white-box">
+                <div class="row">
+                    <div class="col-sm-8">
+                        <h3 class="box-title m-b-0">Pagar Crédito</h3>
+                        <p class="text-muted m-b-0">{{ client.name }}</p>
+                    </div>
+                    <div class="col-sm-4 text-right m-t-10">
+                        <a href="{% url 'clients:detail' client.pk %}" class="btn btn-default waves-effect">Volver</a>
+                    </div>
+                </div>
+            </div>
         </div>
-        <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary">Volver</a>
     </div>
 
-    <div class="pg-card dashboard-card pg-mb-4">
-        <div class="pg-card-body pg-p-4">
-            <h2 class="pg-h5 pg-mb-3">Información del Cliente</h2>
-            <div class="pg-row pg-gap-3">
-                <div class="pg-col-md-6"><strong>Cliente:</strong> {{ client.name }}</div>
-                <div class="pg-col-md-6"><strong>Saldo actual:</strong> ${{ client.balance|floatformat:2 }}</div>
-                <div class="pg-col-md-6"><strong>Deuda actual:</strong> ${{ credit_account.current_debt|floatformat:2 }}</div>
-                <div class="pg-col-md-6"><strong>Límite de crédito:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
-                <div class="pg-col-md-6"><strong>Crédito disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="white-box">
+                <h3 class="box-title">Información del Cliente</h3>
+                <div class="row">
+                    <div class="col-md-6 m-b-10"><strong>Cliente:</strong> {{ client.name }}</div>
+                    <div class="col-md-6 m-b-10"><strong>Saldo actual:</strong> ${{ client.balance|floatformat:2 }}</div>
+                    <div class="col-md-6 m-b-10"><strong>Deuda actual:</strong> ${{ credit_account.current_debt|floatformat:2 }}</div>
+                    <div class="col-md-6 m-b-10"><strong>Límite de crédito:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
+                    <div class="col-md-6 m-b-10"><strong>Crédito disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
+                </div>
             </div>
         </div>
     </div>
 
     {% if error_message %}
-        <div class="pg-alert pg-alert-danger">{{ error_message }}</div>
+        <div class="alert alert-danger">{{ error_message }}</div>
     {% endif %}
 
     {% if credit_reconciliation_warning %}
-        <div class="pg-alert pg-alert-warning" role="alert">
-            <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
-            <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+        <div class="alert alert-warning" role="alert">
+            <h4 class="m-t-0">Revisión de crédito requerida</h4>
+            <p class="m-b-0">{{ credit_reconciliation_warning.message }}</p>
         </div>
     {% endif %}
 
     {% if credit_account.current_debt > 0 or credit_orders %}
-        <div class="pg-card dashboard-card pg-mb-4">
-            <div class="pg-card-body pg-p-4">
-                <form method="post" action="">
-                    {% csrf_token %}
+        <div class="row">
+            <div class="col-md-12">
+                <div class="white-box">
+                    <form method="post" action="">
+                        {% csrf_token %}
 
-                    <input type="hidden" name="client" value="{{ client.id }}">
+                        <input type="hidden" name="client" value="{{ client.id }}">
 
-                    <div class="pg-mb-3">
-                        <label for="{{ form.transaction_type.id_for_label }}" class="pg-label">
-                            {{ form.transaction_type.label }}
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        {{ form.transaction_type }}
-                        {% if form.transaction_type.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.transaction_type.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="pg-mb-3">
-                        <label for="{{ form.date.id_for_label }}" class="pg-label">
-                            {{ form.date.label }}
-                        </label>
-                        {{ form.date }}
-                        {% if form.date.help_text %}
-                            <small class="pg-field-help pg-text-muted pg-block">{{ form.date.help_text }}</small>
-                        {% endif %}
-                        {% if form.date.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.date.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="pg-mb-3" id="amount_row">
-                        <label for="{{ form.amount.id_for_label }}" class="pg-label">
-                            {{ form.amount.label }}
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        {{ form.amount }}
-                        {% if form.amount.help_text %}
-                            <small class="pg-field-help pg-text-muted pg-block">{{ form.amount.help_text }}</small>
-                        {% endif %}
-                        {% if form.amount.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.amount.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="pg-mb-3" id="payment_method_row">
-                        <label for="payment_method" class="pg-label">
-                            Método de pago
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        <select id="payment_method" name="payment_method" class="pg-select" required>
-                            {% for value, label in settlement_payment_types %}
-                                <option value="{{ value }}">{{ label }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <div class="pg-mb-3" id="credit_limit_row" hidden>
-                        <label for="{{ form.new_credit_limit.id_for_label }}" class="pg-label">
-                            {{ form.new_credit_limit.label }}
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        {{ form.new_credit_limit }}
-                        {% if form.new_credit_limit.help_text %}
-                            <small class="pg-field-help pg-text-muted pg-block">{{ form.new_credit_limit.help_text }}</small>
-                        {% endif %}
-                        {% if form.new_credit_limit.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.new_credit_limit.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="pg-mb-4" id="credit_orders_row">
-                        <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
-                            <div>
-                                <h2 class="pg-h5 pg-mb-1">Pedidos a crédito</h2>
-                                <div class="pg-text-muted pg-small">Selecciona los pedidos que se cubrirán con este pago.</div>
-                            </div>
-                            <div class="pg-text-end">
-                                <div class="pg-text-muted pg-small">Total pedidos seleccionados</div>
-                                <div id="selected-orders-total" class="pg-h5 pg-mb-0">${{ selected_total|floatformat:2 }}</div>
-                            </div>
+                        <div class="form-group">
+                            <label for="{{ form.transaction_type.id_for_label }}" class="control-label">
+                                {{ form.transaction_type.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.transaction_type }}
+                            {% if form.transaction_type.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.transaction_type.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
                         </div>
 
-                        {% if credit_orders %}
-                            <div class="pg-table-responsive pg-mb-3">
-                                <table class="pg-table pg-table-sm pg-table-hover pg-align-middle pg-mb-0">
-                                    <thead class="pg-table-light">
-                                        <tr>
-                                            <th scope="col"></th>
-                                            <th scope="col">Pedido</th>
-                                            <th scope="col">Cliente</th>
-                                            <th scope="col">Fecha</th>
-                                            <th scope="col">Total</th>
-                                            <th scope="col">Pagado</th>
-                                            <th scope="col">Pendiente</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {% for order in credit_orders %}
+                        <div class="form-group">
+                            <label for="{{ form.date.id_for_label }}" class="control-label">
+                                {{ form.date.label }}
+                            </label>
+                            {{ form.date }}
+                            {% if form.date.help_text %}
+                                <small class="help-block">{{ form.date.help_text }}</small>
+                            {% endif %}
+                            {% if form.date.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.date.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group" id="amount_row">
+                            <label for="{{ form.amount.id_for_label }}" class="control-label">
+                                {{ form.amount.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.amount }}
+                            {% if form.amount.help_text %}
+                                <small class="help-block">{{ form.amount.help_text }}</small>
+                            {% endif %}
+                            {% if form.amount.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.amount.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group" id="payment_method_row">
+                            <label for="payment_method" class="control-label">
+                                Método de pago
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select id="payment_method" name="payment_method" class="form-control" required>
+                                {% for value, label in settlement_payment_types %}
+                                    <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group" id="credit_limit_row" hidden>
+                            <label for="{{ form.new_credit_limit.id_for_label }}" class="control-label">
+                                {{ form.new_credit_limit.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.new_credit_limit }}
+                            {% if form.new_credit_limit.help_text %}
+                                <small class="help-block">{{ form.new_credit_limit.help_text }}</small>
+                            {% endif %}
+                            {% if form.new_credit_limit.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.new_credit_limit.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="m-b-20" id="credit_orders_row">
+                            <div class="row m-b-15">
+                                <div class="col-sm-8">
+                                    <h4 class="box-title m-b-0">Pedidos a crédito</h4>
+                                    <div class="text-muted small">Selecciona los pedidos que se cubrirán con este pago.</div>
+                                </div>
+                                <div class="col-sm-4 text-right">
+                                    <div class="text-muted small">Total pedidos seleccionados</div>
+                                    <div id="selected-orders-total" class="font-18 font-bold">${{ selected_total|floatformat:2 }}</div>
+                                </div>
+                            </div>
+
+                            {% if credit_orders %}
+                                <div class="table-responsive m-b-15">
+                                    <table class="table table-hover m-b-0">
+                                        <thead>
                                             <tr>
-                                                <td>
-                                                    <input
-                                                        class="pg-checkbox-input credit-order-checkbox"
-                                                        type="checkbox"
-                                                        name="orders" value="{{ order.pk }}"
-                                                        data-remaining="{{ order.remaining_payment_amount|floatformat:2 }}"
-                                                        aria-label="Seleccionar pedido #{{ order.pk }}"
-                                                        {% if order.pk in selected_order_ids %}checked{% endif %}
-                                                    >
-                                                </td>
-                                                <td><a href="{% url 'orders:get_order' order.pk %}">#{{ order.pk }}</a></td>
-                                                <td>{{ order.client.name }}</td>
-                                                <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
-                                                <td>${{ order.total_amount|floatformat:2 }}</td>
-                                                <td>${{ order.total_paid|floatformat:2 }}</td>
-                                                <td class="pg-fw-semibold pg-text-danger">${{ order.remaining_payment_amount|floatformat:2 }}</td>
+                                                <th scope="col"></th>
+                                                <th scope="col">Pedido</th>
+                                                <th scope="col">Cliente</th>
+                                                <th scope="col">Fecha</th>
+                                                <th scope="col">Total</th>
+                                                <th scope="col">Pagado</th>
+                                                <th scope="col">Pendiente</th>
                                             </tr>
-                                        {% endfor %}
-                                    </tbody>
-                                </table>
-                            </div>
-                        {% else %}
-                            <div class="pg-alert pg-alert-info pg-mb-3">
-                                No hay pedidos a crédito pendientes para este cliente.
-                            </div>
-                        {% endif %}
-
-                        <div class="pg-alert pg-alert-light pg-mb-0" id="payment_difference_panel">
-                            <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-gap-2">
-                                <div>
-                                    <div class="pg-text-muted pg-small">Monto disponible</div>
-                                    <div id="payment-difference" class="pg-h5 pg-mb-0">$0.00</div>
+                                        </thead>
+                                        <tbody>
+                                            {% for order in credit_orders %}
+                                                <tr>
+                                                    <td>
+                                                        <input
+                                                            class="pg-checkbox-input credit-order-checkbox"
+                                                            type="checkbox"
+                                                            name="orders" value="{{ order.pk }}"
+                                                            data-remaining="{{ order.remaining_payment_amount|floatformat:2 }}"
+                                                            aria-label="Seleccionar pedido #{{ order.pk }}"
+                                                            {% if order.pk in selected_order_ids %}checked{% endif %}
+                                                        >
+                                                    </td>
+                                                    <td><a href="{% url 'orders:get_order' order.pk %}">#{{ order.pk }}</a></td>
+                                                    <td>{{ order.client.name }}</td>
+                                                    <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
+                                                    <td>${{ order.total_amount|floatformat:2 }}</td>
+                                                    <td>${{ order.total_paid|floatformat:2 }}</td>
+                                                    <td class="font-bold text-danger">${{ order.remaining_payment_amount|floatformat:2 }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div id="credit-payment-guidance" class="pg-text-muted">
-                                    Puede dividir un pedido antes de continuar.
+                            {% else %}
+                                <div class="alert alert-info m-b-15">
+                                    No hay pedidos a crédito pendientes para este cliente.
+                                </div>
+                            {% endif %}
+
+                            <div class="well well-sm m-b-0" id="payment_difference_panel">
+                                <div class="row">
+                                    <div class="col-sm-6">
+                                        <div class="text-muted small">Monto disponible</div>
+                                        <div id="payment-difference" class="font-18 font-bold">$0.00</div>
+                                    </div>
+                                    <div class="col-sm-6 text-right">
+                                        <div id="credit-payment-guidance" class="pg-text-muted">
+                                            Puede dividir un pedido antes de continuar.
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="pg-mb-3">
-                        <label for="{{ form.description.id_for_label }}" class="pg-label">
-                            {{ form.description.label }}
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        {{ form.description }}
-                        {% if form.description.help_text %}
-                            <small class="pg-field-help pg-text-muted pg-block">{{ form.description.help_text }}</small>
-                        {% endif %}
-                        {% if form.description.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.description.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
+                        <div class="form-group">
+                            <label for="{{ form.description.id_for_label }}" class="control-label">
+                                {{ form.description.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.description }}
+                            {% if form.description.help_text %}
+                                <small class="help-block">{{ form.description.help_text }}</small>
+                            {% endif %}
+                            {% if form.description.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.description.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
 
-                    <div class="pg-mb-3">
-                        <label for="{{ form.notes.id_for_label }}" class="pg-label">
-                            {{ form.notes.label }}
-                            <span class="pg-text-danger">*</span>
-                        </label>
-                        {{ form.notes }}
-                        {% if form.notes.help_text %}
-                            <small class="pg-field-help pg-text-muted pg-block">{{ form.notes.help_text }}</small>
-                        {% endif %}
-                        {% if form.notes.errors %}
-                            <div class="pg-text-danger pg-mt-1">
-                                {% for error in form.notes.errors %}
-                                    <small>{{ error }}</small>
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
+                        <div class="form-group">
+                            <label for="{{ form.notes.id_for_label }}" class="control-label">
+                                {{ form.notes.label }}
+                                <span class="text-danger">*</span>
+                            </label>
+                            {{ form.notes }}
+                            {% if form.notes.help_text %}
+                                <small class="help-block">{{ form.notes.help_text }}</small>
+                            {% endif %}
+                            {% if form.notes.errors %}
+                                <div class="text-danger m-t-5">
+                                    {% for error in form.notes.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
 
-                    <div class="pg-flex pg-flex-wrap pg-gap-2">
-                        <button type="submit" class="pg-button pg-button-primary">Procesar Transacción</button>
-                        <a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-outline-secondary">Cancelar</a>
-                    </div>
-                </form>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-success waves-effect waves-light">Procesar Transacción</button>
+                            <a href="{% url 'clients:detail' client.pk %}" class="btn btn-default waves-effect">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
-        <div class="pg-alert pg-alert-info" role="alert">
-            <h2 class="pg-h5 pg-mb-3">Tipos de Transacción</h2>
-            <ul class="pg-mb-3">
+        <div class="alert alert-info" role="alert">
+            <h4 class="m-t-0">Tipos de Transacción</h4>
+            <ul>
                 <li><strong>Pago de deuda:</strong> Cliente pagó su deuda pendiente (efectivo, transferencia, etc.)</li>
                 <li><strong>Pago con Saldo:</strong> Usar el saldo prepagado del cliente para pagar su deuda</li>
                 <li><strong>Ajuste manual de deuda:</strong> Modificar deuda por razones administrativas</li>
                 <li><strong>Corrección:</strong> Corrección de error previo</li>
                 <li><strong>Cambio de límite de crédito:</strong> Modificar el límite de crédito del cliente</li>
             </ul>
-            <p class="pg-mb-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.</p>
+            <p class="m-b-0"><strong>Nota:</strong> Esta transacción quedará registrada permanentemente en el historial del cliente.</p>
         </div>
     {% else %}
-        <div class="pg-alert pg-alert-success pg-mb-0">
-            <i class="fas fa-check-circle pg-me-2"></i>
+        <div class="alert alert-success m-b-0">
+            <i class="fas fa-check-circle m-r-5"></i>
             El cliente no tiene deuda pendiente.
         </div>
     {% endif %}
-    </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {

@@ -1,42 +1,44 @@
 {% if confirmations_no_route %}
-<h3 class="pg-h5 pg-mb-2">Confirmaciones sin ruta para HOY</h3>
-<table class="pg-table pg-table-hover pg-align-middle pg-mb-0">
-                <thead class="pg-table-light">
+<div class="white-box">
+    <h3 class="box-title m-b-15">Confirmaciones sin ruta para HOY</h3>
+    <div class="table-responsive">
+        <table class="table table-hover m-b-0">
+            <thead>
+                <tr>
+                    <th>Cliente</th>
+                    <th>Estatus</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for confirmation in confirmations_no_route %}
                     <tr>
-                        <th>Cliente</th>
-                        <th>Estatus</th>
-                        <th>Acciones</th>
+                        <td>{{ confirmation.client.name }}</td>
+                        <td>
+                            {% with display_status=confirmation.display_status %}
+                                <span class="label {% if display_status == 'Confirmada' %}label-success{% elif display_status == 'NO visitar' %}label-danger{% elif display_status == 'Expirada' %}label-warning{% else %}label-info{% endif %}">
+                                    {{ display_status }}
+                                </span>
+                            {% endwith %}
+                        </td>
+                        <td>
+                            <a href="{% url 'orders:create_order' confirmation.client.id %}"
+                               class="btn btn-success btn-sm waves-effect waves-light"
+                               title="Crear pedido">
+                                <i class="fas fa-plus-circle"></i>
+                                Vender
+                            </a>
+                        </td>
                     </tr>
-                </thead>
-                <tbody>
-                    {% for confirmation in confirmations_no_route %}
-                        <tr>
-                            <td>{{ confirmation.client.name }}</td>
-                            
-                            <td>
-                                {% with display_status=confirmation.display_status %}
-                                    <span class="pg-badge {% if display_status == 'Confirmada' %}pg-bg-success{% elif display_status == 'NO visitar' %}pg-bg-danger{% elif display_status == 'Expirada' %}pg-bg-warning{% else %}pg-bg-info{% endif %}">
-                                        {{ display_status }}
-                                    </span>
-                                {% endwith %}
-                            </td>
-                            
-                            <td>
-                              <a href="{% url 'orders:create_order' confirmation.client.id %}"
-                                                   class="pg-button pg-button-sm pg-button-success"
-                                                   title="Crear pedido">
-                                                    <i class="fas fa-plus-circle"></i>
-                                                    Vender
-                                                </a>
-                                </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="{% if user.is_staff %}7{% else %}6{% endif %}" class="pg-text-center pg-py-4 pg-text-muted">
-                                No hay confirmaciones para mostrar.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-    {% endif %}
+                {% empty %}
+                    <tr>
+                        <td colspan="{% if user.is_staff %}7{% else %}6{% endif %}" class="text-center p-20 text-muted">
+                            No hay confirmaciones para mostrar.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}

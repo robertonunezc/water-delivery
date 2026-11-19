@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'core/vendor/cubic/plugins/images/favicon.png' %}">
+    <title>{% block title %}{% endblock %}</title>
+
+    {% include "includes/posthog.html" %}
+
+    <!-- ===== Bootstrap CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/bootstrap/dist/css/bootstrap.min.css' %}" rel="stylesheet">
+    <!-- ===== Animation CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/animate.css' %}" rel="stylesheet">
+    <!-- ===== Custom CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/style.css' %}" rel="stylesheet">
+    <!-- ===== Color CSS ===== -->
+    <link href="{% static 'core/vendor/cubic/css/colors/default.css' %}" id="theme" rel="stylesheet">
+    <!-- Font Awesome 6 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Project Design System CSS -->
+    <link href="{% static 'core/css/design-system.css' %}" rel="stylesheet">
+    <!-- Cubic Overrides CSS -->
+    <link href="{% static 'core/css/cubic-overrides.css' %}" rel="stylesheet">
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body class="mini-sidebar">
+    <!-- Preloader -->
+    <div class="preloader">
+        <div class="cssload-speeding-wheel"></div>
+    </div>
+    <section id="wrapper" class="login-register">
+        {% block content %}{% endblock %}
+    </section>
+
+    <!-- jQuery -->
+    <script src="{% static 'core/vendor/cubic/plugins/components/jquery/dist/jquery.min.js' %}"></script>
+    <!-- Bootstrap Core JavaScript -->
+    <script src="{% static 'core/vendor/cubic/bootstrap/dist/js/bootstrap.min.js' %}"></script>
+    <!-- Menu Plugin JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/sidebarmenu.js' %}"></script>
+    <!-- Slimscroll JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/jquery.slimscroll.js' %}"></script>
+    <!-- Wave Effects -->
+    <script src="{% static 'core/vendor/cubic/js/waves.js' %}"></script>
+    <!-- Custom Theme JavaScript -->
+    <script src="{% static 'core/vendor/cubic/js/custom.js' %}"></script>
+    <!-- Project Design System JavaScript -->
+    <script src="{% static 'core/js/design-system.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

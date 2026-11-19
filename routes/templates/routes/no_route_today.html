@@ -3,42 +3,36 @@
 {% block title %}No Route Today{% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid">
-    <div class="pg-row pg-justify-center">
-        <div class="pg-col-md-8">
-            <div class="pg-card">
-                <div class="pg-card-header pg-bg-info pg-text-white">
-                    <h4 class="pg-card-title pg-mb-0">No Route Today</h4>
-                </div>
-                <div class="pg-card-body pg-text-center">
-                    <i class="fas fa-calendar-times fa-4x pg-text-info pg-mb-3"></i>
-                    <h5>Hola {{ employee.user.get_full_name }},</h5>
-                    <p>No tienes ruta asignada para <strong>{{ today|date:"l, F d, Y" }}</strong>.</p>
-                    
-                    <div class="pg-row pg-mt-4">
-                        <div class="pg-col-md-6">
-                            <h6>Su transporte:</h6>
-                            <div class="pg-alert pg-alert-light">
-                                <strong>{{ transportation.license_plate }}</strong><br>
-                                {{ transportation.model }}<br>
-                                Capacidad: {{ transportation.capacity_liters }}L
-                            </div>
-                        </div>
-                        <div class="pg-col-md-6">
-                            <h6>Hoy:</h6>
-                            <div class="pg-alert pg-alert-light">
-                                {{ today|date:"l" }}<br>
-                                {{ today|date:"F d, Y" }}
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <p class="pg-text-muted">Contacte al administrador para configurar rutas para este día, o verifique de nuevo mañana.</p>
-                    <div class="pg-mt-3">
-                        <a href="{% url 'routes:list' %}" class="pg-button pg-button-secondary pg-me-2">Ver Rutas</a>
-                        <a href="{% url 'core:home' %}" class="pg-button pg-button-primary">Ir a Inicio</a>
+<div class="row m-t-20">
+    <div class="col-md-8 col-md-offset-2">
+        <div class="white-box text-center">
+            <h3 class="box-title text-info">No Route Today</h3>
+            <i class="fas fa-calendar-times fa-4x text-info m-b-15"></i>
+            <h4>Hola {{ employee.user.get_full_name }},</h4>
+            <p>No tienes ruta asignada para <strong>{{ today|date:"l, F d, Y" }}</strong>.</p>
+            
+            <div class="row m-t-20">
+                <div class="col-md-6">
+                    <h5>Su transporte:</h5>
+                    <div class="well well-sm">
+                        <strong>{{ transportation.license_plate }}</strong><br>
+                        {{ transportation.model }}<br>
+                        Capacidad: {{ transportation.capacity_liters }}L
                     </div>
                 </div>
+                <div class="col-md-6">
+                    <h5>Hoy:</h5>
+                    <div class="well well-sm">
+                        {{ today|date:"l" }}<br>
+                        {{ today|date:"F d, Y" }}
+                    </div>
+                </div>
+            </div>
+            
+            <p class="text-muted">Contacte al administrador para configurar rutas para este día, o verifique de nuevo mañana.</p>
+            <div class="m-t-15">
+                <a href="{% url 'routes:list' %}" class="btn btn-default waves-effect m-r-5">Ver Rutas</a>
+                <a href="{% url 'core:home' %}" class="btn btn-info waves-effect waves-light">Ir a Inicio</a>
             </div>
         </div>
     </div>

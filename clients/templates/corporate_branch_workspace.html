@@ -1,338 +1,372 @@
 {% extends 'base.html' %}
 
 {% block extra_css %}
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 {% endblock %}
 
 {% block content %}
-<div class="pg-container pg-mt-4">
-  <div class="pg-flex pg-flex-wrap pg-justify-between pg-align-start pg-gap-3 pg-mb-4">
-    <div>
-      <div class="pg-flex pg-flex-wrap pg-align-center pg-gap-2 pg-mb-2">
-        <h1 class="pg-mb-0">{{ corporate.name }}</h1>
-        <span class="pg-badge pg-bg-{% if corporate.active %}success{% else %}secondary{% endif %} pg-fs-6">
-          {% if corporate.active %}Activo{% else %}Inactivo{% endif %}
-        </span>
-        <span class="pg-badge pg-bg-info pg-fs-6">{{ corporate.get_type_display }}</span>
+<div class="row m-t-15">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-sm-8">
+          <div class="m-b-5">
+            <h3 class="box-title m-b-0" style="display:inline-block;">{{ corporate.name }}</h3>
+            <span class="label label-{% if corporate.active %}success{% else %}default{% endif %} m-l-5">
+              {% if corporate.active %}Activo{% else %}Inactivo{% endif %}
+            </span>
+            <span class="label label-info m-l-5">{{ corporate.get_type_display }}</span>
+          </div>
+          <p class="text-muted m-b-0">Resumen de ventas, ordenes y pagos por sucursal.</p>
+        </div>
+        <div class="col-sm-4 text-right m-t-10">
+          <a href="{% url 'clients:detail' corporate.pk %}" class="btn btn-default waves-effect">
+            <i class="fas fa-arrow-left"></i> Volver al cliente
+          </a>
+        </div>
       </div>
-      <p class="pg-text-muted pg-mb-0">Resumen de ventas, ordenes y pagos por sucursal.</p>
     </div>
-    <a href="{% url 'clients:detail' corporate.pk %}" class="pg-button pg-button-secondary">
-      <i class="fas fa-arrow-left"></i> Volver al cliente
-    </a>
   </div>
+</div>
 
-  <form method="get" class="pg-card pg-mb-4">
-    <div class="pg-card-body">
-      {% if selected_branch %}
-        <input type="hidden" name="branch" value="{{ selected_branch.pk }}">
-      {% endif %}
-      <input type="hidden" name="tab" value="{{ active_tab }}">
-      <div class="pg-row pg-gap-3 pg-align-end">
-        <div class="pg-col-md-4">
-          <label for="date_from" class="pg-label">Desde</label>
-          <input type="date" id="date_from" name="date_from" value="{{ date_from_value }}" class="pg-input">
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <form method="get" class="row">
+        {% if selected_branch %}
+          <input type="hidden" name="branch" value="{{ selected_branch.pk }}">
+        {% endif %}
+        <input type="hidden" name="tab" value="{{ active_tab }}">
+        <div class="col-md-4 form-group">
+          <label for="date_from" class="control-label">Desde</label>
+          <input type="date" id="date_from" name="date_from" value="{{ date_from_value }}" class="form-control">
         </div>
-        <div class="pg-col-md-4">
-          <label for="date_to" class="pg-label">Hasta</label>
-          <input type="date" id="date_to" name="date_to" value="{{ date_to_value }}" class="pg-input">
+        <div class="col-md-4 form-group">
+          <label for="date_to" class="control-label">Hasta</label>
+          <input type="date" id="date_to" name="date_to" value="{{ date_to_value }}" class="form-control">
         </div>
-        <div class="pg-col-md-4">
-          <button type="submit" class="pg-button pg-button-primary">
+        <div class="col-md-4 form-group m-t-25">
+          <button type="submit" class="btn btn-info waves-effect waves-light">
             <i class="fas fa-filter"></i> Filtrar
           </button>
         </div>
-      </div>
-    </div>
-  </form>
-
-  <div class="metric-grid">
-    <div class="metric-card metric-sales">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-        Ventas sucursales
-      </div>
-      <div class="metric-value">${{ corporate_summary.total_sales|floatformat:2 }}</div>
-      <div class="metric-note">{{ date_from|date:"d/m/Y" }} - {{ date_to|date:"d/m/Y" }}</div>
-    </div>
-    <div class="metric-card metric-orders">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-clipboard-list"></i></span>
-        Órdenes
-      </div>
-      <div class="metric-value">{{ corporate_summary.total_orders }}</div>
-      <div class="metric-note">Incluye pendientes y canceladas</div>
-    </div>
-    <div class="metric-card metric-route">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-circle-check"></i></span>
-        Pagos recibidos
-      </div>
-      <div class="metric-value">${{ corporate_summary.total_payments|floatformat:2 }}</div>
-      <div class="metric-note">Pagos completados</div>
-    </div>
-    <div class="metric-card {% if corporate_summary.total_current_debt > 0 %}metric-risk{% else %}metric-neutral{% endif %}">
-      <div class="metric-label">
-        <span class="metric-icon"><i class="fas fa-file-invoice-dollar"></i></span>
-        Deuda sucursales
-      </div>
-      <div class="metric-value">${{ corporate_summary.total_current_debt|floatformat:2 }}</div>
-      <div class="metric-note">Deuda actual acumulada</div>
+      </form>
     </div>
   </div>
+</div>
 
-  {% if branches %}
-    <div class="pg-row pg-gap-4">
-      <div class="pg-col-lg-4">
-        <div class="pg-card pg-h-100">
-          <div class="pg-card-header">
-            <h5 class="pg-mb-0"><i class="fas fa-code-branch pg-me-2"></i>Sucursales</h5>
-          </div>
-          <div class="pg-card-body branch-selector">
-            <div class="pg-list">
-              {% for branch_row in branches %}
-                <a href="{{ branch_row.url }}" class="pg-list-item {% if branch_row.is_selected %}pg-active{% endif %}">
-                  <div class="pg-flex pg-justify-between pg-align-start pg-gap-2">
-                    <strong>{{ branch_row.branch.name }}</strong>
-                    <span class="pg-badge pg-bg-{% if branch_row.branch.active %}success{% else %}secondary{% endif %}">
-                      {% if branch_row.branch.active %}Activo{% else %}Inactivo{% endif %}
-                    </span>
-                  </div>
-                  <div class="branch-metrics">
-                    <small>Ventas: ${{ branch_row.sales_total|floatformat:2 }}</small>
-                    <small>Ordenes: {{ branch_row.order_count }}</small>
-                    <small>Pagos: ${{ branch_row.payment_total|floatformat:2 }}</small>
-                    <small>Deuda: ${{ branch_row.current_debt|floatformat:2 }}</small>
-                  </div>
-                </a>
-              {% endfor %}
-            </div>
-          </div>
+<div class="row">
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">${{ corporate_summary.total_sales|floatformat:2 }}</span>
+          <p class="font-12">Ventas sucursales</p>
+          <small class="text-muted">{{ date_from|date:"d/m/Y" }} - {{ date_to|date:"d/m/Y" }}</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-success text-white"><i class="fas fa-dollar-sign"></i></span>
         </div>
       </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">{{ corporate_summary.total_orders }}</span>
+          <p class="font-12">Órdenes</p>
+          <small class="text-muted">Incluye pendientes y canceladas</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-primary text-white"><i class="fas fa-clipboard-list"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">${{ corporate_summary.total_payments|floatformat:2 }}</span>
+          <p class="font-12">Pagos recibidos</p>
+          <small class="text-muted">Pagos completados</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf bg-info text-white"><i class="fas fa-circle-check"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-sm-6">
+    <div class="white-box ecom-stat-widget">
+      <div class="row">
+        <div class="col-xs-8">
+          <span class="text-blue font-light">${{ corporate_summary.total_current_debt|floatformat:2 }}</span>
+          <p class="font-12">Deuda sucursales</p>
+          <small class="text-muted">Deuda actual acumulada</small>
+        </div>
+        <div class="col-xs-4 text-right">
+          <span class="icoleaf {% if corporate_summary.total_current_debt > 0 %}bg-danger{% else %}bg-warning{% endif %} text-white"><i class="fas fa-file-invoice-dollar"></i></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-      <div class="pg-col-lg-8">
-        <div class="pg-card">
-          <div class="pg-card-header pg-flex pg-flex-wrap pg-justify-between pg-align-start pg-gap-2">
-            <div>
-              <h5 class="pg-mb-1">{{ selected_branch.name }}</h5>
-              <small class="pg-text-muted">
-                {{ selected_branch_summary.order_count }} ordenes ·
-                ${{ selected_branch_summary.sales_total|floatformat:2 }} ventas ·
-                ${{ selected_branch_summary.payment_total|floatformat:2 }} pagos
-              </small>
-            </div>
-            <a href="{{ selected_branch_summary.detail_url }}" class="pg-button pg-button-sm pg-button-outline-primary">
+{% if branches %}
+  <div class="row">
+    <div class="col-lg-4">
+      <div class="white-box">
+        <h3 class="box-title"><i class="fas fa-code-branch m-r-5"></i>Sucursales</h3>
+        <div class="list-group branch-selector">
+          {% for branch_row in branches %}
+            <a href="{{ branch_row.url }}" class="list-group-item {% if branch_row.is_selected %}active{% endif %}">
+              <div class="row">
+                <div class="col-xs-8">
+                  <strong>{{ branch_row.branch.name }}</strong>
+                </div>
+                <div class="col-xs-4 text-right">
+                  <span class="label label-{% if branch_row.branch.active %}success{% else %}default{% endif %}">
+                    {% if branch_row.branch.active %}Activo{% else %}Inactivo{% endif %}
+                  </span>
+                </div>
+              </div>
+              <div class="branch-metrics m-t-5">
+                <small class="db">Ventas: ${{ branch_row.sales_total|floatformat:2 }} · Ordenes: {{ branch_row.order_count }}</small>
+                <small class="db">Pagos: ${{ branch_row.payment_total|floatformat:2 }} · Deuda: ${{ branch_row.current_debt|floatformat:2 }}</small>
+              </div>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-8">
+      <div class="white-box">
+        <div class="row m-b-15">
+          <div class="col-sm-8">
+            <h3 class="box-title m-b-0">{{ selected_branch.name }}</h3>
+            <small class="text-muted">
+              {{ selected_branch_summary.order_count }} ordenes ·
+              ${{ selected_branch_summary.sales_total|floatformat:2 }} ventas ·
+              ${{ selected_branch_summary.payment_total|floatformat:2 }} pagos
+            </small>
+          </div>
+          <div class="col-sm-4 text-right">
+            <a href="{{ selected_branch_summary.detail_url }}" class="btn btn-info btn-outline btn-sm waves-effect">
               <i class="fas fa-external-link-alt"></i> Abrir sucursal
             </a>
           </div>
-          <div class="pg-card-body">
-            <div class="pg-row pg-gap-3 pg-mb-4">
-              <div class="pg-col-md-6 pg-col-xl-3">
-                <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                  <small class="pg-text-muted pg-block">Ventas</small>
-                  <strong>${{ selected_branch_summary.sales_total|floatformat:2 }}</strong>
-                </div>
-              </div>
-              <div class="pg-col-md-6 pg-col-xl-3">
-                <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                  <small class="pg-text-muted pg-block">Ordenes</small>
-                  <strong>{{ selected_branch_summary.order_count }}</strong>
-                </div>
-              </div>
-              <div class="pg-col-md-6 pg-col-xl-3">
-                <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                  <small class="pg-text-muted pg-block">Deuda actual</small>
-                  <strong>${{ selected_branch_summary.current_debt|floatformat:2 }}</strong>
-                </div>
-              </div>
-              <div class="pg-col-md-6 pg-col-xl-3">
-                <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                  <small class="pg-text-muted pg-block">Ultima orden</small>
-                  <strong>
-                    {% if selected_branch_summary.last_order_date %}
-                      {{ selected_branch_summary.last_order_date|date:"d/m/Y" }}
-                    {% else %}
-                      Sin ventas
-                    {% endif %}
-                  </strong>
-                </div>
-              </div>
+        </div>
+
+        <div class="row m-b-20">
+          <div class="col-md-6 col-lg-3">
+            <div class="well well-sm">
+              <small class="text-muted db">Ventas</small>
+              <strong>${{ selected_branch_summary.sales_total|floatformat:2 }}</strong>
             </div>
-
-            <ul class="pg-nav pg-tabs workspace-tabs pg-mb-3">
-              <li class="pg-tab-item">
-                <a href="{{ tab_urls.summary }}" class="pg-tab {% if active_tab == 'summary' %}active{% endif %}">Resumen</a>
-              </li>
-              <li class="pg-tab-item">
-                <a href="{{ tab_urls.orders }}" class="pg-tab {% if active_tab == 'orders' %}active{% endif %}">Ordenes</a>
-              </li>
-              <li class="pg-tab-item">
-                <a href="{{ tab_urls.payments }}" class="pg-tab {% if active_tab == 'payments' %}active{% endif %}">Pagos</a>
-              </li>
-            </ul>
-
-            {% if active_tab == 'summary' %}
-              <div class="pg-row pg-gap-3">
-                <div class="pg-col-md-6">
-                  <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                    <h6>Actividad</h6>
-                    <div><strong>Pagos recibidos:</strong> ${{ selected_branch_summary.payment_total|floatformat:2 }}</div>
-                    <div><strong>Canceladas:</strong> {{ selected_branch_summary.cancelled_order_count }}</div>
-                    <div><strong>Monto cancelado:</strong> ${{ selected_branch_summary.cancelled_order_amount|floatformat:2 }}</div>
-                  </div>
-                </div>
-                <div class="pg-col-md-6">
-                  <div class="pg-border pg-rounded pg-p-3 pg-h-100">
-                    <h6>Ruta</h6>
-                    {% if selected_branch_summary.next_route_order %}
-                      <div><strong>Proxima visita:</strong> {{ selected_branch_summary.next_route_order.visit_date|date:"d/m/Y" }}</div>
-                      <div><strong>Ruta:</strong> {{ selected_branch_summary.next_route_order.route.name }}</div>
-                    {% else %}
-                      <p class="pg-text-muted pg-mb-0">Sin ruta asignada.</p>
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% elif active_tab == 'orders' %}
-              {% if orders_page.object_list %}
-                <div class="pg-table-responsive">
-                  <table class="pg-table pg-table-hover">
-                    <thead class="pg-table-light">
-                      <tr>
-                        <th>Orden</th>
-                        <th>Fecha</th>
-                        <th>Estado</th>
-                        <th class="pg-text-end">Subtotal</th>
-                        <th class="pg-text-end">Descuento</th>
-                        <th class="pg-text-end">Total</th>
-                        <th>Pago</th>
-                        <th>Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for order in orders_page %}
-                        <tr>
-                          <td><strong>#{{ order.id }}</strong></td>
-                          <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
-                          <td>
-                            <span class="pg-badge pg-bg-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning{% else %}danger{% endif %}">
-                              {{ order.get_status_display_fixed }}
-                            </span>
-                          </td>
-                          <td class="pg-text-end">${{ order.subtotal_amount|floatformat:2 }}</td>
-                          <td class="pg-text-end">${{ order.discount|floatformat:2 }}</td>
-                          <td class="pg-text-end">${{ order.total_amount|floatformat:2 }}</td>
-                          <td>
-                            {% for payment in order.payments.all %}
-                              <span class="pg-badge pg-bg-light pg-text-dark">{{ payment.get_method_display }}</span>
-                            {% empty %}
-                              <span class="pg-text-muted">Sin pago</span>
-                            {% endfor %}
-                          </td>
-                          <td>
-                            <a href="{% url 'orders:get_order' order.id %}" class="pg-button pg-button-sm pg-button-outline-primary">
-                              <i class="fas fa-edit"></i>
-                            </a>
-                          </td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-                {% if orders_page.has_other_pages %}
-                  <nav class="pg-mt-3" aria-label="Paginacion de ordenes de sucursal">
-                    <ul class="pg-pagination pg-justify-end pg-mb-0">
-                      {% if orders_page.has_previous %}
-                        <li class="pg-page-item">
-                          <a class="pg-page-link" href="{{ orders_page_url_prefix }}{{ orders_page.previous_page_number }}">Anterior</a>
-                        </li>
-                      {% else %}
-                        <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
-                      {% endif %}
-                      <li class="pg-page-item pg-disabled">
-                        <span class="pg-page-link">Pagina {{ orders_page.number }} de {{ orders_page.paginator.num_pages }}</span>
-                      </li>
-                      {% if orders_page.has_next %}
-                        <li class="pg-page-item">
-                          <a class="pg-page-link" href="{{ orders_page_url_prefix }}{{ orders_page.next_page_number }}">Siguiente</a>
-                        </li>
-                      {% else %}
-                        <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
-                      {% endif %}
-                    </ul>
-                  </nav>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="well well-sm">
+              <small class="text-muted db">Ordenes</small>
+              <strong>{{ selected_branch_summary.order_count }}</strong>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="well well-sm">
+              <small class="text-muted db">Deuda actual</small>
+              <strong>${{ selected_branch_summary.current_debt|floatformat:2 }}</strong>
+            </div>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <div class="well well-sm">
+              <small class="text-muted db">Ultima orden</small>
+              <strong>
+                {% if selected_branch_summary.last_order_date %}
+                  {{ selected_branch_summary.last_order_date|date:"d/m/Y" }}
+                {% else %}
+                  Sin ventas
                 {% endif %}
-              {% else %}
-                <p class="pg-text-muted pg-mb-0">No hay ordenes registradas para esta sucursal en el periodo seleccionado.</p>
-              {% endif %}
-            {% elif active_tab == 'payments' %}
-              {% if payments_page.object_list %}
-                <div class="pg-table-responsive">
-                  <table class="pg-table pg-table-hover">
-                    <thead class="pg-table-light">
-                      <tr>
-                        <th>Pago</th>
-                        <th>Fecha</th>
-                        <th>Metodo</th>
-                        <th>Estado</th>
-                        <th>Orden</th>
-                        <th class="pg-text-end">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for payment in payments_page %}
-                        <tr>
-                          <td><strong>#{{ payment.id }}</strong></td>
-                          <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
-                          <td>{{ payment.get_method_display }}</td>
-                          <td>
-                            <span class="pg-badge pg-bg-success">{{ payment.status_display }}</span>
-                          </td>
-                          <td>
-                            <a href="{% url 'orders:get_order' payment.order.id %}">#{{ payment.order.id }}</a>
-                          </td>
-                          <td class="pg-text-end">${{ payment.amount|floatformat:2 }}</td>
-                        </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-                {% if payments_page.has_other_pages %}
-                  <nav class="pg-mt-3" aria-label="Paginacion de pagos de sucursal">
-                    <ul class="pg-pagination pg-justify-end pg-mb-0">
-                      {% if payments_page.has_previous %}
-                        <li class="pg-page-item">
-                          <a class="pg-page-link" href="{{ payments_page_url_prefix }}{{ payments_page.previous_page_number }}">Anterior</a>
-                        </li>
-                      {% else %}
-                        <li class="pg-page-item pg-disabled"><span class="pg-page-link">Anterior</span></li>
-                      {% endif %}
-                      <li class="pg-page-item pg-disabled">
-                        <span class="pg-page-link">Pagina {{ payments_page.number }} de {{ payments_page.paginator.num_pages }}</span>
-                      </li>
-                      {% if payments_page.has_next %}
-                        <li class="pg-page-item">
-                          <a class="pg-page-link" href="{{ payments_page_url_prefix }}{{ payments_page.next_page_number }}">Siguiente</a>
-                        </li>
-                      {% else %}
-                        <li class="pg-page-item pg-disabled"><span class="pg-page-link">Siguiente</span></li>
-                      {% endif %}
-                    </ul>
-                  </nav>
-                {% endif %}
-              {% else %}
-                <p class="pg-text-muted pg-mb-0">No hay pagos completados para esta sucursal en el periodo seleccionado.</p>
-              {% endif %}
-            {% endif %}
+              </strong>
+            </div>
           </div>
         </div>
+
+        <ul class="nav nav-tabs customtab workspace-tabs m-b-20">
+          <li class="{% if active_tab == 'summary' %}active{% endif %}">
+            <a href="{{ tab_urls.summary }}">Resumen</a>
+          </li>
+          <li class="{% if active_tab == 'orders' %}active{% endif %}">
+            <a href="{{ tab_urls.orders }}">Ordenes</a>
+          </li>
+          <li class="{% if active_tab == 'payments' %}active{% endif %}">
+            <a href="{{ tab_urls.payments }}">Pagos</a>
+          </li>
+        </ul>
+
+        {% if active_tab == 'summary' %}
+          <div class="row">
+            <div class="col-md-6">
+              <div class="well well-sm">
+                <h5 class="m-t-0">Actividad</h5>
+                <div><strong>Pagos recibidos:</strong> ${{ selected_branch_summary.payment_total|floatformat:2 }}</div>
+                <div><strong>Canceladas:</strong> {{ selected_branch_summary.cancelled_order_count }}</div>
+                <div><strong>Monto cancelado:</strong> ${{ selected_branch_summary.cancelled_order_amount|floatformat:2 }}</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="well well-sm">
+                <h5 class="m-t-0">Ruta</h5>
+                {% if selected_branch_summary.next_route_order %}
+                  <div><strong>Proxima visita:</strong> {{ selected_branch_summary.next_route_order.visit_date|date:"d/m/Y" }}</div>
+                  <div><strong>Ruta:</strong> {{ selected_branch_summary.next_route_order.route.name }}</div>
+                {% else %}
+                  <p class="text-muted m-b-0">Sin ruta asignada.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% elif active_tab == 'orders' %}
+          {% if orders_page.object_list %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Orden</th>
+                    <th>Fecha</th>
+                    <th>Estado</th>
+                    <th class="text-right">Subtotal</th>
+                    <th class="text-right">Descuento</th>
+                    <th class="text-right">Total</th>
+                    <th>Pago</th>
+                    <th>Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for order in orders_page %}
+                    <tr>
+                      <td><strong>#{{ order.id }}</strong></td>
+                      <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
+                      <td>
+                        <span class="label label-{% if order.status == 'COMPLETED' %}success{% elif order.status == 'PENDING' %}warning{% else %}danger{% endif %}">
+                          {{ order.get_status_display_fixed }}
+                        </span>
+                      </td>
+                      <td class="text-right">${{ order.subtotal_amount|floatformat:2 }}</td>
+                      <td class="text-right">${{ order.discount|floatformat:2 }}</td>
+                      <td class="text-right">${{ order.total_amount|floatformat:2 }}</td>
+                      <td>
+                        {% for payment in order.payments.all %}
+                          <span class="label label-default">{{ payment.get_method_display }}</span>
+                        {% empty %}
+                          <span class="text-muted">Sin pago</span>
+                        {% endfor %}
+                      </td>
+                      <td>
+                        <a href="{% url 'orders:get_order' order.id %}" class="btn btn-info btn-outline btn-sm">
+                          <i class="fas fa-edit"></i>
+                        </a>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if orders_page.has_other_pages %}
+              <div class="text-right m-t-15">
+                <nav aria-label="Paginacion de ordenes de sucursal">
+                  <ul class="pagination m-b-0">
+                    {% if orders_page.has_previous %}
+                      <li>
+                        <a href="{{ orders_page_url_prefix }}{{ orders_page.previous_page_number }}">Anterior</a>
+                      </li>
+                    {% else %}
+                      <li class="disabled"><span>Anterior</span></li>
+                    {% endif %}
+                    <li class="disabled">
+                      <span>Pagina {{ orders_page.number }} de {{ orders_page.paginator.num_pages }}</span>
+                    </li>
+                    {% if orders_page.has_next %}
+                      <li>
+                        <a href="{{ orders_page_url_prefix }}{{ orders_page.next_page_number }}">Siguiente</a>
+                      </li>
+                    {% else %}
+                      <li class="disabled"><span>Siguiente</span></li>
+                    {% endif %}
+                  </ul>
+                </nav>
+              </div>
+            {% endif %}
+          {% else %}
+            <p class="text-muted m-b-0">No hay ordenes registradas para esta sucursal en el periodo seleccionado.</p>
+          {% endif %}
+        {% elif active_tab == 'payments' %}
+          {% if payments_page.object_list %}
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>Pago</th>
+                    <th>Fecha</th>
+                    <th>Metodo</th>
+                    <th>Estado</th>
+                    <th>Orden</th>
+                    <th class="text-right">Monto</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for payment in payments_page %}
+                    <tr>
+                      <td><strong>#{{ payment.id }}</strong></td>
+                      <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
+                      <td>{{ payment.get_method_display }}</td>
+                      <td>
+                        <span class="label label-success">{{ payment.status_display }}</span>
+                      </td>
+                      <td>
+                        <a href="{% url 'orders:get_order' payment.order.id %}">#{{ payment.order.id }}</a>
+                      </td>
+                      <td class="text-right">${{ payment.amount|floatformat:2 }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% if payments_page.has_other_pages %}
+              <div class="text-right m-t-15">
+                <nav aria-label="Paginacion de pagos de sucursal">
+                  <ul class="pagination m-b-0">
+                    {% if payments_page.has_previous %}
+                      <li>
+                        <a href="{{ payments_page_url_prefix }}{{ payments_page.previous_page_number }}">Anterior</a>
+                      </li>
+                    {% else %}
+                      <li class="disabled"><span>Anterior</span></li>
+                    {% endif %}
+                    <li class="disabled">
+                      <span>Pagina {{ payments_page.number }} de {{ payments_page.paginator.num_pages }}</span>
+                    </li>
+                    {% if payments_page.has_next %}
+                      <li>
+                        <a href="{{ payments_page_url_prefix }}{{ payments_page.next_page_number }}">Siguiente</a>
+                      </li>
+                    {% else %}
+                      <li class="disabled"><span>Siguiente</span></li>
+                    {% endif %}
+                  </ul>
+                </nav>
+              </div>
+            {% endif %}
+          {% else %}
+            <p class="text-muted m-b-0">No hay pagos completados para esta sucursal en el periodo seleccionado.</p>
+          {% endif %}
+        {% endif %}
       </div>
     </div>
-  {% else %}
-    <div class="pg-alert pg-alert-info">
-      No hay sucursales registradas.
-    </div>
-  {% endif %}
-</div>
+  </div>
+{% else %}
+  <div class="alert alert-info">
+    No hay sucursales registradas.
+  </div>
+{% endif %}
 {% endblock %}

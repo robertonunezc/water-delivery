@@ -4,170 +4,200 @@
 {% endblock %}
 
 {% block content %}
-  <div class="pg-container pg-mt-4">
-    <div class="pg-row pg-mb-4">
-      <div class="pg-col-md-8">
-        <h1><i class="fas fa-credit-card pg-me-2"></i>Reporte de crédito</h1>
-        {% if has_search %}
-          <p class="pg-text-muted pg-mb-0">Resultados para: <strong>"{{ search_query }}"</strong></p>
-        {% endif %}
-      </div>
-      <div class="pg-col-md-4 pg-text-md-end">
-        <a href="{{ credit_report_export_url }}" class="pg-button pg-button-outline-success">
-          <i class="fas fa-file-csv pg-me-1"></i>Exportar CSV
-        </a>
-      </div>
-    </div>
-
-    <div class="metric-grid">
-      <div class="metric-card metric-invoice">
-        <div class="metric-label">
-          <span class="metric-icon"><i class="fas fa-credit-card"></i></span>
-          Crédito vigente
-        </div>
-        <div class="metric-value">${{ totals.total_current_credit|floatformat:2 }}</div>
-        <div class="metric-note">Saldo usado</div>
-      </div>
-      <div class="metric-card metric-capacity">
-        <div class="metric-label">
-          <span class="metric-icon"><i class="fas fa-gauge-high"></i></span>
-          Línea autorizada
-        </div>
-        <div class="metric-value">${{ totals.total_authorized_credit_line|floatformat:2 }}</div>
-        <div class="metric-note">Crédito aprobado</div>
-      </div>
-      <div class="metric-card metric-sales">
-        <div class="metric-label">
-          <span class="metric-icon"><i class="fas fa-circle-check"></i></span>
-          Disponible
-        </div>
-        <div class="metric-value">${{ totals.total_available_credit|floatformat:2 }}</div>
-        <div class="metric-note">Capacidad restante</div>
-      </div>
-      <div class="metric-card metric-risk">
-        <div class="metric-label">
-          <span class="metric-icon"><i class="fas fa-triangle-exclamation"></i></span>
-          Monto vencido
-        </div>
-        <div class="metric-value">${{ totals.total_overdue_amount|floatformat:2 }}</div>
-        <div class="metric-note">Deuda vencida</div>
-      </div>
-    </div>
-
-    <div class="filter-form">
-      <form method="get" action="{% url 'report:credit_report' %}">
-        <div class="pg-row pg-align-end">
-          <div class="pg-col-md-8">
-            <label for="search" class="pg-label">Buscar cliente:</label>
-            <input type="search"
-                   class="pg-input"
-                   id="search"
-                   name="search"
-                   value="{{ search_query }}"
-                   placeholder="Nombre del cliente...">
-          </div>
-          <div class="pg-col-md-4">
-            <button class="pg-button pg-button-primary" type="submit">
-              <i class="fas fa-search pg-me-1"></i>Buscar
-            </button>
+  <div class="row m-t-15">
+    <div class="col-md-12">
+      <div class="white-box">
+        <div class="row">
+          <div class="col-md-8">
+            <h3 class="box-title m-b-0"><i class="fas fa-credit-card m-r-5"></i>Reporte de crédito</h3>
             {% if has_search %}
-              <a href="{% url 'report:credit_report' %}" class="pg-button pg-button-outline-secondary">
-                <i class="fas fa-times pg-me-1"></i>Limpiar
-              </a>
+              <p class="text-muted m-b-0">Resultados para: <strong>"{{ search_query }}"</strong></p>
             {% endif %}
           </div>
-        </div>
-      </form>
-    </div>
-
-    {% if credit_rows %}
-      <div class="pg-flex pg-justify-between pg-align-center pg-mb-2">
-        <span class="pg-text-muted">
-          {{ totals.total_clients }} cliente{{ totals.total_clients|pluralize }} con crédito o deuda
-        </span>
-        {% if credit_rows.has_other_pages %}
-          <small class="pg-text-muted">
-            Página {{ credit_rows.number }} de {{ credit_rows.paginator.num_pages }}
-          </small>
-        {% endif %}
-      </div>
-
-      <div class="pg-card">
-        <div class="pg-card-body pg-p-0">
-          <div class="pg-table-responsive">
-            <table class="pg-table pg-table-hover pg-mb-0">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th class="pg-text-end">Crédito vigente</th>
-                  <th class="pg-text-end">Línea de crédito autorizada</th>
-                  <th class="pg-text-end">Disponible</th>
-                  <th class="pg-text-end">Monto vencido</th>
-                  <th class="pg-text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for row in credit_rows %}
-                  <tr class="credit-row" data-href="{% url 'report:client_credit_report' row.client.pk %}">
-                    <td>
-                      <a href="{% url 'report:client_credit_report' row.client.pk %}" class="pg-fw-bold pg-text-decoration-none">
-                        {{ row.client.name }}
-                      </a>
-                    </td>
-                    <td class="pg-text-end amount-current">${{ row.current_credit|floatformat:2 }}</td>
-                    <td class="pg-text-end">${{ row.authorized_credit_line|floatformat:2 }}</td>
-                    <td class="pg-text-end">${{ row.available_credit|floatformat:2 }}</td>
-                    <td class="pg-text-end">
-                      {% if row.overdue_amount > 0 %}
-                        <span class="amount-overdue">${{ row.overdue_amount|floatformat:2 }}</span>
-                      {% else %}
-                        <span class="pg-text-muted">$0.00</span>
-                      {% endif %}
-                    </td>
-                    <td class="pg-text-center">
-                      <a href="{% url 'report:client_credit_report' row.client.pk %}" class="pg-button pg-button-sm pg-button-outline-primary">
-                        Ver reporte
-                      </a>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+          <div class="col-md-4 text-right m-t-10">
+            <a href="{{ credit_report_export_url }}" class="btn btn-success btn-outline waves-effect">
+              <i class="fas fa-file-csv m-r-5"></i>Exportar CSV
+            </a>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-3 col-sm-6">
+      <div class="white-box ecom-stat-widget">
+        <div class="row">
+          <div class="col-xs-8">
+            <span class="text-blue font-light">${{ totals.total_current_credit|floatformat:2 }}</span>
+            <p class="font-12">Crédito vigente</p>
+            <small class="text-muted">Saldo usado</small>
+          </div>
+          <div class="col-xs-4 text-right">
+            <span class="icoleaf bg-primary text-white"><i class="fas fa-credit-card"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="white-box ecom-stat-widget">
+        <div class="row">
+          <div class="col-xs-8">
+            <span class="text-blue font-light">${{ totals.total_authorized_credit_line|floatformat:2 }}</span>
+            <p class="font-12">Línea autorizada</p>
+            <small class="text-muted">Crédito aprobado</small>
+          </div>
+          <div class="col-xs-4 text-right">
+            <span class="icoleaf bg-info text-white"><i class="fas fa-gauge-high"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="white-box ecom-stat-widget">
+        <div class="row">
+          <div class="col-xs-8">
+            <span class="text-blue font-light">${{ totals.total_available_credit|floatformat:2 }}</span>
+            <p class="font-12">Disponible</p>
+            <small class="text-muted">Capacidad restante</small>
+          </div>
+          <div class="col-xs-4 text-right">
+            <span class="icoleaf bg-success text-white"><i class="fas fa-circle-check"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3 col-sm-6">
+      <div class="white-box ecom-stat-widget">
+        <div class="row">
+          <div class="col-xs-8">
+            <span class="text-blue font-light">${{ totals.total_overdue_amount|floatformat:2 }}</span>
+            <p class="font-12">Monto vencido</p>
+            <small class="text-muted">Deuda vencida</small>
+          </div>
+          <div class="col-xs-4 text-right">
+            <span class="icoleaf bg-danger text-white"><i class="fas fa-triangle-exclamation"></i></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="white-box filter-form">
+    <form method="get" action="{% url 'report:credit_report' %}">
+      <div class="row">
+        <div class="col-md-8 form-group">
+          <label for="search" class="control-label">Buscar cliente:</label>
+          <input type="search"
+                 class="form-control"
+                 id="search"
+                 name="search"
+                 value="{{ search_query }}"
+                 placeholder="Nombre del cliente...">
+        </div>
+        <div class="col-md-4 form-group m-t-25">
+          <button class="btn btn-info waves-effect waves-light" type="submit">
+            <i class="fas fa-search m-r-5"></i>Buscar
+          </button>
+          {% if has_search %}
+            <a href="{% url 'report:credit_report' %}" class="btn btn-default waves-effect">
+              <i class="fas fa-times m-r-5"></i>Limpiar
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  {% if credit_rows %}
+    <div class="white-box">
+      <div class="row m-b-15">
+        <div class="col-sm-8 text-muted">
+          {{ totals.total_clients }} cliente{{ totals.total_clients|pluralize }} con crédito o deuda
+        </div>
+        <div class="col-sm-4 text-right">
+          {% if credit_rows.has_other_pages %}
+            <small class="text-muted">
+              Página {{ credit_rows.number }} de {{ credit_rows.paginator.num_pages }}
+            </small>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-hover m-b-0">
+          <thead>
+            <tr>
+              <th>Cliente</th>
+              <th class="text-right">Crédito vigente</th>
+              <th class="text-right">Línea de crédito autorizada</th>
+              <th class="text-right">Disponible</th>
+              <th class="text-right">Monto vencido</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in credit_rows %}
+              <tr class="credit-row" data-href="{% url 'report:client_credit_report' row.client.pk %}">
+                <td>
+                  <a href="{% url 'report:client_credit_report' row.client.pk %}" class="font-bold">
+                    {{ row.client.name }}
+                  </a>
+                </td>
+                <td class="text-right amount-current">${{ row.current_credit|floatformat:2 }}</td>
+                <td class="text-right">${{ row.authorized_credit_line|floatformat:2 }}</td>
+                <td class="text-right">${{ row.available_credit|floatformat:2 }}</td>
+                <td class="text-right">
+                  {% if row.overdue_amount > 0 %}
+                    <span class="amount-overdue text-danger font-bold">${{ row.overdue_amount|floatformat:2 }}</span>
+                  {% else %}
+                    <span class="text-muted">$0.00</span>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  <a href="{% url 'report:client_credit_report' row.client.pk %}" class="btn btn-info btn-outline btn-sm">
+                    Ver reporte
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
 
       {% if credit_rows.has_other_pages %}
-        <nav class="pg-mt-4" aria-label="Navegación del reporte de crédito">
-          <ul class="pg-pagination pg-justify-center">
-            {% if credit_rows.has_previous %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.previous_page_number }}">
-                  <i class="fas fa-angle-left"></i>
-                </a>
+        <div class="text-center m-t-20">
+          <nav aria-label="Navegación del reporte de crédito">
+            <ul class="pagination m-b-0">
+              {% if credit_rows.has_previous %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.previous_page_number }}">
+                    <i class="fas fa-angle-left"></i>
+                  </a>
+                </li>
+              {% endif %}
+              <li class="active">
+                <span>{{ credit_rows.number }}</span>
               </li>
-            {% endif %}
-            <li class="pg-page-item pg-active">
-              <span class="pg-page-link">{{ credit_rows.number }}</span>
-            </li>
-            {% if credit_rows.has_next %}
-              <li class="pg-page-item">
-                <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.next_page_number }}">
-                  <i class="fas fa-angle-right"></i>
-                </a>
-              </li>
-            {% endif %}
-          </ul>
-        </nav>
+              {% if credit_rows.has_next %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}page={{ credit_rows.next_page_number }}">
+                    <i class="fas fa-angle-right"></i>
+                  </a>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
+        </div>
       {% endif %}
-    {% else %}
-      <div class="pg-text-center pg-py-5">
-        <i class="fas fa-search fa-4x pg-text-muted pg-mb-3"></i>
-        <h4 class="pg-text-muted">No hay clientes para mostrar</h4>
-        <p class="pg-text-muted">No se encontraron clientes activos con línea de crédito o deuda.</p>
-      </div>
-    {% endif %}
-  </div>
+    </div>
+  {% else %}
+    <div class="white-box text-center p-30">
+      <i class="fas fa-search fa-4x text-muted m-b-15"></i>
+      <h4 class="text-muted">No hay clientes para mostrar</h4>
+      <p class="text-muted">No se encontraron clientes activos con línea de crédito o deuda.</p>
+    </div>
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}

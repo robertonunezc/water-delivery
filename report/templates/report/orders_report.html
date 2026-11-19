@@ -4,434 +4,446 @@
 {% endblock %}
 
 {% block content %}
-  <div class="pg-container pg-mt-4">
-    <!-- Header Section -->
-    <div class="pg-row pg-mb-4">
-      <div class="pg-col-md-8">
-        <h1><i class="fas fa-shopping-cart pg-me-2"></i>Reporte de Órdenes</h1>
-        <p class="pg-text-muted pg-mb-0">Pedidos creados por {{ user.get_full_name|default:user.username }}</p>
-        {% if has_search or has_filters %}
-          <p class="pg-text-muted pg-mb-0">
-            {% if has_search %}
-              Resultados para: <strong>"{{ search_query }}"</strong>
+  <!-- Header Section -->
+  <div class="row m-t-15">
+    <div class="col-md-12">
+      <div class="white-box">
+        <div class="row">
+          <div class="col-md-8">
+            <h3 class="box-title m-b-0"><i class="fas fa-shopping-cart m-r-5"></i>Reporte de Órdenes</h3>
+            <p class="text-muted m-b-0">Pedidos creados por {{ user.get_full_name|default:user.username }}</p>
+            {% if has_search or has_filters %}
+              <p class="text-muted m-b-0">
+                {% if has_search %}
+                  Resultados para: <strong>"{{ search_query }}"</strong>
+                {% endif %}
+                {% if has_filters %}
+                  {% if has_search %} | {% endif %}
+                  Con filtros aplicados
+                {% endif %}
+              </p>
             {% endif %}
-            {% if has_filters %}
-              {% if has_search %} | {% endif %}
-              Con filtros aplicados
-            {% endif %}
-          </p>
-        {% endif %}
-      </div>
-      <div class="pg-col-md-4 pg-text-md-end">
-        <a href="{% url 'clients:list' %}" class="pg-button pg-button-outline-primary pg-me-2">
-          <i class="fas fa-users"></i> Ver Clientes
-        </a>
-        <a class="pg-button pg-button-outline-success pg-me-2" href="{{ orders_export_url }}"><i class="fas fa-file-excel pg-me-2"></i>Exportar</a>
+          </div>
+          <div class="col-md-4 text-right m-t-10">
+            <a href="{% url 'clients:list' %}" class="btn btn-info btn-outline waves-effect m-r-5">
+              <i class="fas fa-users"></i> Ver Clientes
+            </a>
+            <a class="btn btn-success btn-outline waves-effect" href="{{ orders_export_url }}"><i class="fas fa-file-excel m-r-5"></i>Exportar</a>
+          </div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <!-- Order Statistics Summary -->
-    {% if order_stats.total_orders %}
-      <div class="metric-grid">
-        <div class="metric-card metric-orders">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-clipboard-list"></i></span>
-            Total órdenes
-          </div>
-          <div class="metric-value">{{ order_stats.total_orders }}</div>
-          <div class="metric-note">Pedidos en el reporte</div>
-        </div>
-        <div class="metric-card metric-sales">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-dollar-sign"></i></span>
-            Monto total
-          </div>
-          <div class="metric-value">${{ order_stats.total_amount_sum|floatformat:2 }}</div>
-          <div class="metric-note">Suma de órdenes</div>
-        </div>
-        <div class="metric-card metric-ticket">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-receipt"></i></span>
-            Promedio por orden
-          </div>
-          <div class="metric-value">${{ order_stats.avg_amount|floatformat:2 }}</div>
-          <div class="metric-note">Monto total / órdenes</div>
-        </div>
-        <div class="metric-card metric-capacity">
-          <div class="metric-label">
-            <span class="metric-icon"><i class="fas fa-arrow-trend-up"></i></span>
-            Orden más alta
-          </div>
-          <div class="metric-value">${{ order_stats.max_amount_stat|floatformat:2 }}</div>
-          <div class="metric-note">Mayor venta del reporte</div>
-        </div>
-      </div>
-    {% endif %}
-
-    <!-- Status Distribution -->
-    {% if status_distribution %}
-      <div class="status-distribution">
-        <strong>Distribución por Estado:</strong>
-        {% for status_item in status_distribution %}
-          <span class="status-item">
-            <span class="pg-badge status-{{ status_item.status|lower }}">
-              {% for choice_value, choice_display in order_status_choices %}
-                {% if choice_value == status_item.status %}{{ choice_display }}{% endif %}
-              {% endfor %}
-            </span>
-            {{ status_item.count }}
-          </span>
-        {% endfor %}
-      </div>
-    {% endif %}
-
-    <!-- Filter Form -->
-    <div class="filter-form">
-      <form method="get" action="{% url 'report:orders_report' %}">
-        <div class="pg-row pg-mb-3">
-          <div class="pg-col-md-4">
-            <label for="search" class="pg-label">Buscar:</label>
-            <input type="search" 
-                   class="pg-input" 
-                   id="search"
-                   name="search" 
-                   value="{{ search_query }}" 
-                   placeholder="Cliente, ID de orden, notas...">
-          </div>
-          <div class="pg-col-md-2">
-            <label for="status" class="pg-label">Estado:</label>
-            <select class="pg-select" id="status" name="status">
-              <option value="all" {% if status_filter == 'all' or not status_filter %}selected{% endif %}>Todos</option>
-              {% for choice_value, choice_display in order_status_choices %}
-                <option value="{{ choice_value }}" {% if status_filter == choice_value %}selected{% endif %}>
-                  {{ choice_display }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="pg-col-md-2">
-            <label for="date_filter" class="pg-label">Período:</label>
-            <select class="pg-select" id="date_filter" name="date_filter">
-              <option value="" {% if not date_filter %}selected{% endif %}>Todas las fechas</option>
-              <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Hoy</option>
-              <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Esta semana</option>
-              <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Este mes</option>
-              <option value="custom" {% if date_filter == 'custom' %}selected{% endif %}>Rango personalizado</option>
-            </select>
-          </div>
-          <div class="pg-col-md-2">
-            <label for="sort_by" class="pg-label">Ordenar por:</label>
-            <select class="pg-select" id="sort_by" name="sort_by">
-              <option value="-order_date" {% if sort_by == '-order_date' %}selected{% endif %}>Fecha (más reciente)</option>
-              <option value="order_date" {% if sort_by == 'order_date' %}selected{% endif %}>Fecha (más antigua)</option>
-              <option value="-total_amount" {% if sort_by == '-total_amount' %}selected{% endif %}>Monto (mayor)</option>
-              <option value="total_amount" {% if sort_by == 'total_amount' %}selected{% endif %}>Monto (menor)</option>
-              <option value="client__name" {% if sort_by == 'client__name' %}selected{% endif %}>Cliente (A-Z)</option>
-              <option value="-client__name" {% if sort_by == '-client__name' %}selected{% endif %}>Cliente (Z-A)</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Custom Date Range (shown when custom is selected) -->
-        <div class="pg-row pg-mb-3 {% if date_filter != 'custom' %}pg-hidden{% endif %}" id="custom-date-range">
-          <div class="pg-col-md-3">
-            <label for="start_date" class="pg-label">Fecha inicio:</label>
-            <input type="date" 
-                   class="pg-input" 
-                   id="start_date"
-                   name="start_date" 
-                   value="{{ start_date }}"
-                   max="{{ today_date }}">
-          </div>
-          <div class="pg-col-md-3">
-            <label for="end_date" class="pg-label">Fecha fin:</label>
-            <input type="date" 
-                   class="pg-input" 
-                   id="end_date"
-                   name="end_date" 
-                   value="{{ end_date }}"
-                   max="{{ today_date }}">
-          </div>
-        </div>
-
-        <!-- Amount Range Filters -->
-        <div class="pg-row pg-mb-3">
-          <div class="pg-col-md-3">
-            <label for="payment_method" class="pg-label">Método de Pago:</label>
-            <select class="pg-select" id="payment_method" name="payment_method">
-              <option value="">Todos</option>
-              {% for method in payment_methods %}
-                <option value="{{ method.0 }}" {% if method.0 == payment_method %}selected{% endif %}>
-                  {{ method.1 }}
-                </option>
-              {% endfor %}
-            </select>
-          </div>
-          <div class="pg-col-md-2">
-            <label for="has_billing" class="pg-label">Facturación:</label>
-            <select class="pg-select" id="has_billing" name="has_billing">
-              <option value="" {% if not has_billing %}selected{% endif %}>Todos</option>
-              <option value="yes" {% if has_billing == 'yes' %}selected{% endif %}>Con Facturación</option>
-              <option value="no" {% if has_billing == 'no' %}selected{% endif %}>Sin Facturación</option>
-            </select>
-          </div>
-          <div class="pg-col-md-4">
-            <label class="pg-label">&nbsp;</label>
-            <div class="pg-grid pg-gap-2 pg-d-md-flex">
-              <button class="pg-button pg-button-primary" type="submit">
-                <i class="fas fa-filter pg-me-1"></i>Filtrar
-              </button>
-              {% if has_search or has_filters %}
-                <a href="{% url 'report:orders_report' %}" class="pg-button pg-button-outline-secondary">
-                  <i class="fas fa-times pg-me-1"></i>Limpiar Filtros
-                </a>
-              {% endif %}
+  <!-- Order Statistics Summary -->
+  {% if order_stats.total_orders %}
+    <div class="row">
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">{{ order_stats.total_orders }}</span>
+              <p class="font-12">Total órdenes</p>
+              <small class="text-muted">Pedidos en el reporte</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-primary text-white"><i class="fas fa-clipboard-list"></i></span>
             </div>
           </div>
         </div>
-          
-      </form>
-    </div>
-
-    <!-- Results Info -->
-    {% if total_orders > 0 %}
-      <div class="search-results-info">
-        <div class="pg-row pg-align-center">
-          <div class="pg-col-md-8">
-            <i class="fas fa-info-circle pg-me-2"></i>
-            Se encontraron <strong>{{ total_orders }}</strong> orden{{ total_orders|pluralize:"es" }}
-            {% if has_search or has_filters %}
-              que coincide{{ total_orders|pluralize:"," }} con los filtros aplicados
-            {% endif %}
-          </div>
-          <div class="pg-col-md-4 pg-text-md-end">
-            <small class="pg-text-muted">
-              {% if orders.has_other_pages %}
-                Página {{ orders.number }} de {{ orders.paginator.num_pages }}
-                ({{ orders.start_index }}-{{ orders.end_index }} de {{ total_orders }})
-              {% endif %}
-            </small>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ order_stats.total_amount_sum|floatformat:2 }}</span>
+              <p class="font-12">Monto total</p>
+              <small class="text-muted">Suma de órdenes</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-success text-white"><i class="fas fa-dollar-sign"></i></span>
+            </div>
           </div>
         </div>
       </div>
-    {% endif %}
-
-    <!-- Orders Table -->
-    {% if orders %}
-      <div class="pg-card">
-        <div class="pg-card-body pg-p-0">
-          <div class="pg-table-responsive">
-            <table class="pg-table pg-table-hover pg-mb-0">
-              <thead>
-                <tr>
-                  <th scope="col">ID / Cliente</th>
-                  <th scope="col">Usuario</th>
-                  <th scope="col">Fecha</th>
-                  <th scope="col" class="pg-text-end">Monto</th>
-                  <th scope="col" class="pg-text-center">Metodo Pago</th>
-                  <th scope="col" class="pg-text-center">Estado</th>
-                  <th scope="col" class="pg-text-center">Facturación</th>
-                  <th scope="col">Productos</th>
-                  <th scope="col" class="pg-text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for order in orders %}
-                  <tr>
-                    <td class="">
-                      <div class=" pg-flex pg-align-center">
-                           
-                          <strong>#{{ order.id }}</strong> - 
-                            <a href="{% url 'clients:detail' order.client.pk %}" class="pg-text-decoration-none">
-                                {{ order.client.name }}
-                            </a>
-                            
-                      </div>
-                    </td>
-                    <td>{{ order.owner.get_full_name|default:order.owner.username }}</td>
-                    <td>
-                      <div class="date-info">
-                        <strong>{{ order.order_date|date:"d/m/Y" }}</strong>
-                        {% comment %} <br><small class="pg-text-muted">{{ order.order_date|date:"H:i" }}</small> {% endcomment %}
-                      </div>
-                    </td>
-                    <td class="pg-text-end">
-                      <span class="amount-high">
-                        ${{ order.total_amount|floatformat:2 }}
-                      </span>
-                      {% if order.cantidad_cobrada and order.cantidad_cobrada != order.total_amount %}
-                        <br><small class="pg-text-muted">
-                          Cobrado: ${{ order.cantidad_cobrada|floatformat:2 }}
-                        </small>
-                      {% endif %}
-                    </td>
-                    <td>
-                      <div class="pg-text-center">
-                        {% if order.payments.all %}
-                          {% for payment in order.payments.all %}
-                            <span class="pg-badge pg-bg-info pg-text-dark pg-me-1">
-                              {{ payment.get_method_display }}
-                            </span>
-                          {% endfor %}
-                        {% else %}
-                          <small class="pg-text-muted">Sin pagos</small>
-                        {% endif %}
-                      </div>
-                    </td>
-                    <td class="pg-text-center">
-                      <span class="pg-badge status-{{ order.status|lower }} status-badge">
-                        {{ order.get_status_display_fixed }}
-                      </span>
-                    </td>
-                    <td class="pg-text-center">
-                      {% with billing_list=order.invoice_links.all %}
-                        {% if billing_list %}
-                          {% for bo in billing_list %}
-                            <span class="pg-badge pg-badge-success pg-me-1">
-                              {{ bo.invoice.identifier }}
-                            </span>
-                          {% endfor %}
-                        {% else %}
-                          <small class="pg-text-muted">No</small>
-                        {% endif %}
-                      {% endwith %}
-                    </td>
-                    
-                    <td>
-                      <div class="order-items-summary">
-                        {% if order.items.all %}
-                          {% for item in order.items.all|slice:":2" %}
-                            {{ item.quantity }}x {{ item.product.name }}{% if not forloop.last %}, {% endif %}
-                          {% endfor %}
-                          {% if order.items.count > 2 %}
-                            <br><small class="pg-text-muted">y {{ order.items.count|add:"-2" }} más...</small>
-                          {% endif %}
-                        {% else %}
-                          <small class="pg-text-muted">Sin productos</small>
-                        {% endif %}
-                      </div>
-                    </td>
-                    <td class="pg-text-center">
-                      <div class="pg-dropdown">
-                        <button class="pg-button pg-button-sm pg-button-outline-secondary pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
-                          Acciones
-                        </button>
-                        <ul class="pg-dropdown-menu pg-dropdown-menu-end">
-                          <li>
-                            <a href="#"
-                               class="pg-dropdown-item"
-                               data-pg-toggle="modal"
-                               data-pg-target="#orderModal{{ order.id }}">
-                              Ver detalles
-                            </a>
-                          </li>
-                          {% include 'orders/_receipt_dropdown_items.html' %}
-                          <li>{% include 'orders/_cancel_order_action.html' %}</li>
-                        </ul>
-                      </div>
-                    </td>
-                  </tr>
-                {% endfor %}
-              </tbody>
-            </table>
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ order_stats.avg_amount|floatformat:2 }}</span>
+              <p class="font-12">Promedio por orden</p>
+              <small class="text-muted">Monto total / órdenes</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-info text-white"><i class="fas fa-receipt"></i></span>
+            </div>
           </div>
         </div>
+      </div>
+      <div class="col-md-3 col-sm-6">
+        <div class="white-box ecom-stat-widget">
+          <div class="row">
+            <div class="col-xs-8">
+              <span class="text-blue font-light">${{ order_stats.max_amount_stat|floatformat:2 }}</span>
+              <p class="font-12">Orden más alta</p>
+              <small class="text-muted">Mayor venta del reporte</small>
+            </div>
+            <div class="col-xs-4 text-right">
+              <span class="icoleaf bg-warning text-white"><i class="fas fa-arrow-trend-up"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Status Distribution -->
+  {% if status_distribution %}
+    <div class="white-box status-distribution">
+      <strong>Distribución por Estado:</strong>
+      {% for status_item in status_distribution %}
+        <span class="status-item m-l-10">
+          <span class="label label-info status-{{ status_item.status|lower }}">
+            {% for choice_value, choice_display in order_status_choices %}
+              {% if choice_value == status_item.status %}{{ choice_display }}{% endif %}
+            {% endfor %}
+          </span>
+          {{ status_item.count }}
+        </span>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <!-- Filter Form -->
+  <div class="white-box filter-form">
+    <form method="get" action="{% url 'report:orders_report' %}">
+      <div class="row">
+        <div class="col-md-4 form-group">
+          <label for="search" class="control-label">Buscar:</label>
+          <input type="search" 
+                 class="form-control" 
+                 id="search"
+                 name="search" 
+                 value="{{ search_query }}" 
+                 placeholder="Cliente, ID de orden, notas...">
+        </div>
+        <div class="col-md-2 form-group">
+          <label for="status" class="control-label">Estado:</label>
+          <select class="form-control" id="status" name="status">
+            <option value="all" {% if status_filter == 'all' or not status_filter %}selected{% endif %}>Todos</option>
+            {% for choice_value, choice_display in order_status_choices %}
+              <option value="{{ choice_value }}" {% if status_filter == choice_value %}selected{% endif %}>
+                {{ choice_display }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 form-group">
+          <label for="date_filter" class="control-label">Período:</label>
+          <select class="form-control" id="date_filter" name="date_filter">
+            <option value="" {% if not date_filter %}selected{% endif %}>Todas las fechas</option>
+            <option value="today" {% if date_filter == 'today' %}selected{% endif %}>Hoy</option>
+            <option value="week" {% if date_filter == 'week' %}selected{% endif %}>Esta semana</option>
+            <option value="month" {% if date_filter == 'month' %}selected{% endif %}>Este mes</option>
+            <option value="custom" {% if date_filter == 'custom' %}selected{% endif %}>Rango personalizado</option>
+          </select>
+        </div>
+        <div class="col-md-2 form-group">
+          <label for="sort_by" class="control-label">Ordenar por:</label>
+          <select class="form-control" id="sort_by" name="sort_by">
+            <option value="-order_date" {% if sort_by == '-order_date' %}selected{% endif %}>Fecha (más reciente)</option>
+            <option value="order_date" {% if sort_by == 'order_date' %}selected{% endif %}>Fecha (más antigua)</option>
+            <option value="-total_amount" {% if sort_by == '-total_amount' %}selected{% endif %}>Monto (mayor)</option>
+            <option value="total_amount" {% if sort_by == 'total_amount' %}selected{% endif %}>Monto (menor)</option>
+            <option value="client__name" {% if sort_by == 'client__name' %}selected{% endif %}>Cliente (A-Z)</option>
+            <option value="-client__name" {% if sort_by == '-client__name' %}selected{% endif %}>Cliente (Z-A)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Custom Date Range (shown when custom is selected) -->
+      <div class="row {% if date_filter != 'custom' %}pg-hidden{% endif %}" id="custom-date-range">
+        <div class="col-md-3 form-group">
+          <label for="start_date" class="control-label">Fecha inicio:</label>
+          <input type="date" 
+                 class="form-control" 
+                 id="start_date"
+                 name="start_date" 
+                 value="{{ start_date }}"
+                 max="{{ today_date }}">
+        </div>
+        <div class="col-md-3 form-group">
+          <label for="end_date" class="control-label">Fecha fin:</label>
+          <input type="date" 
+                 class="form-control" 
+                 id="end_date"
+                 name="end_date" 
+                 value="{{ end_date }}"
+                 max="{{ today_date }}">
+        </div>
+      </div>
+
+      <!-- Amount Range Filters -->
+      <div class="row">
+        <div class="col-md-3 form-group">
+          <label for="payment_method" class="control-label">Método de Pago:</label>
+          <select class="form-control" id="payment_method" name="payment_method">
+            <option value="">Todos</option>
+            {% for method in payment_methods %}
+              <option value="{{ method.0 }}" {% if method.0 == payment_method %}selected{% endif %}>
+                {{ method.1 }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2 form-group">
+          <label for="has_billing" class="control-label">Facturación:</label>
+          <select class="form-control" id="has_billing" name="has_billing">
+            <option value="" {% if not has_billing %}selected{% endif %}>Todos</option>
+            <option value="yes" {% if has_billing == 'yes' %}selected{% endif %}>Con Facturación</option>
+            <option value="no" {% if has_billing == 'no' %}selected{% endif %}>Sin Facturación</option>
+          </select>
+        </div>
+        <div class="col-md-4 form-group m-t-25">
+          <button class="btn btn-info waves-effect waves-light" type="submit">
+            <i class="fas fa-filter m-r-5"></i>Filtrar
+          </button>
+          {% if has_search or has_filters %}
+            <a href="{% url 'report:orders_report' %}" class="btn btn-default waves-effect">
+              <i class="fas fa-times m-r-5"></i>Limpiar Filtros
+            </a>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results Info -->
+  {% if total_orders > 0 %}
+    <div class="alert alert-info search-results-info">
+      <div class="row">
+        <div class="col-md-8">
+          <i class="fas fa-info-circle m-r-5"></i>
+          Se encontraron <strong>{{ total_orders }}</strong> orden{{ total_orders|pluralize:"es" }}
+          {% if has_search or has_filters %}
+            que coincide{{ total_orders|pluralize:"," }} con los filtros aplicados
+          {% endif %}
+        </div>
+        <div class="col-md-4 text-right">
+          <small>
+            {% if orders.has_other_pages %}
+              Página {{ orders.number }} de {{ orders.paginator.num_pages }}
+              ({{ orders.start_index }}-{{ orders.end_index }} de {{ total_orders }})
+            {% endif %}
+          </small>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Orders Table -->
+  {% if orders %}
+    <div class="white-box">
+      <div class="table-responsive">
+        <table class="table table-hover m-b-0">
+          <thead>
+            <tr>
+              <th scope="col">ID / Cliente</th>
+              <th scope="col">Usuario</th>
+              <th scope="col">Fecha</th>
+              <th scope="col" class="text-right">Monto</th>
+              <th scope="col" class="text-center">Metodo Pago</th>
+              <th scope="col" class="text-center">Estado</th>
+              <th scope="col" class="text-center">Facturación</th>
+              <th scope="col">Productos</th>
+              <th scope="col" class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+              <tr>
+                <td>
+                  <strong>#{{ order.id }}</strong> - 
+                  <a href="{% url 'clients:detail' order.client.pk %}">
+                    {{ order.client.name }}
+                  </a>
+                </td>
+                <td>{{ order.owner.get_full_name|default:order.owner.username }}</td>
+                <td>
+                  <div class="date-info">
+                    <strong>{{ order.order_date|date:"d/m/Y" }}</strong>
+                  </div>
+                </td>
+                <td class="text-right">
+                  <span class="amount-high font-bold">
+                    ${{ order.total_amount|floatformat:2 }}
+                  </span>
+                  {% if order.cantidad_cobrada and order.cantidad_cobrada != order.total_amount %}
+                    <br><small class="text-muted">
+                      Cobrado: ${{ order.cantidad_cobrada|floatformat:2 }}
+                    </small>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  {% if order.payments.all %}
+                    {% for payment in order.payments.all %}
+                      <span class="label label-info m-r-5">
+                        {{ payment.get_method_display }}
+                      </span>
+                    {% endfor %}
+                  {% else %}
+                    <small class="text-muted">Sin pagos</small>
+                  {% endif %}
+                </td>
+                <td class="text-center">
+                  <span class="label label-default status-{{ order.status|lower }} status-badge">
+                    {{ order.get_status_display_fixed }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  {% with billing_list=order.invoice_links.all %}
+                    {% if billing_list %}
+                      {% for bo in billing_list %}
+                        <span class="label label-success m-r-5">
+                          {{ bo.invoice.identifier }}
+                        </span>
+                      {% endfor %}
+                    {% else %}
+                      <small class="text-muted">No</small>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td>
+                  <div class="order-items-summary">
+                    {% if order.items.all %}
+                      {% for item in order.items.all|slice:":2" %}
+                        {{ item.quantity }}x {{ item.product.name }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                      {% if order.items.count > 2 %}
+                        <br><small class="text-muted">y {{ order.items.count|add:"-2" }} más...</small>
+                      {% endif %}
+                    {% else %}
+                      <small class="text-muted">Sin productos</small>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="text-center">
+                  <div class="pg-dropdown">
+                    <button class="btn btn-default btn-sm pg-dropdown-trigger" type="button" data-pg-toggle="dropdown" aria-expanded="false">
+                      Acciones
+                    </button>
+                    <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                      <li>
+                        <a href="#"
+                           class="pg-dropdown-item"
+                           data-pg-toggle="modal"
+                           data-pg-target="#orderModal{{ order.id }}">
+                          Ver detalles
+                        </a>
+                      </li>
+                      {% include 'orders/_receipt_dropdown_items.html' %}
+                      <li>{% include 'orders/_cancel_order_action.html' %}</li>
+                    </ul>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
 
       <!-- Pagination -->
       {% if orders.has_other_pages %}
-        <div class="pg-row pg-mt-4">
-          <div class="pg-col-12">
-            <nav aria-label="Navegación de páginas del reporte">
-              <ul class="pg-pagination pg-justify-center">
-                {% if orders.has_previous %}
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
-                      <i class="fas fa-angle-double-left"></i>
-                    </a>
+        <div class="text-center m-t-20">
+          <nav aria-label="Navegación de páginas del reporte">
+            <ul class="pagination m-b-0">
+              {% if orders.has_previous %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page=1" aria-label="Primera página">
+                    <i class="fas fa-angle-double-left"></i>
+                  </a>
+                </li>
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
+                    <i class="fas fa-angle-left"></i>
+                  </a>
+                </li>
+              {% else %}
+                <li class="disabled">
+                  <span><i class="fas fa-angle-double-left"></i></span>
+                </li>
+                <li class="disabled">
+                  <span><i class="fas fa-angle-left"></i></span>
+                </li>
+              {% endif %}
+
+              <!-- Page numbers -->
+              {% for page_num in orders.paginator.page_range %}
+                {% if page_num == orders.number %}
+                  <li class="active">
+                    <span>{{ page_num }}</span>
                   </li>
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.previous_page_number }}" aria-label="Página anterior">
-                      <i class="fas fa-angle-left"></i>
-                    </a>
+                {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
+                  <li>
+                    <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                   </li>
-                {% else %}
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link"><i class="fas fa-angle-double-left"></i></span>
+                {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
+                  <li>
+                    <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
                   </li>
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link"><i class="fas fa-angle-left"></i></span>
+                {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
+                  <li class="disabled">
+                    <span>...</span>
                   </li>
                 {% endif %}
+              {% endfor %}
 
-                <!-- Page numbers -->
-                {% for page_num in orders.paginator.page_range %}
-                  {% if page_num == orders.number %}
-                    <li class="pg-page-item pg-active">
-                      <span class="pg-page-link">{{ page_num }}</span>
-                    </li>
-                  {% elif page_num > orders.number|add:'-3' and page_num < orders.number|add:'3' %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                  {% elif page_num == 1 or page_num == orders.paginator.num_pages %}
-                    <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ page_num }}">{{ page_num }}</a>
-                    </li>
-                  {% elif page_num == orders.number|add:'-4' or page_num == orders.number|add:'4' %}
-                    <li class="pg-page-item pg-disabled">
-                      <span class="pg-page-link">...</span>
-                    </li>
-                  {% endif %}
-                {% endfor %}
-
-                {% if orders.has_next %}
-                  <li class="pg-page-item">
-                      <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
-                      <i class="fas fa-angle-right"></i>
-                    </a>
-                  </li>
-                  <li class="pg-page-item">
-                    <a class="pg-page-link" href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
-                      <i class="fas fa-angle-double-right"></i>
-                    </a>
-                  </li>
-                {% else %}
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link"><i class="fas fa-angle-right"></i></span>
-                  </li>
-                  <li class="pg-page-item pg-disabled">
-                    <span class="pg-page-link"><i class="fas fa-angle-double-right"></i></span>
-                  </li>
-                {% endif %}
-              </ul>
-            </nav>
-          </div>
+              {% if orders.has_next %}
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.next_page_number }}" aria-label="Página siguiente">
+                    <i class="fas fa-angle-right"></i>
+                  </a>
+                </li>
+                <li>
+                  <a href="?{% if search_query %}search={{ search_query|urlencode }}&{% endif %}{% if status_filter %}status={{ status_filter }}&{% endif %}{% if date_filter %}date_filter={{ date_filter }}&{% endif %}{% if start_date %}start_date={{ start_date }}&{% endif %}{% if end_date %}end_date={{ end_date }}&{% endif %}{% if min_amount %}min_amount={{ min_amount }}&{% endif %}{% if max_amount %}max_amount={{ max_amount }}&{% endif %}{% if payment_method %}payment_method={{ payment_method }}&{% endif %}{% if has_billing %}has_billing={{ has_billing }}&{% endif %}{% if sort_by %}sort_by={{ sort_by }}&{% endif %}page={{ orders.paginator.num_pages }}" aria-label="Última página">
+                    <i class="fas fa-angle-double-right"></i>
+                  </a>
+                </li>
+              {% else %}
+                <li class="disabled">
+                  <span><i class="fas fa-angle-right"></i></span>
+                </li>
+                <li class="disabled">
+                  <span><i class="fas fa-angle-double-right"></i></span>
+                </li>
+              {% endif %}
+            </ul>
+          </nav>
         </div>
       {% endif %}
+    </div>
 
-    {% else %}
-      <!-- Empty State -->
-      <div class="pg-text-center pg-py-5">
-        {% if has_search or has_filters %}
-          <i class="fas fa-search fa-4x pg-text-muted pg-mb-3"></i>
-          <h4 class="pg-text-muted">No se encontraron resultados</h4>
-          <p class="pg-text-muted">
-            No hay órdenes que coincidan con los filtros aplicados
-          </p>
-          <div class="pg-mt-3">
-            <a href="{% url 'report:orders_report' %}" class="pg-button pg-button-outline-primary pg-me-2">
-              <i class="fas fa-arrow-left pg-me-2"></i>Ver todas las órdenes
-            </a>
-          </div>
-        {% else %}
-          <i class="fas fa-inbox fa-4x pg-text-muted pg-mb-3"></i>
-          <h4 class="pg-text-muted">No hay órdenes</h4>
-          <p class="pg-text-muted">No se han registrado órdenes en el sistema</p>
-        {% endif %}
-      </div>
-    {% endif %}
-  </div>
+  {% else %}
+    <!-- Empty State -->
+    <div class="white-box text-center p-30">
+      {% if has_search or has_filters %}
+        <i class="fas fa-search fa-4x text-muted m-b-15"></i>
+        <h4 class="text-muted">No se encontraron resultados</h4>
+        <p class="text-muted">
+          No hay órdenes que coincidan con los filtros aplicados
+        </p>
+        <div class="m-t-15">
+          <a href="{% url 'report:orders_report' %}" class="btn btn-info btn-outline waves-effect">
+            <i class="fas fa-arrow-left m-r-5"></i>Ver todas las órdenes
+          </a>
+        </div>
+      {% else %}
+        <i class="fas fa-inbox fa-4x text-muted m-b-15"></i>
+        <h4 class="text-muted">No hay órdenes</h4>
+        <p class="text-muted">No se han registrado órdenes en el sistema</p>
+      {% endif %}
+    </div>
+  {% endif %}
 
   <!-- Order Detail Modals -->
   {% for order in orders %}
@@ -440,26 +452,26 @@
         <div class="pg-modal-content">
           <div class="pg-modal-header">
             <h5 class="pg-modal-title" id="orderModalLabel{{ order.id }}">
-              <i class="fas fa-shopping-cart pg-me-2"></i>Orden #{{ order.id }}
+              <i class="fas fa-shopping-cart m-r-5"></i>Orden #{{ order.id }}
             </h5>
             <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="pg-modal-body">
-            <div class="pg-row">
-              <div class="pg-col-md-6">
-                <h6><i class="fas fa-user pg-me-2"></i>Cliente</h6>
+            <div class="row">
+              <div class="col-md-6">
+                <h6><i class="fas fa-user m-r-5"></i>Cliente</h6>
                 <p>{{ order.client.name }}</p>
                 
-                <h6><i class="fas fa-calendar pg-me-2"></i>Fecha</h6>
+                <h6><i class="fas fa-calendar m-r-5"></i>Fecha</h6>
                 <p>{{ order.order_date|date:"d/m/Y H:i" }}</p>
                 
-                <h6><i class="fas fa-dollar-sign pg-me-2"></i>Monto</h6>
+                <h6><i class="fas fa-dollar-sign m-r-5"></i>Monto</h6>
                 <p>${{ order.total_amount|floatformat:2 }}</p>
               </div>
-              <div class="pg-col-md-6">
-                <h6><i class="fas fa-info-circle pg-me-2"></i>Estado</h6>
-                <p><span class="pg-badge status-{{ order.status|lower }}">{{ order.get_status_display_fixed }}</span></p>
-                <h6><i class="fas fa-user-tie pg-me-2"></i>Empleado</h6>
+              <div class="col-md-6">
+                <h6><i class="fas fa-info-circle m-r-5"></i>Estado</h6>
+                <p><span class="label label-default status-{{ order.status|lower }}">{{ order.get_status_display_fixed }}</span></p>
+                <h6><i class="fas fa-user-tie m-r-5"></i>Empleado</h6>
                 <p>
                   {% if order.owner %}
                     {{ order.owner.get_full_name|default:order.owner.username }}
@@ -469,16 +481,16 @@
                 </p>
                 
                 {% if order.cantidad_cobrada %}
-                  <h6><i class="fas fa-cash-register pg-me-2"></i>Cantidad Cobrada</h6>
+                  <h6><i class="fas fa-cash-register m-r-5"></i>Cantidad Cobrada</h6>
                   <p>${{ order.cantidad_cobrada|floatformat:2 }}</p>
                 {% endif %}
               </div>
             </div>
             
             {% if order.items.all %}
-              <h6><i class="fas fa-list pg-me-2"></i>Productos</h6>
-              <div class="pg-table-responsive">
-                <table class="pg-table pg-table-sm">
+              <h6><i class="fas fa-list m-r-5"></i>Productos</h6>
+              <div class="table-responsive">
+                <table class="table table-condensed">
                   <thead>
                     <tr>
                       <th>Producto</th>
@@ -500,21 +512,20 @@
                 </table>
               </div>
             {% endif %}
-            {% comment %} Billing information for the order (if any) {% endcomment %}
             {% with billing_list=order.invoice_links.all %}
               {% if billing_list %}
-                <h6><i class="fas fa-file-invoice-dollar pg-me-2"></i>Facturación</h6>
+                <h6><i class="fas fa-file-invoice-dollar m-r-5"></i>Facturación</h6>
                 <ul>
                   {% for bo in billing_list %}
                     <li>
                       <strong>{{ bo.invoice.identifier }}</strong>
                       - Monto: ${{ bo.invoice.amount|floatformat:2 }}
                       {% if bo.is_paid %}
-                        <span class="pg-badge pg-bg-success pg-ms-2">Pagado</span>
+                        <span class="label label-success m-l-5">Pagado</span>
                       {% elif bo.partially_paid %}
-                        <span class="pg-badge pg-bg-warning pg-text-dark pg-ms-2">Parcial</span>
+                        <span class="label label-warning m-l-5">Parcial</span>
                       {% else %}
-                        <span class="pg-badge pg-bg-danger pg-ms-2">Pendiente</span>
+                        <span class="label label-danger m-l-5">Pendiente</span>
                       {% endif %}
                       {% if bo.amount_paid and bo.amount_paid > 0 %}
                         - Cobrado: ${{ bo.amount_paid|floatformat:2 }}
@@ -529,13 +540,13 @@
             {% endwith %}
             
             {% if order.notes %}
-              <h6><i class="fas fa-sticky-note pg-me-2"></i>Notas</h6>
+              <h6><i class="fas fa-sticky-note m-r-5"></i>Notas</h6>
               <p>{{ order.notes }}</p>
             {% endif %}
           </div>
           <div class="pg-modal-footer">
-            <button type="button" class="pg-button pg-button-secondary" data-pg-dismiss="modal">Cerrar</button>
-            <a href="{% url 'clients:detail' order.client.pk %}" class="pg-button pg-button-primary">Ver Cliente</a>
+            <button type="button" class="btn btn-default" data-pg-dismiss="modal">Cerrar</button>
+            <a href="{% url 'clients:detail' order.client.pk %}" class="btn btn-info">Ver Cliente</a>
           </div>
         </div>
       </div>

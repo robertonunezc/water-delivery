@@ -4,500 +4,505 @@
 {% endblock %}
 
 {% block content %}
-<div class="pg-container-fluid pg-mt-3 pg-mb-4">
+<div class="m-t-15">
 	{% if client %}
-		<a href="{% url 'clients:detail' client.pk %}" class="pg-button pg-button-primary pg-mb-3">
-			<i class="fas fa-arrow-left pg-me-1" aria-hidden="true"></i>Volver al perfil del cliente
+		<a href="{% url 'clients:detail' client.pk %}" class="btn btn-info waves-effect waves-light m-b-15">
+			<i class="fas fa-arrow-left m-r-5" aria-hidden="true"></i>Volver al perfil del cliente
 		</a>
 	{% endif %}
-	<div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-center pg-gap-2 pg-mb-3">
-		<div>
-			<h1 class="pg-h3 pg-mb-1">{% if client %}Editar Cliente {{ client.name }}{% else %}Crear Cliente{% endif %}</h1>
-		</div>
-		<div class="pg-flex pg-align-center pg-gap-2">
-			{% if client %}
-				<span class="status-pill {% if client.active %}status-active{% else %}status-inactive{% endif %}">
-					{% if client.active %}Activo{% else %}Inactivo{% endif %}
-				</span>
-			{% endif %}
-			<a href="{% url 'admin_clients' %}" class="pg-button pg-button-outline-secondary">Volver a lista</a>
+	<div class="white-box">
+		<div class="row">
+			<div class="col-sm-8">
+				<h3 class="box-title m-b-0">{% if client %}Editar Cliente {{ client.name }}{% else %}Crear Cliente{% endif %}</h3>
+			</div>
+			<div class="col-sm-4 text-right m-t-10">
+				{% if client %}
+					<span class="label {% if client.active %}label-success{% else %}label-default{% endif %} m-r-10">
+						{% if client.active %}Activo{% else %}Inactivo{% endif %}
+					</span>
+				{% endif %}
+				<a href="{% url 'admin_clients' %}" class="btn btn-default waves-effect">Volver a lista</a>
+			</div>
 		</div>
 	</div>
 
 	{% if not client %}
-		<div class="pg-alert pg-alert-info">
+		<div class="alert alert-info">
 			Primero guarda los datos básicos del cliente. Después se habilitan Direcciones, Contactos, Rutas, Facturación y Crédito.
 		</div>
 	{% endif %}
 
-	<div class="pg-card dashboard-card">
-		<div class="pg-card-body" id="client-form-tabs">
-			<ul class="pg-nav pg-tabs" role="tablist">
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+	<div class="white-box" id="client-form-tabs">
+		<ul class="nav nav-tabs customtab pg-tabs" role="tablist">
+			<li class="pg-tab-item {% if active_tab == 'basic' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'basic' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-basic" type="button" role="tab">Datos Básicos</button>
+			</li>
+			<li class="pg-tab-item {% if active_tab == 'addresses' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'addresses' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-addresses" type="button" role="tab" {% if not client %}disabled{% endif %}>Direcciones</button>
+			</li>
+			<li class="pg-tab-item {% if active_tab == 'contacts' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'contacts' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab" {% if not client %}disabled{% endif %}>Contactos</button>
+			</li>
+			{% if client %}
+				<li class="pg-tab-item {% if active_tab == 'prices' %}active{% endif %}" role="presentation">
+					<button class="pg-tab {% if active_tab == 'prices' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab">Precio Productos</button>
 				</li>
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'addresses' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-addresses" type="button" role="tab" {% if not client %}disabled{% endif %}>Direcciones</button>
-				</li>
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'contacts' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-contacts" type="button" role="tab" {% if not client %}disabled{% endif %}>Contactos</button>
-				</li>
-				{% if client %}
-					<li class="pg-tab-item" role="presentation">
-						<button class="pg-tab {% if active_tab == 'prices' %}pg-active{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-prices" type="button" role="tab">Precio Productos</button>
-					</li>
-				{% endif %}
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'routes' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab" {% if not client %}disabled{% endif %}>Rutas</button>
-				</li>
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'billing' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-billing" type="button" role="tab" {% if not client %}disabled{% endif %}>Facturación</button>
-				</li>
-				<li class="pg-tab-item" role="presentation">
-					<button class="pg-tab {% if active_tab == 'credit' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-credit" type="button" role="tab" {% if not client %}disabled{% endif %}>Crédito</button>
-				</li>
-			</ul>
+			{% endif %}
+			<li class="pg-tab-item {% if active_tab == 'routes' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'routes' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-routes" type="button" role="tab" {% if not client %}disabled{% endif %}>Rutas</button>
+			</li>
+			<li class="pg-tab-item {% if active_tab == 'billing' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'billing' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-billing" type="button" role="tab" {% if not client %}disabled{% endif %}>Facturación</button>
+			</li>
+			<li class="pg-tab-item {% if active_tab == 'credit' %}active{% endif %}" role="presentation">
+				<button class="pg-tab {% if active_tab == 'credit' %}pg-active{% endif %} {% if not client %}pg-disabled{% endif %}" data-pg-toggle="tab" data-pg-target="#tab-credit" type="button" role="tab" {% if not client %}disabled{% endif %}>Crédito</button>
+			</li>
+		</ul>
 
-			<div id="client-unsaved-changes-warning" class="pg-alert pg-alert-warning pg-mt-3" role="alert" hidden>
-				Tienes cambios sin guardar. Guarda los cambios de esta pestaña antes de cambiar a otra.
+		<div id="client-unsaved-changes-warning" class="alert alert-warning m-t-15" role="alert" hidden>
+			Tienes cambios sin guardar. Guarda los cambios de esta pestaña antes de cambiar a otra.
+		</div>
+
+		<div class="tab-content m-t-20">
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'basic' %}active pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
+				<form method="post" data-unsaved-changes="{{ core_form.is_bound|yesno:'true,false' }}">
+					{% csrf_token %}
+					<input type="hidden" name="section" value="basic">
+					<div class="row">
+						<div class="col-md-6 form-group">
+							<label class="control-label">{{ core_form.name.label }}</label>
+							{{ core_form.name }}
+							{{ core_form.name.errors }}
+						</div>
+						<div class="col-md-3 form-group">
+							<label class="control-label">{{ core_form.type.label }}</label>
+							{{ core_form.type }}
+							{{ core_form.type.errors }}
+						</div>
+						<div class="col-md-3 form-group">
+							<label class="control-label">{{ core_form.corporate.label }}</label>
+							{{ core_form.corporate }}
+							{{ core_form.corporate.errors }}
+						</div>
+
+						<div class="col-md-4 form-group">
+							<label class="control-label">{{ core_form.external_id.label }}</label>
+							{{ core_form.external_id }}
+							{{ core_form.external_id.errors }}
+						</div>
+						<div class="col-md-4 form-group">
+							<label class="control-label">{{ core_form.address_link.label }}</label>
+							{{ core_form.address_link }}
+							{{ core_form.address_link.errors }}
+						</div>
+						<div class="col-md-4 form-group">
+							<label class="control-label">{{ core_form.confirmation_delivery_method.label }}</label>
+							{{ core_form.confirmation_delivery_method }}
+							<div class="help-block">{{ core_form.confirmation_delivery_method.help_text }}</div>
+							{{ core_form.confirmation_delivery_method.errors }}
+						</div>
+
+						<div class="col-md-12 form-group">
+							<label class="control-label">{{ core_form.note.label }}</label>
+							{{ core_form.note }}
+							{{ core_form.note.errors }}
+						</div>
+
+						<div class="col-md-3 form-group">
+							<div class="checkbox checkbox-info">
+								{{ core_form.active }}
+								<label for="{{ core_form.active.id_for_label }}">{{ core_form.active.label }}</label>
+							</div>
+						</div>
+
+						{% if core_form.type.value == 'branch' %}
+							<div class="col-md-4 form-group">
+								<div class="checkbox checkbox-info">
+									{{ core_form.credit_override_enabled }}
+									<label for="{{ core_form.credit_override_enabled.id_for_label }}">{{ core_form.credit_override_enabled.label }}</label>
+								</div>
+								<div class="help-block">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
+								{{ core_form.credit_override_enabled.errors }}
+							</div>
+							<div class="col-md-6 form-group">
+								<label class="control-label">{{ core_form.branch_credit_limit.label }}</label>
+								{{ core_form.branch_credit_limit }}
+								<div class="help-block">{{ core_form.branch_credit_limit.help_text }}</div>
+								{{ core_form.branch_credit_limit.errors }}
+							</div>
+						{% endif %}
+					</div>
+					{% if core_form.non_field_errors %}
+						<div class="alert alert-danger m-t-15 m-b-0">{{ core_form.non_field_errors }}</div>
+					{% endif %}
+					<div class="form-actions text-right m-t-20">
+						<button type="submit" class="btn btn-success waves-effect waves-light">{% if client %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
+					</div>
+				</form>
 			</div>
 
-			<div class="tab-content">
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'basic' %}pg-show pg-active{% endif %}" id="tab-basic" role="tabpanel">
-					<form method="post" data-unsaved-changes="{{ core_form.is_bound|yesno:'true,false' }}">
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'addresses' %}active pg-show pg-active{% endif %}" id="tab-addresses" role="tabpanel">
+				{% if client %}
+					<form method="post" data-unsaved-changes="{{ address_formset.is_bound|yesno:'true,false' }}">
 						{% csrf_token %}
-						<input type="hidden" name="section" value="basic">
-						<div class="pg-row pg-gap-3">
-							<div class="pg-col-md-6">
-								<label class="pg-label">{{ core_form.name.label }}</label>
-								{{ core_form.name }}
-								{{ core_form.name.errors }}
-							</div>
-							<div class="pg-col-md-3">
-								<label class="pg-label">{{ core_form.type.label }}</label>
-								{{ core_form.type }}
-								{{ core_form.type.errors }}
-							</div>
-							<div class="pg-col-md-3">
-								<label class="pg-label">{{ core_form.corporate.label }}</label>
-								{{ core_form.corporate }}
-								{{ core_form.corporate.errors }}
-							</div>
-
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ core_form.external_id.label }}</label>
-								{{ core_form.external_id }}
-								{{ core_form.external_id.errors }}
-							</div>
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ core_form.address_link.label }}</label>
-								{{ core_form.address_link }}
-								{{ core_form.address_link.errors }}
-							</div>
-							<div class="pg-col-md-4">
-								<label class="pg-label">{{ core_form.confirmation_delivery_method.label }}</label>
-								{{ core_form.confirmation_delivery_method }}
-								<div class="pg-field-help">{{ core_form.confirmation_delivery_method.help_text }}</div>
-								{{ core_form.confirmation_delivery_method.errors }}
-							</div>
-
-							<div class="pg-col-12">
-								<label class="pg-label">{{ core_form.note.label }}</label>
-								{{ core_form.note }}
-								{{ core_form.note.errors }}
-							</div>
-
-							<div class="pg-col-md-3 pg-checkbox">
-								{{ core_form.active }}
-								<label class="pg-checkbox-label">{{ core_form.active.label }}</label>
-							</div>
-
-							{% if core_form.type.value == 'branch' %}
-								<div class="pg-col-md-4 pg-checkbox">
-									{{ core_form.credit_override_enabled }}
-									<label class="pg-checkbox-label">{{ core_form.credit_override_enabled.label }}</label>
-									<div class="pg-field-help">Permite configurar límite, bloqueo y condiciones de crédito específicos para esta sucursal.</div>
-									{{ core_form.credit_override_enabled.errors }}
-								</div>
-								<div class="pg-col-md-6">
-									<label class="pg-label">{{ core_form.branch_credit_limit.label }}</label>
-									{{ core_form.branch_credit_limit }}
-									<div class="pg-field-help">{{ core_form.branch_credit_limit.help_text }}</div>
-									{{ core_form.branch_credit_limit.errors }}
-								</div>
-							{% endif %}
-						</div>
-						{% if core_form.non_field_errors %}
-							<div class="pg-alert pg-alert-danger pg-mt-3 pg-mb-0">{{ core_form.non_field_errors }}</div>
+						<input type="hidden" name="section" value="addresses">
+						{{ address_formset.management_form }}
+						{% if address_formset.non_form_errors %}
+							<div class="alert alert-danger">{{ address_formset.non_form_errors }}</div>
 						{% endif %}
-						<div class="pg-mt-3 pg-flex pg-justify-end">
-							<button type="submit" class="pg-button pg-button-primary">{% if client %}Guardar Datos Básicos{% else %}Guardar y Continuar{% endif %}</button>
+						<div class="text-right m-b-15">
+							<button type="button" class="btn btn-info btn-outline btn-sm waves-effect" id="add-address-row">
+								<i class="fas fa-plus"></i> Agregar dirección
+							</button>
+						</div>
+						<div id="address-formset-container">
+							{% for form in address_formset.forms %}
+								<div class="well well-sm m-b-15">
+									<div class="row">
+										{{ form.errors }}
+										<div class="col-md-2 form-group">{{ form.type.label_tag }}{{ form.type }}</div>
+										<div class="col-md-4 form-group">{{ form.street.label_tag }}{{ form.street }}</div>
+										<div class="col-md-2 form-group">{{ form.exterior_number.label_tag }}{{ form.exterior_number }}</div>
+										<div class="col-md-2 form-group">{{ form.interior_number.label_tag }}{{ form.interior_number }}</div>
+										<div class="col-md-2 form-group">{{ form.zip_code.label_tag }}{{ form.zip_code }}</div>
+										<div class="col-md-3 form-group">{{ form.locality.label_tag }}{{ form.locality }}</div>
+										<div class="col-md-3 form-group">{{ form.municipality.label_tag }}{{ form.municipality }}</div>
+										<div class="col-md-3 form-group">{{ form.state.label_tag }}{{ form.state }}</div>
+										<div class="col-md-3 form-group">{{ form.country.label_tag }}{{ form.country }}</div>
+										<div class="col-md-10 form-group">{{ form.reference.label_tag }}{{ form.reference }}</div>
+										<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-info">{{ form.active }} <label>Activo</label></div></div>
+										{% if form.DELETE %}<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-danger">{{ form.DELETE }} <label>Eliminar</label></div></div>{% endif %}
+										{{ form.id }}
+									</div>
+									{{ form.non_field_errors }}
+								</div>
+							{% endfor %}
+						</div>
+						<template id="address-empty-form-template">
+							<div class="well well-sm m-b-15">
+								<div class="row">
+									<div class="col-md-2 form-group">{{ address_formset.empty_form.type.label_tag }}{{ address_formset.empty_form.type }}</div>
+									<div class="col-md-4 form-group">{{ address_formset.empty_form.street.label_tag }}{{ address_formset.empty_form.street }}</div>
+									<div class="col-md-2 form-group">{{ address_formset.empty_form.exterior_number.label_tag }}{{ address_formset.empty_form.exterior_number }}</div>
+									<div class="col-md-2 form-group">{{ address_formset.empty_form.interior_number.label_tag }}{{ address_formset.empty_form.interior_number }}</div>
+									<div class="col-md-2 form-group">{{ address_formset.empty_form.zip_code.label_tag }}{{ address_formset.empty_form.zip_code }}</div>
+									<div class="col-md-3 form-group">{{ address_formset.empty_form.locality.label_tag }}{{ address_formset.empty_form.locality }}</div>
+									<div class="col-md-3 form-group">{{ address_formset.empty_form.municipality.label_tag }}{{ address_formset.empty_form.municipality }}</div>
+									<div class="col-md-3 form-group">{{ address_formset.empty_form.state.label_tag }}{{ address_formset.empty_form.state }}</div>
+									<div class="col-md-3 form-group">{{ address_formset.empty_form.country.label_tag }}{{ address_formset.empty_form.country }}</div>
+									<div class="col-md-10 form-group">{{ address_formset.empty_form.reference.label_tag }}{{ address_formset.empty_form.reference }}</div>
+									<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-info">{{ address_formset.empty_form.active }} <label>Activo</label></div></div>
+									{% if address_formset.empty_form.DELETE %}<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-danger">{{ address_formset.empty_form.DELETE }} <label>Eliminar</label></div></div>{% endif %}
+									{{ address_formset.empty_form.id }}
+								</div>
+							</div>
+						</template>
+						<div class="checkbox checkbox-info m-t-15">
+							<input class="pg-checkbox-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
+							<label for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
+						</div>
+						<div class="form-actions text-right m-t-20">
+							<button type="submit" class="btn btn-success waves-effect waves-light">Guardar Direcciones</button>
 						</div>
 					</form>
-				</div>
-
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'addresses' %}pg-show pg-active{% endif %}" id="tab-addresses" role="tabpanel">
-					{% if client %}
-						<form method="post" data-unsaved-changes="{{ address_formset.is_bound|yesno:'true,false' }}">
-							{% csrf_token %}
-							<input type="hidden" name="section" value="addresses">
-							{{ address_formset.management_form }}
-							{% if address_formset.non_form_errors %}
-								<div class="pg-alert pg-alert-danger">{{ address_formset.non_form_errors }}</div>
-							{% endif %}
-							<div class="pg-flex pg-justify-end pg-mb-3">
-								<button type="button" class="pg-button pg-button-sm pg-button-outline-primary" id="add-address-row">
-									<i class="fas fa-plus"></i> Agregar dirección
-								</button>
-							</div>
-							<div class="pg-row pg-gap-3" id="address-formset-container">
-								{% for form in address_formset.forms %}
-									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
-										<div class="pg-row pg-gap-2">
-											{{ form.errors }}
-											<div class="pg-col-md-2">{{ form.type.label_tag }}{{ form.type }}</div>
-											<div class="pg-col-md-4">{{ form.street.label_tag }}{{ form.street }}</div>
-											<div class="pg-col-md-2">{{ form.exterior_number.label_tag }}{{ form.exterior_number }}</div>
-											<div class="pg-col-md-2">{{ form.interior_number.label_tag }}{{ form.interior_number }}</div>
-											<div class="pg-col-md-2">{{ form.zip_code.label_tag }}{{ form.zip_code }}</div>
-											<div class="pg-col-md-3">{{ form.locality.label_tag }}{{ form.locality }}</div>
-											<div class="pg-col-md-3">{{ form.municipality.label_tag }}{{ form.municipality }}</div>
-											<div class="pg-col-md-3">{{ form.state.label_tag }}{{ form.state }}</div>
-											<div class="pg-col-md-3">{{ form.country.label_tag }}{{ form.country }}</div>
-											<div class="pg-col-md-10">{{ form.reference.label_tag }}{{ form.reference }}</div>
-											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.active }} <label class="pg-checkbox-label">Activo</label></div></div>
-											{% if form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
-											{{ form.id }}
-										</div>
-										{{ form.non_field_errors }}
-									</div>
-								{% endfor %}
-							</div>
-							<template id="address-empty-form-template">
-								<div class="pg-col-12 pg-border pg-rounded pg-p-3">
-									<div class="pg-row pg-gap-2">
-										<div class="pg-col-md-2">{{ address_formset.empty_form.type.label_tag }}{{ address_formset.empty_form.type }}</div>
-										<div class="pg-col-md-4">{{ address_formset.empty_form.street.label_tag }}{{ address_formset.empty_form.street }}</div>
-										<div class="pg-col-md-2">{{ address_formset.empty_form.exterior_number.label_tag }}{{ address_formset.empty_form.exterior_number }}</div>
-										<div class="pg-col-md-2">{{ address_formset.empty_form.interior_number.label_tag }}{{ address_formset.empty_form.interior_number }}</div>
-										<div class="pg-col-md-2">{{ address_formset.empty_form.zip_code.label_tag }}{{ address_formset.empty_form.zip_code }}</div>
-										<div class="pg-col-md-3">{{ address_formset.empty_form.locality.label_tag }}{{ address_formset.empty_form.locality }}</div>
-										<div class="pg-col-md-3">{{ address_formset.empty_form.municipality.label_tag }}{{ address_formset.empty_form.municipality }}</div>
-										<div class="pg-col-md-3">{{ address_formset.empty_form.state.label_tag }}{{ address_formset.empty_form.state }}</div>
-										<div class="pg-col-md-3">{{ address_formset.empty_form.country.label_tag }}{{ address_formset.empty_form.country }}</div>
-										<div class="pg-col-md-10">{{ address_formset.empty_form.reference.label_tag }}{{ address_formset.empty_form.reference }}</div>
-										<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ address_formset.empty_form.active }} <label class="pg-checkbox-label">Activo</label></div></div>
-										{% if address_formset.empty_form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ address_formset.empty_form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
-										{{ address_formset.empty_form.id }}
-									</div>
-								</div>
-							</template>
-							<div class="pg-checkbox pg-mt-3">
-								<input class="pg-checkbox-input" type="checkbox" id="copy_address_for_all_inlines" name="copy_address_for_all_inlines">
-								<label class="pg-checkbox-label" for="copy_address_for_all_inlines">Si no existe dirección fiscal, copiar la primera de entrega.</label>
-							</div>
-							<div class="pg-mt-3 pg-flex pg-justify-end">
-								<button type="submit" class="pg-button pg-button-primary">Guardar Direcciones</button>
-							</div>
-						</form>
-					{% endif %}
-				</div>
-
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'contacts' %}pg-show pg-active{% endif %}" id="tab-contacts" role="tabpanel">
-					{% if client %}
-						<form method="post" data-unsaved-changes="{{ contact_formset.is_bound|yesno:'true,false' }}">
-							{% csrf_token %}
-							<input type="hidden" name="section" value="contacts">
-							{{ contact_formset.management_form }}
-							<div class="pg-row pg-gap-3">
-								{% for form in contact_formset.forms %}
-									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
-										<div class="pg-row pg-gap-2">
-											<div class="pg-col-md-3">{{ form.name.label_tag }}{{ form.name }}</div>
-											<div class="pg-col-md-3">{{ form.email.label_tag }}{{ form.email }}</div>
-											<div class="pg-col-md-3">{{ form.phone.label_tag }}{{ form.phone }}</div>
-											<div class="pg-col-md-2">{{ form.position.label_tag }}{{ form.position }}</div>
-											{% if form.DELETE %}<div class="pg-col-md-1 pg-checkbox pg-mt-4">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div>{% endif %}
-											{{ form.id }}
-										</div>
-										{{ form.non_field_errors }}
-									</div>
-								{% endfor %}
-							</div>
-							<div class="pg-mt-3 pg-flex pg-justify-end">
-								<button type="submit" class="pg-button pg-button-primary">Guardar Contactos</button>
-							</div>
-						</form>
-					{% endif %}
-				</div>
-
-				{% if client %}
-					<div class="pg-tab-pane pg-fade {% if active_tab == 'prices' %}pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
-						<form method="post" data-unsaved-changes="{{ client_product_price_formset.is_bound|yesno:'true,false' }}">
-							{% csrf_token %}
-							<input type="hidden" name="section" value="prices">
-							{{ client_product_price_formset.management_form }}
-							<div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-align-lg-center pg-gap-2 pg-mb-3">
-								<div class="form-section-title pg-mb-0">Precio Productos</div>
-								<button type="submit" class="pg-button pg-button-primary">Guardar Precios</button>
-							</div>
-							{% if client_product_price_formset.non_form_errors %}
-								<div class="pg-alert pg-alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
-							{% endif %}
-							{% if client_product_price_formset.forms %}
-								<div class="pg-table-responsive">
-									<table class="pg-table pg-table-hover pg-align-middle">
-										<thead class="pg-table-light">
-											<tr>
-												<th>Producto</th>
-												<th>Presentación</th>
-												<th>Precio base</th>
-												<th>Precio cliente</th>
-												<th>Activo</th>
-												<th>Nota</th>
-											</tr>
-										</thead>
-										<tbody>
-											{% for price_form in client_product_price_formset.forms %}
-												<tr>
-													<td>
-														{{ price_form.product_id }}
-														{% if price_form.product %}
-															<strong>{{ price_form.product.name }}</strong>
-														{% else %}
-															<span class="pg-text-danger">Producto no válido</span>
-														{% endif %}
-														{{ price_form.product_id.errors }}
-														{{ price_form.non_field_errors }}
-													</td>
-													<td>
-														{% if price_form.product %}
-															{{ price_form.product.get_presentation_display }}
-														{% else %}
-															<span class="pg-text-muted">-</span>
-														{% endif %}
-													</td>
-													<td>
-														{% if price_form.product %}
-															${{ price_form.product.price|floatformat:2 }}
-														{% else %}
-															<span class="pg-text-muted">-</span>
-														{% endif %}
-													</td>
-													<td>
-														{{ price_form.price }}
-														{{ price_form.price.errors }}
-													</td>
-													<td>
-														<div class="pg-checkbox">
-															{{ price_form.active }}
-															<label class="pg-checkbox-label" for="{{ price_form.active.id_for_label }}">Activo</label>
-														</div>
-														{{ price_form.active.errors }}
-													</td>
-													<td>
-														{{ price_form.note }}
-														{{ price_form.note.errors }}
-													</td>
-												</tr>
-											{% endfor %}
-										</tbody>
-									</table>
-								</div>
-							{% else %}
-								<p class="pg-text-muted pg-mb-0">No hay productos activos.</p>
-							{% endif %}
-						</form>
-					</div>
 				{% endif %}
+			</div>
 
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'routes' %}pg-show pg-active{% endif %}" id="tab-routes" role="tabpanel">
-					{% if client %}
-						{% if not has_delivery_address %}
-							<div class="pg-alert pg-alert-warning">
-								Para asignar rutas, primero agregue una dirección activa de tipo <b>Entrega</b> en la pestaña de Direcciones.
-							</div>
-						{% endif %}
-						<form method="post" data-unsaved-changes="{{ route_assignment_formset.is_bound|yesno:'true,false' }}">
-							{% csrf_token %}
-							<input type="hidden" name="section" value="routes">
-							{{ route_assignment_formset.management_form }}
-							{% if route_assignment_formset.non_form_errors %}
-								<div class="pg-alert pg-alert-danger">{{ route_assignment_formset.non_form_errors }}</div>
-							{% endif %}
-							<div class="form-section-title">Asignaciones de Ruta</div>
-							<div class="pg-row pg-gap-3">
-								{% for form in route_assignment_formset.forms %}
-									<div class="pg-col-12 pg-border pg-rounded pg-p-3">
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'contacts' %}active pg-show pg-active{% endif %}" id="tab-contacts" role="tabpanel">
+				{% if client %}
+					<form method="post" data-unsaved-changes="{{ contact_formset.is_bound|yesno:'true,false' }}">
+						{% csrf_token %}
+						<input type="hidden" name="section" value="contacts">
+						{{ contact_formset.management_form }}
+						<div>
+							{% for form in contact_formset.forms %}
+								<div class="well well-sm m-b-15">
+									<div class="row">
+										<div class="col-md-3 form-group">{{ form.name.label_tag }}{{ form.name }}</div>
+										<div class="col-md-3 form-group">{{ form.email.label_tag }}{{ form.email }}</div>
+										<div class="col-md-3 form-group">{{ form.phone.label_tag }}{{ form.phone }}</div>
+										<div class="col-md-2 form-group">{{ form.position.label_tag }}{{ form.position }}</div>
+										{% if form.DELETE %}<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-danger">{{ form.DELETE }} <label>Eliminar</label></div></div>{% endif %}
 										{{ form.id }}
-										<div class="pg-row pg-gap-2 pg-align-start">
-											{{ form.errors }}
-											<div class="pg-col-md-4">{{ form.route.label_tag }}{{ form.route }}{{ form.route.errors }}</div>
-											<div class="pg-col-md-2">{{ form.sequence.label_tag }}{{ form.sequence }}{{ form.sequence.errors }}</div>
-											<div class="pg-col-md-2">{{ form.interval_weeks.label_tag }}{{ form.interval_weeks }}{{ form.interval_weeks.errors }}</div>
-											<div class="pg-col-md-2">{{ form.anchor_date.label_tag }}{{ form.anchor_date }}{{ form.anchor_date.errors }}</div>
-											<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.is_active }} <label class="pg-checkbox-label">Activo</label></div></div>
-											{% if form.DELETE %}<div class="pg-col-md-1 pg-mt-4"><div class="pg-checkbox">{{ form.DELETE }} <label class="pg-checkbox-label">Eliminar</label></div></div>{% endif %}
-											<div class="pg-col-12">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
-										</div>
-										{{ form.non_field_errors }}
 									</div>
-								{% endfor %}
-							</div>
-							<div class="pg-mt-3 pg-flex pg-justify-end">
-								<button type="submit" class="pg-button pg-button-primary">Guardar Rutas</button>
-							</div>
-						</form>
-					{% endif %}
-				</div>
+									{{ form.non_field_errors }}
+								</div>
+							{% endfor %}
+						</div>
+						<div class="form-actions text-right m-t-20">
+							<button type="submit" class="btn btn-success waves-effect waves-light">Guardar Contactos</button>
+						</div>
+					</form>
+				{% endif %}
+			</div>
 
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'billing' %}pg-show pg-active{% endif %}" id="tab-billing" role="tabpanel">
-					{% if client %}
-						{% if not client.billing_info.effective.has_address and not billing_read_only %}
-							<div class="pg-alert pg-alert-warning">
-								<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
+			{% if client %}
+				<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'prices' %}active pg-show pg-active{% endif %}" id="tab-prices" role="tabpanel">
+					<form method="post" data-unsaved-changes="{{ client_product_price_formset.is_bound|yesno:'true,false' }}">
+						{% csrf_token %}
+						<input type="hidden" name="section" value="prices">
+						{{ client_product_price_formset.management_form }}
+						<div class="row m-b-15">
+							<div class="col-sm-8">
+								<h4 class="box-title m-b-0">Precio Productos</h4>
 							</div>
+							<div class="col-sm-4 text-right">
+								<button type="submit" class="btn btn-success waves-effect waves-light">Guardar Precios</button>
+							</div>
+						</div>
+						{% if client_product_price_formset.non_form_errors %}
+							<div class="alert alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
 						{% endif %}
-						{% if billing_read_only %}
-							<div class="pg-alert pg-alert-info">
-								{% if client.corporate %}
-									Esta sucursal hereda los datos fiscales de
-									<a href="{% url 'admin_edit_client' client.corporate.pk %}?tab=billing">{{ client.corporate.name }}</a>.
-									Puedes consultarlos y actualizarlos en el corporativo.
+						{% if client_product_price_formset.forms %}
+							<div class="table-responsive">
+								<table class="table table-hover">
+									<thead>
+										<tr>
+											<th>Producto</th>
+											<th>Presentación</th>
+											<th>Precio base</th>
+											<th>Precio cliente</th>
+											<th>Activo</th>
+											<th>Nota</th>
+										</tr>
+									</thead>
+									<tbody>
+										{% for price_form in client_product_price_formset.forms %}
+											<tr>
+												<td>
+													{{ price_form.product_id }}
+													{% if price_form.product %}
+														<strong>{{ price_form.product.name }}</strong>
+													{% else %}
+														<span class="text-danger">Producto no válido</span>
+													{% endif %}
+													{{ price_form.product_id.errors }}
+													{{ price_form.non_field_errors }}
+												</td>
+												<td>
+													{% if price_form.product %}
+														{{ price_form.product.get_presentation_display }}
+													{% else %}
+														<span class="text-muted">-</span>
+													{% endif %}
+												</td>
+												<td>
+													{% if price_form.product %}
+														${{ price_form.product.price|floatformat:2 }}
+													{% else %}
+														<span class="text-muted">-</span>
+													{% endif %}
+												</td>
+												<td>
+													{{ price_form.price }}
+													{{ price_form.price.errors }}
+												</td>
+												<td>
+													<div class="checkbox checkbox-info">
+														{{ price_form.active }}
+														<label for="{{ price_form.active.id_for_label }}">Activo</label>
+													</div>
+													{{ price_form.active.errors }}
+												</td>
+												<td>
+													{{ price_form.note }}
+													{{ price_form.note.errors }}
+												</td>
+											</tr>
+										{% endfor %}
+									</tbody>
+								</table>
+							</div>
+						{% else %}
+							<p class="text-muted m-b-0">No hay productos activos.</p>
+						{% endif %}
+					</form>
+				</div>
+			{% endif %}
+
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'routes' %}active pg-show pg-active{% endif %}" id="tab-routes" role="tabpanel">
+				{% if client %}
+					{% if not has_delivery_address %}
+						<div class="alert alert-warning">
+							Para asignar rutas, primero agregue una dirección activa de tipo <b>Entrega</b> en la pestaña de Direcciones.
+						</div>
+					{% endif %}
+					<form method="post" data-unsaved-changes="{{ route_assignment_formset.is_bound|yesno:'true,false' }}">
+						{% csrf_token %}
+						<input type="hidden" name="section" value="routes">
+						{{ route_assignment_formset.management_form }}
+						{% if route_assignment_formset.non_form_errors %}
+							<div class="alert alert-danger">{{ route_assignment_formset.non_form_errors }}</div>
+						{% endif %}
+						<h4 class="box-title">Asignaciones de Ruta</h4>
+						<div>
+							{% for form in route_assignment_formset.forms %}
+								<div class="well well-sm m-b-15">
+									{{ form.id }}
+									<div class="row">
+										{{ form.errors }}
+										<div class="col-md-4 form-group">{{ form.route.label_tag }}{{ form.route }}{{ form.route.errors }}</div>
+										<div class="col-md-2 form-group">{{ form.sequence.label_tag }}{{ form.sequence }}{{ form.sequence.errors }}</div>
+										<div class="col-md-2 form-group">{{ form.interval_weeks.label_tag }}{{ form.interval_weeks }}{{ form.interval_weeks.errors }}</div>
+										<div class="col-md-2 form-group">{{ form.anchor_date.label_tag }}{{ form.anchor_date }}{{ form.anchor_date.errors }}</div>
+										<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-info">{{ form.is_active }} <label>Activo</label></div></div>
+										{% if form.DELETE %}<div class="col-md-1 form-group m-t-25"><div class="checkbox checkbox-danger">{{ form.DELETE }} <label>Eliminar</label></div></div>{% endif %}
+										<div class="col-md-12 form-group">{{ form.notes.label_tag }}{{ form.notes }}{{ form.notes.errors }}</div>
+									</div>
+									{{ form.non_field_errors }}
+								</div>
+							{% endfor %}
+						</div>
+						<div class="form-actions text-right m-t-20">
+							<button type="submit" class="btn btn-success waves-effect waves-light">Guardar Rutas</button>
+						</div>
+					</form>
+				{% endif %}
+			</div>
+
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'billing' %}active pg-show pg-active{% endif %}" id="tab-billing" role="tabpanel">
+				{% if client %}
+					{% if not client.billing_info.effective.has_address and not billing_read_only %}
+						<div class="alert alert-warning">
+							<strong>⚠️ Advertencia:</strong> Para poder facturar debe agregar un domicilio de tipo <b>FISCAL</b> en la pestaña de Direcciones.
+						</div>
+					{% endif %}
+					{% if billing_read_only %}
+						<div class="alert alert-info">
+							{% if client.corporate %}
+								Esta sucursal hereda los datos fiscales de
+								<a href="{% url 'admin_edit_client' client.corporate.pk %}?tab=billing">{{ client.corporate.name }}</a>.
+								Puedes consultarlos y actualizarlos en el corporativo.
+							{% else %}
+								Asigna un corporativo a esta sucursal para configurar sus datos fiscales.
+							{% endif %}
+						</div>
+					{% endif %}
+					{% if not client.requires_billing and not billing_read_only %}
+						<div class="alert alert-info">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
+					{% endif %}
+
+					<div class="row">
+						{% if not billing_read_only %}
+						<div class="col-lg-7">
+							<div class="well well-sm">
+								<h4 class="box-title">Datos de Facturación</h4>
+								<form method="post" data-unsaved-changes="{{ invoice_data_form.is_bound|yesno:'true,false' }}">
+									{% csrf_token %}
+									<input type="hidden" name="section" value="billing_data">
+									<div class="form-group">{{ invoice_data_form.rfc.label_tag }}{{ invoice_data_form.rfc }}{{ invoice_data_form.rfc.errors }}</div>
+									<div class="form-group">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
+									<div class="form-group">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
+									<div class="text-right">
+										<button type="submit" class="btn btn-success waves-effect waves-light" {% if billing_data_disabled %}disabled{% endif %}>Guardar Datos</button>
+									</div>
+								</form>
+							</div>
+						</div>
+						{% endif %}
+						<div class="{% if billing_read_only %}col-lg-12{% else %}col-lg-5{% endif %}">
+							<div class="well well-sm">
+								<h4 class="box-title">Frecuencia de Facturación</h4>
+								<div class="m-b-15" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
+									<div>
+										<div class="checkbox checkbox-info m-b-5">
+											{{ recurring_billing_form.requires_billing }}
+											<label for="{{ recurring_billing_form.requires_billing.id_for_label }}">{{ recurring_billing_form.requires_billing.label }}</label>
+										</div>
+										<div class="help-block">{{ recurring_billing_form.requires_billing.help_text }}</div>
+										{{ recurring_billing_form.requires_billing.errors }}
+									</div>
+									<div id="recurring-billing-feedback" class="m-t-10"></div>
+								</div>
+								<hr>
+								<form method="post" data-unsaved-changes="{{ invoice_schedule_form.is_bound|yesno:'true,false' }}">
+									{% csrf_token %}
+									<input type="hidden" name="section" value="billing_frequency">
+									<div class="form-group">{{ invoice_schedule_form.start_date.label_tag }}{{ invoice_schedule_form.start_date }}{{ invoice_schedule_form.start_date.errors }}</div>
+									<div class="form-group">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
+									<div class="form-group" id="invoice-billing-date-wrapper">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
+									<div class="form-group" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
+									<div class="form-group" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
+									<div class="form-group" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
+									<div class="checkbox checkbox-info m-b-10">{{ invoice_schedule_form.is_active }} <label for="{{ invoice_schedule_form.is_active.id_for_label }}">{{ invoice_schedule_form.is_active.label }}</label></div>
+									<div class="form-group">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
+									<div class="text-right">
+										<button type="submit" class="btn btn-success waves-effect waves-light" {% if billing_frequency_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
+									</div>
+								</form>
+							</div>
+						</div>
+					</div>
+
+					{% if not billing_read_only %}
+						<div class="well well-sm m-t-15">
+							<h4 class="box-title">Información Facturacion</h4>
+							<div class="section-muted">
+								{% if effective_billing_data %}
+									RFC: <strong>{{ effective_billing_data.rfc }}</strong><br>
+									Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong><br>
+									{% if effective_billing_address %}
+										Domicilio Fiscal:
+										<strong>
+											{{ effective_billing_address.street }}
+											{% if effective_billing_address.exterior_number %} {{ effective_billing_address.exterior_number }}{% endif %}
+											{% if effective_billing_address.interior_number %} Int. {{ effective_billing_address.interior_number }}{% endif %},
+											{{ effective_billing_address.locality }},
+											{{ effective_billing_address.municipality }},
+											{{ effective_billing_address.state }},
+											CP {{ effective_billing_address.zip_code }},
+											{{ effective_billing_address.country }}
+										</strong><br>
+									{% endif %}
+									{% if effective_billing_frequency %}
+										Frecuencia: <strong>{{ effective_billing_frequency }}</strong><br>
+									{% endif %}
 								{% else %}
-									Asigna un corporativo a esta sucursal para configurar sus datos fiscales.
+									Sin datos de facturación efectivos disponibles.
 								{% endif %}
 							</div>
-						{% endif %}
-						{% if not client.requires_billing and not billing_read_only %}
-							<div class="pg-alert pg-alert-light">La facturación recurrente está desactivada. Puede capturar datos fiscales, pero la frecuencia de facturación permanecerá deshabilitada hasta activar "Requiere facturación recurrente" en esta pestaña.</div>
-						{% endif %}
+						</div>
+					{% endif %}
+				{% endif %}
+			</div>
 
-						<div class="pg-row pg-gap-3">
-							{% if not billing_read_only %}
-							<div class="pg-col-lg-7">
-								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
-									<div class="form-section-title">Datos de Facturación</div>
-									<form method="post" data-unsaved-changes="{{ invoice_data_form.is_bound|yesno:'true,false' }}">
-										{% csrf_token %}
-										<input type="hidden" name="section" value="billing_data">
-										<div class="pg-mb-2">{{ invoice_data_form.rfc.label_tag }}{{ invoice_data_form.rfc }}{{ invoice_data_form.rfc.errors }}</div>
-										<div class="pg-mb-2">{{ invoice_data_form.razon_social.label_tag }}{{ invoice_data_form.razon_social }}{{ invoice_data_form.razon_social.errors }}</div>
-										<div class="pg-mb-2">{{ invoice_data_form.curp.label_tag }}{{ invoice_data_form.curp }}{{ invoice_data_form.curp.errors }}</div>
-										<div class="pg-flex pg-justify-end">
-											<button type="submit" class="pg-button pg-button-primary" {% if billing_data_disabled %}disabled{% endif %}>Guardar Datos</button>
-										</div>
-									</form>
+			<div class="tab-pane pg-tab-pane pg-fade {% if active_tab == 'credit' %}active pg-show pg-active{% endif %}" id="tab-credit" role="tabpanel">
+				{% if client %}
+					{% if credit_read_only %}
+						<div class="alert alert-warning">Crédito administrado por {{ effective_credit_account.name }}. La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
+					{% endif %}
+					<form method="post" data-unsaved-changes="{{ credit_policy_form.is_bound|yesno:'true,false' }}">
+						{% csrf_token %}
+						<input type="hidden" name="section" value="credit">
+						<div class="row">
+							<div class="col-lg-6">
+								<div class="well well-sm">
+									<h4 class="box-title">Política de Crédito</h4>
+									<div class="checkbox checkbox-info m-b-10">
+										{{ credit_policy_form.can_pay_with_credit }} <label for="{{ credit_policy_form.can_pay_with_credit.id_for_label }}">{{ credit_policy_form.can_pay_with_credit.label }}</label>
+									</div>
+									<div class="help-block">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
+									<div class="form-group">
+										{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}
+										<div class="help-block">{{ credit_policy_form.credit_limit.help_text }}</div>
+										{{ credit_policy_form.credit_limit.errors }}
+									</div>
 								</div>
 							</div>
-							{% endif %}
-							<div class="{% if billing_read_only %}pg-col-lg-12{% else %}pg-col-lg-5{% endif %}">
-								<div class="pg-border pg-rounded pg-p-3 pg-h-100">
-									<div class="form-section-title">Frecuencia de Facturación</div>
-									<div class="pg-mb-3" data-recurring-billing-url="{% url 'clients:update' client.pk %}">
-										<div class="pg-flex pg-flex-column pg-flex-sm-row pg-justify-between pg-align-sm-start pg-gap-2">
-											<div>
-												<div class="pg-checkbox pg-mb-1">
-													{{ recurring_billing_form.requires_billing }}
-													<label class="pg-checkbox-label">{{ recurring_billing_form.requires_billing.label }}</label>
-												</div>
-												<div class="pg-field-help">{{ recurring_billing_form.requires_billing.help_text }}</div>
-												{{ recurring_billing_form.requires_billing.errors }}
-											</div>
-										</div>
-										<div id="recurring-billing-feedback" class="pg-mt-2"></div>
-									</div>
-									<hr class="pg-my-3">
-									<form method="post" data-unsaved-changes="{{ invoice_schedule_form.is_bound|yesno:'true,false' }}">
-										{% csrf_token %}
-										<input type="hidden" name="section" value="billing_frequency">
-										<div class="pg-mb-2">{{ invoice_schedule_form.start_date.label_tag }}{{ invoice_schedule_form.start_date }}{{ invoice_schedule_form.start_date.errors }}</div>
-										<div class="pg-mb-2">{{ invoice_schedule_form.frequency.label_tag }}{{ invoice_schedule_form.frequency }}{{ invoice_schedule_form.frequency.errors }}</div>
-										<div class="pg-mb-2" id="invoice-billing-date-wrapper">{{ invoice_schedule_form.billing_date.label_tag }}{{ invoice_schedule_form.billing_date }}{{ invoice_schedule_form.billing_date.errors }}</div>
-										<div class="pg-mb-2" id="invoice-specific-day-wrapper">{{ invoice_schedule_form.specific_day.label_tag }}{{ invoice_schedule_form.specific_day }}{{ invoice_schedule_form.specific_day.errors }}</div>
-										<div class="pg-mb-2" id="invoice-weekday-wrapper">{{ invoice_schedule_form.weekday.label_tag }}{{ invoice_schedule_form.weekday }}{{ invoice_schedule_form.weekday.errors }}</div>
-										<div class="pg-mb-2" id="invoice-occurrence-wrapper">{{ invoice_schedule_form.occurrence.label_tag }}{{ invoice_schedule_form.occurrence }}{{ invoice_schedule_form.occurrence.errors }}</div>
-										<div class="pg-checkbox pg-mb-2">{{ invoice_schedule_form.is_active }} <label class="pg-checkbox-label">{{ invoice_schedule_form.is_active.label }}</label></div>
-										<div class="pg-mb-2">{{ invoice_schedule_form.notes.label_tag }}{{ invoice_schedule_form.notes }}{{ invoice_schedule_form.notes.errors }}</div>
-										<div class="pg-flex pg-justify-end">
-											<button type="submit" class="pg-button pg-button-primary" {% if billing_frequency_disabled %}disabled{% endif %}>Guardar Frecuencia</button>
-										</div>
-									</form>
+							<div class="col-lg-6">
+								<div class="well well-sm">
+									<h4 class="box-title">Condiciones de Pago</h4>
+									<div class="form-group">{{ credit_config_form.payment_term_type.label_tag }}{{ credit_config_form.payment_term_type }}{{ credit_config_form.payment_term_type.errors }}</div>
+									<div class="form-group" id="credit-cutoff-day-wrapper">{{ credit_config_form.cutoff_day.label_tag }}{{ credit_config_form.cutoff_day }}{{ credit_config_form.cutoff_day.errors }}</div>
+									<div class="form-group" id="credit-payment-days-wrapper">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
 								</div>
 							</div>
 						</div>
-
-						{% if not billing_read_only %}
-							<div class="pg-mt-3 pg-p-3 pg-border pg-rounded pg-bg-light">
-								<div class="form-section-title">Información Facturacion</div>
-								<div class="section-muted">
-									{% if effective_billing_data %}
-										RFC: <strong>{{ effective_billing_data.rfc }}</strong><br>
-										Razón Social: <strong>{{ effective_billing_data.razon_social }}</strong><br>
-										{% if effective_billing_address %}
-											Domicilio Fiscal:
-											<strong>
-												{{ effective_billing_address.street }}
-												{% if effective_billing_address.exterior_number %} {{ effective_billing_address.exterior_number }}{% endif %}
-												{% if effective_billing_address.interior_number %} Int. {{ effective_billing_address.interior_number }}{% endif %},
-												{{ effective_billing_address.locality }},
-												{{ effective_billing_address.municipality }},
-												{{ effective_billing_address.state }},
-												CP {{ effective_billing_address.zip_code }},
-												{{ effective_billing_address.country }}
-											</strong><br>
-										{% endif %}
-										{% if effective_billing_frequency %}
-											Frecuencia: <strong>{{ effective_billing_frequency }}</strong><br>
-										{% endif %}
-									{% else %}
-										Sin datos de facturación efectivos disponibles.
-									{% endif %}
-								</div>
-
-							</div>
-						{% endif %}
-					{% endif %}
-				</div>
-
-				<div class="pg-tab-pane pg-fade {% if active_tab == 'credit' %}pg-show pg-active{% endif %}" id="tab-credit" role="tabpanel">
-					{% if client %}
-						{% if credit_read_only %}
-							<div class="pg-alert pg-alert-warning">Crédito administrado por {{ effective_credit_account.name }}. La configuración de crédito se administra desde el corporativo para esta sucursal. Active "Usar datos propios de crédito" en Datos Básicos para editarla.</div>
-						{% endif %}
-						<form method="post" data-unsaved-changes="{{ credit_policy_form.is_bound|yesno:'true,false' }}">
-							{% csrf_token %}
-							<input type="hidden" name="section" value="credit">
-							<div class="pg-row pg-gap-3">
-								<div class="pg-col-lg-6">
-									<div class="pg-border pg-rounded pg-p-3 pg-h-100">
-										<div class="form-section-title">Política de Crédito</div>
-										<div class="pg-checkbox pg-mb-2">
-											{{ credit_policy_form.can_pay_with_credit }} <label class="pg-checkbox-label">{{ credit_policy_form.can_pay_with_credit.label }}</label>
-											<div class="pg-field-help">{{ credit_policy_form.can_pay_with_credit.help_text }}</div>
-										</div>
-										<div class="pg-mb-2">
-											{{ credit_policy_form.credit_limit.label_tag }}{{ credit_policy_form.credit_limit }}
-											<div class="pg-field-help">{{ credit_policy_form.credit_limit.help_text }}</div>
-											{{ credit_policy_form.credit_limit.errors }}
-										</div>
-									</div>
-								</div>
-								<div class="pg-col-lg-6">
-									<div class="pg-border pg-rounded pg-p-3 pg-h-100">
-										<div class="form-section-title">Condiciones de Pago</div>
-										<div class="pg-mb-2">{{ credit_config_form.payment_term_type.label_tag }}{{ credit_config_form.payment_term_type }}{{ credit_config_form.payment_term_type.errors }}</div>
-										<div class="pg-mb-2" id="credit-cutoff-day-wrapper">{{ credit_config_form.cutoff_day.label_tag }}{{ credit_config_form.cutoff_day }}{{ credit_config_form.cutoff_day.errors }}</div>
-										<div class="pg-mb-2" id="credit-payment-days-wrapper">{{ credit_config_form.max_payment_days.label_tag }}{{ credit_config_form.max_payment_days }}{{ credit_config_form.max_payment_days.errors }}</div>
-									</div>
-								</div>
-							</div>
-							<div class="pg-mt-3 pg-flex pg-justify-end">
-								<button type="submit" class="pg-button pg-button-primary" {% if credit_read_only %}disabled{% endif %}>Guardar Configuración de Crédito</button>
-							</div>
-						</form>
-					{% endif %}
-				</div>
+						<div class="form-actions text-right m-t-20">
+							<button type="submit" class="btn btn-success waves-effect waves-light" {% if credit_read_only %}disabled{% endif %}>Guardar Configuración de Crédito</button>
+						</div>
+					</form>
+				{% endif %}
 			</div>
 		</div>
 	</div>

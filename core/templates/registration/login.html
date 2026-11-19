@@ -1,90 +1,86 @@
-{% extends 'base.html' %}
+{% extends 'base_auth.html' %}
 
 {% block title %}Iniciar Sesión - PuriGest{% endblock %}
 
 {% block content %}
-<div class="pg-row pg-justify-center">
-    <div class="pg-col-md-6 pg-col-lg-4">
-        <div class="pg-card pg-shadow">
-            <div class="pg-card-header pg-bg-primary pg-text-white pg-text-center">
-                <h4 class="pg-mb-0"><i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión</h4>
-            </div>
-            <div class="pg-card-body">
-                {% if form.errors %}
-                    <div class="pg-alert pg-alert-danger">
-                        <strong>Error:</strong>
-                        {% for field, errors in form.errors.items %}
-                            {% for error in errors %}
-                                <div>{{ error }}</div>
-                            {% endfor %}
-                        {% endfor %}
-                    </div>
-                {% endif %}
+<div class="login-box">
+    <div class="white-box">
+        <form class="form-horizontal form-material" id="loginform" method="post">
+            {% csrf_token %}
+            <h3 class="box-title m-b-20">Iniciar Sesión</h3>
 
-                {% if form.non_field_errors %}
-                    <div class="pg-alert pg-alert-danger">
-                        {% for error in form.non_field_errors %}
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    <strong>Error:</strong>
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
                             <div>{{ error }}</div>
                         {% endfor %}
-                    </div>
-                {% endif %}
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-                <form method="post">
-                    {% csrf_token %}
-                    
-                    <div class="pg-mb-3">
-                        <label for="{{ form.username.id_for_label }}" class="pg-label">
-                            <i class="fas fa-user pg-me-1"></i>Usuario
-                        </label>
-                        <input type="text" 
-                               class="pg-input {% if form.username.errors %}is-invalid{% endif %}" 
-                               id="{{ form.username.id_for_label }}"
-                               name="{{ form.username.name }}"
-                               value="{{ form.username.value|default:'' }}"
-                               required>
-                        {% if form.username.errors %}
-                            <div class="pg-invalid-feedback">
-                                {% for error in form.username.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {% for error in form.non_field_errors %}
+                        <div>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
 
-                    <div class="pg-mb-3">
-                        <label for="{{ form.password.id_for_label }}" class="pg-label">
-                            <i class="fas fa-lock pg-me-1"></i>Contraseña
-                        </label>
-                        <input type="password" 
-                               class="pg-input {% if form.password.errors %}is-invalid{% endif %}" 
-                               id="{{ form.password.id_for_label }}"
-                               name="{{ form.password.name }}"
-                               required>
-                        {% if form.password.errors %}
-                            <div class="pg-invalid-feedback">
-                                {% for error in form.password.errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                    </div>
-
-                    <div class="pg-grid">
-                        <button type="submit" class="pg-button pg-button-primary">
-                            <i class="fas fa-sign-in-alt pg-me-2"></i>Iniciar Sesión
-                        </button>
-                    </div>
-
-                    <input type="hidden" name="next" value="{{ next }}">
-                </form>
+            <div class="form-group">
+                <div class="col-xs-12">
+                    <label for="{{ form.username.id_for_label }}" class="control-label">
+                        <i class="fas fa-user m-r-5"></i>Usuario
+                    </label>
+                    <input type="text"
+                           class="form-control"
+                           id="{{ form.username.id_for_label }}"
+                           name="{{ form.username.name }}"
+                           value="{{ form.username.value|default:'' }}"
+                           placeholder="Usuario"
+                           required>
+                    {% if form.username.errors %}
+                        <div class="text-danger m-t-5">
+                            {% for error in form.username.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-            <div class="pg-card-footer pg-text-center pg-text-muted">
-                <small>
-                    <i class="fas fa-shield-alt pg-me-1"></i>
-                    Ingresa con tu cuenta para acceder al sistema
-                </small>
+
+            <div class="form-group">
+                <div class="col-xs-12">
+                    <label for="{{ form.password.id_for_label }}" class="control-label">
+                        <i class="fas fa-lock m-r-5"></i>Contraseña
+                    </label>
+                    <input type="password"
+                           class="form-control"
+                           id="{{ form.password.id_for_label }}"
+                           name="{{ form.password.name }}"
+                           placeholder="Contraseña"
+                           required>
+                    {% if form.password.errors %}
+                        <div class="text-danger m-t-5">
+                            {% for error in form.password.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
             </div>
-        </div>
+
+            <div class="form-group text-center m-t-20">
+                <div class="col-xs-12">
+                    <button class="btn btn-info btn-lg btn-block text-uppercase waves-effect waves-light" type="submit">
+                        Iniciar Sesión
+                    </button>
+                </div>
+            </div>
+
+            <input type="hidden" name="next" value="{{ next }}">
+        </form>
     </div>
 </div>
 {% endblock %}

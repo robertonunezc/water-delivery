@@ -3,27 +3,35 @@
 {% block title %}Recordatorios{% endblock %}
 
 {% block content %}
-<div class="pg-container pg-mt-4">
-  <div class="pg-flex pg-flex-column pg-flex-md-row pg-justify-between pg-align-md-end pg-gap-3 pg-mb-4">
-    <div>
-      <h1 class="pg-h3 pg-mb-1">Recordatorios</h1>
-      <p class="pg-text-muted pg-mb-0">Seguimiento personal de pendientes por fecha y cliente.</p>
-    </div>
-    <a href="{% url 'reminders:create' %}" class="pg-button pg-button-primary">
-      <i class="fas fa-plus pg-me-1"></i>NUEVO RECORDATORIO
-    </a>
-  </div>
-
-  <form method="get" class="pg-card pg-mb-4">
-    <div class="pg-card-body">
-      <div class="pg-flex pg-flex-column pg-flex-lg-row pg-gap-3 pg-align-lg-end">
-        <div class="pg-flex-1">
-          <label for="q" class="pg-label">Buscar</label>
-          <input id="q" type="search" name="q" value="{{ q }}" class="pg-input" placeholder="Titulo o descripcion">
+<div class="row m-t-15">
+  <div class="col-md-12">
+    <div class="white-box">
+      <div class="row">
+        <div class="col-sm-8">
+          <h3 class="box-title m-b-0">Recordatorios</h3>
+          <p class="text-muted m-b-0">Seguimiento personal de pendientes por fecha y cliente.</p>
         </div>
-        <div>
-          <label for="client" class="pg-label">Cliente</label>
-          <select id="client" name="client" class="pg-select">
+        <div class="col-sm-4 text-right m-t-10">
+          <a href="{% url 'reminders:create' %}" class="btn btn-info waves-effect waves-light">
+            <i class="fas fa-plus m-r-5"></i>NUEVO RECORDATORIO
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="white-box">
+      <form method="get" class="row">
+        <div class="col-md-6 form-group">
+          <label for="q" class="control-label">Buscar</label>
+          <input id="q" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Titulo o descripcion">
+        </div>
+        <div class="col-md-4 form-group">
+          <label for="client" class="control-label">Cliente</label>
+          <select id="client" name="client" class="form-control">
             <option value="">Todos</option>
             {% for client in clients %}
               <option value="{{ client.pk }}" {% if selected_client_id == client.pk|stringformat:"s" %}selected{% endif %}>
@@ -32,26 +40,28 @@
             {% endfor %}
           </select>
         </div>
-        <div>
-          <button type="submit" class="pg-button pg-button-secondary">
-            <i class="fas fa-search pg-me-1"></i>Filtrar
+        <div class="col-md-2 form-group m-t-25">
+          <button type="submit" class="btn btn-default btn-block waves-effect">
+            <i class="fas fa-search m-r-5"></i>Filtrar
           </button>
         </div>
+      </form>
+
+      <div class="m-t-10">
+        <a class="btn {% if status == 'activos' %}btn-info{% else %}btn-default{% endif %} waves-effect" href="{% url 'reminders:list' %}?status=activos">Activos</a>
+        <a class="btn {% if status == 'vencidos' %}btn-info{% else %}btn-default{% endif %} waves-effect" href="{% url 'reminders:list' %}?status=vencidos">Vencidos</a>
+        <a class="btn {% if status == 'listos' %}btn-info{% else %}btn-default{% endif %} waves-effect" href="{% url 'reminders:list' %}?status=listos">Listos</a>
       </div>
     </div>
-  </form>
-
-  <div class="pg-flex pg-flex-wrap pg-gap-2 pg-mb-3">
-    <a class="pg-button {% if status == 'activos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=activos">Activos</a>
-    <a class="pg-button {% if status == 'vencidos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=vencidos">Vencidos</a>
-    <a class="pg-button {% if status == 'listos' %}pg-button-primary{% else %}pg-button-outline-secondary{% endif %}" href="{% url 'reminders:list' %}?status=listos">Listos</a>
   </div>
+</div>
 
-  <div class="pg-flex pg-flex-column pg-gap-3">
+<div class="row">
+  <div class="col-md-12">
     {% for reminder in reminders %}
       {% include "reminders/_reminder_row.html" with reminder=reminder %}
     {% empty %}
-      <div class="pg-alert pg-alert-info">Sin recordatorios</div>
+      <div class="alert alert-info">Sin recordatorios</div>
     {% endfor %}
   </div>
 </div>
