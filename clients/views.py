@@ -1103,6 +1103,12 @@ def detail(request, pk):
         'upcoming_route_orders': upcoming_route_orders,
         'recent_completed_routes': recent_completed_routes,
         'client_invoices': client_invoices_list,
+        'tab_counts': {
+            'orders': total_orders,
+            'movements': len(all_payment_data),
+            'invoices': len(client_invoices_list),
+            'overdue': len(overdue_order_ids),
+        },
         'debt_percentage': debt_percentage,
         'credit_account': credit_account,
         'credit_reconciliation_warning': get_credit_reconciliation_warning(client),

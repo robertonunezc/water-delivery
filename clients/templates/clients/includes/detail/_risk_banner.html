@@ -1,0 +1,35 @@
+{% if has_financial_risk %}
+  <section class="alert alert-danger client-risk-banner" role="alert">
+    <div class="client-risk-banner-body">
+      <div class="client-risk-banner-summary">
+        <i class="fas fa-exclamation-triangle m-r-5" aria-hidden="true"></i>
+        <strong>${{ pending_payment_data.total_overdue_amount|floatformat:2 }} vencidos</strong>
+        <span class="client-risk-sep">·</span>
+        {{ tab_counts.overdue }} pedido{% if tab_counts.overdue != 1 %}s{% endif %}
+        <span class="client-risk-sep">·</span>
+        atraso máx. <strong>{{ pending_payment_data.days_overdue }} días</strong>
+      </div>
+      <div class="client-risk-banner-actions">
+        <a
+          href="?tab=orders&amp;orders_filter=overdue#orders-tab-pane"
+          class="btn btn-default btn-sm">
+          Ver pedidos vencidos
+        </a>
+        {% if overdue_payment_query %}
+          <a
+            href="{% url 'clients:pay_selected_orders' client.pk %}?{{ overdue_payment_query }}"
+            class="btn btn-danger btn-sm">
+            Cobrar vencidos
+          </a>
+        {% endif %}
+      </div>
+    </div>
+  </section>
+{% endif %}
+
+{% if credit_reconciliation_warning %}
+  <section class="alert alert-warning" role="alert">
+    <h4 class="m-t-0">Revisión de crédito requerida</h4>
+    <p class="m-b-0">{{ credit_reconciliation_warning.message }}</p>
+  </section>
+{% endif %}

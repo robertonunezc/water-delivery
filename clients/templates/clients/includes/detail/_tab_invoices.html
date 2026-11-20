@@ -1,0 +1,96 @@
+<div
+  class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'invoices' %}active pg-show pg-active{% endif %}"
+  id="invoices-tab-pane"
+  role="tabpanel"
+  aria-labelledby="invoices-tab"
+  tabindex="0">
+  {% if not client.requires_billing %}
+    <div class="well well-sm m-b-0">
+      <p class="m-b-10">Este cliente no requiere facturación recurrente.</p>
+      {% if request.user.is_staff %}
+        <a href="{% url 'clients:edit_v2' client.pk %}?tab=billing" class="btn btn-default btn-sm">
+          <i class="fas fa-cog m-r-5" aria-hidden="true"></i>Configurar facturación
+        </a>
+      {% endif %}
+    </div>
+  {% else %}
+    {% if billing_frequency %}
+      <div class="well well-sm m-b-15 small">
+        <strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}
+        · <strong>Fecha:</strong> {{ billing_frequency.get_billing_date_display }}
+        {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
+          · <strong>Próxima:</strong> <span class="text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
+        {% endif %}
+        <span class="label label-{% if billing_frequency.is_active %}success{% else %}default{% endif %} m-l-5">
+          {% if billing_frequency.is_active %}Activa{% else %}Inactiva{% endif %}
+        </span>
+      </div>
+    {% endif %}
+
+    {% if client_invoices %}
+      <div class="table-responsive">
+        <table class="table table-hover color-table info-table">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Cliente fiscal</th>
+              <th>Serie / Folio</th>
+              <th>Emisión</th>
+              <th>Estado</th>
+              <th>Monto</th>
+              <th>Pagado</th>
+              <th>Pendiente</th>
+              <th class="text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for invoice in client_invoices %}
+              <tr>
+                <td><strong>#{{ invoice.id }}</strong></td>
+                <td>{{ invoice.client.name }}</td>
+                <td><code>{{ invoice.identifier }}</code>-<code>{{ invoice.folio }}</code></td>
+                <td>{{ invoice.emmited_at|date:"d/m/Y"|default:"—" }}</td>
+                <td>
+                  {% if invoice.status == 'ACTIVE' %}
+                    <span class="label label-success">ACTIVA</span>
+                  {% elif invoice.status == 'DRAFT' %}
+                    <span class="label label-warning">BORRADOR</span>
+                  {% else %}
+                    <span class="label label-danger">CANCELADA</span>
+                  {% endif %}
+                </td>
+                <td>${{ invoice.amount|floatformat:2 }}</td>
+                <td>
+                  {% if invoice.status == 'ACTIVE' %}${{ invoice.total_payments|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td class="{% if invoice.status == 'ACTIVE' and invoice.pending_amount > 0 %}text-danger font-bold{% else %}text-success{% endif %}">
+                  {% if invoice.status == 'ACTIVE' %}${{ invoice.pending_amount|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                </td>
+                <td class="text-right">
+                  <a
+                    href="{% url 'admin_edit_invoice' invoice.id %}"
+                    class="btn btn-default btn-xs"
+                    title="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}"
+                    aria-label="{% if invoice.status == 'DRAFT' %}Editar borrador{% else %}Ver factura{% endif %}">
+                    <i class="fas {% if invoice.status == 'DRAFT' %}fa-pen{% else %}fa-eye{% endif %}" aria-hidden="true"></i>
+                  </a>
+                  {% if request.user.is_staff and invoice.status != 'CANCELLED' %}
+                    <form method="post" action="{% url 'admin_cancel_invoice' invoice.id %}" style="display:inline-block;" onsubmit="return confirm('¿Cancelar la factura {{ invoice.identifier }}-{{ invoice.folio }}? Esta acción no se puede deshacer.');">
+                      {% csrf_token %}
+                      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                      <button type="submit" class="btn btn-danger btn-outline btn-xs" title="Cancelar factura" aria-label="Cancelar factura">
+                        <i class="fas fa-ban" aria-hidden="true"></i>
+                      </button>
+                    </form>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted m-b-0">No hay facturas vinculadas a los pedidos de este cliente.</p>
+    {% endif %}
+  {% endif %}
+</div>

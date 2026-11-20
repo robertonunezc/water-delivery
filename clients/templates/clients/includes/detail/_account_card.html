@@ -1,0 +1,136 @@
+<aside class="white-box client-account-card">
+  <div class="client-account-card-head">
+    <div class="client-avatar" aria-hidden="true">{{ client.name|slice:":2"|upper }}</div>
+    <div class="client-account-card-ident">
+      <div class="client-account-card-name">{{ client.name }}</div>
+      <div class="text-muted small">{{ client.get_type_display }}</div>
+    </div>
+    {% if request.user.is_staff %}
+      <a
+        href="{% url 'clients:edit_v2' client.pk %}"
+        class="btn btn-default btn-xs"
+        title="Editar cliente"
+        aria-label="Editar cliente">
+        <i class="fas fa-pen" aria-hidden="true"></i>
+      </a>
+    {% endif %}
+  </div>
+
+  {% if client.note %}
+    <div class="client-account-note">
+      <i class="fas fa-sticky-note m-r-5" aria-hidden="true"></i>{{ client.note }}
+    </div>
+  {% endif %}
+
+  <div class="client-account-section">
+    <div class="client-account-section-title">Estado de cuenta</div>
+
+    <div class="client-account-metrics">
+      {% for card in snapshot_cards %}
+        {% if card.label == 'Saldo prepago' or card.label == 'Deuda actual' %}
+          <div class="client-account-metric">
+            <div class="text-muted small">{{ card.label }}</div>
+            <div class="client-account-metric-value text-{% if card.tone == 'muted' %}muted{% else %}{{ card.tone }}{% endif %}">
+              {{ card.value }}
+            </div>
+            <div class="text-muted small">{{ card.note }}</div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+
+    {% if credit_enabled %}
+      <div class="client-account-credit m-t-15">
+        <div class="client-account-credit-meta small">
+          <span>Crédito usado</span>
+          <strong>{{ debt_percentage }}%</strong>
+        </div>
+        <div class="progress progress-sm m-t-5 m-b-5">
+          <div
+            class="progress-bar progress-bar-{{ credit_bar_tone }}"
+            role="progressbar"
+            aria-valuenow="{{ credit_usage_percent }}"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            style="width: {{ credit_usage_percent }}%;">
+          </div>
+        </div>
+        <div class="text-muted small">
+          Disponible: ${{ client.get_available_credit|floatformat:2 }} de ${{ credit_account.credit_limit|floatformat:2 }}
+        </div>
+      </div>
+    {% else %}
+      <div class="text-muted small m-t-10">Sin crédito habilitado</div>
+    {% endif %}
+
+    {% for card in snapshot_cards %}
+      {% if card.label == 'Facturación' %}
+        <div class="client-account-billing small m-t-15">
+          <span class="text-muted">Facturación:</span>
+          <strong>{{ card.value }}</strong>
+          <span class="text-muted">· {{ card.note }}</span>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="client-account-actions m-t-15">
+      <a href="{% url 'clients:pay_credit' client.pk %}" class="btn btn-success btn-sm">
+        <i class="fas fa-hand-holding-usd m-r-5" aria-hidden="true"></i>Registrar pago
+      </a>
+      <a href="{% url 'clients:add_balance' client.pk %}" class="btn btn-default btn-sm">
+        <i class="fas fa-wallet m-r-5" aria-hidden="true"></i>Agregar saldo
+      </a>
+    </div>
+  </div>
+
+  <div class="client-account-section">
+    <div class="client-account-section-title">Contacto y entrega</div>
+
+    {% with contact=contacts|first %}
+      {% if contact %}
+        <div class="client-account-line">
+          <i class="fas fa-user text-muted" aria-hidden="true"></i>
+          <div>
+            <strong>{{ contact.name }}</strong>
+            {% if contact.position %}<span class="text-muted small">· {{ contact.position }}</span>{% endif %}
+            {% if contact.phone %}
+              <div class="small"><a href="tel:{{ contact.phone }}">{{ contact.phone }}</a></div>
+            {% endif %}
+            {% if contact.email %}
+              <div class="small"><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></div>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="text-muted small">Sin contacto principal</div>
+      {% endif %}
+    {% endwith %}
+
+    {% with address=addresses|first %}
+      {% if address %}
+        <div class="client-account-line m-t-10">
+          <i class="fas fa-map-marker-alt text-muted" aria-hidden="true"></i>
+          <div class="small">
+            {{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}
+            {% if client.address_link %}
+              · <a href="{{ client.address_link }}" target="_blank" rel="noopener">Maps</a>
+            {% endif %}
+          </div>
+        </div>
+      {% else %}
+        <div class="text-muted small m-t-10">Sin dirección activa</div>
+      {% endif %}
+    {% endwith %}
+
+    {% with route_client=route_clients|first %}
+      {% if route_client %}
+        <div class="client-account-line m-t-10">
+          <i class="fas fa-truck text-muted" aria-hidden="true"></i>
+          <div class="small">
+            {{ route_client.route.name }} · {{ route_client.route.get_weekday_display }} · {{ route_client.get_frequency_display }}
+          </div>
+        </div>
+      {% endif %}
+    {% endwith %}
+  </div>
+</aside>

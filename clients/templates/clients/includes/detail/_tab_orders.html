@@ -1,0 +1,297 @@
+<div
+  class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'orders' %}active pg-show pg-active{% endif %}"
+  id="orders-tab-pane"
+  role="tabpanel"
+  aria-labelledby="orders-tab"
+  tabindex="0">
+  <div class="client-tab-toolbar m-b-15">
+    <div class="client-filter-chips" role="group" aria-label="Filtrar pedidos">
+      <a
+        href="?tab=orders&amp;orders_filter=all&amp;movements_type={{ movements_type }}#orders-tab-pane"
+        class="btn btn-xs {% if orders_filter == 'all' %}btn-info{% else %}btn-default{% endif %}">
+        Todos
+      </a>
+      <a
+        href="?tab=orders&amp;orders_filter=due&amp;movements_type={{ movements_type }}#orders-tab-pane"
+        class="btn btn-xs {% if orders_filter == 'due' %}btn-info{% else %}btn-default{% endif %}">
+        Por cobrar
+      </a>
+      <a
+        href="?tab=orders&amp;orders_filter=overdue&amp;movements_type={{ movements_type }}#orders-tab-pane"
+        class="btn btn-xs {% if orders_filter == 'overdue' %}btn-danger{% else %}btn-default{% endif %}">
+        Vencidos{% if tab_counts.overdue %} ({{ tab_counts.overdue }}){% endif %}
+      </a>
+    </div>
+    <small class="text-muted">
+      {% if orders %}
+        Mostrando {{ orders.start_index }}-{{ orders.end_index }} de {{ orders.paginator.count }}
+      {% else %}
+        Sin pedidos
+      {% endif %}
+    </small>
+  </div>
+
+  {% if orders %}
+    <div class="client-selection-bar pg-d-none m-b-15" id="client-order-selection-bar" role="region" aria-live="polite">
+      <div class="client-selection-summary">
+        <strong id="client-order-selected-count">0</strong> seleccionados ·
+        <strong id="client-order-selected-total">$0.00</strong>
+      </div>
+      <div class="client-selection-actions">
+        <button type="button" class="btn btn-success btn-xs" data-bulk-action="pay">
+          <i class="fas fa-hand-holding-usd m-r-5" aria-hidden="true"></i>Cobrar
+        </button>
+        {% if request.user.is_staff %}
+          <button type="button" class="btn btn-default btn-xs" data-bulk-action="create_invoice">
+            <i class="fas fa-file-invoice m-r-5" aria-hidden="true"></i>Facturar
+          </button>
+        {% endif %}
+        {% if receipt_signature_enabled %}
+          <button type="button" class="btn btn-default btn-xs" data-bulk-action="send_receipts">
+            <i class="fas fa-envelope m-r-5" aria-hidden="true"></i>Enviar recibos
+          </button>
+        {% endif %}
+        <button type="button" class="btn btn-default btn-xs" id="clear-client-order-selection" aria-label="Limpiar selección" title="Limpiar selección">
+          <i class="fas fa-times" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-hover color-table info-table">
+        <thead>
+          <tr>
+            <th>
+              <input class="pg-checkbox-input" type="checkbox" id="select-all-client-orders" aria-label="Seleccionar todos los pedidos visibles">
+            </th>
+            <th>#</th>
+            <th>Fecha</th>
+            <th>Productos</th>
+            <th>Total</th>
+            <th>Estado</th>
+            <th class="text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in orders %}
+            <tr>
+              <td>
+                <input
+                  class="pg-checkbox-input client-order-bulk-checkbox"
+                  type="checkbox"
+                  name="orders"
+                  value="{{ order.pk }}"
+                  form="selected-orders-payment-form"
+                  data-order-total="{{ order.total_amount }}"
+                  data-has-receipt="{% if order.receipt and not order.receipt.deleted_at %}true{% else %}false{% endif %}"
+                  aria-label="Seleccionar pedido #{{ order.pk }}">
+              </td>
+              <td>
+                <span class="client-order-id-cell">
+                  <a href="{% url 'orders:get_order' order.id %}" class="font-bold">#{{ order.id }}</a>
+                  {% if order.notes %}
+                    <button
+                      type="button"
+                      class="btn btn-default btn-xs client-order-note-trigger"
+                      data-pg-toggle="modal"
+                      data-pg-target="#order-note-modal-{{ order.pk }}"
+                      aria-label="Ver nota del pedido #{{ order.pk }}"
+                      title="Ver nota">
+                      <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                      <span class="sr-only">Ver nota</span>
+                    </button>
+                  {% endif %}
+                </span>
+              </td>
+              <td>{{ order.order_date|date:"d/m/Y H:i" }}</td>
+              <td>
+                <small>
+                  {% for item in order.items.all %}
+                    {{ item.product.name }} ({{ item.quantity }}){% if not forloop.last %}<br>{% endif %}
+                  {% empty %}
+                    <span class="text-muted">Sin productos</span>
+                  {% endfor %}
+                </small>
+              </td>
+              <td class="font-bold">${{ order.total_amount|floatformat:2 }}</td>
+              <td>
+                {% if order.status == 'CANCELLED' %}
+                  <span class="label label-danger">Cancelado</span>
+                {% elif order.status == 'PENDING' %}
+                  <span class="label label-info">Pendiente de entrega</span>
+                {% elif order.is_paid %}
+                  <span class="label label-success">Pagado</span>
+                {% elif order.pk in overdue_order_ids %}
+                  <span class="label label-danger">Vencido</span>
+                {% else %}
+                  <span class="label label-warning">Por cobrar</span>
+                {% endif %}
+              </td>
+              <td class="text-right">
+                <div class="pg-dropdown">
+                  <button
+                    class="btn btn-default btn-xs pg-dropdown-trigger"
+                    type="button"
+                    data-pg-toggle="dropdown"
+                    aria-expanded="false"
+                    aria-label="Acciones del pedido #{{ order.id }}">
+                    <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                  </button>
+                  <ul class="pg-dropdown-menu pg-dropdown-menu-end">
+                    <li>
+                      <a class="pg-dropdown-item" href="{% url 'orders:get_order' order.id %}">
+                        {% if order.status == 'PENDING' %}Editar{% else %}Ver detalle{% endif %}
+                      </a>
+                    </li>
+                    {% if order.status == 'COMPLETED' %}
+                      <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
+                    {% endif %}
+                    {% include 'orders/_receipt_dropdown_items.html' %}
+                    {% if order.status != 'CANCELLED' %}
+                      <li class="pg-dropdown-divider" role="separator"></li>
+                      <li>
+                        <button
+                          type="button"
+                          class="pg-dropdown-item pg-text-danger client-order-cancel-action"
+                          data-cancel-url="{% url 'orders:cancel_order' order.id %}"
+                          aria-label="Cancelar pedido #{{ order.id }}">
+                          Cancelar
+                        </button>
+                      </li>
+                    {% endif %}
+                  </ul>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% for order in orders %}
+      {% if order.notes %}
+        <div class="pg-modal pg-fade" id="order-note-modal-{{ order.pk }}" tabindex="-1" aria-labelledby="order-note-modal-{{ order.pk }}-label" aria-hidden="true">
+          <div class="pg-modal-dialog pg-modal-dialog-centered">
+            <div class="pg-modal-content">
+              <div class="pg-modal-header">
+                <h3 class="pg-modal-title pg-h5" id="order-note-modal-{{ order.pk }}-label">Nota del pedido #{{ order.pk }}</h3>
+                <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+              </div>
+              <div class="pg-modal-body">
+                {{ order.notes|linebreaksbr }}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    {% if orders.has_other_pages %}
+      <div class="text-right m-t-15">
+        <nav aria-label="Paginación de pedidos del cliente">
+          <ul class="pagination m-b-0">
+            {% if orders.has_previous %}
+              <li>
+                <a href="?tab=orders&amp;orders_filter={{ orders_filter }}&amp;movements_type={{ movements_type }}&amp;orders_page={{ orders.previous_page_number }}&amp;payments_page={{ all_payment_data.number }}#orders-tab-pane">Anterior</a>
+              </li>
+            {% else %}
+              <li class="disabled"><span>Anterior</span></li>
+            {% endif %}
+            <li class="disabled">
+              <span>Página {{ orders.number }} de {{ orders.paginator.num_pages }}</span>
+            </li>
+            {% if orders.has_next %}
+              <li>
+                <a href="?tab=orders&amp;orders_filter={{ orders_filter }}&amp;movements_type={{ movements_type }}&amp;orders_page={{ orders.next_page_number }}&amp;payments_page={{ all_payment_data.number }}#orders-tab-pane">Siguiente</a>
+              </li>
+            {% else %}
+              <li class="disabled"><span>Siguiente</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+
+    {% if receipt_signature_enabled %}
+      <button
+        type="button"
+        class="pg-d-none"
+        id="open-receipt-bundle-modal"
+        data-pg-toggle="modal"
+        data-pg-target="#receipt-bundle-modal"
+        aria-hidden="true"
+        tabindex="-1">
+      </button>
+      <div class="pg-modal pg-fade" id="receipt-bundle-modal" tabindex="-1" aria-labelledby="receipt-bundle-modal-label" aria-hidden="true">
+        <div class="pg-modal-dialog pg-modal-dialog-centered pg-modal-dialog-scrollable">
+          <form
+            class="pg-modal-content"
+            id="receipt-bundle-form"
+            data-send-url="{% url 'clients:send_selected_order_receipts' client.pk %}">
+            {% csrf_token %}
+            <div class="pg-modal-header">
+              <h3 class="pg-modal-title" id="receipt-bundle-modal-label">Enviar recibos firmados</h3>
+              <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="pg-modal-body">
+              <div class="form-group">
+                <label for="receipt-bundle-contact" class="control-label">Contacto</label>
+                <select class="form-control" id="receipt-bundle-contact">
+                  <option value="">Capturar destinatario manualmente</option>
+                  {% for contact in contacts %}
+                    <option value="{{ contact.pk }}" data-name="{{ contact.name }}" data-email="{{ contact.email|default:'' }}">
+                      {{ contact.name }}{% if contact.email %} - {{ contact.email }}{% endif %}
+                    </option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="receipt-bundle-recipient-name" class="control-label">Nombre</label>
+                <input class="form-control" id="receipt-bundle-recipient-name" name="recipient_name" maxlength="100" autocomplete="name">
+              </div>
+              <div class="form-group">
+                <label for="receipt-bundle-recipient-email" class="control-label">Correo</label>
+                <input class="form-control" id="receipt-bundle-recipient-email" name="recipient_email" type="email" required autocomplete="email">
+              </div>
+              <div class="alert alert-info m-b-15">
+                Se adjuntarán <strong id="receipt-bundle-available-count">0</strong> recibo(s) firmado(s).
+                Los pedidos sin recibo no bloquean el envío.
+              </div>
+              <div class="m-b-15">
+                <strong>Recibos disponibles</strong>
+                <ul class="m-b-0" id="receipt-bundle-available-orders"></ul>
+              </div>
+              <div class="pg-alert pg-alert-warning pg-d-none pg-mb-3" id="receipt-bundle-missing-section">
+                <strong>Pedidos sin recibo firmado</strong>
+                <ul class="m-b-5" id="receipt-bundle-missing-orders"></ul>
+                Firma o crea estos recibos antes de intentar enviarlos.
+              </div>
+              <div class="pg-alert pg-d-none pg-mb-0" id="receipt-bundle-result" role="status"></div>
+            </div>
+            <div class="pg-modal-footer">
+              <button type="button" class="btn btn-default" data-pg-dismiss="modal">Cerrar</button>
+              <button type="submit" class="btn btn-info" id="send-receipt-bundle">
+                <i class="fas fa-envelope m-r-5" aria-hidden="true"></i>Enviar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="text-muted">
+      {% if orders_filter == 'overdue' %}
+        No hay pedidos vencidos para este cliente.
+      {% elif orders_filter == 'due' %}
+        No hay pedidos pendientes de pago.
+      {% else %}
+        No hay pedidos registrados para este cliente.
+      {% endif %}
+    </p>
+    {% if orders_filter == 'all' %}
+      <a href="{% url 'orders:create_order' client.pk %}" class="btn btn-info waves-effect waves-light">
+        <i class="fas fa-plus m-r-5" aria-hidden="true"></i>Crear primer pedido
+      </a>
+    {% endif %}
+  {% endif %}
+</div>

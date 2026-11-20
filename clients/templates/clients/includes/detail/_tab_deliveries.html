@@ -1,0 +1,113 @@
+<div
+  class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'deliveries' %}active pg-show pg-active{% endif %}"
+  id="deliveries-tab-pane"
+  role="tabpanel"
+  aria-labelledby="deliveries-tab"
+  tabindex="0">
+  {% if route_clients or upcoming_route_orders or recent_completed_routes %}
+    {% if route_clients %}
+      <h5 class="text-primary m-t-0">Rutas regulares asignadas</h5>
+      <div class="table-responsive m-b-20">
+        <table class="table table-hover color-table info-table">
+          <thead>
+            <tr>
+              <th>Ruta</th>
+              <th>Día</th>
+              <th>Frecuencia</th>
+              <th>Secuencia</th>
+              <th>Vehículo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route_client in route_clients %}
+              <tr>
+                <td>{{ route_client.route.name }}</td>
+                <td>{{ route_client.route.get_weekday_display }}</td>
+                <td>{{ route_client.get_frequency_display }}</td>
+                <td>{{ route_client.sequence }}</td>
+                <td>
+                  {% if route_client.route.transportation %}
+                    {{ route_client.route.transportation.license_plate }} - {{ route_client.route.transportation.model }}
+                  {% else %}
+                    <span class="text-muted">Sin vehículo asignado</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    {% if upcoming_route_orders %}
+      <h5 class="text-success">Próximas visitas programadas</h5>
+      <div class="table-responsive m-b-20">
+        <table class="table table-hover color-table info-table">
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Ruta</th>
+              <th>Conductor</th>
+              <th>Pedido</th>
+              <th>Estado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route_order in upcoming_route_orders %}
+              <tr>
+                <td>{{ route_order.visit_date|date:"d/m/Y" }}</td>
+                <td>{{ route_order.route.name }} <small class="text-muted">Seq: {{ route_order.sequence }}</small></td>
+                <td>
+                  {% if route_order.route.transportation.assigned_driver %}
+                    {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                  {% else %}
+                    <span class="text-muted">Sin asignar</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <a href="{% url 'orders:get_order' route_order.order.id %}">#{{ route_order.order.id }}</a>
+                  <small class="text-muted">${{ route_order.order.total_amount|floatformat:2 }}</small>
+                </td>
+                <td><span class="label label-info">Programado</span></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
+    {% if recent_completed_routes %}
+      <h5 class="text-muted">Entregas recientes completadas</h5>
+      <div class="table-responsive">
+        <table class="table table-hover color-table info-table">
+          <thead>
+            <tr>
+              <th>Completado</th>
+              <th>Ruta</th>
+              <th>Conductor</th>
+              <th>Pedido</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route_order in recent_completed_routes %}
+              <tr>
+                <td>{{ route_order.completed_at|date:"d/m/Y H:i" }}</td>
+                <td>{{ route_order.route.name }}</td>
+                <td>
+                  {% if route_order.route.transportation.assigned_driver %}
+                    {{ route_order.route.transportation.assigned_driver.user.get_full_name }}
+                  {% else %}
+                    <span class="text-muted">N/A</span>
+                  {% endif %}
+                </td>
+                <td><a href="{% url 'orders:get_order' route_order.order.id %}">#{{ route_order.order.id }}</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="text-muted m-b-0">Este cliente no tiene rutas o entregas programadas.</p>
+  {% endif %}
+</div>

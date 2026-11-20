@@ -723,7 +723,7 @@ class ReminderTemplateIntegrationTests(FastTenantTestCase):
 
         response = self.client.get(reverse("clients:detail", kwargs={"pk": self.client_record.pk}))
 
-        self.assertContains(response, "NUEVO RECORDATORIO")
+        self.assertContains(response, "Nuevo recordatorio")
         self.assertContains(
             response,
             f'{reverse("reminders:create")}?client={self.client_record.pk}',

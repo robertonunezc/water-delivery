@@ -1,0 +1,204 @@
+<div
+  class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'data' %}active pg-show pg-active{% endif %}"
+  id="data-tab-pane"
+  role="tabpanel"
+  aria-labelledby="data-tab"
+  tabindex="0">
+  {% if request.user.is_staff %}
+    <section class="m-b-25" id="client-prices">
+      <form method="post" action="{% url 'clients:update_product_prices' client.pk %}" id="client-product-prices-form">
+        {% csrf_token %}
+        {{ client_product_price_formset.management_form }}
+        <div class="client-tab-toolbar m-b-10">
+          <h4 class="box-title m-b-0">Precios por producto</h4>
+          <button type="submit" class="btn btn-success btn-sm waves-effect waves-light">
+            Guardar precios
+          </button>
+        </div>
+        {% if client_product_price_formset.non_form_errors %}
+          <div class="alert alert-danger">{{ client_product_price_formset.non_form_errors }}</div>
+        {% endif %}
+        {% if client_product_price_formset.forms %}
+          <div class="table-responsive">
+            <table class="table table-hover color-table info-table">
+              <thead>
+                <tr>
+                  <th>Producto</th>
+                  <th>Presentación</th>
+                  <th>Precio base</th>
+                  <th>Precio cliente</th>
+                  <th>Activo</th>
+                  <th>Nota</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for price_form in client_product_price_formset.forms %}
+                  <tr>
+                    <td>
+                      {{ price_form.product_id }}
+                      {% if price_form.product %}
+                        <strong>{{ price_form.product.name }}</strong>
+                      {% else %}
+                        <span class="text-danger">Producto no válido</span>
+                      {% endif %}
+                      {{ price_form.product_id.errors }}
+                      {{ price_form.non_field_errors }}
+                    </td>
+                    <td>
+                      {% if price_form.product %}{{ price_form.product.get_presentation_display }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                      {% if price_form.product %}${{ price_form.product.price|floatformat:2 }}{% else %}<span class="text-muted">—</span>{% endif %}
+                    </td>
+                    <td>
+                      {{ price_form.price }}
+                      {{ price_form.price.errors }}
+                    </td>
+                    <td>
+                      <div class="checkbox checkbox-info">
+                        {{ price_form.active }}
+                        <label for="{{ price_form.active.id_for_label }}">Activo</label>
+                      </div>
+                      {{ price_form.active.errors }}
+                    </td>
+                    <td>
+                      {{ price_form.note }}
+                      {{ price_form.note.errors }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="text-muted m-b-0">No hay productos activos.</p>
+        {% endif %}
+      </form>
+    </section>
+    <hr>
+  {% endif %}
+
+  <div class="client-profile-grid">
+    <section class="client-profile-section">
+      <h4 class="m-t-0"><i class="fas fa-user m-r-5" aria-hidden="true"></i>Contactos</h4>
+      {% if contacts %}
+        {% for contact in contacts %}
+          <div class="b-b p-b-10 m-b-10">
+            <strong>{{ contact.name }}</strong>
+            {% if contact.position %}<small class="text-muted db">{{ contact.position }}</small>{% endif %}
+            {% if contact.phone %}<div><i class="fas fa-phone m-r-5" aria-hidden="true"></i>{{ contact.phone }}</div>{% endif %}
+            {% if contact.email %}<div><i class="fas fa-envelope m-r-5" aria-hidden="true"></i>{{ contact.email }}</div>{% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted m-b-0">Sin contacto principal</p>
+      {% endif %}
+    </section>
+
+    <section class="client-profile-section">
+      <h4 class="m-t-0"><i class="fas fa-map-marker-alt m-r-5" aria-hidden="true"></i>Direcciones</h4>
+      {% if addresses %}
+        {% for address in addresses %}
+          <div class="b-b p-b-10 m-b-10">
+            <span class="label label-default m-b-5">{{ address.get_type_display }}</span>
+            <div>{{ address.street }}, {{ address.municipality }}, {{ address.state }} {{ address.zip_code }}</div>
+          </div>
+        {% endfor %}
+        {% if client.address_link %}
+          <a href="{{ client.address_link }}" target="_blank" rel="noopener" class="btn btn-info btn-outline btn-sm">
+            <i class="fas fa-map-marker-alt m-r-5" aria-hidden="true"></i>Ver ubicación en Google Maps
+          </a>
+        {% endif %}
+      {% else %}
+        <p class="text-muted m-b-0">Sin dirección activa</p>
+      {% endif %}
+    </section>
+
+    {% if client.type == 'corporate' %}
+      <section class="client-profile-section">
+        <h4 class="m-t-0"><i class="fas fa-code-branch m-r-5" aria-hidden="true"></i>Sucursales</h4>
+        {% if branches %}
+          {% for branch in branches %}
+            <div class="row b-b p-b-10 m-b-10">
+              <div class="col-xs-8">
+                <a href="{% url 'clients:detail' branch.pk %}" class="font-bold">{{ branch.name }}</a>
+              </div>
+              <div class="col-xs-4 text-right">
+                <span class="label label-{% if branch.active %}success{% else %}default{% endif %}">{% if branch.active %}Activo{% else %}Inactivo{% endif %}</span>
+              </div>
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted m-b-0">No hay sucursales registradas.</p>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    <section class="client-profile-section">
+      <h4 class="m-t-0"><i class="fas fa-file-invoice-dollar m-r-5" aria-hidden="true"></i>Datos fiscales</h4>
+      {% if client.type == 'branch' and client.corporate %}
+        <p class="text-muted m-b-0">
+          Esta sucursal hereda los datos fiscales de
+          <a href="{% url 'clients:detail' client.corporate.pk %}">{{ client.corporate.name }}</a>.
+        </p>
+      {% elif billing_data %}
+        <div><strong>RFC:</strong> {{ billing_data.rfc }}</div>
+        <div><strong>Razón Social:</strong> {{ billing_data.razon_social }}</div>
+      {% else %}
+        <p class="text-muted m-b-0">Sin datos fiscales configurados</p>
+      {% endif %}
+    </section>
+
+    <section class="client-profile-section">
+      <h4 class="m-t-0"><i class="fas fa-calendar-alt m-r-5" aria-hidden="true"></i>Frecuencia de facturación</h4>
+      {% if billing_frequency %}
+        <div><strong>Frecuencia:</strong> {{ billing_frequency.get_frequency_display }}</div>
+        <div><strong>Tipo de fecha:</strong> {{ billing_frequency.get_billing_date_display }}</div>
+        <div>
+          <strong>Estado:</strong>
+          <span class="label label-{% if billing_frequency.is_active %}success{% else %}default{% endif %}">
+            {% if billing_frequency.is_active %}Activo{% else %}Inactivo{% endif %}
+          </span>
+        </div>
+        {% if billing_frequency.next_billing_date and billing_frequency.is_active %}
+          <div class="m-t-10">
+            <strong>Próxima facturación:</strong>
+            <span class="text-primary">{{ billing_frequency.next_billing_date|date:"d/m/Y" }}</span>
+          </div>
+        {% endif %}
+        {% if billing_frequency.notes %}
+          <p class="small text-muted m-t-10 m-b-0">{{ billing_frequency.notes }}</p>
+        {% endif %}
+      {% else %}
+        <p class="text-muted m-b-0">Sin frecuencia configurada</p>
+      {% endif %}
+    </section>
+
+    <section class="client-profile-section">
+      <h4 class="m-t-0"><i class="fas fa-credit-card m-r-5" aria-hidden="true"></i>Crédito y plazos</h4>
+      {% if credit_enabled %}
+        {% if credit_is_inherited %}
+          <div class="text-muted m-b-10">Crédito administrado por {{ credit_account.name }}</div>
+        {% endif %}
+        <div><strong>Límite:</strong> ${{ credit_account.credit_limit|floatformat:2 }}</div>
+        <div><strong>Disponible:</strong> ${{ client.get_available_credit|floatformat:2 }}</div>
+        <div><strong>Uso:</strong> {{ debt_percentage }}%</div>
+        <div class="m-t-10">
+          <strong>Ciclo de vencimiento:</strong>
+          {% if effective_credit_config and effective_credit_config.payment_term_type == 'monthly_cutoff' %}
+            {{ effective_credit_config.get_cutoff_day_display }}
+          {% elif effective_credit_config and effective_credit_config.payment_term_type == 'invoice_due' %}
+            {{ effective_credit_config.max_payment_days }} días después de emitir la factura
+          {% else %}
+            <span class="text-muted">Sin configuración</span>
+          {% endif %}
+        </div>
+        {% if pending_payment_data.nearest_due_date %}
+          <div><strong>Próximo vencimiento:</strong> {{ pending_payment_data.nearest_due_date|date:"d/m/Y" }}</div>
+        {% endif %}
+      {% else %}
+        <p class="text-muted m-b-0">Sin crédito habilitado</p>
+      {% endif %}
+    </section>
+  </div>
+</div>

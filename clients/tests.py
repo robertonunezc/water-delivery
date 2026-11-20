@@ -18,7 +18,12 @@ from .models import (
     CreditTransaction,
     InvoiceData,
 )
-from .services.client_detail_service import build_client_detail_snapshot
+from .services.client_detail_service import (
+    build_client_detail_snapshot,
+    build_overdue_payment_query,
+    filter_client_detail_movements,
+    resolve_client_detail_tab,
+)
 from invoice.models import Invoice, InvoiceOrderLink
 from orders.models import Order, OrderStatus
 from payment.models import Payment
@@ -1187,3 +1192,37 @@ class ClientDetailSnapshotServiceTests(FastTenantTestCase):
 
         self.assertEqual(billing_card['value'], 'Próxima: 08/07/2026')
         self.assertEqual(billing_card['note'], '1 factura pendiente')
+
+    def test_resolve_client_detail_tab_maps_legacy_and_unknown_tabs(self) -> None:
+        self.assertEqual(resolve_client_detail_tab(None), 'orders')
+        self.assertEqual(resolve_client_detail_tab('sales'), 'orders')
+        self.assertEqual(resolve_client_detail_tab('payments'), 'movements')
+        self.assertEqual(resolve_client_detail_tab('routes'), 'deliveries')
+        self.assertEqual(resolve_client_detail_tab('prices'), 'data')
+        self.assertEqual(resolve_client_detail_tab('profile'), 'data')
+        self.assertEqual(resolve_client_detail_tab('invoices'), 'invoices')
+        self.assertEqual(resolve_client_detail_tab('unknown'), 'orders')
+
+    def test_filter_client_detail_movements_filters_by_type(self) -> None:
+        items = [
+            {'id': 1, 'type': 'payment'},
+            {'id': 2, 'type': 'balance_transaction'},
+            {'id': 3, 'type': 'credit_transaction'},
+        ]
+        self.assertEqual(len(filter_client_detail_movements(items, 'all')), 3)
+        self.assertEqual(
+            [item['id'] for item in filter_client_detail_movements(items, 'payment')],
+            [1],
+        )
+        self.assertEqual(
+            [item['id'] for item in filter_client_detail_movements(items, 'balance_transaction')],
+            [2],
+        )
+
+    def test_build_overdue_payment_query_encodes_order_ids(self) -> None:
+        order_a = self._create_credit_order(client=self.client_obj, amount=Decimal('50.00'))
+        order_b = self._create_credit_order(client=self.client_obj, amount=Decimal('75.00'))
+
+        query = build_overdue_payment_query([order_a, order_b])
+
+        self.assertEqual(query, f'orders={order_a.pk}&orders={order_b.pk}')

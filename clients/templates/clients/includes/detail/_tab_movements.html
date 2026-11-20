@@ -1,0 +1,163 @@
+<div
+  class="tab-pane pg-tab-pane pg-fade {% if active_detail_tab == 'movements' %}active pg-show pg-active{% endif %}"
+  id="movements-tab-pane"
+  role="tabpanel"
+  aria-labelledby="movements-tab"
+  tabindex="0">
+  <div class="client-tab-toolbar m-b-15">
+    <div class="client-filter-chips" role="group" aria-label="Filtrar movimientos">
+      <a
+        href="?tab=movements&amp;movements_type=all&amp;orders_filter={{ orders_filter }}#movements-tab-pane"
+        class="btn btn-xs {% if movements_type == 'all' %}btn-info{% else %}btn-default{% endif %}">
+        Todos
+      </a>
+      <a
+        href="?tab=movements&amp;movements_type=payment&amp;orders_filter={{ orders_filter }}#movements-tab-pane"
+        class="btn btn-xs {% if movements_type == 'payment' %}btn-info{% else %}btn-default{% endif %}">
+        Pagos
+      </a>
+      <a
+        href="?tab=movements&amp;movements_type=balance_transaction&amp;orders_filter={{ orders_filter }}#movements-tab-pane"
+        class="btn btn-xs {% if movements_type == 'balance_transaction' %}btn-info{% else %}btn-default{% endif %}">
+        Saldo
+      </a>
+      <a
+        href="?tab=movements&amp;movements_type=credit_transaction&amp;orders_filter={{ orders_filter }}#movements-tab-pane"
+        class="btn btn-xs {% if movements_type == 'credit_transaction' %}btn-info{% else %}btn-default{% endif %}">
+        Crédito
+      </a>
+    </div>
+    <small class="text-muted">
+      {% if all_payment_data %}
+        Mostrando {{ all_payment_data.start_index }}-{{ all_payment_data.end_index }} de {{ all_payment_data.paginator.count }}
+      {% else %}
+        Sin movimientos
+      {% endif %}
+    </small>
+  </div>
+
+  {% if all_payment_data %}
+    <div class="table-responsive">
+      <table class="table table-hover color-table info-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Pedido</th>
+            <th>Método / Concepto</th>
+            <th>Estado</th>
+            <th>Monto</th>
+            <th>Por</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment_data in all_payment_data %}
+            <tr>
+              <td>
+                {% if payment_data.type == 'payment' %}
+                  <span class="label label-primary">Pago</span>
+                {% elif payment_data.type == 'balance_transaction' %}
+                  <span class="label label-info">Saldo</span>
+                {% elif payment_data.type == 'credit_transaction' %}
+                  <span class="label label-warning">Crédito</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="client-order-id-cell">
+                  <strong>#{{ payment_data.id }}</strong>
+                  {% if payment_data.notes %}
+                    <button
+                      type="button"
+                      class="btn btn-default btn-xs client-order-note-trigger client-payment-note-trigger"
+                      data-pg-toggle="modal"
+                      data-pg-target="#{{ payment_data.note_modal_id }}"
+                      aria-label="{{ payment_data.note_aria_label }}"
+                      title="Ver nota">
+                      <i class="fas fa-sticky-note" aria-hidden="true"></i>
+                      <span class="sr-only">Ver nota</span>
+                    </button>
+                  {% endif %}
+                </span>
+              </td>
+              <td>{{ payment_data.date|date:"d/m/Y H:i" }}</td>
+              <td>
+                {% if payment_data.order_id %}
+                  <a href="{% url 'orders:get_order' payment_data.order_id %}">#{{ payment_data.order_id }}</a>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>{{ payment_data.method }}</td>
+              <td>
+                <span class="label label-{{ payment_data.status_class }}">
+                  {{ payment_data.status }}
+                </span>
+              </td>
+              <td class="font-bold">
+                {% if payment_data.type == 'payment' %}
+                  {% if payment_data.is_credit_debt %}
+                    <span class="text-danger">${{ payment_data.amount|floatformat:2 }}</span>
+                  {% else %}
+                    <span class="text-success">${{ payment_data.amount|floatformat:2 }}</span>
+                  {% endif %}
+                {% elif payment_data.is_positive %}
+                  <span class="text-success">+${{ payment_data.amount|floatformat:2 }}</span>
+                {% else %}
+                  <span class="text-danger">-${{ payment_data.amount|floatformat:2 }}</span>
+                {% endif %}
+              </td>
+              <td><small class="text-muted">{{ payment_data.created_by|default:"—" }}</small></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% for payment_data in all_payment_data %}
+      {% if payment_data.notes %}
+        <div class="pg-modal pg-fade" id="{{ payment_data.note_modal_id }}" tabindex="-1" aria-labelledby="{{ payment_data.note_modal_id }}-label" aria-hidden="true">
+          <div class="pg-modal-dialog pg-modal-dialog-centered">
+            <div class="pg-modal-content">
+              <div class="pg-modal-header">
+                <h3 class="pg-modal-title pg-h5" id="{{ payment_data.note_modal_id }}-label">{{ payment_data.note_title }}</h3>
+                <button type="button" class="pg-modal-close" data-pg-dismiss="modal" aria-label="Cerrar"></button>
+              </div>
+              <div class="pg-modal-body">
+                {{ payment_data.notes|linebreaksbr }}
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+
+    {% if all_payment_data.has_other_pages %}
+      <div class="text-right m-t-15">
+        <nav aria-label="Paginación de movimientos del cliente">
+          <ul class="pagination m-b-0">
+            {% if all_payment_data.has_previous %}
+              <li>
+                <a href="?tab=movements&amp;movements_type={{ movements_type }}&amp;orders_filter={{ orders_filter }}&amp;orders_page={{ orders.number }}&amp;payments_page={{ all_payment_data.previous_page_number }}#movements-tab-pane">Anterior</a>
+              </li>
+            {% else %}
+              <li class="disabled"><span>Anterior</span></li>
+            {% endif %}
+            <li class="disabled">
+              <span>Página {{ all_payment_data.number }} de {{ all_payment_data.paginator.num_pages }}</span>
+            </li>
+            {% if all_payment_data.has_next %}
+              <li>
+                <a href="?tab=movements&amp;movements_type={{ movements_type }}&amp;orders_filter={{ orders_filter }}&amp;orders_page={{ orders.number }}&amp;payments_page={{ all_payment_data.next_page_number }}#movements-tab-pane">Siguiente</a>
+              </li>
+            {% else %}
+              <li class="disabled"><span>Siguiente</span></li>
+            {% endif %}
+          </ul>
+        </nav>
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="text-muted m-b-0">No hay movimientos registrados para este filtro.</p>
+  {% endif %}
+</div>
