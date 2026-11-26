@@ -634,6 +634,17 @@ class OrderAdmin(SoftDeleteAdminMixin, ModelAdmin):
                 level='error'
             )
             return
+
+        from orders.services.order_split_service import get_order_split_block_reason
+
+        block_reason = get_order_split_block_reason(order)
+        if block_reason:
+            self.message_user(
+                request,
+                f'La orden #{order.id} no se puede dividir: {block_reason}',
+                level='error',
+            )
+            return
         
         # Redirect to the split order page
         url = reverse('orders:split_order', args=[order.id])

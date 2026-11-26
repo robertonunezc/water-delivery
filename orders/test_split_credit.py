@@ -6,7 +6,7 @@ from django.core.management import call_command, CommandError
 from django.urls import reverse
 from django.utils import timezone
 
-from clients.models import Client, CreditTransaction
+from clients.models import BalanceTransaction, Client, CreditTransaction
 from clients.services.credit_payment_service import (
     get_open_credit_orders_for_credit_management,
 )
@@ -26,7 +26,10 @@ from tenant_client.test_utils import FastTenantTestCase
 
 class CreditOrderSplitTests(FastTenantTestCase):
     def setUp(self) -> None:
-        self.user = get_user_model().objects.create_user(username="split-credit-user")
+        self.user = get_user_model().objects.create_user(
+            username="split-credit-user",
+            is_staff=True,
+        )
         self.corporate = Client.objects.create(
             name="Corporativo", type="corporate", credit_limit=Decimal("5000.00"),
         )
@@ -161,25 +164,23 @@ class CreditOrderSplitTests(FastTenantTestCase):
             ledger["total_purchases"] - ledger["total_payments"], Decimal("987.00"),
         )
 
-    def test_prepaid_balance_is_not_charged_again_when_split_credit_is_paid(self) -> None:
+    def test_mixed_balance_and_credit_order_cannot_be_split(self) -> None:
         self.customer.balance = Decimal("100.00")
         self.customer.save(update_fields=["balance", "updated_at"])
-        self.order = self._create_credit_order(8)
-        item = self.order.items.get()
-        response = self.client.post(
-            reverse("orders:split_order", args=[self.order.pk]),
+        order = self._create_credit_order(8)
+        item = order.items.get()
+        get_response = self.client.get(reverse("orders:split_order", args=[order.pk]))
+        self.assertEqual(get_response.status_code, 200)
+        self.assertContains(get_response, "No se puede dividir un pedido con métodos de pago mixtos.")
+        self.assertContains(get_response, "disabled")
+        post_response = self.client.post(
+            reverse("orders:split_order", args=[order.pk]),
             {f"quantity_{item.pk}": 6},
         )
-        self.assertEqual(response.status_code, 302)
-        child = Order.objects.get(notes=f"Dividida de Orden #{self.order.pk}")
-        self.assertEqual(self.order.total_paid, Decimal("25.00"))
-        self.assertEqual(child.total_paid, Decimal("75.00"))
-        pay_client_orders(self.customer, [child], "cash", Decimal("207.00"), self.user)
-        self.customer.refresh_from_db()
-        self.corporate.refresh_from_db()
-        self.assertEqual(self.customer.balance, Decimal("0.00"))
-        self.assertEqual(self.corporate.current_debt, Decimal("1056.00"))
-        self.assertTrue(get_credit_reconciliation_summary(self.customer).is_balanced)
+        self.assertEqual(post_response.status_code, 200)
+        self.assertFalse(OrderSplit.objects.filter(source_order=order).exists())
+        order.refresh_from_db()
+        self.assertEqual(order.total_amount, Decimal("376.00"))
 
     def _legacy_split(self) -> Order:
         self.order.items.update(quantity=2)
@@ -261,7 +262,7 @@ class CreditOrderSplitTests(FastTenantTestCase):
         self.assertTrue(child.is_paid)
         self.assertTrue(order.is_paid)
 
-    def test_rounding_multiple_payments_preserves_a_one_cent_credit(self) -> None:
+    def test_mixed_cash_and_pending_credit_order_cannot_be_split(self) -> None:
         from clients.services import balance_service
 
         order = self._cash_order_with_payments(["93.98", "93.98", "93.98", "94.05"])
@@ -275,10 +276,9 @@ class CreditOrderSplitTests(FastTenantTestCase):
         balance_service.add_debt(
             self.customer, Decimal("0.01"), reference_order=order, reference_payment=pending,
         )
-        child = split_order(order, {order.items.get().pk: 2}, self.user)
-        self.assertEqual(child.total_paid, Decimal("94.00"))
-        self.assertEqual(order.payments.get(method="pending_credit").amount, Decimal("0.01"))
-        self.assertTrue(get_credit_reconciliation_summary(self.customer).is_balanced)
+        with self.assertRaises(OrderSplitError):
+            split_order(order, {order.items.get().pk: 2}, self.user)
+        self.assertFalse(OrderSplit.objects.filter(source_order=order).exists())
 
     def test_legacy_repair_rejects_credit_already_reduced_in_the_ledger(self) -> None:
         from clients.services import balance_service
@@ -296,15 +296,142 @@ class CreditOrderSplitTests(FastTenantTestCase):
         self.corporate.refresh_from_db()
         self.assertEqual(self.corporate.current_debt, Decimal("705.00"))
 
-    def test_zero_rounded_balance_payment_does_not_prevent_cancellation(self) -> None:
-        self.customer.balance = Decimal("0.01")
+    def test_mixed_real_payment_methods_cannot_be_split(self) -> None:
+        order = self._cash_order_with_payments(["200.00"])
+        extra = Payment(
+            client=self.customer, order=order, amount=Decimal("176.00"),
+            method="credit_card", status="completed",
+        )
+        extra.save(apply_accounting=False)
+        with self.assertRaises(OrderSplitError):
+            split_order(order, {order.items.get().pk: 6}, self.user)
+        self.assertFalse(OrderSplit.objects.filter(source_order=order).exists())
+
+    def test_order_without_payments_cannot_be_split(self) -> None:
+        order = Order.objects.create(
+            client=self.customer, total_amount=Decimal("376.00"),
+            subtotal_amount=Decimal("376.00"), status=OrderStatus.COMPLETED.value,
+        )
+        item = OrderProduct.objects.create(
+            order=order, product=self.product, quantity=8, unit_price=Decimal("47.00"),
+        )
+        with self.assertRaises(OrderSplitError):
+            split_order(order, {item.pk: 2}, self.user)
+        response = self.client.get(reverse("orders:split_order", args=[order.pk]))
+        self.assertContains(response, "No se puede dividir un pedido sin pagos registrados.")
+
+    def test_partially_and_fully_paid_credit_orders_cannot_be_split(self) -> None:
+        partial_payment = Payment(
+            client=self.customer, order=self.other_order, amount=Decimal("100.00"),
+            method="cash", status="completed", created_by=self.user,
+        )
+        partial_payment.save(apply_accounting=False)
+        with self.assertRaises(OrderSplitError):
+            split_order(self.other_order, {self.other_order.items.get().pk: 2}, self.user)
+
+        pay_client_orders(self.customer, [self.order], "cash", Decimal("376.00"), self.user)
+        with self.assertRaises(OrderSplitError):
+            split_order(self.order, {self.order.items.get().pk: 2}, self.user)
+
+    def test_split_balance_order_creates_balance_transactions_and_supports_reversal(self) -> None:
+        from payment import reversal_service
+
+        self.customer.balance = Decimal("500.00")
         self.customer.save(update_fields=["balance", "updated_at"])
-        order = self._create_credit_order(8)
-        split_order(order, {order.items.get().pk: 6}, self.user)
-        result = cancel_order(order, user=self.user)
-        self.assertTrue(result["success"], result)
-        self.corporate.refresh_from_db()
-        self.assertEqual(self.corporate.current_debt, Decimal("1268.99"))
+        order = Order.objects.create(
+            client=self.customer, total_amount=Decimal("376.00"),
+            subtotal_amount=Decimal("376.00"), status=OrderStatus.COMPLETED.value,
+        )
+        item = OrderProduct.objects.create(
+            order=order, product=self.product, quantity=8, unit_price=Decimal("47.00"),
+        )
+        payment = Payment.objects.create(
+            client=self.customer, order=order, amount=Decimal("376.00"),
+            method="balance", status="completed", created_by=self.user,
+        )
+        orig_tx = BalanceTransaction.objects.get(reference_payment=payment, transaction_type="payment")
+
+        child = split_order(order, {item.pk: 6}, self.user)
+        order.refresh_from_db()
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("124.00"))
+
+        orig_tx.refresh_from_db()
+        self.assertTrue(BalanceTransaction.objects.filter(reverses_transaction=orig_tx).exists())
+        parent_active_tx = BalanceTransaction.objects.get(
+            reference_payment=payment, transaction_type="payment", reversal_transaction__isnull=True,
+        )
+        child_payment = child.payments.get(method="balance")
+        child_active_tx = BalanceTransaction.objects.get(
+            reference_payment=child_payment, transaction_type="payment", reversal_transaction__isnull=True,
+        )
+        self.assertEqual(parent_active_tx.amount, Decimal("94.00"))
+        self.assertEqual(child_active_tx.amount, Decimal("282.00"))
+
+        child_plan = reversal_service.plan_payment_reversal(child_payment.pk)
+        self.assertTrue(child_plan.can_reverse, child_plan.blocking_reasons)
+        child_token = reversal_service.sign_reversal_token(
+            "payment", child_payment.pk, child_plan.fingerprint,
+        )
+        reversal_service.execute_payment_reversal(
+            child_payment.pk, self.user, "Reversión hija", preview_token=child_token,
+        )
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("406.00"))
+
+        parent_plan = reversal_service.plan_payment_reversal(payment.pk)
+        self.assertTrue(parent_plan.can_reverse, parent_plan.blocking_reasons)
+        parent_token = reversal_service.sign_reversal_token(
+            "payment", payment.pk, parent_plan.fingerprint,
+        )
+        reversal_service.execute_payment_reversal(
+            payment.pk, self.user, "Reversión padre", preview_token=parent_token,
+        )
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.balance, Decimal("500.00"))
+
+    def test_split_balance_order_rolls_back_when_balance_transaction_missing(self) -> None:
+        order = Order.objects.create(
+            client=self.customer, total_amount=Decimal("376.00"),
+            subtotal_amount=Decimal("376.00"), status=OrderStatus.COMPLETED.value,
+        )
+        item = OrderProduct.objects.create(
+            order=order, product=self.product, quantity=8, unit_price=Decimal("47.00"),
+        )
+        payment = Payment(
+            client=self.customer, order=order, amount=Decimal("376.00"),
+            method="balance", status="completed", balance_used=Decimal("376.00"),
+        )
+        payment.save(apply_accounting=False)
+        with self.assertRaises(OrderSplitError):
+            split_order(order, {item.pk: 6}, self.user)
+        order.refresh_from_db()
+        self.assertEqual(order.total_amount, Decimal("376.00"))
+        self.assertFalse(OrderSplit.objects.filter(source_order=order).exists())
+
+    def test_admin_split_order_action_blocks_mixed_payment_order(self) -> None:
+        from django.contrib.admin.sites import AdminSite
+        from django.contrib.messages.storage.fallback import FallbackStorage
+        from django.test import RequestFactory
+        from orders.admin import OrderAdmin
+
+        order = self._cash_order_with_payments(["200.00"])
+        extra = Payment(
+            client=self.customer, order=order, amount=Decimal("176.00"),
+            method="credit_card", status="completed",
+        )
+        extra.save(apply_accounting=False)
+        request = RequestFactory().post("/admin/orders/order/")
+        request.user = self.user
+        request.session = self.client.session
+        messages_storage = FallbackStorage(request)
+        request._messages = messages_storage
+        admin_instance = OrderAdmin(Order, AdminSite())
+
+        result = admin_instance.split_order_action(request, Order.objects.filter(pk=order.pk))
+        self.assertIsNone(result)
+        messages_list = [str(m) for m in messages_storage]
+        self.assertTrue(any("métodos de pago mixtos" in m for m in messages_list))
 
     def test_credit_validation_failure_rolls_back_the_entire_split(self) -> None:
         CreditTransaction.objects.filter(reference_order=self.order).delete()

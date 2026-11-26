@@ -5,7 +5,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from clients.models import Client, CreditTransaction
+from clients.models import BalanceTransaction, Client, CreditTransaction
 from orders.models import Order, OrderProduct, OrderSplit, OrderStatus
 from payment.models import Payment
 from payment.services import get_unpaid_amount
@@ -17,6 +17,26 @@ CENT = Decimal("0.01")
 
 class OrderSplitError(ValueError):
     """The split cannot preserve the order's quantities or financial records."""
+
+
+def _active_split_payments_qs(order: Order):
+    return order.payments.filter(
+        Q(status="completed") | Q(method="pending_credit", status="pending"),
+    ).order_by("pk")
+
+
+def get_order_split_block_reason(order: Order) -> str | None:
+    """Return a user-facing reason if the order cannot be split, else None."""
+    if order.status != OrderStatus.COMPLETED.value:
+        return "Solo se pueden dividir pedidos completados."
+    if order.payments.reversals().exists():
+        return "No se puede dividir un pedido que tiene reversiones de pago registradas."
+    methods = set(_active_split_payments_qs(order).values_list("method", flat=True))
+    if not methods:
+        return "No se puede dividir un pedido sin pagos registrados."
+    if len(methods) > 1:
+        return "No se puede dividir un pedido con métodos de pago mixtos."
+    return None
 
 
 def _portion(amount: Decimal, proportion: Decimal) -> Decimal:
@@ -169,6 +189,80 @@ def _record_credit_transfer(
     )
 
 
+def _record_balance_transfer(
+    account: Client,
+    orig_txs: list[BalanceTransaction],
+    payment: Payment,
+    child_payment: Payment,
+    original_amount: Decimal,
+    user: AbstractBaseUser | None,
+) -> None:
+    tx_date = timezone.now()
+    notes = (
+        f"Redistribución por división del pedido #{payment.order_id} "
+        f"a #{child_payment.order_id}"
+    )
+    running_balance = account.balance
+    for orig_tx in orig_txs:
+        next_balance = running_balance + orig_tx.amount
+        BalanceTransaction.objects.create(
+            client=account, transaction_type="payment_reversal", amount=orig_tx.amount,
+            balance_before=running_balance, balance_after=next_balance, date=tx_date,
+            reference_order=payment.order, reference_payment=payment,
+            reverses_transaction=orig_tx, notes=notes, created_by=user,
+        )
+        running_balance = next_balance
+    parent_amount = original_amount - child_payment.amount
+    if parent_amount > ZERO:
+        next_balance = running_balance - parent_amount
+        BalanceTransaction.objects.create(
+            client=account, transaction_type="payment", amount=parent_amount,
+            balance_before=running_balance, balance_after=next_balance, date=tx_date,
+            reference_order=payment.order, reference_payment=payment,
+            notes=notes, created_by=user,
+        )
+        running_balance = next_balance
+    BalanceTransaction.objects.create(
+        client=account, transaction_type="payment", amount=child_payment.amount,
+        balance_before=running_balance, balance_after=running_balance - child_payment.amount,
+        date=tx_date, reference_order=child_payment.order, reference_payment=child_payment,
+        notes=notes, created_by=user,
+    )
+
+
+def _transfer_balance(
+    payment: Payment,
+    child_payment: Payment,
+    original_amount: Decimal,
+    user: AbstractBaseUser | None,
+) -> None:
+    if child_payment.amount <= ZERO:
+        return
+    orig_txs = list(
+        BalanceTransaction.objects.select_for_update(of=("self",))
+        .filter(
+            reference_payment=payment,
+            transaction_type="payment",
+            reversal_transaction__isnull=True,
+        )
+        .order_by("pk")
+    )
+    if not orig_txs:
+        raise OrderSplitError(
+            "El pago con saldo no tiene una transacción de saldo vinculada. Requiere revisión."
+        )
+    if len({tx.client_id for tx in orig_txs}) != 1:
+        raise OrderSplitError(
+            "El pago con saldo tiene cuentas ambiguas. Requiere revisión."
+        )
+    if sum((tx.amount for tx in orig_txs), ZERO) != original_amount:
+        raise OrderSplitError(
+            "El saldo registrado del pago no coincide con el monto a dividir. Requiere revisión."
+        )
+    account = Client.objects.select_for_update().get(pk=orig_txs[0].client_id)
+    _record_balance_transfer(account, orig_txs, payment, child_payment, original_amount, user)
+
+
 def _split_completed_payments(
     payments: list[Payment], child: Order, proportion: Decimal,
     user: AbstractBaseUser | None,
@@ -181,9 +275,12 @@ def _split_completed_payments(
     processed = ZERO
     allocated = ZERO
     for payment in real_payments:
-        processed += payment.amount
+        original_amount = payment.amount
+        processed += original_amount
         cumulative = _portion(target, processed / total_paid) if total_paid else ZERO
-        _split_payment(payment, child, cumulative - allocated, user)
+        child_payment = _split_payment(payment, child, cumulative - allocated, user)
+        if payment.method == "balance":
+            _transfer_balance(payment, child_payment, original_amount, user)
         allocated = cumulative
     for payment in payments:
         if payment.status == "completed" and payment.method == "pending_credit":
@@ -193,9 +290,12 @@ def _split_completed_payments(
 def _split_payments(
     order: Order, child: Order, proportion: Decimal, user: AbstractBaseUser | None,
 ) -> None:
-    payments = list(order.payments.select_for_update().filter(
-        Q(status="completed") | Q(method="pending_credit", status="pending"),
-    ).order_by("pk"))
+    payments = list(_active_split_payments_qs(order).select_for_update())
+    methods = {p.method for p in payments}
+    if not methods:
+        raise OrderSplitError("No se puede dividir un pedido sin pagos registrados.")
+    if len(methods) > 1:
+        raise OrderSplitError("No se puede dividir un pedido con métodos de pago mixtos.")
     pending = [p for p in payments if p.method == "pending_credit" and p.status == "pending"]
     if len(pending) > 1:
         raise OrderSplitError("El pedido tiene varios créditos pendientes. Requiere revisión.")
@@ -218,8 +318,9 @@ def split_order(
     """Split a completed sale, preserving money received and total credit debt."""
     lock_order_credit_clients([order.pk])
     order = Order.objects.select_for_update().get(pk=order.pk)
-    if order.status != OrderStatus.COMPLETED.value:
-        raise OrderSplitError("Solo se pueden dividir pedidos completados.")
+    block_reason = get_order_split_block_reason(order)
+    if block_reason:
+        raise OrderSplitError(block_reason)
     items = list(order.items.select_for_update().order_by("pk"))
     _validate_quantities(items, quantities)
     subtotal = sum((item.quantity * item.unit_price for item in items), ZERO)

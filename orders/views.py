@@ -24,7 +24,11 @@ from .models import (
     ReceiptDeliveryMethod,
 )
 from .forms import OrderReceiptSignForm, OrderReceiptSignOnlyForm, SplitOrderForm
-from orders.services.order_split_service import OrderSplitError, split_order as split_completed_order
+from orders.services.order_split_service import (
+    OrderSplitError,
+    get_order_split_block_reason,
+    split_order as split_completed_order,
+)
 from core.utils import combine_date_with_local_time, parse_date_input
 from core.services.feature_flags import is_receipt_signature_enabled
 from product.models import Product, ProductClientPrice
@@ -767,13 +771,14 @@ def cancel_order(request: HttpRequest, order_pk: int) -> HttpResponse:
         return redirect(_get_safe_next_url(request, 'orders:list'))
 
     if not result.get('success'):
+        status_code = 403 if result.get('permission_denied') else 400
         return JsonResponse(
             {
                 'success': False,
                 'review_required': bool(result.get('review_required')),
                 'error': result.get('error', 'No se pudo cancelar el pedido.'),
             },
-            status=400,
+            status=status_code,
         )
 
     return JsonResponse({
@@ -794,11 +799,14 @@ def split_order(request: HttpRequest, order_id: int) -> HttpResponse:
     if order.status != OrderStatus.COMPLETED.value:
         raise PermissionDenied('Solo se pueden dividir pedidos completados.')
     order_items = order.items.all()
+    split_block_reason = get_order_split_block_reason(order)
     
     if request.method == 'POST':
         form = SplitOrderForm(request.POST, order=order)
         
-        if form.is_valid():
+        if split_block_reason:
+            form.add_error(None, split_block_reason)
+        elif form.is_valid():
             quantities = {
                 item.pk: form.cleaned_data[f'quantity_{item.pk}']
                 for item in order_items
@@ -832,6 +840,7 @@ def split_order(request: HttpRequest, order_id: int) -> HttpResponse:
         'order': order,
         'items': order_items,
         'items_with_fields': items_with_fields,
+        'split_block_reason': split_block_reason,
         'title': f'Dividir Orden #{order.id}',
     }
     

@@ -124,19 +124,27 @@ new_order.cantidad_cobrada = original_cobrada * proportion_new
 ### Transaction Safety
 The split operation is wrapped in a database transaction (`@transaction.atomic`) to ensure data integrity. If any error occurs, all changes are rolled back.
 
-### Credit orders and payments
+### Credit orders, balance payments, and single-method rule
 
-`orders/services/order_split_service.py` coordinates the split under row locks. It
-distributes completed payments and the pending credit marker between both orders,
+`orders/services/order_split_service.py` coordinates the split under row locks. Orders
+must have **at least one active payment** and **all active payments must share a single
+payment method** — orders with no payments, mixed payment methods (e.g., cash + card,
+balance + credit, or partially/fully settled credit orders), or payment reversals are
+blocked in the service, admin action, and split form view.
+
+It distributes completed payments and the pending credit marker between both orders,
 preserving payment dates and the exact sum of the original amounts. Rounding
 remainders stay on the source order. Discounts and subtotals are also distributed,
 including products whose quantities were not moved.
 
-For outstanding credit, the service records a `purchase_reversal` on the source
-and a matching `purchase` on the child. These entries reassign existing debt;
-`current_debt`, prepaid balance, and the original purchase record remain unchanged.
-Both orders therefore appear in credit management and can be settled independently.
-Cancellation reverses only the purchase amount that has not already been reassigned.
+- **Pending credit (`pending_credit`):** Records a `purchase_reversal` on the source
+  and a matching `purchase` on the child (`CreditTransaction`). These entries reassign
+  existing debt without changing `current_debt` or rewriting the original purchase.
+  Both orders appear in credit management and can be settled or cancelled independently.
+- **Balance (`balance`):** Reverses the original `BalanceTransaction` (`payment_reversal`)
+  and appends fresh `payment` transactions for the parent's remaining amount and the
+  child's moved amount. Net effect on `client.balance` is `$0.00`, and both split
+  payments remain independently reversible via `payment.reversal_service`.
 
 ### Repairing legacy credit splits
 

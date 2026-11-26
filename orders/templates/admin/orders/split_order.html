@@ -40,6 +40,12 @@
         <strong>Importante:</strong> La orden original debe mantener al menos un producto con cantidad mayor a 0.
     </div>
     
+    {% if split_block_reason %}
+        <div class="pg-alert pg-alert-danger" role="alert">
+            <strong>⚠️ No se puede dividir esta orden:</strong> {{ split_block_reason }}
+        </div>
+    {% endif %}
+
     {% if form.non_field_errors %}
         <ul class="errorlist">
             {% for error in form.non_field_errors %}
@@ -114,7 +120,7 @@
             <a href="{% url 'admin_orders' %}" class="pg-button pg-button-secondary">
                 ← Cancelar
             </a>
-            <button type="submit" class="pg-button pg-button-primary">
+            <button type="submit" class="pg-button pg-button-primary" {% if split_block_reason %}disabled{% endif %}>
                 ✂️ Dividir Orden
             </button>
         </div>
