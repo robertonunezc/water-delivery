@@ -65,6 +65,11 @@ def _has_outstanding_credit_ledger(order: Order) -> bool:
     return (summary['total_purchases'] - summary['total_payments']) > ZERO
 
 
+def has_open_credit_exposure(order: Order) -> bool:
+    """Return True when an order has either a pending credit marker or positive credit ledger debt."""
+    return _has_pending_credit_marker(order) or _has_outstanding_credit_ledger(order)
+
+
 def _open_credit_orders_for_account(
     credit_account: Client,
     *,
@@ -88,11 +93,7 @@ def _open_credit_orders_for_account(
         .prefetch_related('payments')
         .distinct()
     )
-    return [
-        order
-        for order in candidates
-        if _has_pending_credit_marker(order) or _has_outstanding_credit_ledger(order)
-    ]
+    return [order for order in candidates if has_open_credit_exposure(order)]
 
 
 def _open_credit_orders(client: Client) -> list[Order]:

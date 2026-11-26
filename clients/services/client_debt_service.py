@@ -36,7 +36,10 @@ def _decimal(value: object) -> Decimal:
 
 def _get_inherited_branch_debt(client: Client, credit_account: Client) -> Decimal:
     summary = (
-        credit_account.credit_transactions.filter(reference_order__client=client)
+        credit_account.credit_transactions.filter(
+            reference_order__client=client,
+            reference_order__deleted_at__isnull=True,
+        )
         .aggregate_summary()
     )
     if summary["transaction_count"] == 0:
@@ -61,6 +64,7 @@ def with_display_current_debt(queryset: QuerySet[Client]) -> QuerySet[Client]:
         CreditTransaction.objects.filter(
             client_id=OuterRef("corporate_id"),
             reference_order__client_id=OuterRef("pk"),
+            reference_order__deleted_at__isnull=True,
         )
         .values("reference_order__client_id")
         .annotate(

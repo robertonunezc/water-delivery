@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from clients.models import BalanceTransaction, Client, CreditTransaction
-from orders.models import Order
+from orders.models import Order, OrderSplit
 from orders.services.credit_lock_service import lock_order_credit_clients
 from payment.models import (
     PAYMENT_ENTRY_KIND_PAYMENT,
@@ -229,6 +229,33 @@ def _check_historical_attribution(
     return reasons
 
 
+def _check_legacy_split_credit_attribution(
+    payment: Payment,
+    credit_txs: list[CreditTransaction],
+) -> list[str]:
+    if credit_txs:
+        return []
+    order = payment.order
+    if CreditTransaction.objects.filter(reference_order=order).exists():
+        return []
+    if order.payments.filter(method='pending_credit').exists():
+        return []
+    parent_splits = OrderSplit.objects.filter(child_order=order).select_related('source_order')
+    for split in parent_splits:
+        source = split.source_order
+        source_has_credit = (
+            source.payments.filter(method='pending_credit', status='pending').exists()
+            or _order_outstanding_credit(source) > ZERO
+        )
+        if source_has_credit:
+            return [
+                f'Requiere revisión: este pedido es una división histórica del pedido #{source.pk}, '
+                f'que aún conserva crédito pendiente sin redistribuir. '
+                f'Concilia el crédito de la división antes de revertir este pago.'
+            ]
+    return []
+
+
 def _plan_balance_effects(
     balance_txs: list[BalanceTransaction],
     excess_tx: BalanceTransaction | None,
@@ -388,6 +415,7 @@ def plan_payment_reversal(payment_id: int) -> PaymentReversalPlan:
         ).select_related('client').order_by('pk')
     )
     reasons.extend(_check_historical_attribution(payment, balance_txs))
+    reasons.extend(_check_legacy_split_credit_attribution(payment, credit_txs))
 
     excess_tx = None
     excess_already_removed = False

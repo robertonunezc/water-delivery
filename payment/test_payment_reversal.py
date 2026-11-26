@@ -521,3 +521,55 @@ class PaymentReversalMatrixTests(FastTenantTestCase):
         credit_report = get_client_credit_report(client=self.client_account)
         self.assertEqual(credit_report.current_credit, Decimal('200.00'))
         self.assertEqual(credit_report.open_credit_total, Decimal('200.00'))
+
+    def test_reverse_payment_on_legacy_split_child_is_blocked_to_prevent_double_debt(self):
+        from orders.models import OrderSplit
+
+        # Parent credit order still holding full unsplit debt ($200)
+        parent = self._create_order(total=Decimal('200.00'), order_type='credito')
+        resp, status_code = services.process_payment_request(
+            parent,
+            PaymentRequestData(order_type='credito'),
+            self.manager,
+        )
+        self.assertEqual(status_code, 200)
+        self.client_account.refresh_from_db()
+        self.assertEqual(self.client_account.current_debt, Decimal('200.00'))
+
+        # Legacy split child with no pending_credit marker and no CreditTransaction
+        child = self._create_order(
+            total=Decimal('100.00'),
+            order_type='contado',
+            status=OrderStatus.COMPLETED.value,
+        )
+        OrderSplit.objects.create(
+            source_order=parent,
+            child_order=child,
+            split_by=self.manager,
+        )
+        child_payment, error = services.process_single_payment(
+            order=child,
+            payment_method='cash',
+            amount=Decimal('100.00'),
+            request_user=self.manager,
+        )
+        self.assertIsNone(error)
+        assert child_payment is not None
+
+        plan = reversal_service.plan_payment_reversal(child_payment.pk)
+        self.assertFalse(plan.can_reverse)
+        self.assertTrue(
+            any('división histórica' in reason for reason in plan.blocking_reasons),
+            plan.blocking_reasons,
+        )
+
+        with self.assertRaises(reversal_service.ReversalBlockedError):
+            reversal_service.execute_payment_reversal(
+                child_payment.pk,
+                self.manager,
+                'Intentar revertir pago de división histórica',
+                require_token=False,
+            )
+
+        self.client_account.refresh_from_db()
+        self.assertEqual(self.client_account.current_debt, Decimal('200.00'))

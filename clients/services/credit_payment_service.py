@@ -6,6 +6,10 @@ from typing import Iterable
 from django.db.models import Q
 
 from clients.models import Client, CreditTransaction
+from clients.services.credit_reconciliation_service import (
+    CREDIT_ORIGIN_TYPES,
+    has_open_credit_exposure,
+)
 from orders.models import Order
 from payment import services as payment_services
 
@@ -17,25 +21,35 @@ class CreditManagementOrderError(ValueError):
 def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
     """Return open credit orders selectable from the client's credit screen."""
     credit_transactions = CreditTransaction.objects.filter(
-        transaction_type__in=['purchase', 'payment_reversal', 'transfer_in'],
+        transaction_type__in=CREDIT_ORIGIN_TYPES,
         reference_order__isnull=False,
     )
     if client.type == 'corporate':
+        scope_filter = (
+            Q(client=client)
+            | Q(client__corporate=client)
+            | Q(credit_account=client)
+        )
         credit_transactions = credit_transactions.filter(
             Q(reference_order__client=client)
             | Q(reference_order__client__corporate=client)
             | Q(client=client),
         )
     else:
+        scope_filter = Q(client=client)
         credit_transactions = credit_transactions.filter(
             Q(reference_order__client=client) | Q(client=client.get_credit_account()),
         )
 
     credit_order_ids = credit_transactions.values('reference_order_id')
+    pending_credit_q = Q(
+        payments__method='pending_credit',
+        payments__status='pending',
+    ) & scope_filter
     orders = (
         Order.objects.active()
         .unpaid()
-        .filter(pk__in=credit_order_ids)
+        .filter(Q(pk__in=credit_order_ids) | pending_credit_q)
         .select_related('client', 'client__corporate', 'credit_account')
         .prefetch_related('payments')
         .distinct()
@@ -43,11 +57,7 @@ def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
     )
     if client.type != 'corporate':
         orders = orders.for_credit_accounts([client.get_credit_account().pk])
-    return [
-        order
-        for order in orders
-        if payment_services.get_order_outstanding_credit(order) > Decimal('0.00')
-    ]
+    return [order for order in orders if has_open_credit_exposure(order)]
 
 
 def get_selected_credit_orders_for_credit_management(

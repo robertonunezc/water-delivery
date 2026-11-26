@@ -1059,6 +1059,88 @@ class ClientCreditReconciliationServiceTests(FastTenantTestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.current_debt, Decimal('0.00'))
 
+    def test_inherited_branch_debt_ignores_soft_deleted_orders(self) -> None:
+        from clients.services.client_debt_service import (
+            get_client_display_current_debt,
+            with_display_current_debt,
+        )
+
+        corporate = Client.objects.create(
+            name='Corporativo soft delete debt',
+            type='corporate',
+            credit_limit=Decimal('1000.00'),
+            current_debt=Decimal('120.00'),
+            can_pay_with_credit=True,
+        )
+        branch = Client.objects.create(
+            name='Sucursal soft delete debt',
+            type='branch',
+            corporate=corporate,
+            credit_override_enabled=False,
+            current_debt=Decimal('0.00'),
+        )
+        order = Order.objects.create(
+            client=branch,
+            credit_account=corporate,
+            subtotal_amount=Decimal('120.00'),
+            total_amount=Decimal('120.00'),
+            status=OrderStatus.COMPLETED.value,
+            type='credito',
+            owner=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=corporate,
+            transaction_type='purchase',
+            amount=Decimal('120.00'),
+            debt_before=Decimal('0.00'),
+            debt_after=Decimal('120.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=order,
+            created_by=self.user,
+        )
+
+        self.assertEqual(get_client_display_current_debt(branch), Decimal('120.00'))
+        order.delete()
+
+        self.assertEqual(get_client_display_current_debt(branch), Decimal('0.00'))
+        annotated = with_display_current_debt(Client.objects.filter(pk=branch.pk)).get()
+        self.assertEqual(annotated.display_current_debt, Decimal('0.00'))
+
+    def test_open_credit_orders_consistent_between_reconciliation_and_credit_management(self) -> None:
+        from clients.services.credit_payment_service import (
+            get_open_credit_orders_for_credit_management,
+        )
+        from clients.services.credit_reconciliation_service import (
+            get_credit_reconciliation_summary,
+        )
+
+        # Order with only a pending_credit marker (no CreditTransaction yet)
+        marker_only = Order.objects.create(
+            client=self.customer,
+            credit_account=self.customer,
+            subtotal_amount=Decimal('75.00'),
+            total_amount=Decimal('75.00'),
+            status=OrderStatus.COMPLETED.value,
+            type='credito',
+            owner=self.user,
+        )
+        Payment.objects.create(
+            client=self.customer,
+            order=marker_only,
+            amount=Decimal('75.00'),
+            method='pending_credit',
+            status='pending',
+            created_by=self.user,
+        )
+
+        summary = get_credit_reconciliation_summary(self.customer)
+        credit_mgmt_orders = get_open_credit_orders_for_credit_management(self.customer)
+
+        self.assertEqual(summary.open_order_count, 1)
+        self.assertEqual(summary.open_credit_total, Decimal('75.00'))
+        self.assertEqual([o.pk for o in credit_mgmt_orders], [marker_only.pk])
+
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):
     def setUp(self) -> None:
