@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Revertir Pago #{{ plan.payment_id }}{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-py-4" style="max-width: 900px;">
+  <div class="pg-flex pg-justify-between pg-items-center pg-mb-4">
+    <div>
+      <h1 class="pg-h2 pg-mb-1">Confirmar Reversión de Pago #{{ plan.payment_id }}</h1>
+      <p class="pg-text-muted pg-mb-0">
+        Esta acción registra cambios contables únicamente (no realiza devolución bancaria ni modifica el pago original).
+      </p>
+    </div>
+    <a href="{{ next_url }}" class="pg-button pg-button-secondary pg-button-sm">Cancelar</a>
+  </div>
+
+  {% if not plan.can_reverse %}
+    <div class="pg-card pg-p-3 pg-mb-4" style="border-left: 4px solid #dc2626;">
+      <h3 class="pg-h4 pg-text-danger pg-mb-2">No es posible revertir este pago</h3>
+      <ul class="pg-mb-0">
+        {% for reason_msg in plan.blocking_reasons %}
+          <li>{{ reason_msg }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="pg-card pg-p-4 pg-mb-4">
+    <h2 class="pg-h4 pg-mb-3">Pago original (permanece intacto)</h2>
+    <div class="pg-grid pg-gap-3" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+      <div><span class="pg-text-muted pg-small">Pago ID</span><div class="pg-fw-semibold">#{{ plan.payment_id }}</div></div>
+      <div><span class="pg-text-muted pg-small">Pedido</span><div class="pg-fw-semibold">#{{ plan.order_id }}</div></div>
+      <div><span class="pg-text-muted pg-small">Fecha original</span><div>{{ plan.original_date|date:"d/m/Y H:i" }}</div></div>
+      <div><span class="pg-text-muted pg-small">Pagador</span><div>{{ plan.payer_name }}</div></div>
+      <div><span class="pg-text-muted pg-small">Método</span><div>{{ plan.method_display }}</div></div>
+      <div><span class="pg-text-muted pg-small">Nuevo movimiento</span><div class="pg-text-danger pg-fw-semibold">-${{ plan.amount|floatformat:2 }}</div></div>
+    </div>
+  </div>
+
+  <div class="pg-card pg-p-4 pg-mb-4">
+    <h2 class="pg-h4 pg-mb-3">Efecto en el Pedido #{{ plan.order_id }}</h2>
+    <table class="pg-table">
+      <thead>
+        <tr>
+          <th>Concepto</th>
+          <th>Antes</th>
+          <th>Después</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Total pagado neto</td>
+          <td>${{ plan.order_paid_before|floatformat:2 }}</td>
+          <td><strong>${{ plan.order_paid_after|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td>Saldo pendiente del pedido</td>
+          <td>${{ plan.order_unpaid_before|floatformat:2 }}</td>
+          <td><strong>${{ plan.order_unpaid_after|floatformat:2 }}</strong></td>
+        </tr>
+        <tr>
+          <td>Deuda a crédito del pedido</td>
+          <td>${{ plan.order_credit_before|floatformat:2 }}</td>
+          <td><strong class="pg-text-danger">${{ plan.order_credit_after|floatformat:2 }}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if plan.balance_effects or plan.excess_already_removed %}
+    <div class="pg-card pg-p-4 pg-mb-4">
+      <h2 class="pg-h4 pg-mb-3">Efectos en Saldo a Favor</h2>
+      {% if plan.excess_already_removed %}
+        <p class="pg-text-muted pg-mb-3">
+          El excedente de saldo de este cobro ya fue retirado en una reversión previa y no se volverá a descontar.
+        </p>
+      {% endif %}
+      {% if plan.balance_effects %}
+        <table class="pg-table">
+          <thead>
+            <tr>
+              <th>Cuenta</th>
+              <th>Saldo antes</th>
+              <th>Saldo restituido</th>
+              <th>Excedente retirado</th>
+              <th>Saldo después</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for eff in plan.balance_effects %}
+              <tr>
+                <td>{{ eff.client_name }}</td>
+                <td>${{ eff.balance_before|floatformat:2 }}</td>
+                <td class="pg-text-success">+${{ eff.restored_amount|floatformat:2 }}</td>
+                <td class="pg-text-danger">-${{ eff.removed_amount|floatformat:2 }}</td>
+                <td>
+                  <strong class="{% if eff.shortage > 0 %}pg-text-danger{% endif %}">
+                    ${{ eff.balance_after|floatformat:2 }}
+                  </strong>
+                  {% if eff.shortage > 0 %}
+                    <div class="pg-small pg-text-danger">Faltante: ${{ eff.shortage|floatformat:2 }}</div>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </div>
+  {% endif %}
+
+  {% if plan.credit_effects %}
+    <div class="pg-card pg-p-4 pg-mb-4">
+      <h2 class="pg-h4 pg-mb-3">Efectos en Cuenta de Crédito</h2>
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Cuenta de crédito</th>
+            <th>Deuda antes</th>
+            <th>Deuda agregada / restaurada</th>
+            <th>Deuda después</th>
+            <th>Crédito disponible después</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eff in plan.credit_effects %}
+            <tr>
+              <td>{{ eff.client_name }}</td>
+              <td>${{ eff.debt_before|floatformat:2 }}</td>
+              <td class="pg-text-danger">+${{ eff.debt_delta|floatformat:2 }}</td>
+              <td><strong>${{ eff.debt_after|floatformat:2 }}</strong></td>
+              <td>${{ eff.available_credit_after|floatformat:2 }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  {% if plan.invoice_impacts %}
+    <div class="pg-card pg-p-4 pg-mb-4">
+      <h2 class="pg-h4 pg-mb-2">Facturas vinculadas</h2>
+      <p class="pg-text-muted pg-small pg-mb-3">La factura permanece vigente; únicamente se actualiza su estado de pago.</p>
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>Factura</th>
+            <th>Estado fiscal</th>
+            <th>Estado pago antes</th>
+            <th>Estado pago después</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for inv in plan.invoice_impacts %}
+            <tr>
+              <td>{{ inv.folio }}</td>
+              <td>{{ inv.status_display }}</td>
+              <td>{{ inv.state_before }}</td>
+              <td><strong>{{ inv.state_after }}</strong></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+
+  <form method="post" class="pg-card pg-p-4">
+    {% csrf_token %}
+    <input type="hidden" name="preview_token" value="{{ preview_token }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+
+    <div class="pg-mb-3">
+      <label class="pg-label" for="reason">Motivo de la reversión (requerido)</label>
+      <textarea class="pg-input" id="reason" name="reason" rows="3" required {% if not plan.can_reverse %}disabled{% endif %}>{{ reason }}</textarea>
+    </div>
+
+    <div class="pg-flex pg-gap-2">
+      <button type="submit" class="pg-button pg-button-danger" {% if not plan.can_reverse %}disabled{% endif %}>
+        Confirmar reversión
+      </button>
+      <a href="{{ next_url }}" class="pg-button pg-button-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -41,7 +41,12 @@ def reverse_transferred_order_credit(order: Order, user: AbstractBaseUser | None
         remaining = summary['total_purchases'] - summary['total_payments']
         if remaining < ZERO or remaining > account.current_debt:
             raise ValueError('La deuda del pedido transferido requiere conciliación antes de cancelar.')
-        payments = list(account_entries.filter(transaction_type__in=['payment', 'payment_from_balance']))
+        payments = list(
+            account_entries.filter(
+                transaction_type__in=['payment', 'payment_from_balance'],
+                reversal_transaction__isnull=True,
+            )
+        )
         exposure = remaining + sum((payment.amount for payment in payments), ZERO)
         for payment in payments:
             _record_reversal(account, order, payment.amount, 'payment_reversal', user, payment.reference_payment_id)

@@ -27,7 +27,10 @@ from tenant_client.test_utils import FastTenantTestCase
 
 class BranchCreditTransferTests(FastTenantTestCase):
     def setUp(self) -> None:
-        self.user = get_user_model().objects.create_user(username="credit-transfer-user")
+        self.user = get_user_model().objects.create_user(
+            username="credit-transfer-user",
+            is_staff=True,
+        )
         self.corporate = Client.objects.create(
             name="ABC", type="corporate", credit_limit=Decimal("5000.00"),
         )
@@ -363,8 +366,12 @@ class BranchCreditTransferTests(FastTenantTestCase):
 
         self.assertTrue(result["success"], result)
         self.assertFalse(order.credit_transfers.exists())
+        payment.refresh_from_db()
+        self.assertTrue(payment.has_reversal)
         self.assertTrue(CreditTransaction.objects.filter(
-            client=self.corporate, reference_payment=payment, transaction_type="payment_reversal",
+            client=self.corporate,
+            reference_payment=payment.reversal_entry,
+            transaction_type="payment_reversal",
         ).exists())
         self.corporate.refresh_from_db()
         self.branch.refresh_from_db()

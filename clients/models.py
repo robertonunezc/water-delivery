@@ -397,6 +397,7 @@ class BalanceTransaction(TimeStampedModel):
     """
     TRANSACTION_TYPES = [
         ('deposit', 'Depósito'),           # Client adds money
+        ('deposit_reversal', 'Reversión de abono a saldo'),
         ('payment', 'Pago con saldo'),     # Using balance for order payment
         ('added_in_order', 'Saldo agregado en venta'), # Using balance for deferred payment
         ('payment_reversal', 'Reversión de pago con saldo'),
@@ -418,6 +419,15 @@ class BalanceTransaction(TimeStampedModel):
     # References to related objects
     reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")
     reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")
+    reverses_transaction = models.OneToOneField(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='reversal_transaction',
+        verbose_name="Transacción revertida",
+    )
+    reversal_reason = models.TextField(blank=True, default='', verbose_name="Motivo de reversión")
     transfer_to_client = models.ForeignKey('Client', null=True, blank=True, on_delete=models.SET_NULL, related_name='balance_transfers_received', verbose_name="Cliente destino (transferencia)")
     
     # Audit fields
@@ -515,6 +525,14 @@ class CreditTransaction(TimeStampedModel):
     # References to related objects
     reference_order = models.ForeignKey('orders.Order', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Orden relacionada")
     reference_payment = models.ForeignKey('payment.Payment', null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Pago relacionado")
+    reverses_transaction = models.OneToOneField(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='reversal_transaction',
+        verbose_name="Transacción revertida",
+    )
     
     # Audit fields
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, verbose_name="Creado por")

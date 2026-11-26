@@ -2,7 +2,7 @@ from datetime import date
 from collections.abc import Iterable
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Count, QuerySet, Sum
+from django.db.models import Count, Q, QuerySet, Sum
 from django.utils import timezone
 from clients.models import Client
 from core import models
@@ -29,7 +29,12 @@ def get_sales_snapshot(start_date: date, end_date: date) -> dict[str, object]:
     total_discount = totals['total_discount'] or Decimal('0.00')
     average_ticket = total_amount / total_orders if total_orders else Decimal('0.00')
 
-    from payment.models import PAYMENT_METHOD_CHOICES, Payment
+    from payment.models import (
+        PAYMENT_ENTRY_KIND_PAYMENT,
+        PAYMENT_METHOD_CHOICES,
+        Payment,
+        PaymentQuerySet,
+    )
 
     method_labels = dict(PAYMENT_METHOD_CHOICES)
     payment_rows = (
@@ -40,8 +45,8 @@ def get_sales_snapshot(start_date: date, end_date: date) -> dict[str, object]:
         .exclude(method='pending_credit')
         .values('method')
         .annotate(
-            total_amount=Sum('amount'),
-            payment_count=Count('id'),
+            total_amount=Sum(PaymentQuerySet.signed_amount_expression()),
+            payment_count=Count('id', filter=Q(entry_kind=PAYMENT_ENTRY_KIND_PAYMENT)),
         )
         .order_by('method')
     )
@@ -249,11 +254,15 @@ def _clear_cancellation_review(order: Order) -> None:
 
 
 def _get_added_balance_amount(order: Order) -> Decimal:
-    total = order.client.balance_transactions.filter(
+    added = order.client.balance_transactions.filter(
         reference_order=order,
         transaction_type='added_in_order',
-    ).aggregate(total=Sum('amount'))['total']
-    return total or Decimal('0.00')
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    reversed_added = order.client.balance_transactions.filter(
+        reference_order=order,
+        transaction_type='added_in_order_reversal',
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+    return max(added - reversed_added, Decimal('0.00'))
 
 
 def _reverse_added_balance(
@@ -303,6 +312,7 @@ def _reverse_credit_payment_transactions(
     credit_payments = credit_account.credit_transactions.filter(
         reference_order=order,
         transaction_type__in=['payment', 'payment_from_balance'],
+        reversal_transaction__isnull=True,
     ).order_by('created_at', 'id')
     for credit_payment in credit_payments:
         balance_service.reverse_credit_payment(
@@ -322,34 +332,48 @@ def _reverse_credit_purchase_transactions(
     from clients.services import balance_service
 
     credit_account = order.client.get_credit_account()
-    credit_purchases = credit_account.credit_transactions.filter(
+    summary = credit_account.credit_transactions.filter(
         reference_order=order,
-        transaction_type='purchase',
-    ).order_by('created_at', 'id')
-    reversed_amount = credit_account.credit_transactions.filter(
-        reference_order=order,
-        transaction_type='purchase_reversal',
-    ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
-    for credit_purchase in credit_purchases:
-        # A split may already have reassigned part of this order's credit.
-        already_reversed = min(reversed_amount, credit_purchase.amount)
-        reversed_amount -= already_reversed
-        amount = credit_purchase.amount - already_reversed
-        if amount <= 0:
-            continue
-        balance_service.reverse_credit_purchase(
-            client=order.client,
-            amount=amount,
-            user=user,
+    ).aggregate_summary()
+    remaining_debt = max(
+        summary['total_purchases'] - summary['total_payments'],
+        Decimal('0.00'),
+    )
+    if remaining_debt <= 0:
+        return
+
+    reference_payment = (
+        credit_account.credit_transactions.filter(
             reference_order=order,
-            reference_payment=credit_purchase.reference_payment,
-            notes=f'Reversión de compra a crédito por cancelación de pedido #{order.id}',
+            transaction_type='purchase',
+            reference_payment__isnull=False,
         )
+        .order_by('created_at', 'id')
+        .values_list('reference_payment', flat=True)
+        .first()
+    )
+    from payment.models import Payment
+
+    ref_payment_obj = (
+        Payment.objects.filter(pk=reference_payment).first()
+        if reference_payment
+        else None
+    )
+    balance_service.reverse_credit_purchase(
+        client=order.client,
+        amount=remaining_debt,
+        user=user,
+        reference_order=order,
+        reference_payment=ref_payment_obj,
+        notes=f'Reversión de compra a crédito por cancelación de pedido #{order.id}',
+    )
 
 
 def _mark_payments_reversed(order: Order) -> int:
+    """Mark only pending/credit-marker payments as reversed; preserve real receipts."""
     return order.payments.select_for_update().filter(
-        status__in=['completed', 'pending'],
+        Q(method='pending_credit', status__in=['completed', 'pending'])
+        | Q(status='pending')
     ).update(status='reversed', updated_at=timezone.now())
 
 
@@ -358,6 +382,7 @@ def _cancel_order_in_transaction(
     user: object | None = None,
 ) -> Dict[str, object]:
     from orders.services.credit_lock_service import lock_order_credit_clients
+    from payment import reversal_service
 
     lock_order_credit_clients([order.pk])
     locked_order = (
@@ -384,6 +409,30 @@ def _cancel_order_in_transaction(
             user=user,
         )
 
+    reversible_receipts = list(
+        locked_order.payments.reversible_receipts().order_by('date', 'id')
+    )
+    if reversible_receipts and not reversal_service.is_payment_manager(user):
+        return {
+            'success': False,
+            'permission_denied': True,
+            'error': 'Solo administradores o gerentes pueden cancelar pedidos con pagos registrados.',
+        }
+
+    payments_reversed = 0
+    for receipt in reversible_receipts:
+        try:
+            reversal_service.execute_payment_reversal(
+                payment_id=receipt.pk,
+                user=user,
+                reason=f'Cancelación de pedido #{locked_order.id}',
+                require_token=False,
+            )
+            payments_reversed += 1
+        except reversal_service.ReversalError as exc:
+            raise ValueError(str(exc)) from exc
+
+    locked_client.refresh_from_db()
     added_balance_amount = _get_added_balance_amount(locked_order)
     if added_balance_amount > locked_client.balance:
         return _mark_cancellation_review_required(
@@ -396,7 +445,6 @@ def _cancel_order_in_transaction(
         )
 
     _reverse_added_balance(locked_order, added_balance_amount, user=user)
-    _reverse_completed_balance_payments(locked_order, user=user)
     if (
         locked_order.credit_transfers.exists()
         or locked_order.get_credit_account().pk != locked_order.client.get_credit_account().pk
@@ -407,7 +455,7 @@ def _cancel_order_in_transaction(
     else:
         _reverse_credit_payment_transactions(locked_order, user=user)
         _reverse_credit_purchase_transactions(locked_order, user=user)
-    payments_reversed = _mark_payments_reversed(locked_order)
+    payments_reversed += _mark_payments_reversed(locked_order)
 
     locked_order.status = OrderStatus.CANCELLED.value
     _clear_cancellation_review(locked_order)
@@ -670,6 +718,10 @@ def cancel_orders(queryset: QuerySet, user: object | None = None) -> Dict[str, i
     review_required = 0
 
     for order in orders:
+        if order.payments.reversible_receipts().exists():
+            skipped += 1
+            review_required += 1
+            continue
         result = cancel_order(order=order, user=user)
         if result.get('success') and not result.get('skipped'):
             updated += 1

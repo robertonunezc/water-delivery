@@ -5,6 +5,7 @@ from io import StringIO
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db.models import Sum
+from django.urls import reverse
 from django.utils import timezone
 from tenant_client.test_utils import FastTenantTestCase
 
@@ -941,6 +942,122 @@ class ClientCreditReconciliationServiceTests(FastTenantTestCase):
         self.assertIn('Cliente conciliacion credito', report)
         self.assertIn('ledger=50.00', report)
         self.assertIn('open_orders=100.00', report)
+
+    def test_recalculate_client_debt_decreases_stale_debt_and_logs_correction(self) -> None:
+        from clients.services.credit_reconciliation_service import recalculate_client_debt
+
+        # Stale debt of $50.00 with no active unpaid credit orders
+        result = recalculate_client_debt(self.customer, user=self.user)
+
+        self.customer.refresh_from_db()
+        self.assertTrue(result.changed)
+        self.assertEqual(result.debt_before, Decimal('50.00'))
+        self.assertEqual(result.debt_after, Decimal('0.00'))
+        self.assertEqual(result.open_order_count, 0)
+        self.assertEqual(self.customer.current_debt, Decimal('0.00'))
+        self.assertIsNotNone(result.transaction)
+        assert result.transaction is not None
+        self.assertEqual(result.transaction.transaction_type, 'correction')
+        self.assertEqual(result.transaction.amount, Decimal('50.00'))
+        self.assertEqual(result.transaction.debt_before, Decimal('50.00'))
+        self.assertEqual(result.transaction.debt_after, Decimal('0.00'))
+        result.transaction.clean()
+
+    def test_recalculate_client_debt_increases_understated_debt_and_logs_adjustment(self) -> None:
+        from clients.services.credit_reconciliation_service import recalculate_client_debt
+
+        self._credit_order(Decimal('100.00'))
+        result = recalculate_client_debt(self.customer, user=self.user)
+
+        self.customer.refresh_from_db()
+        self.assertTrue(result.changed)
+        self.assertEqual(result.debt_before, Decimal('50.00'))
+        self.assertEqual(result.debt_after, Decimal('100.00'))
+        self.assertEqual(result.open_order_count, 1)
+        self.assertEqual(self.customer.current_debt, Decimal('100.00'))
+        assert result.transaction is not None
+        self.assertEqual(result.transaction.transaction_type, 'adjustment')
+        self.assertEqual(result.transaction.amount, Decimal('50.00'))
+        result.transaction.clean()
+
+    def test_recalculate_client_debt_includes_payment_reversal_orders_and_excludes_cancelled_or_deleted(self) -> None:
+        from clients.services.credit_reconciliation_service import recalculate_client_debt
+
+        reversed_order = Order.objects.create(
+            client=self.customer,
+            credit_account=self.customer,
+            subtotal_amount=Decimal('80.00'),
+            total_amount=Decimal('80.00'),
+            status='COMPLETED',
+            type='contado',
+            owner=self.user,
+        )
+        CreditTransaction.objects.create(
+            client=self.customer,
+            transaction_type='payment_reversal',
+            amount=Decimal('80.00'),
+            debt_before=Decimal('50.00'),
+            debt_after=Decimal('130.00'),
+            credit_limit_before=Decimal('1000.00'),
+            credit_limit_after=Decimal('1000.00'),
+            reference_order=reversed_order,
+            created_by=self.user,
+        )
+        cancelled_order = self._credit_order(Decimal('60.00'))
+        cancelled_order.status = 'CANCELLED'
+        cancelled_order.save(update_fields=['status'])
+        deleted_order = self._credit_order(Decimal('40.00'))
+        deleted_order.delete()
+
+        result = recalculate_client_debt(self.customer, user=self.user)
+
+        self.customer.refresh_from_db()
+        self.assertEqual(result.debt_after, Decimal('80.00'))
+        self.assertEqual(result.open_order_count, 1)
+        self.assertEqual(self.customer.current_debt, Decimal('80.00'))
+
+    def test_recalculate_client_debt_is_noop_when_already_balanced(self) -> None:
+        from clients.services.credit_reconciliation_service import recalculate_client_debt
+
+        self._credit_order(Decimal('50.00'))
+        result = recalculate_client_debt(self.customer, user=self.user)
+
+        self.assertFalse(result.changed)
+        self.assertIsNone(result.transaction)
+        self.assertEqual(
+            CreditTransaction.objects.filter(
+                client=self.customer,
+                transaction_type__in=['correction', 'adjustment'],
+            ).count(),
+            0,
+        )
+
+    def test_recalculate_debt_view_requires_manager_or_staff_and_updates_debt(self) -> None:
+        staff_user = User.objects.create_user(
+            username='recalc_staff',
+            password='password123',
+            is_staff=True,
+        )
+        regular_user = User.objects.create_user(
+            username='recalc_regular',
+            password='password123',
+            is_staff=False,
+        )
+        url = reverse('clients:recalculate_debt', args=[self.customer.pk])
+
+        self.client.force_login(regular_user)
+        forbidden = self.client.post(url)
+        self.assertEqual(forbidden.status_code, 403)
+
+        self.client.force_login(staff_user)
+        detail_response = self.client.get(reverse('clients:detail', args=[self.customer.pk]))
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'Recalcular deuda')
+
+        response = self.client.post(url)
+        self.assertRedirects(response, reverse('clients:detail', args=[self.customer.pk]))
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.current_debt, Decimal('0.00'))
 
 
 class ClientDetailSnapshotServiceTests(FastTenantTestCase):

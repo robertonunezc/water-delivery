@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Revertir Abono a Saldo #{{ plan.transaction_id }}{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-py-4" style="max-width: 780px;">
+  <div class="pg-flex pg-justify-between pg-items-center pg-mb-4">
+    <div>
+      <h1 class="pg-h2 pg-mb-1">Confirmar Reversión de Abono a Saldo #{{ plan.transaction_id }}</h1>
+      <p class="pg-text-muted pg-mb-0">
+        El abono original permanece registrado y se creará un movimiento compensatorio de reversión.
+      </p>
+    </div>
+    <a href="{{ next_url }}" class="pg-button pg-button-secondary pg-button-sm">Cancelar</a>
+  </div>
+
+  {% if not plan.can_reverse %}
+    <div class="pg-card pg-p-3 pg-mb-4" style="border-left: 4px solid #dc2626;">
+      <h3 class="pg-h4 pg-text-danger pg-mb-2">No es posible revertir este abono</h3>
+      <ul class="pg-mb-0">
+        {% for reason_msg in plan.blocking_reasons %}
+          <li>{{ reason_msg }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
+
+  <div class="pg-card pg-p-4 pg-mb-4">
+    <h2 class="pg-h4 pg-mb-3">Detalle del abono y efecto en saldo</h2>
+    <table class="pg-table">
+      <tbody>
+        <tr><th>Cliente</th><td>{{ plan.client_name }}</td></tr>
+        <tr><th>Fecha original</th><td>{{ plan.original_date|date:"d/m/Y H:i" }}</td></tr>
+        <tr><th>Monto a descontar</th><td class="pg-text-danger pg-fw-semibold">-${{ plan.amount|floatformat:2 }}</td></tr>
+        <tr><th>Saldo antes</th><td>${{ plan.balance_before|floatformat:2 }}</td></tr>
+        <tr>
+          <th>Saldo después</th>
+          <td>
+            <strong class="{% if plan.shortage > 0 %}pg-text-danger{% endif %}">
+              ${{ plan.balance_after|floatformat:2 }}
+            </strong>
+            {% if plan.shortage > 0 %}
+              <div class="pg-small pg-text-danger">Faltante: ${{ plan.shortage|floatformat:2 }}</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% if plan.notes %}
+          <tr><th>Notas originales</th><td>{{ plan.notes }}</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+  <form method="post" class="pg-card pg-p-4">
+    {% csrf_token %}
+    <input type="hidden" name="preview_token" value="{{ preview_token }}">
+    <input type="hidden" name="next" value="{{ next_url }}">
+
+    <div class="pg-mb-3">
+      <label class="pg-label" for="reason">Motivo de la reversión (requerido)</label>
+      <textarea class="pg-input" id="reason" name="reason" rows="3" required {% if not plan.can_reverse %}disabled{% endif %}>{{ reason }}</textarea>
+    </div>
+
+    <div class="pg-flex pg-gap-2">
+      <button type="submit" class="pg-button pg-button-danger" {% if not plan.can_reverse %}disabled{% endif %}>
+        Confirmar reversión
+      </button>
+      <a href="{{ next_url }}" class="pg-button pg-button-secondary">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

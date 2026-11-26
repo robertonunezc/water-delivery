@@ -210,6 +210,9 @@
                       <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                     {% endif %}
                     {% include 'orders/_receipt_dropdown_items.html' %}
+                    {% if request.user.is_staff or request.user.employee.position == 'manager' %}
+                      <li><a class="pg-dropdown-item" href="{% url 'payment:order_payments' order.id %}?next={{ request.get_full_path|urlencode }}">Pagos</a></li>
+                    {% endif %}
                     <li>{% include 'orders/_cancel_order_action.html' %}</li>
                     {% if order.status == 'PENDING' %}
                       <li><a class="pg-dropdown-item" href="{% url 'orders:create_order' order.client.pk %}">Editar</a></li>

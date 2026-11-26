@@ -68,7 +68,7 @@ class InvoiceQuerySet(models.QuerySet):
 
     def with_balance_totals(self) -> 'InvoiceQuerySet':
         """Annotate invoice linked order totals, paid totals, and remaining amounts."""
-        from payment.models import Payment
+        from payment.models import Payment, PaymentQuerySet
 
         linked_total_subquery = (
             InvoiceOrderLink.objects.filter(invoice=OuterRef('pk'))
@@ -83,7 +83,7 @@ class InvoiceQuerySet(models.QuerySet):
             )
             .exclude(method='pending_credit')
             .values('order__invoice_links__invoice')
-            .annotate(total=Sum('amount'))
+            .annotate(total=Sum(PaymentQuerySet.signed_amount_expression()))
             .values('total')
         )
         decimal_zero = Value(Decimal('0.00'), output_field=DecimalField())
@@ -224,18 +224,16 @@ class Invoice(TimeStampedModel):
 
     @property
     def total_payments(self):
-        """Calcula el total pagado de la factura sumando todos los pagos de las órdenes vinculadas"""
-        from django.db.models import Sum, Q
-        payments = self.invoice_links.aggregate(
-            total=Sum(
-                'order__payments__amount',
-                filter=(
-                    Q(order__payments__status='completed')
-                    & ~Q(order__payments__method='pending_credit')
-                ),
-            )
+        """Calcula el total pagado neto de la factura considerando pagos y reversiones."""
+        from django.db.models import Sum
+        from payment.models import Payment, PaymentQuerySet
+
+        total = Payment.objects.filter(
+            order__invoice_links__invoice=self,
+        ).aggregate(
+            total=Sum(PaymentQuerySet.signed_amount_expression())
         )['total']
-        return payments or 0.00
+        return total or 0.00
     @property
     def pending_amount(self):
         if self.status != InvoiceStatus.ACTIVE:

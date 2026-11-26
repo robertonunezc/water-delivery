@@ -46,6 +46,14 @@
         <a href="{% url 'report:client_credit_report' client.pk %}" class="pg-button client-header-action">
           <i class="fas fa-credit-card pg-me-1"></i>Reporte de crédito
         </a>
+        {% if can_recalculate_debt %}
+          <form method="post" action="{% url 'clients:recalculate_debt' client.pk %}" class="pg-mb-0">
+            {% csrf_token %}
+            <button type="submit" class="pg-button client-header-action">
+              <i class="fas fa-sync-alt pg-me-1"></i>Recalcular deuda
+            </button>
+          </form>
+        {% endif %}
         {% if client.type == 'corporate' %}
           <a href="{% url 'clients:corporate_branches' client.pk %}" class="pg-button client-header-action">
             <i class="fas fa-code-branch"></i> Ver sucursales / ventas
@@ -139,8 +147,20 @@
 
   {% if credit_reconciliation_warning %}
     <section class="pg-alert pg-alert-warning pg-mb-3" role="alert">
-      <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
-      <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+      <div class="pg-flex pg-flex-column pg-flex-lg-row pg-justify-between pg-align-lg-center pg-gap-2">
+        <div>
+          <h2 class="pg-h5 pg-mb-1">Revisión de crédito requerida</h2>
+          <p class="pg-mb-0">{{ credit_reconciliation_warning.message }}</p>
+        </div>
+        {% if can_recalculate_debt %}
+          <form method="post" action="{% url 'clients:recalculate_debt' client.pk %}" class="pg-mb-0">
+            {% csrf_token %}
+            <button type="submit" class="pg-button pg-button-sm pg-button-warning">
+              <i class="fas fa-sync-alt pg-me-1"></i>Recalcular deuda
+            </button>
+          </form>
+        {% endif %}
+      </div>
     </section>
   {% endif %}
 
@@ -331,6 +351,9 @@
                               <li><a class="pg-dropdown-item" href="{% url 'orders:split_order' order.id %}">Dividir</a></li>
                             {% endif %}
                             {% include 'orders/_receipt_dropdown_items.html' %}
+                            {% if request.user.is_staff or request.user.employee.position == 'manager' %}
+                              <li><a class="pg-dropdown-item" href="{% url 'payment:order_payments' order.id %}?next={{ request.get_full_path|urlencode }}">Pagos</a></li>
+                            {% endif %}
                             {% if not order.is_paid and order.status != 'CANCELLED' %}
                               <li><a class="pg-dropdown-item" href="{% url 'clients:pay_selected_orders' client.pk %}?orders={{ order.id }}">Pagar</a></li>
                             {% endif %}

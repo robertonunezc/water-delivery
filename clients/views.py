@@ -48,7 +48,11 @@ from .services.credit_payment_service import (
     get_selected_credit_orders_for_credit_management,
     get_selected_credit_orders_total,
 )
-from .services.credit_reconciliation_service import get_credit_reconciliation_warning
+from .services.credit_reconciliation_service import (
+    get_credit_reconciliation_warning,
+    recalculate_client_debt,
+)
+from payment.reversal_service import is_payment_manager, require_payment_manager
 from .services.product_price_service import (
     build_client_product_price_initial,
     update_client_product_prices,
@@ -657,26 +661,52 @@ def _payment_status_class(status: str) -> str:
 
 def _payment_history_item(payment: Any) -> dict[str, Any]:
     is_credit_debt = payment.method == 'pending_credit'
+    is_reversal = getattr(payment, 'is_reversal', False)
+    if is_reversal:
+        status_label = 'Reversión'
+        status_class = 'danger'
+        description = (
+            f'Reversión de pago #{payment.reversal_of_id} (orden #{payment.order.id})'
+            if payment.order
+            else f'Reversión de pago #{payment.reversal_of_id}'
+        )
+    elif is_credit_debt:
+        status_label = 'DEUDA'
+        status_class = 'warning'
+        description = f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general'
+    else:
+        status_label = (
+            'Con reversión' if getattr(payment, 'has_reversal', False) else payment.get_status_display()
+        )
+        status_class = 'warning' if getattr(payment, 'has_reversal', False) else _payment_status_class(payment.status)
+        description = f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general'
+
     return {
         'type': 'payment',
         'id': payment.id,
         'date': payment.date,
         'amount': payment.amount,
         'method': payment.get_method_display(),
-        'status': 'DEUDA' if is_credit_debt else payment.get_status_display(),
-        'status_class': 'warning' if is_credit_debt else _payment_status_class(payment.status),
+        'status': status_label,
+        'status_class': status_class,
         'order_id': payment.order.id if payment.order else None,
-        'description': f'Pago de orden #{payment.order.id}' if payment.order else 'Pago general',
+        'description': description,
         'is_credit_debt': is_credit_debt,
-        'is_positive': True,
+        'is_positive': not is_reversal,
         'object': payment,
         'created_by': payment.created_by,
     }
 
 
 def _balance_history_item(balance_tx: Any) -> dict[str, Any]:
-    positive_types = ['deposit', 'refund', 'transfer_in', 'adjustment']
-    success_types = ['deposit', 'refund', 'transfer_in']
+    positive_types = ['deposit', 'refund', 'transfer_in', 'adjustment', 'added_in_order', 'payment_reversal']
+    success_types = ['deposit', 'refund', 'transfer_in', 'added_in_order', 'payment_reversal']
+    if balance_tx.transaction_type in ('deposit_reversal', 'added_in_order_reversal'):
+        status_class = 'danger'
+    elif balance_tx.transaction_type in success_types:
+        status_class = 'success'
+    else:
+        status_class = 'info'
     return {
         'type': 'balance_transaction',
         'id': balance_tx.id,
@@ -684,7 +714,7 @@ def _balance_history_item(balance_tx: Any) -> dict[str, Any]:
         'amount': balance_tx.amount,
         'method': balance_tx.get_transaction_type_display(),
         'status': 'Completado',
-        'status_class': 'success' if balance_tx.transaction_type in success_types else 'info',
+        'status_class': status_class,
         'order_id': balance_tx.reference_order.id if balance_tx.reference_order else None,
         'description': balance_tx.notes or balance_tx.get_transaction_type_display(),
         'notes': balance_tx.notes,
@@ -730,7 +760,12 @@ def _credit_history_item(credit_tx: Any) -> dict[str, Any]:
 
 
 def _build_payment_history(client: Client) -> List[dict[str, Any]]:
-    payments = client.payments.select_related('order', 'created_by').order_by('-date')
+    payments = client.payments.select_related(
+        'order',
+        'created_by',
+        'reversal_of',
+        'reversal_entry',
+    ).order_by('-date')
     balance_transactions = client.balance_transactions.select_related(
         'reference_order',
         'reference_payment',
@@ -1028,8 +1063,13 @@ def detail(request, pk):
     client_invoices = _get_client_detail_invoices(client)
     
     # Calculate client statistics
+    from payment.models import PaymentQuerySet
+
     total_orders = orders.count()
-    total_spent = payments.filter(status='completed').aggregate(total=Sum('amount'))['total'] or 0
+    total_spent = (
+        payments.aggregate(total=Sum(PaymentQuerySet.signed_amount_expression()))['total']
+        or Decimal('0.00')
+    )
     pending_orders = orders.filter(status='pending').count()
     completed_orders = orders.filter(status='completed').count()
     
@@ -1097,6 +1137,7 @@ def detail(request, pk):
         'debt_percentage': debt_percentage,
         'credit_account': credit_account,
         'credit_reconciliation_warning': get_credit_reconciliation_warning(client),
+        'can_recalculate_debt': is_payment_manager(request.user),
         'effective_credit_config': effective_credit_config,
         'credit_is_inherited': credit_account.pk != client.pk,
         'stats': {
@@ -1111,6 +1152,31 @@ def detail(request, pk):
     }
     
     return render(request, 'client_detail.html', context)
+
+
+@login_required
+@require_POST
+def recalculate_client_debt_view(request: HttpRequest, pk: int) -> HttpResponse:
+    """Recalculate the client's credit account debt from active unpaid credit orders."""
+    require_payment_manager(request.user)
+    client = get_object_or_404(Client, pk=pk)
+    result = recalculate_client_debt(client=client, user=request.user)
+
+    if result.changed:
+        messages.success(
+            request,
+            f'Deuda de {result.credit_account.name} recalculada: '
+            f'${result.debt_before:.2f} → ${result.debt_after:.2f} '
+            f'({result.open_order_count} pedido(s) a crédito pendiente(s)).',
+        )
+    else:
+        messages.info(
+            request,
+            f'La deuda de {result.credit_account.name} ya coincide con los pedidos '
+            f'a crédito pendientes (${result.debt_after:.2f}).',
+        )
+
+    return redirect('clients:detail', pk=client.pk)
 
 
 @user_passes_test(_is_admin_user)

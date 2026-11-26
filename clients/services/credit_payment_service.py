@@ -17,34 +17,37 @@ class CreditManagementOrderError(ValueError):
 def get_open_credit_orders_for_credit_management(client: Client) -> list[Order]:
     """Return open credit orders selectable from the client's credit screen."""
     credit_transactions = CreditTransaction.objects.filter(
-        transaction_type='purchase',
+        transaction_type__in=['purchase', 'payment_reversal', 'transfer_in'],
         reference_order__isnull=False,
     )
     if client.type == 'corporate':
         credit_transactions = credit_transactions.filter(
             Q(reference_order__client=client)
-            | Q(reference_order__client__corporate=client),
+            | Q(reference_order__client__corporate=client)
+            | Q(client=client),
         )
     else:
-        credit_transactions = credit_transactions.filter(reference_order__client=client)
+        credit_transactions = credit_transactions.filter(
+            Q(reference_order__client=client) | Q(client=client.get_credit_account()),
+        )
 
     credit_order_ids = credit_transactions.values('reference_order_id')
     orders = (
         Order.objects.active()
         .unpaid()
-        .filter(
-            pk__in=credit_order_ids,
-            payments__method='pending_credit',
-            payments__status='pending',
-        )
-        .select_related('client', 'client__corporate')
+        .filter(pk__in=credit_order_ids)
+        .select_related('client', 'client__corporate', 'credit_account')
         .prefetch_related('payments')
         .distinct()
         .order_by('-order_date', '-id')
     )
     if client.type != 'corporate':
         orders = orders.for_credit_accounts([client.get_credit_account().pk])
-    return list(orders)
+    return [
+        order
+        for order in orders
+        if payment_services.get_order_outstanding_credit(order) > Decimal('0.00')
+    ]
 
 
 def get_selected_credit_orders_for_credit_management(

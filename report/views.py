@@ -61,6 +61,8 @@ def _get_report_orders_queryset(
 
 def _get_payment_method_order_ids(payment_method: str) -> QuerySet:
     return Payment.objects.not_reversed().filter(
+        entry_kind='payment',
+        reversal_entry__isnull=True,
         method=payment_method,
     ).values('order_id')
 
@@ -68,8 +70,14 @@ def _get_payment_method_order_ids(payment_method: str) -> QuerySet:
 def _get_report_payments(order: Order) -> list[Payment] | QuerySet:
     prefetched_payments = getattr(order, REPORT_PAYMENTS_ATTR, None)
     if prefetched_payments is not None:
-        return prefetched_payments
-    return order.payments.not_reversed()
+        return [
+            p for p in prefetched_payments
+            if getattr(p, 'entry_kind', 'payment') == 'payment' and not p.has_reversal
+        ]
+    return order.payments.not_reversed().filter(
+        entry_kind='payment',
+        reversal_entry__isnull=True,
+    )
 
 
 def _get_order_payment_bucket(order: Order) -> tuple[str, str]:

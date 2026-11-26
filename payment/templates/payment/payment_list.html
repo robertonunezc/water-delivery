@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Pagos{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-py-4">
+  <div class="pg-flex pg-justify-between pg-items-center pg-mb-4">
+    <div>
+      <h1 class="pg-h2 pg-mb-1">Gestión de Pagos</h1>
+      <p class="pg-text-muted pg-mb-0">Historial completo de pagos recibidos, reversiones y abonos a saldo.</p>
+    </div>
+  </div>
+
+  <div class="pg-flex pg-gap-2 pg-mb-4">
+    <a href="{% url 'payment:list_payments' %}?tab=payments"
+       class="pg-button {% if active_tab == 'payments' %}pg-button-primary{% else %}pg-button-secondary{% endif %}">
+      Pagos de pedidos
+    </a>
+    <a href="{% url 'payment:list_payments' %}?tab=deposits"
+       class="pg-button {% if active_tab == 'deposits' %}pg-button-primary{% else %}pg-button-secondary{% endif %}">
+      Abonos a saldo
+    </a>
+  </div>
+
+  {% if active_tab == 'payments' %}
+    <form method="get" class="pg-card pg-p-3 pg-mb-4">
+      <input type="hidden" name="tab" value="payments">
+      <div class="pg-grid pg-gap-3" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+        <div>
+          <label class="pg-label" for="order_id">Pedido #</label>
+          <input class="pg-input" id="order_id" name="order_id" value="{{ filters.order_id }}" placeholder="ID pedido">
+        </div>
+        <div>
+          <label class="pg-label" for="client">Cliente / Pagador</label>
+          <input class="pg-input" id="client" name="client" value="{{ filters.client }}" placeholder="Nombre">
+        </div>
+        <div>
+          <label class="pg-label" for="date_from">Desde</label>
+          <input class="pg-input" type="date" id="date_from" name="date_from" value="{{ filters.date_from }}">
+        </div>
+        <div>
+          <label class="pg-label" for="date_to">Hasta</label>
+          <input class="pg-input" type="date" id="date_to" name="date_to" value="{{ filters.date_to }}">
+        </div>
+        <div>
+          <label class="pg-label" for="method">Método</label>
+          <select class="pg-input" id="method" name="method">
+            <option value="">Todos</option>
+            {% for value, label in method_choices %}
+              <option value="{{ value }}" {% if filters.method == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="pg-label" for="entry_kind">Tipo</label>
+          <select class="pg-input" id="entry_kind" name="entry_kind">
+            <option value="">Todos</option>
+            {% for value, label in entry_kind_choices %}
+              <option value="{{ value }}" {% if filters.entry_kind == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="pg-label" for="reversal_state">Estado reversión</label>
+          <select class="pg-input" id="reversal_state" name="reversal_state">
+            <option value="">Todos</option>
+            <option value="active" {% if filters.reversal_state == 'active' %}selected{% endif %}>Vigentes (reversibles)</option>
+            <option value="reversed" {% if filters.reversal_state == 'reversed' %}selected{% endif %}>Con reversión</option>
+            <option value="reversal" {% if filters.reversal_state == 'reversal' %}selected{% endif %}>Reversiones</option>
+          </select>
+        </div>
+      </div>
+      <div class="pg-flex pg-gap-2 pg-mt-3">
+        <button type="submit" class="pg-button pg-button-primary pg-button-sm">Filtrar</button>
+        <a href="{% url 'payment:list_payments' %}?tab=payments" class="pg-button pg-button-secondary pg-button-sm">Limpiar</a>
+      </div>
+    </form>
+
+    <div class="pg-grid pg-gap-3 pg-mb-4" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+      <div class="pg-card pg-p-3">
+        <div class="pg-text-muted pg-small">Monto neto</div>
+        <div class="pg-h3 pg-mb-0">${{ net_total|floatformat:2 }}</div>
+      </div>
+      <div class="pg-card pg-p-3">
+        <div class="pg-text-muted pg-small">Pagos recibidos</div>
+        <div class="pg-h3 pg-mb-0">{{ receipt_count }}</div>
+      </div>
+      <div class="pg-card pg-p-3">
+        <div class="pg-text-muted pg-small">Reversiones</div>
+        <div class="pg-h3 pg-mb-0">{{ reversal_count }}</div>
+      </div>
+    </div>
+
+    <div class="pg-card pg-overflow-x-auto">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Pedido</th>
+            <th>Cliente / Pagador</th>
+            <th>Tipo</th>
+            <th>Método</th>
+            <th>Monto</th>
+            <th>Estado</th>
+            <th>Usuario</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for payment in payments_page %}
+            <tr>
+              <td>#{{ payment.pk }}</td>
+              <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
+              <td>
+                <a href="{% url 'payment:order_payments' payment.order_id %}?next={{ request.get_full_path|urlencode }}">
+                  Pedido #{{ payment.order_id }}
+                </a>
+              </td>
+              <td>
+                <div>{{ payment.order.client.name }}</div>
+                {% if payment.client_id != payment.order.client_id %}
+                  <small class="pg-text-muted">Pagó: {{ payment.client.name }}</small>
+                {% endif %}
+              </td>
+              <td>
+                {% if payment.is_reversal %}
+                  <span class="pg-badge pg-badge-danger">Reversión</span>
+                  {% if payment.reversal_of_id %}
+                    <div class="pg-small pg-text-muted">de #{{ payment.reversal_of_id }}</div>
+                  {% endif %}
+                {% else %}
+                  <span class="pg-badge pg-badge-info">Pago</span>
+                {% endif %}
+              </td>
+              <td>{{ payment.get_method_display }}</td>
+              <td>
+                {% if payment.is_reversal %}
+                  <span class="pg-text-danger pg-fw-semibold">-${{ payment.amount|floatformat:2 }}</span>
+                {% else %}
+                  <span class="pg-text-success pg-fw-semibold">+${{ payment.amount|floatformat:2 }}</span>
+                {% endif %}
+              </td>
+              <td>
+                {{ payment.status_display }}
+                {% if payment.has_reversal %}
+                  <div><span class="pg-badge pg-badge-warning">Con reversión</span></div>
+                {% endif %}
+              </td>
+              <td>{{ payment.created_by.get_full_name|default:payment.created_by.username|default:"-" }}</td>
+              <td>
+                {% if payment.is_real_payment and payment.status == 'completed' and not payment.has_reversal %}
+                  <a href="{% url 'payment:reverse_payment_preview' payment.pk %}?next={{ request.get_full_path|urlencode }}"
+                     class="pg-button pg-button-danger pg-button-sm">
+                    Revertir pago
+                  </a>
+                {% else %}
+                  <span class="pg-text-muted">-</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="10" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron pagos.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if payments_page.has_other_pages %}
+      <div class="pg-flex pg-justify-between pg-items-center pg-mt-3">
+        <span class="pg-small pg-text-muted">Página {{ payments_page.number }} de {{ payments_page.paginator.num_pages }}</span>
+        <div class="pg-flex pg-gap-2">
+          {% if payments_page.has_previous %}
+            <a class="pg-button pg-button-secondary pg-button-sm" href="?tab=payments&page={{ payments_page.previous_page_number }}">Anterior</a>
+          {% endif %}
+          {% if payments_page.has_next %}
+            <a class="pg-button pg-button-secondary pg-button-sm" href="?tab=payments&page={{ payments_page.next_page_number }}">Siguiente</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  {% else %}
+    <form method="get" class="pg-card pg-p-3 pg-mb-4">
+      <input type="hidden" name="tab" value="deposits">
+      <div class="pg-grid pg-gap-3" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        <div>
+          <label class="pg-label" for="client_dep">Cliente</label>
+          <input class="pg-input" id="client_dep" name="client" value="{{ filters.client }}" placeholder="Nombre">
+        </div>
+        <div>
+          <label class="pg-label" for="date_from_dep">Desde</label>
+          <input class="pg-input" type="date" id="date_from_dep" name="date_from" value="{{ filters.date_from }}">
+        </div>
+        <div>
+          <label class="pg-label" for="date_to_dep">Hasta</label>
+          <input class="pg-input" type="date" id="date_to_dep" name="date_to" value="{{ filters.date_to }}">
+        </div>
+        <div>
+          <label class="pg-label" for="reversal_state_dep">Estado</label>
+          <select class="pg-input" id="reversal_state_dep" name="reversal_state">
+            <option value="">Todos</option>
+            <option value="active" {% if filters.reversal_state == 'active' %}selected{% endif %}>Vigentes</option>
+            <option value="reversed" {% if filters.reversal_state == 'reversed' %}selected{% endif %}>Con reversión</option>
+          </select>
+        </div>
+      </div>
+      <div class="pg-flex pg-gap-2 pg-mt-3">
+        <button type="submit" class="pg-button pg-button-primary pg-button-sm">Filtrar</button>
+        <a href="{% url 'payment:list_payments' %}?tab=deposits" class="pg-button pg-button-secondary pg-button-sm">Limpiar</a>
+      </div>
+    </form>
+
+    <div class="pg-card pg-overflow-x-auto">
+      <table class="pg-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Fecha</th>
+            <th>Cliente</th>
+            <th>Monto</th>
+            <th>Notas</th>
+            <th>Estado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in deposits_page %}
+            <tr>
+              <td>#{{ tx.pk }}</td>
+              <td>{{ tx.date|default:tx.created_at|date:"d/m/Y H:i" }}</td>
+              <td>{{ tx.client.name }}</td>
+              <td class="pg-text-success pg-fw-semibold">+${{ tx.amount|floatformat:2 }}</td>
+              <td>{{ tx.notes|default:"-" }}</td>
+              <td>
+                {% if tx.reversal_transaction %}
+                  <span class="pg-badge pg-badge-warning">Con reversión (#{{ tx.reversal_transaction.pk }})</span>
+                {% else %}
+                  <span class="pg-badge pg-badge-success">Vigente</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not tx.reversal_transaction %}
+                  <a href="{% url 'payment:reverse_deposit_preview' tx.pk %}?next={{ request.get_full_path|urlencode }}"
+                     class="pg-button pg-button-danger pg-button-sm">
+                    Revertir abono
+                  </a>
+                {% else %}
+                  <span class="pg-text-muted">-</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="7" class="pg-text-center pg-py-4 pg-text-muted">No se encontraron abonos a saldo.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

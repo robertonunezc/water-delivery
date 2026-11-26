@@ -157,10 +157,16 @@ def _products_table(order: Order) -> Table:
 def _payments_table(order: Order) -> Table:
     rows = [["Metodo", "Monto", "Fecha"]]
     for payment in order.payments.not_reversed().all():
+        if payment.is_reversal:
+            method_label = f"Reversion ({payment.get_method_display()})"
+            amount_label = f"-{_money(payment.amount)}"
+        else:
+            method_label = payment.get_method_display()
+            amount_label = _money(payment.amount)
         rows.append(
             [
-                _safe_text(payment.get_method_display()),
-                _money(payment.amount),
+                _safe_text(method_label),
+                amount_label,
                 timezone.localtime(payment.date).strftime("%d/%m/%Y %H:%M"),
             ]
         )

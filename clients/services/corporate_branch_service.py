@@ -223,6 +223,8 @@ def _get_payment_totals(
     if not branches:
         return {}
 
+    from payment.models import PaymentQuerySet
+
     amount_field = DecimalField(max_digits=12, decimal_places=2)
     rows = (
         Payment.objects.filter(
@@ -235,7 +237,7 @@ def _get_payment_totals(
         .values('client_id')
         .annotate(
             payment_total=Coalesce(
-                Sum('amount'),
+                Sum(PaymentQuerySet.signed_amount_expression()),
                 Value(ZERO, output_field=amount_field),
             ),
         )
@@ -329,7 +331,7 @@ def _get_selected_payments(
             date__date__lte=date_to,
         )
         .exclude(method='pending_credit')
-        .select_related('order', 'created_by')
+        .select_related('order', 'created_by', 'reversal_of', 'reversal_entry')
         .order_by('-date', '-id')
     )
 

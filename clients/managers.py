@@ -53,7 +53,21 @@ class BalanceTransactionQuerySet(models.QuerySet):
 
     def payments(self) -> Self:
         """Filter to payment-type transactions (money out)."""
-        return self.by_types(["payment", "transfer_out", "added_in_order_reversal"])
+        return self.by_types(
+            ["payment", "transfer_out", "added_in_order_reversal", "deposit_reversal"]
+        )
+
+    def standalone_deposits(self) -> Self:
+        """Return standalone balance deposits not linked to an order or payment."""
+        return self.filter(
+            transaction_type="deposit",
+            reference_order__isnull=True,
+            reference_payment__isnull=True,
+        )
+
+    def reversible_standalone_deposits(self) -> Self:
+        """Return standalone deposits that have not yet been reversed."""
+        return self.standalone_deposits().filter(reversal_transaction__isnull=True)
 
     def balance_at(self, target_date: date | datetime) -> Decimal:
         """

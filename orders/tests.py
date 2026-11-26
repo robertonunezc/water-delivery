@@ -663,6 +663,11 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
 
     def setUp(self) -> None:
         self.user = User.objects.create_user(username="cancel_service_user", password="testpass")
+        self.manager = User.objects.create_user(
+            username="cancel_manager_user",
+            password="testpass",
+            is_staff=True,
+        )
         self.customer = Client.objects.create(
             name="Cliente Cancelación Servicio",
             balance=Decimal("100.00"),
@@ -705,7 +710,7 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
         self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
         self.assertTrue(Order.objects.filter(pk=self.order.pk).exists())
 
-    def test_cancel_completed_external_payment_marks_payment_reversed(self) -> None:
+    def test_cancel_completed_external_payment_creates_append_only_reversal(self) -> None:
         self.order.status = OrderStatus.COMPLETED.value
         self.order.save(update_fields=["status"])
         payment = Payment.objects.create(
@@ -717,13 +722,22 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
             created_by=self.user,
         )
 
-        result = services.cancel_order(order=self.order, user=self.user)
+        # Non-manager collector cannot cancel an order with real payments
+        denied_result = services.cancel_order(order=self.order, user=self.user)
+        self.assertFalse(denied_result["success"])
+        self.assertTrue(denied_result.get("permission_denied"))
+
+        result = services.cancel_order(order=self.order, user=self.manager)
 
         self.assertTrue(result["success"])
         self.order.refresh_from_db()
         payment.refresh_from_db()
+        self.customer.refresh_from_db()
         self.assertEqual(self.order.status, OrderStatus.CANCELLED.value)
-        self.assertEqual(payment.status, "reversed")
+        self.assertEqual(payment.status, "completed")
+        self.assertTrue(payment.has_reversal)
+        self.assertEqual(self.order.total_paid, Decimal("0.00"))
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
 
     def test_cancel_order_with_balance_payment_restores_client_balance(self) -> None:
         self.order.status = OrderStatus.COMPLETED.value
@@ -739,16 +753,18 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.balance, Decimal("60.00"))
 
-        result = services.cancel_order(order=self.order, user=self.user)
+        result = services.cancel_order(order=self.order, user=self.manager)
 
         self.assertTrue(result["success"])
         self.customer.refresh_from_db()
         payment.refresh_from_db()
         self.assertEqual(self.customer.balance, Decimal("100.00"))
-        self.assertEqual(payment.status, "reversed")
+        self.assertEqual(self.customer.current_debt, Decimal("0.00"))
+        self.assertEqual(payment.status, "completed")
+        self.assertTrue(payment.has_reversal)
         self.assertTrue(
             BalanceTransaction.objects.filter(
-                reference_payment=payment,
+                reference_payment=payment.reversal_entry,
                 transaction_type="payment_reversal",
             ).exists()
         )
@@ -887,7 +903,7 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.current_debt, Decimal("0.00"))
 
-        result = services.cancel_order(order=self.order, user=self.user)
+        result = services.cancel_order(order=self.order, user=self.manager)
 
         self.assertTrue(result["success"])
         self.customer.refresh_from_db()
@@ -895,10 +911,11 @@ class CancelOrderServiceTestCase(FastTenantTestCase):
         settlement_payment.refresh_from_db()
         self.assertEqual(self.customer.current_debt, Decimal("0.00"))
         self.assertEqual(pending_credit.status, "reversed")
-        self.assertEqual(settlement_payment.status, "reversed")
+        self.assertEqual(settlement_payment.status, "completed")
+        self.assertTrue(settlement_payment.has_reversal)
         self.assertTrue(
             CreditTransaction.objects.filter(
-                reference_payment=settlement_payment,
+                reference_payment=settlement_payment.reversal_entry,
                 transaction_type="payment_reversal",
             ).exists()
         )

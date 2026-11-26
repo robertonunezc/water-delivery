@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Pagos del Pedido #{{ order.pk }}{% endblock %}
+
+{% block content %}
+<div class="pg-container pg-py-4">
+  <div class="pg-flex pg-justify-between pg-items-center pg-mb-4">
+    <div>
+      <h1 class="pg-h2 pg-mb-1">Pagos del Pedido #{{ order.pk }}</h1>
+      <p class="pg-text-muted pg-mb-0">
+        Cliente: <strong>{{ order.client.name }}</strong> · Fecha: {{ order.order_date|date:"d/m/Y H:i" }}
+      </p>
+    </div>
+    <a href="{{ back_url }}" class="pg-button pg-button-secondary pg-button-sm">Volver</a>
+  </div>
+
+  <div class="pg-grid pg-gap-3 pg-mb-4" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+    <div class="pg-card pg-p-3">
+      <div class="pg-text-muted pg-small">Total del pedido</div>
+      <div class="pg-h3 pg-mb-0">${{ order_total|floatformat:2 }}</div>
+    </div>
+    <div class="pg-card pg-p-3">
+      <div class="pg-text-muted pg-small">Pagado neto</div>
+      <div class="pg-h3 pg-mb-0 pg-text-success">${{ net_paid|floatformat:2 }}</div>
+    </div>
+    <div class="pg-card pg-p-3">
+      <div class="pg-text-muted pg-small">Saldo pendiente</div>
+      <div class="pg-h3 pg-mb-0 pg-text-warning">${{ total_unpaid|floatformat:2 }}</div>
+    </div>
+    <div class="pg-card pg-p-3">
+      <div class="pg-text-muted pg-small">Crédito pendiente</div>
+      <div class="pg-h3 pg-mb-0 pg-text-danger">${{ outstanding_credit|floatformat:2 }}</div>
+    </div>
+  </div>
+
+  <div class="pg-card pg-overflow-x-auto">
+    <table class="pg-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Fecha</th>
+          <th>Tipo</th>
+          <th>Método</th>
+          <th>Pagador</th>
+          <th>Monto</th>
+          <th>Estado</th>
+          <th>Usuario / Motivo</th>
+          <th>Acción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+          <tr>
+            <td>#{{ event.pk }}</td>
+            <td>{{ event.date|date:"d/m/Y H:i" }}</td>
+            <td>
+              {% if event.method == 'pending_credit' %}
+                <span class="pg-badge pg-badge-secondary">Registro de crédito</span>
+              {% elif event.is_reversal %}
+                <span class="pg-badge pg-badge-danger">Reversión</span>
+                {% if event.reversal_of_id %}
+                  <div class="pg-small pg-text-muted">de pago #{{ event.reversal_of_id }}</div>
+                {% endif %}
+              {% else %}
+                <span class="pg-badge pg-badge-info">Pago</span>
+              {% endif %}
+            </td>
+            <td>{{ event.get_method_display }}</td>
+            <td>{{ event.client.name }}</td>
+            <td>
+              {% if event.method == 'pending_credit' %}
+                <span class="pg-text-muted">${{ event.amount|floatformat:2 }}</span>
+              {% elif event.is_reversal %}
+                <span class="pg-text-danger pg-fw-semibold">-${{ event.amount|floatformat:2 }}</span>
+              {% else %}
+                <span class="pg-text-success pg-fw-semibold">+${{ event.amount|floatformat:2 }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {{ event.status_display }}
+              {% if event.has_reversal %}
+                <div><span class="pg-badge pg-badge-warning">Con reversión (#{{ event.reversal_entry.pk }})</span></div>
+              {% endif %}
+            </td>
+            <td>
+              <div>{{ event.created_by.get_full_name|default:event.created_by.username|default:"-" }}</div>
+              {% if event.reversal_reason %}
+                <small class="pg-text-muted">{{ event.reversal_reason }}</small>
+              {% endif %}
+            </td>
+            <td>
+              {% if event.is_real_payment and event.status == 'completed' and not event.has_reversal %}
+                <a href="{% url 'payment:reverse_payment_preview' event.pk %}?next={{ request.get_full_path|urlencode }}"
+                   class="pg-button pg-button-danger pg-button-sm">
+                  Revertir pago
+                </a>
+              {% else %}
+                <span class="pg-text-muted">-</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="9" class="pg-text-center pg-py-4 pg-text-muted">Este pedido no tiene pagos registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

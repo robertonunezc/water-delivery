@@ -222,6 +222,13 @@
                       ${{ order.total_amount|floatformat:2 }}
                     </div>
                     <div class="pg-button-group" role="group">
+                      {% if request.user.is_staff or request.user.employee.position == 'manager' %}
+                        <a href="{% url 'payment:order_payments' order.id %}?next={{ request.get_full_path|urlencode }}"
+                           class="pg-button pg-button-sm pg-button-outline-secondary"
+                           title="Pagos del pedido">
+                          Pagos
+                        </a>
+                      {% endif %}
                       {% include 'orders/_cancel_order_action.html' with button_class='pg-button pg-button-sm pg-button-outline-danger' %}
                       <a href="{% url 'clients:detail' order.client.pk %}" 
                          class="pg-button pg-button-sm pg-button-outline-primary" 

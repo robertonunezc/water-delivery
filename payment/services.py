@@ -11,7 +11,7 @@ from core.utils import combine_date_with_local_time, parse_date_input
 from orders.models import Order, OrderStatus
 from orders.services.credit_lock_service import lock_order_credit_clients
 
-from .models import Payment
+from .models import Payment, PaymentCollection
 
 if TYPE_CHECKING:
     from clients.models import Client
@@ -59,6 +59,26 @@ def get_unpaid_amount(order: Order) -> Decimal:
     return max(
         Decimal(str(order.total_amount)) - Decimal(str(order.total_paid)),
         Decimal('0.00'),
+    )
+
+
+def get_order_outstanding_credit(order: Order) -> Decimal:
+    """Return net outstanding credit debt for an order from credit ledger deltas."""
+    summary = CreditTransaction.objects.filter(reference_order=order).aggregate_summary()
+    outstanding = summary['total_purchases'] - summary['total_payments']
+    return max(outstanding, Decimal('0.00'))
+
+
+def _create_payment_collection(
+    payer: "Client | None",
+    request_user: User | None,
+    notes: str = '',
+) -> PaymentCollection:
+    """Create a PaymentCollection grouping receipts and any excess deposit."""
+    return PaymentCollection.objects.create(
+        payer=payer,
+        created_by=request_user,
+        notes=notes,
     )
 
 
@@ -185,6 +205,11 @@ def pay_client_orders(
             f'Pago con saldo debe coincidir con el total seleccionado ${selected_total:.2f}.'
         )
 
+    collection = _create_payment_collection(
+        payer=payment_client or client,
+        request_user=request_user,
+        notes=f'Pago de pedidos {", ".join(f"#{order.id}" for order in selected_orders)}',
+    )
     created_payments = []
     for order in selected_orders:
         order_amount = get_unpaid_amount(order)
@@ -195,7 +220,8 @@ def pay_client_orders(
             method='pending_credit',
             status='pending',
         ).first()
-        if pending_credit:
+        outstanding_credit = get_order_outstanding_credit(order)
+        if pending_credit or outstanding_credit > 0:
             payment, error = settle_credit_order_payment(
                 order=order,
                 payment_method=payment_method,
@@ -203,6 +229,7 @@ def pay_client_orders(
                 request_user=request_user,
                 payment_client=payment_client,
                 payment_date=payment_date,
+                collection=collection,
             )
         elif order.type == 'credito':
             raise ClientOrderPaymentError(
@@ -216,6 +243,7 @@ def pay_client_orders(
                 request_user=request_user,
                 payment_client=payment_client,
                 payment_date=payment_date,
+                collection=collection,
             )
         if error:
             raise ClientOrderPaymentError(error['error'])
@@ -223,7 +251,7 @@ def pay_client_orders(
 
     balance_added = amount - selected_total
     if balance_added > 0:
-        balance_service.add_balance(
+        excess_tx = balance_service.add_balance(
             client=client,
             amount=balance_added,
             transaction_type='added_in_order',
@@ -236,6 +264,8 @@ def pay_client_orders(
                 f'Excedente: ${balance_added:.2f}.'
             ),
         )
+        collection.excess_balance_transaction = excess_tx
+        collection.save(update_fields=['excess_balance_transaction', 'updated_at'])
 
     return {
         'selected_total': selected_total,
@@ -315,6 +345,7 @@ def process_single_payment(
     credit_note: Optional[str] = None,
     payment_client: "Client | None" = None,
     payment_date: date | None = None,
+    collection: PaymentCollection | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Process and persist one payment for an order."""
     if payment_method not in VALID_SETTLEMENT_METHODS:
@@ -329,22 +360,29 @@ def process_single_payment(
             'error': f'Saldo insuficiente. Disponible: ${client.balance:.2f}, Requerido: ${amount:.2f}'
         }
 
-    payment = Payment(
-        amount=amount,
-        method=payment_method,
-        client=client,
-        order=order,
-        created_by=request_user,
-    )
-
     # Persist payment first, then apply accounting explicitly.
     with transaction.atomic():
+        active_collection = collection or _create_payment_collection(
+            payer=client,
+            request_user=request_user,
+            notes=f'Pago de orden #{order.id}',
+        )
+        payment = Payment(
+            amount=amount,
+            method=payment_method,
+            client=client,
+            order=order,
+            collection=active_collection,
+            created_by=request_user,
+        )
         payment.save(apply_accounting=False)
         transaction_datetime = _set_payment_date(payment, payment_date)
         if payment.status == 'completed':
             payment.apply_accounting_side_effects(transaction_date=transaction_datetime)
             payment.save(update_fields=['balance_used', 'updated_at'], apply_accounting=False)
             payment.link_pending_transaction_references()
+            from payment.reversal_service import sync_invoice_order_links_for_order
+            sync_invoice_order_links_for_order(order)
 
     return payment, None
 
@@ -409,6 +447,7 @@ def settle_credit_order_payment(
     request_user: User,
     payment_client: "Client | None" = None,
     payment_date: date | None = None,
+    collection: PaymentCollection | None = None,
 ) -> tuple[Optional[Payment], Optional[dict[str, str]]]:
     """Record a credit-order payment and reduce the client's debt atomically."""
     lock_order_credit_clients([order.pk])
@@ -417,19 +456,24 @@ def settle_credit_order_payment(
         method='pending_credit',
         status='pending',
     ).first()
-    if pending_credit is None:
+    outstanding_credit = get_order_outstanding_credit(order)
+
+    if pending_credit is None and outstanding_credit <= 0:
         return None, {'error': 'La orden no tiene crédito pendiente por liquidar.'}
 
-    reconciled_payment = _reconcile_unapplied_credit_payment(
-        order=order,
-        pending_credit=pending_credit,
-        request_user=request_user,
-        payment_date=payment_date,
-    )
-    if reconciled_payment:
-        return reconciled_payment, None
+    if pending_credit is not None:
+        reconciled_payment = _reconcile_unapplied_credit_payment(
+            order=order,
+            pending_credit=pending_credit,
+            request_user=request_user,
+            payment_date=payment_date,
+        )
+        if reconciled_payment:
+            return reconciled_payment, None
+        amount_due = Decimal(str(pending_credit.amount))
+    else:
+        amount_due = outstanding_credit
 
-    amount_due = Decimal(str(pending_credit.amount))
     if amount != amount_due:
         return None, {
             'error': (
@@ -444,6 +488,7 @@ def settle_credit_order_payment(
         request_user=request_user,
         payment_client=payment_client,
         payment_date=payment_date,
+        collection=collection,
     )
     if error:
         return None, error
@@ -462,7 +507,8 @@ def settle_credit_order_payment(
     if paid_amount != amount:
         raise ValueError('No se pudo aplicar el pago completo a la deuda del cliente.')
 
-    _complete_pending_credit(pending_credit)
+    if pending_credit is not None:
+        _complete_pending_credit(pending_credit)
     return payment, None
 
 
@@ -479,11 +525,8 @@ def _reconcile_unapplied_credit_payment(
         transaction_type__in=['payment', 'payment_from_balance'],
         reference_payment__isnull=False,
     ).values('reference_payment_id')
-    payment = order.payments.filter(
-        status='completed',
+    payment = order.payments.reversible_receipts().filter(
         date__gt=pending_credit.date,
-    ).exclude(
-        method='pending_credit',
     ).exclude(
         pk__in=accounted_payment_ids,
     ).order_by('date').first()
@@ -554,6 +597,11 @@ def process_multiple_payments(
             )
         }, 400
 
+    collection = _create_payment_collection(
+        payer=order.client,
+        request_user=request_user,
+        notes=f'Cobro múltiple orden #{order.id}',
+    )
     created_payments = []
     for payment_item in payments_data:
         amount = Decimal(str(payment_item['amount']))
@@ -567,6 +615,7 @@ def process_multiple_payments(
             request_user=request_user,
             credit_note=payment_item.get('credit_note'),
             payment_date=payment_date,
+            collection=collection,
         )
         if error:
             return error, 400
@@ -584,6 +633,7 @@ def process_multiple_payments(
             cantidad_cobrada_value=cantidad_cobrada,
             user=request_user,
             payment_date=payment_date,
+            collection=collection,
         )
     except ValueError as exc:
         return {'error': str(exc)}, 400
@@ -621,6 +671,11 @@ def process_legacy_payment(
     order_total = Decimal(str(order.total_amount))
     amount = order_total if not amount else Decimal(str(amount))
 
+    collection = _create_payment_collection(
+        payer=order.client,
+        request_user=request_user,
+        notes=f'Cobro orden #{order.id}',
+    )
     payment, error = process_single_payment(
         order=order,
         payment_method=payment_method,
@@ -628,6 +683,7 @@ def process_legacy_payment(
         request_user=request_user,
         credit_note=credit_note,
         payment_date=data.payment_date,
+        collection=collection,
     )
     if error:
         return error, 400
@@ -638,6 +694,7 @@ def process_legacy_payment(
             cantidad_cobrada_value=cantidad_cobrada,
             user=request_user,
             payment_date=data.payment_date,
+            collection=collection,
         )
     except ValueError as exc:
         return {'error': str(exc)}, 400
@@ -661,6 +718,7 @@ def apply_cantidad_cobrada(
     cantidad_cobrada_value: Optional[object],
     user: User,
     payment_date: date | None = None,
+    collection: PaymentCollection | None = None,
 ) -> dict[str, object]:
     """Apply charged amount to order and optionally add excess to client balance."""
     if cantidad_cobrada_value is None:
@@ -682,7 +740,7 @@ def apply_cantidad_cobrada(
 
     if cantidad_cobrada > order_total:
         balance_added = cantidad_cobrada - order_total
-        balance_service.add_balance(
+        excess_tx = balance_service.add_balance(
             client=order.client,
             amount=balance_added,
             transaction_type='added_in_order',
@@ -694,6 +752,9 @@ def apply_cantidad_cobrada(
                 f'(${cantidad_cobrada:.2f}) y total de orden (${order_total:.2f})'
             ),
         )
+        if collection is not None:
+            collection.excess_balance_transaction = excess_tx
+            collection.save(update_fields=['excess_balance_transaction', 'updated_at'])
 
     return {
         'cantidad_cobrada': cantidad_cobrada,
@@ -803,6 +864,19 @@ def _register_credit_order_from_payment_rows(
 
     try:
         with transaction.atomic():
+            real_rows = [
+                row for row in payment_rows
+                if row['payment_method'] != USER_SELECTED_CREDIT_METHOD
+            ]
+            collection = (
+                _create_payment_collection(
+                    payer=order.client,
+                    request_user=request_user,
+                    notes=f'Pago mixto con crédito orden #{order.id}',
+                )
+                if real_rows
+                else None
+            )
             for payment_row in payment_rows:
                 payment_method = payment_row['payment_method']
                 if payment_method == USER_SELECTED_CREDIT_METHOD:
@@ -815,6 +889,7 @@ def _register_credit_order_from_payment_rows(
                     request_user=request_user,
                     credit_note=payment_row.get('credit_note'),
                     payment_date=payment_date,
+                    collection=collection,
                 )
                 if error:
                     raise ValueError(error['error'])
@@ -993,6 +1068,11 @@ def _settle_pending_credit_order(
             )
         }, 400
 
+    collection = _create_payment_collection(
+        payer=order.client,
+        request_user=request_user,
+        notes=f'Liquidación de orden a crédito #{order.id}',
+    )
     created_payments = []
     credit_account = _get_order_credit_account(order)
     for payment_item in payments_data:
@@ -1006,6 +1086,7 @@ def _settle_pending_credit_order(
             amount=amount,
             request_user=request_user,
             payment_date=payment_date,
+            collection=collection,
         )
         if error:
             return error, 400
@@ -1013,7 +1094,7 @@ def _settle_pending_credit_order(
         paid_amount = balance_service.pay_debt(
             client=credit_account,
             amount=amount,
-            transaction_type='payment',
+            transaction_type=_credit_payment_transaction_type(payment_item['payment_method']),
             transaction_date=payment_date,
             user=request_user,
             reference_order=order,

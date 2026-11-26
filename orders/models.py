@@ -184,14 +184,14 @@ class OrderQuerySet(models.QuerySet):
         )
 
     def with_payment_totals(self) -> 'OrderQuerySet':
-        """Annotate each order with the sum of its completed payments as `total_paid`."""
-        from payment.models import Payment
+        """Annotate each order with the signed net sum of its completed payments as `total_paid`."""
+        from payment.models import Payment, PaymentQuerySet
 
         paid_subquery = (
             Payment.objects.filter(order=OuterRef('pk'), status='completed')
             .exclude(method='pending_credit')
             .values('order')
-            .annotate(total=Sum('amount'))
+            .annotate(total=Sum(PaymentQuerySet.signed_amount_expression()))
             .values('total')
         )
         return self.annotate(
@@ -359,16 +359,11 @@ class Order(TimeStampedModel):
     
     @property
     def total_paid(self) -> Decimal:
-        """Sum of all completed payments. Uses prefetch cache when available."""
+        """Signed net sum of all completed payments and reversals. Uses prefetch cache when available."""
         if hasattr(self, '_annotated_total_paid'):
             return self._annotated_total_paid
         return sum(
-            (
-                payment.amount
-                for payment in self.payments.all()
-                if payment.status == 'completed'
-                and payment.method != 'pending_credit'
-            ),
+            (payment.signed_amount for payment in self.payments.all()),
             Decimal('0'),
         )
 

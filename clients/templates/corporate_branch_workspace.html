@@ -231,9 +231,16 @@
                             {% endfor %}
                           </td>
                           <td>
-                            <a href="{% url 'orders:get_order' order.id %}" class="pg-button pg-button-sm pg-button-outline-primary">
-                              <i class="fas fa-edit"></i>
-                            </a>
+                            <div class="pg-d-flex pg-gap-1">
+                              <a href="{% url 'orders:get_order' order.id %}" class="pg-button pg-button-sm pg-button-outline-primary" title="Ver/Editar pedido">
+                                <i class="fas fa-edit"></i>
+                              </a>
+                              {% if request.user.is_staff or request.user.employee.position == 'manager' %}
+                                <a href="{% url 'payment:order_payments' order.id %}?next={{ request.get_full_path|urlencode }}" class="pg-button pg-button-sm pg-button-outline-secondary" title="Pagos del pedido">
+                                  Pagos
+                                </a>
+                              {% endif %}
+                            </div>
                           </td>
                         </tr>
                       {% endfor %}
@@ -283,16 +290,29 @@
                     <tbody>
                       {% for payment in payments_page %}
                         <tr>
-                          <td><strong>#{{ payment.id }}</strong></td>
+                          <td>
+                            <strong>#{{ payment.id }}</strong>
+                            {% if payment.is_reversal and payment.reversal_of_id %}
+                              <div class="pg-small pg-text-muted">Reversión de #{{ payment.reversal_of_id }}</div>
+                            {% endif %}
+                          </td>
                           <td>{{ payment.date|date:"d/m/Y H:i" }}</td>
                           <td>{{ payment.get_method_display }}</td>
                           <td>
-                            <span class="pg-badge pg-bg-success">{{ payment.status_display }}</span>
+                            {% if payment.is_reversal %}
+                              <span class="pg-badge pg-bg-danger">Reversión</span>
+                            {% elif payment.has_reversal %}
+                              <span class="pg-badge pg-bg-warning">Con reversión</span>
+                            {% else %}
+                              <span class="pg-badge pg-bg-success">{{ payment.status_display }}</span>
+                            {% endif %}
                           </td>
                           <td>
                             <a href="{% url 'orders:get_order' payment.order.id %}">#{{ payment.order.id }}</a>
                           </td>
-                          <td class="pg-text-end">${{ payment.amount|floatformat:2 }}</td>
+                          <td class="pg-text-end {% if payment.is_reversal %}pg-text-danger{% endif %}">
+                            {% if payment.is_reversal %}-${{ payment.amount|floatformat:2 }}{% else %}${{ payment.amount|floatformat:2 }}{% endif %}
+                          </td>
                         </tr>
                       {% endfor %}
                     </tbody>
